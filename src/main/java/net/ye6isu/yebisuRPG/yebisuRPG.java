@@ -1,6 +1,5 @@
 package net.ye6isu.yebisuRPG;
 
-import net.minecraft.world.item.CreativeModeTabs;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.item.ModCreativeModeTabs;
 import net.ye6isu.yebisuRPG.item.ModItems;

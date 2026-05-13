@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "Y": {
+      "item": "yebisurpg:ye6isu"
+    }
+  },
+  "pattern": [
+    "YYY",
+    "YYY",
+    "YYY"
+  ],
+  "result": {
+    "count": 1,
+    "id": "yebisurpg:ye6isu_block"
+  }
+}
