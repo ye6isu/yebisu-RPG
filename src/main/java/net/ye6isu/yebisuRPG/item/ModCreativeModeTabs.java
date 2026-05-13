@@ -21,6 +21,7 @@ public class ModCreativeModeTabs {
             .displayItems((itemDisplayParameters, output) -> {
                 output.accept(ModItems.YE6ISU);
                 output.accept(ModItems.WALKMAN);
+                output.accept(ModItems.PLANK);
             })
             .build());
 
