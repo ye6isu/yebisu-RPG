@@ -1,25 +1,51 @@
+# yebisu RPG
 
-Installation information
-=======
+A NeoForge 1.21.1 RPG mod adding abilities, energy systems, and custom gameplay mechanics.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+## Requirements
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+| Dependency | Version |
+|------------|---------|
+| Minecraft  | 1.21.1  |
+| NeoForge   | 21.1.x  |
+| Java       | 21      |
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+## Project structure
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+```
+src/main/java/net/ye6isu/
+├── yebisuRPG/          Main mod — items, blocks, keybinds, gameplay
+│   ├── block/          ModBlocks.java
+│   ├── client/         ModKeybinds.java  (Dist.CLIENT only)
+│   ├── datagen/        Data generators
+│   ├── item/           ModItems.java, ModCreativeModeTabs.java
+│   └── yebisuRPG.java  @Mod entry point
+└── yebisulib/          Internal library — networking foundation
+    └── network/        See NETWORKING.md for full reference
+```
 
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+## Building
+
+```bash
+./gradlew build
+# Output: build/libs/yebisurpg-<version>.jar
+```
+
+## Development setup
+
+```bash
+./gradlew genEclipseRuns   # Eclipse
+./gradlew genIntellijRuns  # IntelliJ (usually auto-detected)
+```
+
+## Networking
+
+See [`NETWORKING.md`](NETWORKING.md) for the full guide covering:
+- How to add C2S and S2C packets
+- Dedicated-server safety rules
+- High-frequency data (energy, stats) with `NetworkThrottle`
+- Codec cheat-sheet
+
+## License
+
+MIT
