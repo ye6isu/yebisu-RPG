@@ -13,6 +13,8 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
+import net.ye6isu.yebisuRPG.component.ModDataComponents;
+import net.ye6isu.yebisuRPG.data.EntityVarCapability;
 import net.ye6isu.yebisuRPG.item.ModCreativeModeTabs;
 import net.ye6isu.yebisuRPG.item.ModItems;
 import org.slf4j.Logger;
@@ -32,6 +34,8 @@ public class yebisuRPG {
         ModCreativeModeTabs.register(modEventBus);
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
+        ModDataComponents.register(modEventBus);
+        EntityVarCapability.register(modEventBus);
 
         modEventBus.addListener(this::addCreative);
 
