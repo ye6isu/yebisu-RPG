@@ -26,6 +26,14 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache") // datagen cache files
 }
 
+// Suppress duplicate resource errors. This can occur when a file exists in both
+// src/main/resources (manually created) and src/generated/resources (datagen output).
+// Example: texture2.png.mcmeta was manually created then moved to datagen.
+// Long-term fix: delete stale files from src/main/resources after datagen takes over.
+tasks.named('processResources') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
 }
@@ -76,11 +84,11 @@ neoForge {
         data {
             data()
 
-            // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it
-            // gameDirectory = project.file('run-data')
-
-            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
             programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+
+            // Pass the project source root as a system property so ModSpriteSliceProvider
+            // can find source textures regardless of JVM working directory.
+            systemProperty 'yebisurpg.sourceResources', file('src/main/resources').getAbsolutePath()
         }
 
         // applies to all the run configs above

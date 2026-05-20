@@ -51,14 +51,22 @@ public final class NetworkRegistry {
         // );
 
         // ---------------------------------------------------------------------------------
-        // S2C  (server → client)
-        // NEVER reference a @OnlyIn(CLIENT) class here — use ClientHandlerProxy instead.
+        // S2C — texture system
         // ---------------------------------------------------------------------------------
-        // registrar.playToClient(
-        //     YourS2CPayload.TYPE,
-        //     YourS2CPayload.STREAM_CODEC,
-        //     ClientHandlerProxy::onYourPayload
-        // );
+        registrar.playToClient(
+            net.ye6isu.yebisulib.texture.network.TextureSyncPayload.TYPE,
+            net.ye6isu.yebisulib.texture.network.TextureSyncPayload.STREAM_CODEC,
+            net.ye6isu.yebisulib.network.ClientHandlerProxy::onTextureSync
+        );
+
+        // ---------------------------------------------------------------------------------
+        // S2C — entity variable sync
+        // ---------------------------------------------------------------------------------
+        registrar.playToClient(
+            net.ye6isu.yebisuRPG.data.network.VarSyncPayload.TYPE,
+            net.ye6isu.yebisuRPG.data.network.VarSyncPayload.STREAM_CODEC,
+            net.ye6isu.yebisulib.network.ClientHandlerProxy::onVarSync
+        );
     }
 
     /** Exposed so {@link ClientHandlerProxy} can reuse it without duplication. */

@@ -4,7 +4,6 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.loot.LootTableProvider;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -13,6 +12,7 @@ import net.neoforged.neoforge.common.data.ExistingFileHelper;
 import net.neoforged.neoforge.data.event.GatherDataEvent;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -37,5 +37,25 @@ public class DataGenerators {
 
         generator.addProvider(event.includeClient(), new ModItemModelProvider(packOutput, existingFileHelper));
         generator.addProvider(event.includeClient(), new ModBlockStateProvider(packOutput, existingFileHelper));
+
+        // Generate .mcmeta for animated textures
+        generator.addProvider(event.includeClient(), new ModAnimationProvider(packOutput)
+            .animate("yebisurpg:item/texture2", 20, false));
+
+        // Slice spritesheet PNGs into per-frame textures (used by walkman model overrides).
+        // Read the source root from a system property set in build.gradle's data run config
+        // so the path is always absolute regardless of JVM working directory.
+        String sourceResourcesProp = System.getProperty("yebisurpg.sourceResources");
+        if (sourceResourcesProp == null) {
+            throw new IllegalStateException(
+                "System property 'yebisurpg.sourceResources' is not set. " +
+                "Make sure it is defined in the 'data' run config in build.gradle.");
+        }
+        Path sourceResources = Path.of(sourceResourcesProp);
+        generator.addProvider(event.includeClient(),
+            new ModSpriteSliceProvider(packOutput, sourceResources, "yebisurpg")
+                .slice("textures/item/texture2.png", 16, 16,
+                    "textures/item/walkman_frame0.png",
+                    "textures/item/walkman_frame1.png"));
     }
 }
