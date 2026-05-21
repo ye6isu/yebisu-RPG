@@ -25,6 +25,7 @@ public final class OverlaySync {
     private static final String BANDANA_MASK = "yebisurpg:textures/test/bandana_shape.png";
     private static final String FLAME        = "yebisurpg:textures/test/flame.png";
     private static final String FLAME_MASK   = "yebisurpg:textures/test/flame_shape.png";
+    private static final String FLAME_EMISSIVE = "yebisurpg:textures/test/flame_emissive.png";
 
     private OverlaySync() {}
 
@@ -50,8 +51,8 @@ public final class OverlaySync {
 
         // ── Ye6isu item (flame) ──────────────────────────────────────────────────
         if (isFlameActive(player)) {
-            layers.add(TextureSyncPayload.LayerData.animatedCutoutWithMask(
-                FLAME, 3, FLAME_MASK, 1, 4, 4, (byte) 1));
+            layers.add(TextureSyncPayload.LayerData.animatedCutoutWithMaskAndEmissive(
+                FLAME, 3, FLAME_MASK, FLAME_EMISSIVE, 1, 4, 4, (byte) 1));
         }
 
         if (layers.isEmpty()) {

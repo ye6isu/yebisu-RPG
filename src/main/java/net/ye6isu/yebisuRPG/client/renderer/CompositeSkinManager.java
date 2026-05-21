@@ -39,6 +39,16 @@ public final class CompositeSkinManager {
 
     private final Map<UUID, Entry> entries = new HashMap<>();
 
+    /**
+     * Returns the emissive-only DynamicTexture location for a player, or null if
+     * no emissive layers are active. Used by {@link EmissiveSkinLayer}.
+     */
+    @Nullable
+    public ResourceLocation getEmissiveLocation(UUID playerId) {
+        Entry e = entries.get(playerId);
+        return (e != null && e.emissiveLoc != null) ? e.emissiveLoc : null;
+    }
+
     private CompositeSkinManager() {}
 
     public void update(AbstractClientPlayer player) {
@@ -102,33 +112,40 @@ public final class CompositeSkinManager {
     private static final class Entry {
         boolean dirty = true;
         boolean injected = false;
-        @Nullable NativeImage originalPixels; // saved copy of unmodified skin
-        // Per-layer frame snapshot: zIndex → last composited frame index.
-        // Used to detect animation advances without re-dirtying every render frame.
+        boolean emissiveInjected = false;
+        @Nullable NativeImage originalPixels;
+        @Nullable ResourceLocation emissiveLoc; // yebisurpg:emissive/<uuid>
         private final java.util.HashMap<Integer, Integer> lastFrames = new java.util.HashMap<>();
 
         void rebuild(AbstractClientPlayer player, TextureStack stack) {
             Minecraft mc = Minecraft.getInstance();
             ResourceLocation skinLoc = player.getSkin().texture();
 
-            // If we don't have the original pixels yet, load them from disk.
-            // Once originalPixels is set we never re-read from disk — the original is
-            // always the unmodified skin, regardless of whether we've already injected a
-            // DynamicTexture at skinLoc (which would make readSkinFromDisk fail for HTTP skins).
             if (originalPixels == null) {
                 NativeImage skinPixels;
                 try {
                     skinPixels = readSkinFromDisk(mc, skinLoc);
                 } catch (IOException e) {
-                    // Skin file not ready yet (async download in progress) — stay dirty, retry next frame
                     LOGGER.debug("Skin not ready for {} ({}): {}", player.getName().getString(), skinLoc, e.getMessage());
-                    return; // dirty stays true → will retry next frame
+                    return;
                 }
-                originalPixels = skinPixels; // take ownership — don't copy, just keep it
+                originalPixels = skinPixels;
             }
 
-            // Composite overlays onto a fresh copy of the original skin
+            // ── Skin composite (no emissive) ──────────────────────────────────────
             NativeImage result = copy(originalPixels);
+
+            // ── Emissive-only texture (transparent base) ──────────────────────────
+            boolean hasEmissive = stack.getLayers().stream()
+                .anyMatch(c -> c.getEmissiveTexture().isPresent());
+            NativeImage emissiveResult = null;
+            if (hasEmissive) {
+                emissiveResult = new NativeImage(originalPixels.getWidth(), originalPixels.getHeight(), false);
+                // Explicitly zero-fill — NativeImage(w,h,false) does NOT guarantee transparent init
+                for (int y = 0; y < emissiveResult.getHeight(); y++)
+                    for (int x = 0; x < emissiveResult.getWidth(); x++)
+                        emissiveResult.setPixelRGBA(x, y, 0x00000000);
+            }
 
             for (TextureComponent component : stack.getLayers()) {
                 NativeImage overlay = null;
@@ -148,29 +165,59 @@ public final class CompositeSkinManager {
                     }
                 }
 
+                // Apply to skin composite
                 if (overlay != null) {
                     applyLayer(result, overlay, mask != null ? mask : overlay, component);
                 }
+
+                // Emissive: composite onto BOTH the skin (so first-person shows the colour
+                // at normal brightness) AND the dedicated emissive texture (so EmissiveSkinLayer
+                // can glow it at full brightness in third-person and via mixin in first-person).
+                final NativeImage emissiveDst = emissiveResult;
+                component.getEmissiveTexture().ifPresent(emissiveLoc -> {
+                    try {
+                        NativeImage emissive = loadModAsset(mc, emissiveLoc);
+                        applyLayerNormal(result, emissive, component);
+                        if (emissiveDst != null) {
+                            applyLayerNormal(emissiveDst, emissive, component);
+                        }
+                        emissive.close();
+                    } catch (IOException e) {
+                        LOGGER.warn("Cannot load emissive {}: {}", emissiveLoc, e.getMessage());
+                    }
+                });
 
                 if (mask != null) mask.close();
                 if (overlay != null) overlay.close();
             }
 
-            // Register composite DynamicTexture at the skin's ResourceLocation.
-            // Key on the actual texture type, NOT on `injected`, so that after restore()
-            // (which writes back into the existing DynamicTexture and sets injected=false)
-            // we still reuse the same DynamicTexture object rather than registering a new one
-            // (which would leave the first-person arm renderer holding a stale reference).
+            // ── Upload skin composite ─────────────────────────────────────────────
             net.minecraft.client.renderer.texture.TextureManager tm = mc.getTextureManager();
             AbstractTexture existing = tm.getTexture(skinLoc);
             if (existing instanceof DynamicTexture dt) {
                 dt.setPixels(result);
                 dt.upload();
-                injected = true;
             } else {
-                DynamicTexture dt = new DynamicTexture(result);
-                tm.register(skinLoc, dt);
-                injected = true;
+                tm.register(skinLoc, new DynamicTexture(result));
+            }
+            injected = true;
+
+            // ── Upload emissive-only texture ──────────────────────────────────────
+            if (emissiveResult != null) {
+                if (emissiveLoc == null) {
+                    emissiveLoc = ResourceLocation.fromNamespaceAndPath(
+                        "yebisurpg", "emissive/" + player.getUUID());
+                }
+                AbstractTexture existingEmissive = tm.getTexture(emissiveLoc);
+                if (existingEmissive instanceof DynamicTexture edt) {
+                    edt.setPixels(emissiveResult);
+                    edt.upload();
+                } else {
+                    tm.register(emissiveLoc, new DynamicTexture(emissiveResult));
+                }
+                emissiveInjected = true;
+            } else {
+                emissiveInjected = false;
             }
 
             dirty = false;
@@ -192,6 +239,8 @@ public final class CompositeSkinManager {
                 dt.upload();
             }
             injected = false;
+            emissiveInjected = false;
+            emissiveLoc = null;
             dirty = true;
         }
     }
@@ -284,6 +333,25 @@ public final class CompositeSkinManager {
     }
 
     private static int alpha(int pixel) { return (pixel >> 24) & 0xFF; }
+
+    /** NORMAL blend of a full-image emissive texture onto the base. No frame windowing. */
+    private static void applyLayerNormal(NativeImage base, NativeImage overlay, TextureComponent component) {
+        int bw = base.getWidth(), bh = base.getHeight();
+        int ow = overlay.getWidth(), oh = overlay.getHeight();
+        // Use the same frame window as the parent component so animated emissives sync
+        int frameX = Math.round(component.getU()     * ow);
+        int frameY = Math.round(component.getV()     * oh);
+        int frameW = Math.max(1, Math.round(component.getUSpan() * ow));
+        int frameH = Math.max(1, Math.round(component.getVSpan() * oh));
+        for (int y = 0; y < bh; y++) for (int x = 0; x < bw; x++) {
+            int ox = frameX + x * frameW / bw;
+            int oy = frameY + y * frameH / bh;
+            int ov = overlay.getPixelRGBA(ox, oy);
+            int oa = alpha(ov);
+            if (oa == 0) continue;
+            base.setPixelRGBA(x, y, oa == 255 ? ov : over(base.getPixelRGBA(x, y), ov, oa));
+        }
+    }
 
     private static int over(int dst, int src, int srcA) {
         float sa = srcA / 255f, da = 1f - sa;

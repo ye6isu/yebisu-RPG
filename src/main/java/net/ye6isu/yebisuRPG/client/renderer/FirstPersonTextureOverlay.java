@@ -25,6 +25,10 @@ public final class FirstPersonTextureOverlay {
     @SubscribeEvent
     public static void onRenderArm(RenderArmEvent event) {
         CompositeSkinManager.INSTANCE.update(event.getPlayer());
+        // Note: first-person emissive glow is not supported — RenderArmEvent does not
+        // expose the arm model, so we cannot issue a second entityTranslucentEmissive draw.
+        // The emissive pixels are still baked into the skin composite so they render at
+        // normal (non-glowing) brightness in first-person.
     }
 
     @SubscribeEvent
