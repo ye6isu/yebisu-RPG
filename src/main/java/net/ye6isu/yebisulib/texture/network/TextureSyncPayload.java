@@ -57,18 +57,17 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
     /**
      * Wire representation of a single {@link net.ye6isu.yebisulib.texture.TextureComponent}.
      *
-     * <p>Composed of {@link LayerBase} (texture path, z-index, mask info) and
-     * {@link LayerAnim} (spritesheet dimensions and playback mode).</p>
-     *
-     * @param base base layer descriptor
-     * @param anim animation descriptor (columns=rows=1, ticksPerFrame=1 when not animated)
+     * @param base     base layer descriptor
+     * @param anim     animation descriptor
+     * @param emissive emissive descriptor (path is empty string when no emissive)
      */
-    public record LayerData(LayerBase base, LayerAnim anim) {
+    public record LayerData(LayerBase base, LayerAnim anim, LayerEmissive emissive) {
 
         public static final StreamCodec<ByteBuf, LayerData> STREAM_CODEC =
             StreamCodec.composite(
-                LayerBase.STREAM_CODEC, LayerData::base,
-                LayerAnim.STREAM_CODEC, LayerData::anim,
+                LayerBase.STREAM_CODEC,     LayerData::base,
+                LayerAnim.STREAM_CODEC,     LayerData::anim,
+                LayerEmissive.STREAM_CODEC, LayerData::emissive,
                 LayerData::new);
 
         // ---------------------------------------------------------------------------------
@@ -79,14 +78,14 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
         public static LayerData simple(String texturePath, int zIndex) {
             return new LayerData(
                 new LayerBase(texturePath, zIndex, (byte) 0, false, "", 0),
-                LayerAnim.NONE);
+                LayerAnim.NONE, LayerEmissive.NONE);
         }
 
         /** Static texture masked by the layer beneath it in the stack. */
         public static LayerData maskedByBase(String texturePath, int zIndex) {
             return new LayerData(
                 new LayerBase(texturePath, zIndex, (byte) 1, false, "", 0),
-                LayerAnim.NONE);
+                LayerAnim.NONE, LayerEmissive.NONE);
         }
 
         /** Static texture masked by a dedicated mask texture. */
@@ -95,18 +94,27 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
                 String maskPath, int maskZIndex) {
             return new LayerData(
                 new LayerBase(texturePath, zIndex, (byte) 2, true, maskPath, maskZIndex),
-                LayerAnim.NONE);
+                LayerAnim.NONE, LayerEmissive.NONE);
         }
 
         /**
          * CUTOUT_BELOW with a separate shape/mask texture.
-         * The overlay is painted wherever the mask is opaque, cutting below.
          */
         public static LayerData cutoutWithMask(
                 String texturePath, int zIndex, String maskPath) {
             return new LayerData(
                 new LayerBase(texturePath, zIndex, (byte) 1, true, maskPath, 0),
-                LayerAnim.NONE);
+                LayerAnim.NONE, LayerEmissive.NONE);
+        }
+
+        /**
+         * CUTOUT_BELOW with a separate mask AND an emissive overlay.
+         */
+        public static LayerData cutoutWithMaskAndEmissive(
+                String texturePath, int zIndex, String maskPath, String emissivePath) {
+            return new LayerData(
+                new LayerBase(texturePath, zIndex, (byte) 1, true, maskPath, 0),
+                LayerAnim.NONE, new LayerEmissive(emissivePath));
         }
 
         /**
@@ -119,14 +127,28 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
                 int columns, int rows, int ticksPerFrame, byte animModeByte) {
             return new LayerData(
                 new LayerBase(texturePath, zIndex, (byte) 1, true, maskPath, 0),
-                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte));
+                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte),
+                LayerEmissive.NONE);
+        }
+
+        /**
+         * Animated CUTOUT_BELOW with mask AND emissive overlay.
+         *
+         * @param animModeByte 0=MANUAL, 1=LOOP, 2=PLAY_ONCE
+         */
+        public static LayerData animatedCutoutWithMaskAndEmissive(
+                String texturePath, int zIndex, String maskPath, String emissivePath,
+                int columns, int rows, int ticksPerFrame, byte animModeByte) {
+            return new LayerData(
+                new LayerBase(texturePath, zIndex, (byte) 1, true, maskPath, 0),
+                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte),
+                new LayerEmissive(emissivePath));
         }
 
         /**
          * Animated spritesheet with configurable masking.
          *
          * @param maskModeByte 0=NONE, 1=ALPHA_FROM_BASE, 2=ALPHA_FROM_MASK
-         * @param maskPath     mask path if mode=2, else pass {@code ""}
          * @param animModeByte 0=MANUAL, 1=LOOP, 2=PLAY_ONCE
          */
         public static LayerData animated(
@@ -137,7 +159,8 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
             return new LayerData(
                 new LayerBase(texturePath, zIndex, maskModeByte, hasMask,
                     hasMask ? maskPath : "", maskZIndex),
-                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte));
+                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte),
+                LayerEmissive.NONE);
         }
     }
 
@@ -201,5 +224,26 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
                 ByteBufCodecs.VAR_INT, LayerAnim::ticksPerFrame,
                 ByteBufCodecs.BYTE,    LayerAnim::animModeByte,
                 LayerAnim::new);
+    }
+
+    // ---------------------------------------------------------------------------------
+    // LayerEmissive — optional emissive overlay path
+    // ---------------------------------------------------------------------------------
+
+    /**
+     * @param emissivePath full texture path for the emissive overlay, or {@code ""}
+     *                     when no emissive is attached.
+     */
+    public record LayerEmissive(String emissivePath) {
+
+        /** Sentinel value for layers with no emissive. */
+        public static final LayerEmissive NONE = new LayerEmissive("");
+
+        public boolean hasEmissive() { return !emissivePath.isEmpty(); }
+
+        public static final StreamCodec<ByteBuf, LayerEmissive> STREAM_CODEC =
+            StreamCodec.composite(
+                ByteBufCodecs.stringUtf8(256), LayerEmissive::emissivePath,
+                LayerEmissive::new);
     }
 }

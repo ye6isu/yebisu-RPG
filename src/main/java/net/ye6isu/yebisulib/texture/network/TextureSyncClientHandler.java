@@ -51,6 +51,12 @@ public final class TextureSyncClientHandler {
                 }
             }
 
+            // Attach emissive texture if present
+            TextureSyncPayload.LayerEmissive emissive = data.emissive();
+            if (emissive.hasEmissive()) {
+                builder.emissive(emissive.emissivePath());
+            }
+
             stack.add(builder.build());
         }
 

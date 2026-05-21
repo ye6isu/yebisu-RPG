@@ -74,6 +74,7 @@ public final class TextureComponent {
     private final int zIndex;
     private final MaskMode maskMode;
     @Nullable private final ResourceLocation maskTexture;
+    @Nullable private final ResourceLocation emissiveTexture;
 
     // Spritesheet layout — (1,1) for a plain static texture
     private final int columns;
@@ -91,13 +92,14 @@ public final class TextureComponent {
     // ---------------------------------------------------------------------------------
 
     private TextureComponent(Builder b) {
-        this.texture     = b.texture;
-        this.zIndex      = b.zIndex;
-        this.maskMode    = b.maskMode;
-        this.maskTexture = b.maskTexture;
-        this.columns     = b.columns;
-        this.rows        = b.rows;
-        this.animation   = b.animation;
+        this.texture          = b.texture;
+        this.zIndex           = b.zIndex;
+        this.maskMode         = b.maskMode;
+        this.maskTexture      = b.maskTexture;
+        this.emissiveTexture  = b.emissiveTexture;
+        this.columns          = b.columns;
+        this.rows             = b.rows;
+        this.animation        = b.animation;
     }
 
     // ---------------------------------------------------------------------------------
@@ -134,6 +136,15 @@ public final class TextureComponent {
      */
     public ResourceLocation getEffectiveMaskTexture() {
         return maskTexture != null ? maskTexture : texture;
+    }
+
+    /**
+     * Returns the emissive overlay texture for this layer, if any.
+     * When present, this texture is rendered on top using full-bright lighting
+     * ({@code entityTranslucentEmissive}), making it glow regardless of light level.
+     */
+    public Optional<ResourceLocation> getEmissiveTexture() {
+        return Optional.ofNullable(emissiveTexture);
     }
 
     /** Number of frame columns in the spritesheet (1 for a plain texture). */
@@ -217,7 +228,8 @@ public final class TextureComponent {
         private final int zIndex;
 
         private MaskMode maskMode = MaskMode.NORMAL;
-        @Nullable private ResourceLocation maskTexture = null;
+        @Nullable private ResourceLocation maskTexture    = null;
+        @Nullable private ResourceLocation emissiveTexture = null;
         private int columns = 1;
         private int rows    = 1;
         @Nullable private AnimationState animation = null;
@@ -302,6 +314,18 @@ public final class TextureComponent {
         public Builder maskMode(MaskMode mode, String maskTexturePath) {
             this.maskMode    = mode;
             this.maskTexture = ResourceLocation.parse(maskTexturePath);
+            return this;
+        }
+
+        /**
+         * Attaches an emissive overlay texture to this layer.
+         * The emissive texture is rendered on top of the composited skin using
+         * full-bright lighting, making it glow regardless of the in-game light level.
+         *
+         * @param emissiveTexturePath full path e.g. {@code "yebisurpg:textures/test/bandana_emissive.png"}
+         */
+        public Builder emissive(String emissiveTexturePath) {
+            this.emissiveTexture = ResourceLocation.parse(emissiveTexturePath);
             return this;
         }
 
