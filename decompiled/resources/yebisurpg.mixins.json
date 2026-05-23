@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.ye6isu.yebisuRPG.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MixinItemInHandRenderer"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

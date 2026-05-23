@@ -1,0 +1,11 @@
+{
+  "parent": "yebisurpg:item/walkman_frame0",
+  "overrides": [
+    {
+      "model": "yebisurpg:item/walkman_frame1",
+      "predicate": {
+        "minecraft:custom_model_data": 1.0
+      }
+    }
+  ]
+}

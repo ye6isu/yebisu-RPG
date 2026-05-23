@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "yebisurpg:ye6isu_block"
+    }
+  ],
+  "result": {
+    "count": 9,
+    "id": "yebisurpg:ye6isu"
+  }
+}

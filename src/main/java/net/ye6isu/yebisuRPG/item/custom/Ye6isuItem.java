@@ -1,12 +1,17 @@
 package net.ye6isu.yebisuRPG.item.custom;
 
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+
+import java.util.List;
 
 /**
  * ye6isu item — right-click toggles an animated flame overlay (highest priority).
@@ -42,4 +47,16 @@ public class Ye6isuItem extends Item {
 
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }
+
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
+        if(Screen.hasShiftDown()) {
+            tooltipComponents.add(Component.translatable("tooltip.yebisurpg.ye6isu.shift_down"));
+        } else {
+            tooltipComponents.add(Component.translatable("tooltip.yebisurpg.ye6isu"));
+        }
+
+        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+    }
+
 }

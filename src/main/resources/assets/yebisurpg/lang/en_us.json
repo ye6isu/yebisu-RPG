@@ -2,13 +2,29 @@
   "item.yebisurpg.ye6isu": "ye6isu",
   "item.yebisurpg.walkman": "Walkman",
   "item.yebisurpg.plank": "Plank",
+  "item.yebisurpg.sukuna_finger": "Sukuna's Finger",
+  "item.yebisurpg.mother_flame": "Mother Flame",
 
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
   "block.yebisurpg.crate_block": "Crate Block",
+
+  "block.yebisurpg.crate_stairs": "Crate Stairs",
+  "block.yebisurpg.crate_slab": "Crate Slab",
+  "block.yebisurpg.crate_pressure_plate": "Crate Pressure Plate",
+  "block.yebisurpg.crate_button": "Crate Button",
+  "block.yebisurpg.crate_fence": "Crate Fence",
+  "block.yebisurpg.crate_fence_gate": "Crate Fence Gate",
+  "block.yebisurpg.crate_wall": "Crate Wall",
+  "block.yebisurpg.crate_door": "Crate Door",
+  "block.yebisurpg.crate_trapdoor": "Crate Trapdoor",
 
   "creativetab.yebisurpg.yebisurpg_items": "yebisu RPG Items",
   "creativetab.yebisurpg.yebisurpg_blocks": "yebisu RPG Blocks",
 
   "key.categories.yebisurpg": "yebisu RPG",
-  "key.yebisurpg.use_ability": "Use Ability"
+  "key.yebisurpg.use_ability": "Use Ability",
+
+  "tooltip.yebisurpg.ye6isu.shift_down": "YES",
+  "tooltip.yebisurpg.ye6isu": "NO",
+  "tooltip.yebisurpg.sukuna_finger.tooltip": "Finger of the the King of Curses"
 }

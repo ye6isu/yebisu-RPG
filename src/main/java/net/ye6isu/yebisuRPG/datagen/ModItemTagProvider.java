@@ -5,6 +5,8 @@ import net.minecraft.data.PackOutput;
 import net.minecraft.data.tags.ItemTagsProvider;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
+import net.ye6isu.yebisuRPG.item.ModItems;
+import net.ye6isu.yebisuRPG.util.ModTags;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,6 +19,8 @@ public class ModItemTagProvider extends ItemTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider provider) {
+        tag(ModTags.Items.CURSED_ITEMS)
+                .add(ModItems.SUKUNA_FINGER.get());
 
     }
 }

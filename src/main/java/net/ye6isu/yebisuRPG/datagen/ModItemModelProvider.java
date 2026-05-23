@@ -2,9 +2,12 @@ package net.ye6isu.yebisuRPG.datagen;
 
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
+import net.neoforged.neoforge.registries.DeferredBlock;
+import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.item.ModItems;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
@@ -43,5 +46,31 @@ public class ModItemModelProvider extends ItemModelProvider {
                 .end();
 
         basicItem(ModItems.PLANK.get());
+        basicItem(ModItems.SUKUNA_FINGER.get());
+        basicItem(ModItems.MOTHER_FLAME.get());
+
+        buttonItem(ModBlocks.CRATE_BUTTON, ModBlocks.CRATE_BLOCK);
+        fenceItem(ModBlocks.CRATE_FENCE, ModBlocks.CRATE_BLOCK);
+        wallItem(ModBlocks.CRATE_WALL, ModBlocks.CRATE_BLOCK);
+
+        basicItem(ModBlocks.CRATE_DOOR.asItem());
+        
+    }
+    public void buttonItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
+        this.withExistingParent(block.getId().getPath(), mcLoc("block/button_inventory"))
+                .texture("texture",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,
+                        "block/" + baseBlock.getId().getPath()));
+    }
+
+    public void fenceItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
+        this.withExistingParent(block.getId().getPath(), mcLoc("block/fence_inventory"))
+                .texture("texture",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,
+                        "block/" + baseBlock.getId().getPath()));
+    }
+
+    public void wallItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
+        this.withExistingParent(block.getId().getPath(), mcLoc("block/wall_inventory"))
+                .texture("wall",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,
+                        "block/" + baseBlock.getId().getPath()));
     }
 }
