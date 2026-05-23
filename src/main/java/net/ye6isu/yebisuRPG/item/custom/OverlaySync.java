@@ -67,7 +67,10 @@ public final class OverlaySync {
     /** Returns the walkman bitmask (FLAG_JACKET | FLAG_BANDANA) from the first
      *  walkman found in the player's inventory, or 0 if none. */
     private static int findWalkmanFlags(ServerPlayer player) {
-        for (ItemStack stack : player.getInventory().items) {
+        // Check main inventory AND off-hand
+        var allSlots = new java.util.ArrayList<>(player.getInventory().items);
+        allSlots.addAll(player.getInventory().offhand);
+        for (ItemStack stack : allSlots) {
             if (stack.is(ModItems.WALKMAN.get())) {
                 return stack.getOrDefault(ModDataComponents.WALKMAN_FRAME.get(), 0);
             }
@@ -75,9 +78,10 @@ public final class OverlaySync {
         return 0;
     }
 
-    /** Returns true if the player has an active ye6isu item (CUSTOM_MODEL_DATA == 1). */
     private static boolean isFlameActive(ServerPlayer player) {
-        for (ItemStack stack : player.getInventory().items) {
+        var allSlots = new java.util.ArrayList<>(player.getInventory().items);
+        allSlots.addAll(player.getInventory().offhand);
+        for (ItemStack stack : allSlots) {
             if (stack.is(ModItems.YE6ISU.get())) {
                 int v = stack.getOrDefault(
                     net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,

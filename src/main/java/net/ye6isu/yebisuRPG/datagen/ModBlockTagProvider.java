@@ -23,5 +23,9 @@ public class ModBlockTagProvider extends BlockTagsProvider {
 
         tag(BlockTags.NEEDS_IRON_TOOL)
                 .add(ModBlocks.YE6ISU_BLOCK.get());
+
+        tag(BlockTags.FENCES).add(ModBlocks.CRATE_FENCE.get());
+        tag(BlockTags.FENCE_GATES).add(ModBlocks.CRATE_FENCE_GATE.get());
+        tag(BlockTags.WALLS).add(ModBlocks.CRATE_WALL.get());
     }
 }

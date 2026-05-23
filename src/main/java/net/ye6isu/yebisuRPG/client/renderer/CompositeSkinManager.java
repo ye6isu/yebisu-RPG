@@ -46,13 +46,12 @@ public final class CompositeSkinManager {
     @Nullable
     public ResourceLocation getEmissiveLocation(UUID playerId) {
         Entry e = entries.get(playerId);
-        return (e != null && e.emissiveLoc != null) ? e.emissiveLoc : null;
+        return (e != null && e.emissiveInjected) ? e.emissiveLoc : null;
     }
 
     private CompositeSkinManager() {}
 
     public void update(AbstractClientPlayer player) {
-        // Consume any pending invalidation for this player's entity ID
         if (pendingInvalidations.remove(player.getId()) != null) {
             Entry e = entries.get(player.getUUID());
             if (e != null) e.dirty = true;
@@ -71,7 +70,6 @@ public final class CompositeSkinManager {
 
         Entry entry = entries.computeIfAbsent(id, k -> new Entry());
 
-        // Re-dirty when any animated layer has advanced to a new frame since last composite
         if (!entry.dirty) {
             for (net.ye6isu.yebisulib.texture.TextureComponent c : stack.getLayers()) {
                 c.getAnimation().ifPresent(anim -> {
@@ -114,7 +112,8 @@ public final class CompositeSkinManager {
         boolean injected = false;
         boolean emissiveInjected = false;
         @Nullable NativeImage originalPixels;
-        @Nullable ResourceLocation emissiveLoc; // yebisurpg:emissive/<uuid>
+        @Nullable ResourceLocation emissiveLoc;
+        @Nullable DynamicTexture emissiveDynTex; // kept so we never call tm.getTexture(emissiveLoc)
         private final java.util.HashMap<Integer, Integer> lastFrames = new java.util.HashMap<>();
 
         void rebuild(AbstractClientPlayer player, TextureStack stack) {
@@ -208,12 +207,13 @@ public final class CompositeSkinManager {
                     emissiveLoc = ResourceLocation.fromNamespaceAndPath(
                         "yebisurpg", "emissive/" + player.getUUID());
                 }
-                AbstractTexture existingEmissive = tm.getTexture(emissiveLoc);
-                if (existingEmissive instanceof DynamicTexture edt) {
-                    edt.setPixels(emissiveResult);
-                    edt.upload();
+                // Never call tm.getTexture(emissiveLoc) — it tries to load from disk and throws
+                if (emissiveDynTex == null) {
+                    emissiveDynTex = new DynamicTexture(emissiveResult);
+                    tm.register(emissiveLoc, emissiveDynTex);
                 } else {
-                    tm.register(emissiveLoc, new DynamicTexture(emissiveResult));
+                    emissiveDynTex.setPixels(emissiveResult);
+                    emissiveDynTex.upload();
                 }
                 emissiveInjected = true;
             } else {
@@ -233,14 +233,12 @@ public final class CompositeSkinManager {
             net.minecraft.client.renderer.texture.TextureManager tm = mc.getTextureManager();
             AbstractTexture existing = tm.getTexture(skinLoc);
             if (existing instanceof DynamicTexture dt) {
-                // Restore original skin pixels into the DynamicTexture
                 NativeImage restored = copy(originalPixels);
                 dt.setPixels(restored);
                 dt.upload();
             }
             injected = false;
             emissiveInjected = false;
-            emissiveLoc = null;
             dirty = true;
         }
     }
@@ -334,11 +332,43 @@ public final class CompositeSkinManager {
 
     private static int alpha(int pixel) { return (pixel >> 24) & 0xFF; }
 
-    /** NORMAL blend of a full-image emissive texture onto the base. No frame windowing. */
+    /** NORMAL blend of emissive texture onto base at MAXIMUM brightness.
+     *  Each opaque emissive pixel is written at full RGB intensity so it appears
+     *  bright in first-person regardless of the in-game lightmap level. */
+    private static void applyLayerNormalMaxBright(NativeImage base, NativeImage overlay, TextureComponent component) {
+        int bw = base.getWidth(), bh = base.getHeight();
+        int ow = overlay.getWidth(), oh = overlay.getHeight();
+        int frameX = Math.round(component.getU()     * ow);
+        int frameY = Math.round(component.getV()     * oh);
+        int frameW = Math.max(1, Math.round(component.getUSpan() * ow));
+        int frameH = Math.max(1, Math.round(component.getVSpan() * oh));
+        for (int y = 0; y < bh; y++) for (int x = 0; x < bw; x++) {
+            int ox = frameX + x * frameW / bw;
+            int oy = frameY + y * frameH / bh;
+            int ov = overlay.getPixelRGBA(ox, oy);
+            int oa = alpha(ov);
+            if (oa == 0) continue;
+            // Find max channel to preserve hue while boosting to full brightness
+            int r = (ov      ) & 0xFF;
+            int g = (ov >>  8) & 0xFF;
+            int b = (ov >> 16) & 0xFF;
+            int maxCh = Math.max(r, Math.max(g, b));
+            if (maxCh > 0) {
+                r = Math.min(255, r * 255 / maxCh);
+                g = Math.min(255, g * 255 / maxCh);
+                b = Math.min(255, b * 255 / maxCh);
+            } else {
+                r = g = b = 255;
+            }
+            int bright = r | (g << 8) | (b << 16) | (oa << 24);
+            base.setPixelRGBA(x, y, oa == 255 ? bright : over(base.getPixelRGBA(x, y), bright, oa));
+        }
+    }
+
+    /** NORMAL blend of emissive texture onto base. Frame-windowed to match animation. */
     private static void applyLayerNormal(NativeImage base, NativeImage overlay, TextureComponent component) {
         int bw = base.getWidth(), bh = base.getHeight();
         int ow = overlay.getWidth(), oh = overlay.getHeight();
-        // Use the same frame window as the parent component so animated emissives sync
         int frameX = Math.round(component.getU()     * ow);
         int frameY = Math.round(component.getV()     * oh);
         int frameW = Math.max(1, Math.round(component.getUSpan() * ow));

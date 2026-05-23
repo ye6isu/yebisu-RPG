@@ -22,6 +22,8 @@ public class ModCreativeModeTabs {
                 output.accept(ModItems.YE6ISU);
                 output.accept(ModItems.WALKMAN);
                 output.accept(ModItems.PLANK);
+                output.accept(ModItems.SUKUNA_FINGER);
+                output.accept(ModItems.MOTHER_FLAME);
             })
             .build());
 
@@ -32,6 +34,16 @@ public class ModCreativeModeTabs {
             .displayItems((itemDisplayParameters, output) -> {
                 output.accept(ModBlocks.YE6ISU_BLOCK);
                 output.accept(ModBlocks.CRATE_BLOCK);
+
+                output.accept(ModBlocks.CRATE_STAIRS);
+                output.accept(ModBlocks.CRATE_SLAB);
+                output.accept(ModBlocks.CRATE_PRESSURE_PLATE);
+                output.accept(ModBlocks.CRATE_BUTTON);
+                output.accept(ModBlocks.CRATE_FENCE);
+                output.accept(ModBlocks.CRATE_FENCE_GATE);
+                output.accept(ModBlocks.CRATE_WALL);
+                output.accept(ModBlocks.CRATE_DOOR);
+                output.accept(ModBlocks.CRATE_TRAPDOOR);
             })
             .build());
 
