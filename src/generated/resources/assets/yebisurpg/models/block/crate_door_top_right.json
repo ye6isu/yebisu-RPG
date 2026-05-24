@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/door_top_right",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "bottom": "yebisurpg:block/crate_door_bottom",
+    "top": "yebisurpg:block/crate_door_top"
+  }
+}

@@ -24,6 +24,13 @@ public class ModCreativeModeTabs {
                 output.accept(ModItems.PLANK);
                 output.accept(ModItems.SUKUNA_FINGER);
                 output.accept(ModItems.MOTHER_FLAME);
+
+                output.accept(ModItems.YE6ISU_SWORD);
+                output.accept(ModItems.YE6ISU_PICKAXE);
+                output.accept(ModItems.YE6ISU_SHOVEL);
+                output.accept(ModItems.YE6ISU_AXE);
+                output.accept(ModItems.YE6ISU_HOE);
+
             })
             .build());
 

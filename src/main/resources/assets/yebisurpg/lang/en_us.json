@@ -5,6 +5,12 @@
   "item.yebisurpg.sukuna_finger": "Sukuna's Finger",
   "item.yebisurpg.mother_flame": "Mother Flame",
 
+  "item.yebisurpg.ye6isu_sword": "ye6isu Sword",
+  "item.yebisurpg.ye6isu_pickaxe": "ye6isu Pickaxe",
+  "item.yebisurpg.ye6isu_shovel": "ye6isu Shovel",
+  "item.yebisurpg.ye6isu_axe": "ye6isu Axe",
+  "item.yebisurpg.ye6isu_hoe": "ye6isu Hoe",
+
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
   "block.yebisurpg.crate_block": "Crate Block",
 
@@ -17,6 +23,8 @@
   "block.yebisurpg.crate_wall": "Crate Wall",
   "block.yebisurpg.crate_door": "Crate Door",
   "block.yebisurpg.crate_trapdoor": "Crate Trapdoor",
+
+
 
   "creativetab.yebisurpg.yebisurpg_items": "yebisu RPG Items",
   "creativetab.yebisurpg.yebisurpg_blocks": "yebisu RPG Blocks",

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "group": "CRATE",
+  "key": {
+    "#": {
+      "item": "yebisurpg:plank"
+    }
+  },
+  "pattern": [
+    "##",
+    "##",
+    "##"
+  ],
+  "result": {
+    "count": 3,
+    "id": "yebisurpg:crate_door"
+  }
+}

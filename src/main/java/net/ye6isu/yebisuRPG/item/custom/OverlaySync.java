@@ -39,8 +39,12 @@ public final class OverlaySync {
     public static void resync(ServerPlayer player) {
         List<TextureSyncPayload.LayerData> layers = new ArrayList<>();
 
-        // ── Walkman (jacket + bandana) ───────────────────────────────────────────
         int walkmanFlags = findWalkmanFlags(player);
+        boolean flame = isFlameActive(player);
+
+        org.slf4j.LoggerFactory.getLogger("OverlaySync").info(
+            "resync: player={} walkmanFlags={} flame={}", 
+            player.getName().getString(), walkmanFlags, flame);
 
         if ((walkmanFlags & WalkmanItem.FLAG_JACKET) != 0) {
             layers.add(TextureSyncPayload.LayerData.cutoutWithMask(JACKET, 1, JACKET));
@@ -49,7 +53,6 @@ public final class OverlaySync {
             layers.add(TextureSyncPayload.LayerData.cutoutWithMask(BANDANA, 2, BANDANA_MASK));
         }
 
-        // ── Ye6isu item (flame) ──────────────────────────────────────────────────
         if (isFlameActive(player)) {
             layers.add(TextureSyncPayload.LayerData.animatedCutoutWithMaskAndEmissive(
                 FLAME, 3, FLAME_MASK, FLAME_EMISSIVE, 1, 4, 4, (byte) 1));
