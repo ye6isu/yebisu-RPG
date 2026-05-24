@@ -3,10 +3,12 @@ package net.ye6isu.yebisuRPG.datagen;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
+import net.neoforged.neoforge.client.model.generators.ItemModelBuilder;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredItem;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.item.ModItems;
 import net.ye6isu.yebisuRPG.yebisuRPG;
@@ -54,7 +56,13 @@ public class ModItemModelProvider extends ItemModelProvider {
         wallItem(ModBlocks.CRATE_WALL, ModBlocks.CRATE_BLOCK);
 
         basicItem(ModBlocks.CRATE_DOOR.asItem());
-        
+
+        handheldItem(ModItems.YE6ISU_SWORD);
+        handheldItem(ModItems.YE6ISU_PICKAXE);
+        handheldItem(ModItems.YE6ISU_SHOVEL);
+        handheldItem(ModItems.YE6ISU_AXE);
+        handheldItem(ModItems.YE6ISU_HOE);
+
     }
     public void buttonItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
         this.withExistingParent(block.getId().getPath(), mcLoc("block/button_inventory"))
@@ -73,4 +81,11 @@ public class ModItemModelProvider extends ItemModelProvider {
                 .texture("wall",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,
                         "block/" + baseBlock.getId().getPath()));
     }
+
+    private ItemModelBuilder handheldItem(DeferredItem<?> item) {
+        return withExistingParent(item.getId().getPath(),
+                ResourceLocation.parse("item/handheld")).texture("layer0",
+                ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/" + item.getId().getPath()));
+    }
+
 }

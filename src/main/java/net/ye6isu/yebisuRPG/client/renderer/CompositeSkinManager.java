@@ -46,7 +46,20 @@ public final class CompositeSkinManager {
     @Nullable
     public ResourceLocation getEmissiveLocation(UUID playerId) {
         Entry e = entries.get(playerId);
-        return (e != null && e.emissiveInjected) ? e.emissiveLoc : null;
+        if (e == null) return null;
+        // If emissive not yet injected but we have a pending stack, force a rebuild attempt
+        if (!e.emissiveInjected) {
+            e.dirty = true;
+            return null;
+        }
+        if (e.emissiveDynTex == null || e.emissiveLoc == null) return null;
+        // Re-register if TextureManager lost our texture (e.g. after resource reload / POV switch)
+        Minecraft mc = Minecraft.getInstance();
+        net.minecraft.client.renderer.texture.TextureManager tm = mc.getTextureManager();
+        if (tm.getTexture(e.emissiveLoc) != e.emissiveDynTex) {
+            tm.register(e.emissiveLoc, e.emissiveDynTex);
+        }
+        return e.emissiveLoc;
     }
 
     private CompositeSkinManager() {}
@@ -113,7 +126,7 @@ public final class CompositeSkinManager {
         boolean emissiveInjected = false;
         @Nullable NativeImage originalPixels;
         @Nullable ResourceLocation emissiveLoc;
-        @Nullable DynamicTexture emissiveDynTex; // kept so we never call tm.getTexture(emissiveLoc)
+        @Nullable DynamicTexture emissiveDynTex;
         private final java.util.HashMap<Integer, Integer> lastFrames = new java.util.HashMap<>();
 
         void rebuild(AbstractClientPlayer player, TextureStack stack) {
@@ -169,14 +182,13 @@ public final class CompositeSkinManager {
                     applyLayer(result, overlay, mask != null ? mask : overlay, component);
                 }
 
-                // Emissive: composite onto BOTH the skin (so first-person shows the colour
-                // at normal brightness) AND the dedicated emissive texture (so EmissiveSkinLayer
-                // can glow it at full brightness in third-person and via mixin in first-person).
+                // Emissive: bake into skin composite (visible in first-person at normal brightness)
+                // AND into dedicated emissive texture (for full-bright glow pass in 3rd person + mixin)
                 final NativeImage emissiveDst = emissiveResult;
                 component.getEmissiveTexture().ifPresent(emissiveLoc -> {
                     try {
                         NativeImage emissive = loadModAsset(mc, emissiveLoc);
-                        applyLayerNormal(result, emissive, component);
+                        applyLayerNormalBright(result, emissive, component);
                         if (emissiveDst != null) {
                             applyLayerNormal(emissiveDst, emissive, component);
                         }
@@ -207,7 +219,6 @@ public final class CompositeSkinManager {
                     emissiveLoc = ResourceLocation.fromNamespaceAndPath(
                         "yebisurpg", "emissive/" + player.getUUID());
                 }
-                // Never call tm.getTexture(emissiveLoc) — it tries to load from disk and throws
                 if (emissiveDynTex == null) {
                     emissiveDynTex = new DynamicTexture(emissiveResult);
                     tm.register(emissiveLoc, emissiveDynTex);
@@ -332,10 +343,10 @@ public final class CompositeSkinManager {
 
     private static int alpha(int pixel) { return (pixel >> 24) & 0xFF; }
 
-    /** NORMAL blend of emissive texture onto base at MAXIMUM brightness.
-     *  Each opaque emissive pixel is written at full RGB intensity so it appears
-     *  bright in first-person regardless of the in-game lightmap level. */
-    private static void applyLayerNormalMaxBright(NativeImage base, NativeImage overlay, TextureComponent component) {
+    /** NORMAL blend of emissive texture onto base at FULL BRIGHT.
+     *  Writes emissive pixels with all channels at maximum so they appear
+     *  fully lit regardless of the lightmap in first-person rendering. */
+    private static void applyLayerNormalBright(NativeImage base, NativeImage overlay, TextureComponent component) {
         int bw = base.getWidth(), bh = base.getHeight();
         int ow = overlay.getWidth(), oh = overlay.getHeight();
         int frameX = Math.round(component.getU()     * ow);
@@ -348,17 +359,15 @@ public final class CompositeSkinManager {
             int ov = overlay.getPixelRGBA(ox, oy);
             int oa = alpha(ov);
             if (oa == 0) continue;
-            // Find max channel to preserve hue while boosting to full brightness
+            // Write at full saturation — preserve hue but max out brightness
             int r = (ov      ) & 0xFF;
             int g = (ov >>  8) & 0xFF;
             int b = (ov >> 16) & 0xFF;
-            int maxCh = Math.max(r, Math.max(g, b));
-            if (maxCh > 0) {
-                r = Math.min(255, r * 255 / maxCh);
-                g = Math.min(255, g * 255 / maxCh);
-                b = Math.min(255, b * 255 / maxCh);
-            } else {
-                r = g = b = 255;
+            int max = Math.max(r, Math.max(g, b));
+            if (max > 0 && max < 255) {
+                r = Math.min(255, r * 255 / max);
+                g = Math.min(255, g * 255 / max);
+                b = Math.min(255, b * 255 / max);
             }
             int bright = r | (g << 8) | (b << 16) | (oa << 24);
             base.setPixelRGBA(x, y, oa == 255 ? bright : over(base.getPixelRGBA(x, y), bright, oa));

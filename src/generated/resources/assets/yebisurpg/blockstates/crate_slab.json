@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "yebisurpg:block/crate_slab"
+    },
+    "type=double": {
+      "model": "yebisurpg:block/crate_block"
+    },
+    "type=top": {
+      "model": "yebisurpg:block/crate_slab_top"
+    }
+  }
+}
