@@ -4,8 +4,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.item.ModItems;
-import net.ye6isu.yebisulib.texture.TextureServerEvents;
-import net.ye6isu.yebisulib.texture.network.TextureSyncPayload;
+import net.ye6isu.yebisuRPG.texture.TextureServerEvents;
+import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
 
 import java.util.ArrayList;
 import java.util.List;

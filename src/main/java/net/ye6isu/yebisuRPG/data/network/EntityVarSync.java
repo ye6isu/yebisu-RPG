@@ -15,7 +15,7 @@ import net.ye6isu.yebisuRPG.data.EntityVar;
 import net.ye6isu.yebisuRPG.data.EntityVarCapability;
 import net.ye6isu.yebisuRPG.data.EntityVarMap;
 import net.ye6isu.yebisuRPG.yebisuRPG;
-import net.ye6isu.yebisulib.network.util.NetworkUtils;
+import net.ye6isu.yebisuRPG.network.util.NetworkUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

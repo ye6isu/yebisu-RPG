@@ -7,9 +7,9 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.HttpTexture;
 import net.minecraft.resources.ResourceLocation;
-import net.ye6isu.yebisulib.texture.MaskMode;
-import net.ye6isu.yebisulib.texture.TextureComponent;
-import net.ye6isu.yebisulib.texture.TextureStack;
+import net.ye6isu.yebisuRPG.texture.MaskMode;
+import net.ye6isu.yebisuRPG.texture.TextureComponent;
+import net.ye6isu.yebisuRPG.texture.TextureStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,8 +70,8 @@ public final class CompositeSkinManager {
             if (e != null) e.dirty = true;
         }
 
-        net.ye6isu.yebisulib.texture.TextureStack stack =
-            net.ye6isu.yebisulib.texture.TextureManager.INSTANCE.getStack(player.getId());
+        net.ye6isu.yebisuRPG.texture.TextureStack stack =
+            net.ye6isu.yebisuRPG.texture.TextureManager.INSTANCE.getStack(player.getId());
 
         UUID id = player.getUUID();
 
@@ -84,7 +84,7 @@ public final class CompositeSkinManager {
         Entry entry = entries.computeIfAbsent(id, k -> new Entry());
 
         if (!entry.dirty) {
-            for (net.ye6isu.yebisulib.texture.TextureComponent c : stack.getLayers()) {
+            for (net.ye6isu.yebisuRPG.texture.TextureComponent c : stack.getLayers()) {
                 c.getAnimation().ifPresent(anim -> {
                     int currentFrame = anim.getCurrentFrame();
                     Integer last = entry.lastFrames.get(c.getZIndex());
@@ -95,8 +95,6 @@ public final class CompositeSkinManager {
 
         if (entry.dirty) entry.rebuild(player, stack);
     }
-
-    /** Keyed by entity integer ID for pre-spawn invalidation from network packets. */
     private final Map<Integer, Boolean> pendingInvalidations = new HashMap<>();
 
     public void invalidate(UUID playerId) {
@@ -232,7 +230,7 @@ public final class CompositeSkinManager {
             }
 
             dirty = false;
-            for (net.ye6isu.yebisulib.texture.TextureComponent c : stack.getLayers()) {
+            for (net.ye6isu.yebisuRPG.texture.TextureComponent c : stack.getLayers()) {
                 c.getAnimation().ifPresent(anim -> lastFrames.put(c.getZIndex(), anim.getCurrentFrame()));
             }
         }
