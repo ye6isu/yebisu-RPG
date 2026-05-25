@@ -11,10 +11,10 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.ye6isu.yebisulib.texture.MaskMode;
-import net.ye6isu.yebisulib.texture.TextureComponent;
-import net.ye6isu.yebisulib.texture.TextureManager;
-import net.ye6isu.yebisulib.texture.TextureStack;
+import net.ye6isu.yebisuRPG.texture.MaskMode;
+import net.ye6isu.yebisuRPG.texture.TextureComponent;
+import net.ye6isu.yebisuRPG.texture.TextureManager;
+import net.ye6isu.yebisuRPG.texture.TextureStack;
 
 /**
  * A render layer that composites {@link TextureStack} entries from {@link TextureManager}
