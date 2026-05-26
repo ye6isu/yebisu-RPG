@@ -30,7 +30,6 @@ public class ModCreativeModeTabs {
                 output.accept(ModItems.YE6ISU_SHOVEL);
                 output.accept(ModItems.YE6ISU_AXE);
                 output.accept(ModItems.YE6ISU_HOE);
-
             })
             .build());
 

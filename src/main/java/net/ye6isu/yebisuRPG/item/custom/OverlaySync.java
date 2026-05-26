@@ -1,61 +1,50 @@
 package net.ye6isu.yebisuRPG.item.custom;
 
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
-import net.ye6isu.yebisuRPG.component.ModDataComponents;
-import net.ye6isu.yebisuRPG.item.ModItems;
 import net.ye6isu.yebisuRPG.texture.TextureServerEvents;
 import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Single source of truth for rebuilding the player's full overlay layer list.
  *
- * <p>Both {@link WalkmanItem} and {@link Ye6isuItem} delegate here after mutating
- * their own item stack state. This ensures that toggling one item never wipes the
- * layers contributed by another item — the combined active state is always sent as
- * one atomic {@link TextureServerEvents#apply} call.</p>
+ * <p>Items register an {@link OverlayProvider} once (typically in their constructor
+ * or a static initializer block via {@link #registerProvider}). When any overlay
+ * state changes, the item calls {@link #resync(ServerPlayer)} — OverlaySync then
+ * iterates all registered providers to build the combined layer list and sends it.</p>
+ *
+ * <p>This means items never need item-specific helpers here — each item is fully
+ * self-contained and OverlaySync never needs to know what items exist.</p>
  */
 public final class OverlaySync {
 
-    private static final String JACKET       = "yebisurpg:textures/test/jacket.png";
-    private static final String BANDANA      = "yebisurpg:textures/test/bandana.png";
-    private static final String BANDANA_MASK = "yebisurpg:textures/test/bandana_shape.png";
-    private static final String FLAME        = "yebisurpg:textures/test/flame.png";
-    private static final String FLAME_MASK   = "yebisurpg:textures/test/flame_shape.png";
-    private static final String FLAME_EMISSIVE = "yebisurpg:textures/test/flame_emissive.png";
+    private static final List<OverlayProvider> PROVIDERS = new CopyOnWriteArrayList<>();
 
     private OverlaySync() {}
 
     /**
-     * Reads the current toggle state of every overlay item in the player's inventory
-     * and sends one combined layer list (or a clear if nothing is active).
+     * Registers an overlay provider. Call this once per item type, e.g. from a
+     * static initializer or {@code ModItems} registration.
+     */
+    public static void registerProvider(OverlayProvider provider) {
+        PROVIDERS.add(provider);
+    }
+
+    /**
+     * Reads the current state of every registered provider and sends one combined
+     * layer list (or a clear if nothing is active).
      *
-     * <p>Call this after mutating the item stack's component — the updated value will
-     * already be visible when this method reads inventory state.</p>
+     * <p>Call this after mutating the item stack's component — the updated value
+     * will already be visible when this method reads inventory state.</p>
      */
     public static void resync(ServerPlayer player) {
         List<TextureSyncPayload.LayerData> layers = new ArrayList<>();
 
-        int walkmanFlags = findWalkmanFlags(player);
-        boolean flame = isFlameActive(player);
-
-        org.slf4j.LoggerFactory.getLogger("OverlaySync").info(
-            "resync: player={} walkmanFlags={} flame={}", 
-            player.getName().getString(), walkmanFlags, flame);
-
-        if ((walkmanFlags & WalkmanItem.FLAG_JACKET) != 0) {
-            layers.add(TextureSyncPayload.LayerData.cutoutWithMask(JACKET, 1, JACKET));
-        }
-        if ((walkmanFlags & WalkmanItem.FLAG_BANDANA) != 0) {
-            layers.add(TextureSyncPayload.LayerData.cutoutWithMask(BANDANA, 2, BANDANA_MASK));
-        }
-
-        if (isFlameActive(player)) {
-            layers.add(TextureSyncPayload.LayerData.animatedCutoutWithMaskAndEmissive(
-                FLAME, 3, FLAME_MASK, FLAME_EMISSIVE, 1, 4, 4, (byte) 1));
+        for (OverlayProvider provider : PROVIDERS) {
+            provider.collectLayers(player, layers);
         }
 
         if (layers.isEmpty()) {
@@ -63,35 +52,5 @@ public final class OverlaySync {
         } else {
             TextureServerEvents.apply(player, layers);
         }
-    }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────────
-
-    /** Returns the walkman bitmask (FLAG_JACKET | FLAG_BANDANA) from the first
-     *  walkman found in the player's inventory, or 0 if none. */
-    private static int findWalkmanFlags(ServerPlayer player) {
-        // Check main inventory AND off-hand
-        var allSlots = new java.util.ArrayList<>(player.getInventory().items);
-        allSlots.addAll(player.getInventory().offhand);
-        for (ItemStack stack : allSlots) {
-            if (stack.is(ModItems.WALKMAN.get())) {
-                return stack.getOrDefault(ModDataComponents.WALKMAN_FRAME.get(), 0);
-            }
-        }
-        return 0;
-    }
-
-    private static boolean isFlameActive(ServerPlayer player) {
-        var allSlots = new java.util.ArrayList<>(player.getInventory().items);
-        allSlots.addAll(player.getInventory().offhand);
-        for (ItemStack stack : allSlots) {
-            if (stack.is(ModItems.YE6ISU.get())) {
-                int v = stack.getOrDefault(
-                    net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
-                    new net.minecraft.world.item.component.CustomModelData(0)).value();
-                if (v == 1) return true;
-            }
-        }
-        return false;
     }
 }

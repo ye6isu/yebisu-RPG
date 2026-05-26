@@ -36,6 +36,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
         blockItem(ModBlocks.CRATE_PRESSURE_PLATE);
         blockItem(ModBlocks.CRATE_FENCE_GATE);
         blockItem(ModBlocks.CRATE_TRAPDOOR, "_bottom");
+        // YCS_BSP_INSERT
     }
 
     private void blockWithItem(DeferredBlock<?> deferredBlock) {
