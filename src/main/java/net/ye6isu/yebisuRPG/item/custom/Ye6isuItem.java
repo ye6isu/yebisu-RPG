@@ -10,19 +10,27 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ye6isu item — right-click toggles an animated flame overlay (highest priority).
+ * ye6isu item — right-click toggles animated flame overlay.
  *
- * <p>The flame is a 64×256 spritesheet containing 4 frames arranged in a single column
- * (1 column × 4 rows). It uses {@code CUTOUT_BELOW} masking driven by
- * {@code flame_shape.png}, so only the shape area is painted and the skin below is
- * cut in that region. Z-index 3 ensures it renders on top of both jacket (1) and
- * bandana (2).</p>
+ * <p>Registers its own {@link OverlayProvider} with {@link OverlaySync} so the
+ * overlay system knows about flame layers without OverlaySync needing any
+ * ye6isu-specific code.</p>
  */
 public class Ye6isuItem extends Item {
+
+    private static final String FLAME          = "yebisurpg:textures/test/flame.png";
+    private static final String FLAME_MASK     = "yebisurpg:textures/test/flame_shape.png";
+    private static final String FLAME_EMISSIVE = "yebisurpg:textures/test/flame_emissive.png";
+
+    static {
+        OverlaySync.registerProvider(Ye6isuItem::collectLayers);
+    }
 
     public Ye6isuItem(Properties properties) {
         super(properties);
@@ -36,27 +44,41 @@ public class Ye6isuItem extends Item {
             int current = stack.getOrDefault(
                 net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
                 new net.minecraft.world.item.component.CustomModelData(0)).value();
-            int next = current == 0 ? 1 : 0;
 
             stack.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
-                new net.minecraft.world.item.component.CustomModelData(next));
+                new net.minecraft.world.item.component.CustomModelData(current == 0 ? 1 : 0));
 
-            // Delegate to OverlaySync so walkman layers are preserved
             OverlaySync.resync(serverPlayer);
         }
 
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }
 
+    private static void collectLayers(ServerPlayer player, List<TextureSyncPayload.LayerData> layers) {
+        var allSlots = new ArrayList<>(player.getInventory().items);
+        allSlots.addAll(player.getInventory().offhand);
+        for (ItemStack stack : allSlots) {
+            if (stack.getItem() instanceof Ye6isuItem) {
+                int v = stack.getOrDefault(
+                    net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
+                    new net.minecraft.world.item.component.CustomModelData(0)).value();
+                if (v == 1) {
+                    layers.add(TextureSyncPayload.LayerData.animatedCutoutWithMaskAndEmissive(
+                        FLAME, 3, FLAME_MASK, FLAME_EMISSIVE, 1, 4, 4, (byte) 1));
+                }
+                return;
+            }
+        }
+    }
+
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
-        if(Screen.hasShiftDown()) {
+    public void appendHoverText(ItemStack stack, TooltipContext context,
+            List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
+        if (Screen.hasShiftDown()) {
             tooltipComponents.add(Component.translatable("tooltip.yebisurpg.ye6isu.shift_down"));
         } else {
             tooltipComponents.add(Component.translatable("tooltip.yebisurpg.ye6isu"));
         }
-
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
     }
-
 }

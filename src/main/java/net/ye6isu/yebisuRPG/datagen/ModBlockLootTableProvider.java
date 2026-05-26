@@ -29,7 +29,7 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 
         add(ModBlocks.CRATE_SLAB.get(), block -> createSlabItemTable(ModBlocks.CRATE_SLAB.get()));
         add(ModBlocks.CRATE_DOOR.get(), block -> createDoorTable(ModBlocks.CRATE_DOOR.get()));
-
+        // YCS_LOOT_INSERT
     }
 
     @Override

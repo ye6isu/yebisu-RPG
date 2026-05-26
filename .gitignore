@@ -76,13 +76,6 @@ local.properties
 secrets.properties
 
 # ============================================================
-# Dead test/dev artifacts — delete these files from disk
+# Decompiled Sources
 # ============================================================
-delete_networking_test.bat
-delete_networking_test.sh
-NETWORKING_TEST_FIXED.md
-NETWORKING_TEST_README.md
-NETWORKING_TEST_SUMMARY.md
-YEBISULIB_NETWORKING_IMPLEMENTATION.md
-YEBISULIB_NETWORKING_IMPLEMENTATION.md
-src/main/resources/assets/yebisulib/
+decompiled/

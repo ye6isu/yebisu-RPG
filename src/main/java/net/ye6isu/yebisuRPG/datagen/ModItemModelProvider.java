@@ -51,6 +51,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(ModItems.SUKUNA_FINGER.get());
         basicItem(ModItems.MOTHER_FLAME.get());
 
+        basicItem(ModItems.RODAROLA.get());
         buttonItem(ModBlocks.CRATE_BUTTON, ModBlocks.CRATE_BLOCK);
         fenceItem(ModBlocks.CRATE_FENCE, ModBlocks.CRATE_BLOCK);
         wallItem(ModBlocks.CRATE_WALL, ModBlocks.CRATE_BLOCK);
