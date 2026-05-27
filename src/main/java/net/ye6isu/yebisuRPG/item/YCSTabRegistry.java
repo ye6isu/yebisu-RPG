@@ -3,106 +3,90 @@ package net.ye6isu.yebisuRPG.item;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
-import java.io.*;
 import java.lang.reflect.Type;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 
-/**
- * Data-driven creative tab registry managed by the yebisu Content Studio.
- *
- * Tab assignments are stored in src/main/resources/assets/yebisurpg/ycs_tabs.json
- * as a simple map of "item_id" -> "tab_key".
- *
- * Tab key format:
- *   "yebisurpg_items_tab"   → mod items tab
- *   "yebisurpg_blocks_tab"  → mod blocks tab
- *   "combat"                → vanilla combat tab
- *   "tools_and_utilities"   → vanilla tools tab
- *   "food_and_drinks"       → vanilla food tab
- *   "ingredients"           → vanilla ingredients tab
- *   "building_blocks"       → vanilla building blocks tab
- *   "redstone"              → vanilla redstone tab
- *   "natural_blocks"        → vanilla natural blocks tab
- */
-@EventBusSubscriber(modid = yebisuRPG.MODID)
 public final class YCSTabRegistry {
 
-    private static final String JSON_PATH =
-        "src/main/resources/assets/yebisurpg/ycs_tabs.json";
-
-    private static Map<String, String> tabAssignments = new HashMap<>();
-
-    static {
-        load();
-    }
+    private static final Map<String, ResourceLocation> TAB_LOCATIONS = Map.of(
+        "yebisurpg_items_tab",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_items_tab"),
+        "yebisurpg_blocks_tab", ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_blocks_tab"),
+        "combat",               ResourceLocation.fromNamespaceAndPath("minecraft", "combat"),
+        "tools_and_utilities",  ResourceLocation.fromNamespaceAndPath("minecraft", "tools_and_utilities"),
+        "food_and_drinks",      ResourceLocation.fromNamespaceAndPath("minecraft", "food_and_drinks"),
+        "ingredients",          ResourceLocation.fromNamespaceAndPath("minecraft", "ingredients"),
+        "building_blocks",      ResourceLocation.fromNamespaceAndPath("minecraft", "building_blocks"),
+        "redstone_blocks",      ResourceLocation.fromNamespaceAndPath("minecraft", "redstone_blocks"),
+        "natural_blocks",       ResourceLocation.fromNamespaceAndPath("minecraft", "natural_blocks")
+    );
 
     private YCSTabRegistry() {}
 
-    public static void load() {
-        try {
-            Path p = Path.of(JSON_PATH);
-            if (!Files.exists(p)) {
-                tabAssignments = new HashMap<>();
-                return;
-            }
-            Type type = new TypeToken<Map<String, String>>(){}.getType();
-            tabAssignments = new Gson().fromJson(Files.readString(p), type);
-            if (tabAssignments == null) tabAssignments = new HashMap<>();
-        } catch (Exception e) {
-            tabAssignments = new HashMap<>();
-            System.err.println("[YCSTabRegistry] Failed to load ycs_tabs.json: " + e.getMessage());
-        }
+    public static void register(IEventBus modBus) {
+        modBus.addListener(YCSTabRegistry::onBuildTabContents);
     }
 
-    @SubscribeEvent
-    public static void onBuildTabContents(BuildCreativeModeTabContentsEvent event) {
-        ResourceLocation tabKey = event.getTabKey().location();
+    private static void onBuildTabContents(BuildCreativeModeTabContentsEvent event) {
+        Map<String, String> assignments = loadJson();
+        ResourceLocation currentTab = event.getTabKey().location();
 
-        for (Map.Entry<String, String> entry : tabAssignments.entrySet()) {
-            String itemId   = entry.getKey();   // e.g. "tess" or "block:crate_block"
-            String tabValue = entry.getValue(); // e.g. "yebisurpg_blocks_tab" or "combat"
+        System.out.println("[YCSTabRegistry] Building tab: " + currentTab + " | assignments: " + assignments.size());
 
-            ResourceLocation targetTab = resolveTab(tabValue);
-            if (targetTab == null || !targetTab.equals(tabKey)) continue;
+        for (Map.Entry<String, String> entry : assignments.entrySet()) {
+            String entryId = entry.getKey();
+            String tabKey  = entry.getValue();
 
-            // Resolve the item/block
-            if (itemId.startsWith("block:")) {
-                String bid = itemId.substring(6);
-                var block = ModBlocks.BLOCKS.getEntries().stream()
+            ResourceLocation targetTab = TAB_LOCATIONS.get(tabKey);
+            if (targetTab == null || !targetTab.equals(currentTab)) continue;
+
+            if (entryId.startsWith("block:")) {
+                String bid = entryId.substring(6);
+                ModBlocks.BLOCKS.getEntries().stream()
                     .filter(h -> h.getId().getPath().equals(bid))
-                    .findFirst().orElse(null);
-                if (block != null) event.accept(block.get().asItem());
+                    .findFirst()
+                    .ifPresent(h -> {
+                        System.out.println("[YCSTabRegistry] Adding block " + bid + " to " + currentTab);
+                        event.accept(h.get().asItem());
+                    });
             } else {
-                var item = ModItems.ITEMS.getEntries().stream()
-                    .filter(h -> h.getId().getPath().equals(itemId))
-                    .findFirst().orElse(null);
-                if (item != null) event.accept(item.get());
+                ModItems.ITEMS.getEntries().stream()
+                    .filter(h -> h.getId().getPath().equals(entryId))
+                    .findFirst()
+                    .ifPresent(h -> {
+                        System.out.println("[YCSTabRegistry] Adding item " + entryId + " to " + currentTab);
+                        event.accept(h.get());
+                    });
             }
         }
     }
 
-    private static ResourceLocation resolveTab(String tabValue) {
-        return switch (tabValue) {
-            case "yebisurpg_items_tab"  -> ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_items_tab");
-            case "yebisurpg_blocks_tab" -> ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_blocks_tab");
-            case "combat"               -> CreativeModeTabs.COMBAT.location();
-            case "tools_and_utilities"  -> CreativeModeTabs.TOOLS_AND_UTILITIES.location();
-            case "food_and_drinks"      -> CreativeModeTabs.FOOD_AND_DRINKS.location();
-            case "ingredients"          -> CreativeModeTabs.INGREDIENTS.location();
-            case "building_blocks"      -> CreativeModeTabs.BUILDING_BLOCKS.location();
-            case "redstone"             -> CreativeModeTabs.REDSTONE_BLOCKS.location();
-            case "natural_blocks"       -> CreativeModeTabs.NATURAL_BLOCKS.location();
-            default                     -> null;
-        };
+    private static Map<String, String> loadJson() {
+        // Walk up from working dir to find project root (run/ -> project root)
+        try {
+            Path cwd = Path.of("").toAbsolutePath();
+            for (int i = 0; i <= 3; i++) {
+                Path candidate = cwd.resolve("src/main/resources/assets/yebisurpg/ycs_tabs.json");
+                if (Files.exists(candidate)) {
+                    String json = Files.readString(candidate);
+                    Type type = new TypeToken<Map<String, String>>(){}.getType();
+                    Map<String, String> result = new Gson().fromJson(json, type);
+                    System.out.println("[YCSTabRegistry] Loaded " + (result != null ? result.size() : 0) + " entries from " + candidate);
+                    return result != null ? result : Map.of();
+                }
+                if (cwd.getParent() == null) break;
+                cwd = cwd.getParent();
+            }
+            System.out.println("[YCSTabRegistry] ycs_tabs.json not found, cwd=" + Path.of("").toAbsolutePath());
+        } catch (Exception e) {
+            System.err.println("[YCSTabRegistry] Error: " + e.getMessage());
+        }
+        return Map.of();
     }
 }

@@ -1,7 +1,6 @@
 {
   "item.yebisurpg.mother_flame": "Mother Flame",
   "item.yebisurpg.plank": "Plank",
-  "item.yebisurpg.rodarola": "Roda Rola",
   "item.yebisurpg.sukuna_finger": "Sukuna's Finger",
   "item.yebisurpg.walkman": "Walkman",
   "item.yebisurpg.ye6isu": "ye6isu",
@@ -28,5 +27,6 @@
   "creativetab.yebisurpg.yebisurpg_blocks": "yebisu RPG Blocks",
   "creativetab.yebisurpg.yebisurpg_items": "yebisu RPG Items",
   "key.categories.yebisurpg": "yebisu RPG",
-  "key.yebisurpg.use_ability": "Use Ability"
+  "key.yebisurpg.use_ability": "Use Ability",
+  "block.yebisurpg.cat_block": "Cat Block"
 }

@@ -57,8 +57,7 @@ public class ModItems {
                     .attributes(HoeItem.createAttributes(ModToolTiers.YE6ISU, 5.5f, -2.8f))));
 
 
-    public static final DeferredItem<Item> RODAROLA = ITEMS.register("rodarola",
-                () -> new Item(new Item.Properties()));
+
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

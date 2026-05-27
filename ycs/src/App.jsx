@@ -86,7 +86,23 @@ function ConfirmModal({message,onConfirm,onCancel}){
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}><div style={{background:"#1a1a1c",border:"1px solid #3a3a3c",borderRadius:8,padding:"24px 28px",maxWidth:380,width:"100%",display:"flex",flexDirection:"column",gap:16}}><div style={{fontSize:14,color:"#e8e8e0"}}>{message}</div><div style={{display:"flex",gap:10,justifyContent:"flex-end"}}><Btn variant="ghost" onClick={onCancel}>cancel</Btn><Btn variant="danger" onClick={onConfirm}>delete</Btn></div></div></div>;
 }
 
-// ── Tooltip section (shared between item and block) ────────────────────────────
+function validateId(id) {
+  if (!id) return 'ID is required';
+  if (!/^[a-z0-9_]+$/.test(id)) return 'ID must be lowercase letters, numbers and underscores only (no spaces, dots, capitals)';
+  return null;
+}
+
+function IdField({label, value, onChange, disabled=false}) {
+  const err = validateId(value);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <span style={{fontSize:11,color:"#888880",textTransform:"uppercase",letterSpacing:1}}>{label}</span>
+      <input value={value} onChange={e=>onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,''))} disabled={disabled}
+        style={{background:"#1a1a1c",border:`1px solid ${value&&err?"#aa4444":"#2a2a2e"}`,borderRadius:4,padding:"7px 10px",color:"#e8e8e0",fontSize:13,fontFamily:"'IBM Plex Mono',monospace",outline:"none"}} />
+      {value && err && <span style={{fontSize:11,color:"#cc8888"}}>{err}</span>}
+    </div>
+  );
+}
 function TooltipSection({form, F}){
   return <div style={{display:"flex",flexDirection:"column",gap:12,padding:"14px 16px",background:"#1a1a1c",border:"1px solid #2a2a2e",borderRadius:6}}>
     <span style={{fontSize:12,color:"#d4a843",fontWeight:500}}>Tooltip</span>
@@ -160,7 +176,13 @@ function genItemCode(item, textures) {
   }
 
   const langKey=`item.${MODID}.${id}`;
-  const modelLine=item.itemType==="Tool"?`handheldItem(ModItems.${CN});`:`basicItem(ModItems.${CN}.get());`;
+  // For animated textures, basicItem fails datagen because it validates texture existence
+  // Use a tracked model instead so datagen passes even before runData copies the texture
+  const modelLine = item.itemType==="Tool"
+    ? `handheldItem(ModItems.${CN});`
+    : tex?.isAnimated
+      ? `existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "item/${id}"), TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0", "${MODID}:item/${id}");`
+      : `basicItem(ModItems.${CN}.get());`;
   return { reg, langKey, langVal:dn, modelLine, tex };
 }
 
@@ -207,7 +229,8 @@ function genBlockEntries(block) {
   const baseTex2 = block.parentBlock ? `blockTexture(ModBlocks.${block.parentBlock.toUpperCase()}.get())` : `blockTexture(ModBlocks.${CN}.get())`;
 
   if (block.blockShape==="simple") {
-    bspLine=`blockWithItem(ModBlocks.${CN});`; lootLine=`dropSelf(ModBlocks.${CN}.get());`; modelLine=`basicItem(ModBlocks.${CN}.asItem());`;
+    bspLine=`blockWithItem(ModBlocks.${CN});`; lootLine=`dropSelf(ModBlocks.${CN}.get());`;
+    modelLine=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;
   } else if (block.blockShape==="pillar") {
     bspLine=`logBlock((RotatedPillarBlock) ModBlocks.${CN}.get());\n        simpleBlockItem(ModBlocks.${CN}.get(), new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;
     lootLine=`dropSelf(ModBlocks.${CN}.get());`; modelLine=`basicItem(ModBlocks.${CN}.asItem());`;
@@ -369,19 +392,23 @@ function TextureBankTab({textures,setTextures}){
 
 // ── Item form ──────────────────────────────────────────────────────────────────
 function ItemForm({textures,initial,isEdit,onSave,onCancel}){
-  const empty=()=>({id:"",constName:"",displayName:"",textureId:"",itemType:"None",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",creativeTab:"",hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""});
+  const empty=()=>({id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"None",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",creativeTab:"",hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""});
   const [form,setForm]=useState(initial?{...empty(),...initial}:empty());
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState([]);
   const [preview,setPreview]=useState(null);
   const F=(k,v)=>setForm(f=>({...f,[k]:v}));
 
-  const autoFill=id=>setForm(f=>({...f,constName:f.constName||id.toUpperCase(),displayName:f.displayName||id.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" ")}));
+  const autoFill=id=>setForm(f=>({
+    ...f,
+    constName: f.constName || id.toUpperCase(),
+    displayName: f.displayName || id.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" ")
+  }));
 
   const save=async()=>{
     if(!form.id.trim()) return;
     setSaving(true); setStatus([]);
-    const item={...form,savedAt:Date.now()};
+    const item={...form, constName: form.customConstName ? form.constName : form.id.toUpperCase(), savedAt:Date.now()};
     const code=genItemCode(item,textures);
     const msgs=[];
 
@@ -426,7 +453,7 @@ function ItemForm({textures,initial,isEdit,onSave,onCancel}){
     }
 
     if(form.creativeTab){
-      const jt=await api('/creativetab',{ref:`ModItems.${form.constName||form.id.toUpperCase()}`,tabConst:form.creativeTab});
+      const jt=await api('/creativetab',{ref:`ModItems.${form.constName||form.id.toUpperCase()}`,itemId:form.id,tabConst:form.creativeTab});
       msgs.push({ok:jt.ok,label:"CreativeTab",msg:jt.ok?(jt.skipped?jt.reason:"added to tab"):jt.reason});
     }
 
@@ -440,8 +467,15 @@ function ItemForm({textures,initial,isEdit,onSave,onCancel}){
     <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:18,maxWidth:600}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}><Btn variant="ghost" small onClick={onCancel}>← back</Btn><span style={{fontSize:16,fontWeight:500}}>{isEdit?"edit item":"new item"}</span>{isEdit&&<Tag color="#2a2a3a">editing</Tag>}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-        <Input label="Item ID" value={form.id} mono onChange={v=>{F("id",v);if(!isEdit)autoFill(v);}} placeholder="mother_flame" />
-        <Input label="Const name" value={form.constName||form.id.toUpperCase()} mono onChange={v=>F("constName",v)} placeholder="MOTHER_FLAME" />
+        <IdField label="Item ID" value={form.id} onChange={v=>{F("id",v);if(!isEdit)autoFill(v);}} />
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:11,color:"#888880",textTransform:"uppercase",letterSpacing:1}}>Const name</span>
+            <CheckBox label="custom" checked={!!form.customConstName} onChange={v=>F("customConstName",v)} />
+          </div>
+          <input value={form.customConstName?form.constName:form.id.toUpperCase()} onChange={e=>F("constName",e.target.value)} disabled={!form.customConstName} placeholder="MOTHER_FLAME"
+            style={{background:"#1a1a1c",border:"1px solid #2a2a2e",borderRadius:4,padding:"7px 10px",color:form.customConstName?"#e8e8e0":"#555550",fontSize:13,fontFamily:"'IBM Plex Mono',monospace",outline:"none",opacity:form.customConstName?1:0.6}} />
+        </div>
       </div>
       <Input label="Display name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Mother Flame" />
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -467,7 +501,7 @@ function ItemForm({textures,initial,isEdit,onSave,onCancel}){
       {form.itemType==="Fuel"&&<Input label="Burn time ticks (200 = 1 coal)" type="number" value={form.burnTime} onChange={v=>F("burnTime",v)} />}
       <TooltipSection form={form} F={F} />
       <div style={{display:"flex",gap:10,alignItems:"center"}}>
-        <Btn variant="primary" onClick={save} disabled={saving||!form.id.trim()}>{saving?"saving...":isEdit?"save changes":"save & write to mod"}</Btn>
+        <Btn variant="primary" onClick={save} disabled={saving||!form.id.trim()||!!validateId(form.id)}>{saving?"saving...":isEdit?"save changes":"save & write to mod"}</Btn>
         <Btn variant="ghost" onClick={()=>setPreview(genItemCode(form,textures))}>preview code</Btn>
       </div>
       <StatusBar messages={status} />
@@ -615,7 +649,7 @@ function BlockForm({textures,initial,isEdit,onSave,onCancel}){
     }
 
     if(form.creativeTab){
-      const jt=await api('/creativetab',{ref:`ModBlocks.${form.constName||form.id.toUpperCase()}`,tabConst:form.creativeTab});
+      const jt=await api('/creativetab',{ref:`ModBlocks.${form.constName||form.id.toUpperCase()}`,blockId:form.id,tabConst:form.creativeTab});
       msgs.push({ok:jt.ok,label:"CreativeTab",msg:jt.ok?(jt.skipped?jt.reason:"added to tab"):jt.reason});
     }
 
@@ -633,7 +667,7 @@ function BlockForm({textures,initial,isEdit,onSave,onCancel}){
     <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:18,maxWidth:640}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}><Btn variant="ghost" small onClick={onCancel}>← back</Btn><span style={{fontSize:16,fontWeight:500}}>{isEdit?"edit block":"new block"}</span>{isEdit&&<Tag color="#2a2a3a">editing</Tag>}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-        <Input label="Block ID" value={form.id} mono onChange={v=>{F("id",v);if(!isEdit)autoFill(v);}} placeholder="obsidian_bricks" />
+        <IdField label="Block ID" value={form.id} onChange={v=>{F("id",v);if(!isEdit)autoFill(v);}} />
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:11,color:"#888880",textTransform:"uppercase",letterSpacing:1}}>Const name</span>
@@ -702,7 +736,7 @@ function BlockForm({textures,initial,isEdit,onSave,onCancel}){
       <TooltipSection form={form} F={F} />
 
       <div style={{display:"flex",gap:10,alignItems:"center"}}>
-        <Btn variant="primary" onClick={save} disabled={saving||!form.id.trim()}>{saving?"saving...":isEdit?"save changes":"save & write to mod"}</Btn>
+        <Btn variant="primary" onClick={save} disabled={saving||!form.id.trim()||!!validateId(form.id)}>{saving?"saving...":isEdit?"save changes":"save & write to mod"}</Btn>
         <Btn variant="ghost" onClick={()=>setPreview(genBlockEntries(form))}>preview code</Btn>
       </div>
       <StatusBar messages={status} />

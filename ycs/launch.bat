@@ -1,6 +1,6 @@
 @echo off
 title yebisu Content Studio
-cd /d D:\Programs\ycs
+cd /d D:\Projects\Mods\yebisu-RPG\ycs
 
 echo Starting backend...
 start "ycs-backend" cmd /k "node server.js"
