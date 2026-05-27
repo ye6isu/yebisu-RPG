@@ -17,6 +17,7 @@ import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.data.EntityVarCapability;
 import net.ye6isu.yebisuRPG.item.ModCreativeModeTabs;
 import net.ye6isu.yebisuRPG.item.ModItems;
+import net.ye6isu.yebisuRPG.item.YCSTabRegistry;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -36,6 +37,7 @@ public class yebisuRPG {
         ModBlocks.register(modEventBus);
         ModDataComponents.register(modEventBus);
         EntityVarCapability.register(modEventBus);
+        YCSTabRegistry.register(modEventBus);
 
         modEventBus.addListener(this::addCreative);
 

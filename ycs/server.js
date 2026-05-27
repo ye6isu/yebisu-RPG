@@ -274,8 +274,35 @@ app.post('/api/items/delete', (req, res) => {
     const lang = rl()
     for (const k of Object.keys(lang)) { if (k.startsWith(`item.${MODID}.${id}`) || k.startsWith(`tooltip.${MODID}.${id}`)) delete lang[k] }
     wl(lang)
-    removeLines(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java'), l => l.includes(`ModItems.${constName}`))
-    removeLines(jp(JAVA_ROOT,'item','ModCreativeModeTabs.java'), l => l.includes(`ModItems.${constName}`))
+    // Remove from ModItemModelProvider — handle multi-line getBuilder blocks
+    const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
+    let msrc = rf(modelFile)
+    // Remove any line that directly references this item/constName
+    // AND the following continuation lines (.parent, .texture, .trackGenerated etc) until next statement
+    const modelLines = msrc.split('\n')
+    const cleanedModel = []
+    let skipNext = false
+    for (let i = 0; i < modelLines.length; i++) {
+      const l = modelLines[i]
+      const refersToItem = l.includes(`ModItems.${constName}`) || l.includes(`"${id}"`)
+      if (refersToItem) {
+        skipNext = true
+        continue
+      }
+      if (skipNext) {
+        // Skip continuation lines (start with . or are closing ;)
+        if (l.trim().startsWith('.') || l.trim() === ';') continue
+        skipNext = false
+      }
+      cleanedModel.push(l)
+    }
+    wf(modelFile, cleanedModel.join('\n'))
+    // Clean up ycs_tabs.json
+    const tabs = readTabsJson()
+    delete tabs[id]
+    writeTabsJson(tabs)
+    // Also clean ModCreativeTabEvents (vanilla tabs)
+    removeLines(jp(JAVA_ROOT,'item','ModCreativeTabEvents.java'), l => l.includes(`ModItems.${constName}`))
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -286,10 +313,12 @@ app.post('/api/items/model', (req, res) => {
     const { line } = req.body
     const file = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
     let src = rf(file)
-    if (src.includes(line.trim())) return res.json({ ok:false, reason:'already exists' })
-    const marker = '\n        buttonItem('
-    if (!src.includes(marker)) return res.json({ ok:false, reason:'insertion point not found' })
-    wf(file, src.replace(marker, '\n        '+line.trim()+'\n        buttonItem('))
+    const firstLine = line.split('\n')[0].trim()
+    if (src.includes(firstLine)) return res.json({ ok:false, reason:'already exists' })
+    const marker = '\n        // YCS_MODEL_INSERT'
+    if (!src.includes(marker)) return res.json({ ok:false, reason:'YCS_MODEL_INSERT marker not found' })
+    const indented = line.split('\n').map(l => '        ' + l.trim()).join('\n')
+    wf(file, src.replace(marker, '\n' + indented + '\n        // YCS_MODEL_INSERT'))
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -323,17 +352,21 @@ function writeTabsJson(obj) {
 
 app.post('/api/creativetab', (req, res) => {
   try {
-    const { ref, tabConst } = req.body
+    const { ref, tabConst, itemId, blockId } = req.body
     if (!tabConst) return res.json({ ok:false, reason:'no tab selected' })
     const tabKey = TAB_VALUE_TO_KEY[tabConst]
     if (!tabKey) return res.json({ ok:false, reason:`unknown tab: ${tabConst}` })
 
-    // ref is e.g. "ModItems.TESS" or "ModBlocks.CRATE_BLOCK"
-    // Extract the entry key for ycs_tabs.json
     let entryKey
-    if (ref.startsWith('ModBlocks.')) {
+    if (blockId) {
+      // Block ID passed directly — most reliable
+      entryKey = `block:${blockId}`
+    } else if (itemId) {
+      // Item ID passed directly
+      entryKey = itemId
+    } else if (ref.startsWith('ModBlocks.')) {
+      // Fall back to regex lookup
       const cn = ref.replace('ModBlocks.','')
-      // Find the registered id from ModBlocks.java
       const bsrc = rf(jp(JAVA_ROOT,'block','ModBlocks.java'))
       const idM = new RegExp(`${cn}\\s*=\\s*registerBlock\\("([^"]+)"`).exec(bsrc)
       if (!idM) return res.json({ ok:false, reason:`could not find block ${cn} in ModBlocks.java` })
@@ -403,7 +436,15 @@ app.post('/api/blocks/register', (req, res) => {
       wf(blockFile, rf(blockFile).replace(bmarker, '\n'+bindented+'\n'+bmarker))
       if (bspLines) { const bsp=rf(bspFile); if(bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker)) }
       if (lootLine) { const loot=rf(lootFile); if(loot.includes(lootMarker)) wf(lootFile, loot.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker)) }
-      if (modelLine && !modelLine.startsWith('/*')) { let msrc=rf(modelFile); if(msrc.includes(mmarker)&&!msrc.includes(modelLine.trim())) wf(modelFile, msrc.replace(mmarker, '\n        '+modelLine.trim()+'\n        buttonItem(')) }
+      if (modelLine && !modelLine.startsWith('/*')) {
+        let msrc = rf(modelFile)
+        const mmarker2 = '\n        // YCS_MODEL_INSERT'
+        const firstLine = modelLine.split('\n')[0].trim()
+        if (msrc.includes(mmarker2) && !msrc.includes(firstLine)) {
+          const indented2 = modelLine.split('\n').map(l => '        ' + l.trim()).join('\n')
+          wf(modelFile, msrc.replace(mmarker2, '\n' + indented2 + '\n        // YCS_MODEL_INSERT'))
+        }
+      }
       if (langKey&&langVal) { const r=insertLangGrouped(lang,langKey,langVal); if(!r.exists) Object.assign(lang,r.result) }
       results.push({constName:eCN, ok:true})
     }
@@ -456,12 +497,36 @@ app.post('/api/blocks/delete', (req, res) => {
     const lang=rl()
     for (const k of Object.keys(lang)) { if (k===`block.${MODID}.${id}`) delete lang[k] }
     wl(lang)
+    // Remove from ModItemModelProvider — handle both single-line and multi-line getBuilder blocks
+    const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
+    let msrc = rf(modelFile)
+    const modelLines = msrc.split('\n')
+    const cleanedModel = []
+    let skipContinuation = false
+    for (let i = 0; i < modelLines.length; i++) {
+      const l = modelLines[i]
+      const refersToBlock = l.includes(`ModBlocks.${constName}`) || l.includes(`"${id}"`)
+      if (refersToBlock) {
+        skipContinuation = true
+        continue
+      }
+      if (skipContinuation) {
+        if (l.trim().startsWith('.') || l.trim() === ';') continue
+        skipContinuation = false
+      }
+      cleanedModel.push(l)
+    }
+    wf(modelFile, cleanedModel.join('\n'))
+
     for (const f of [
       jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java'),
       jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java'),
-      jp(JAVA_ROOT,'datagen','ModItemModelProvider.java'),
       jp(JAVA_ROOT,'item','ModCreativeModeTabs.java'),
     ]) removeLines(f, l => l.includes(`ModBlocks.${constName}`))
+    // Clean up ycs_tabs.json
+    const tabs2 = readTabsJson()
+    delete tabs2[`block:${id}`]
+    writeTabsJson(tabs2)
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
