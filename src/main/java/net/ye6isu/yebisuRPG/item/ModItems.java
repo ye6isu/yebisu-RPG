@@ -5,10 +5,7 @@ import net.minecraft.world.item.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.ye6isu.yebisuRPG.item.custom.FuelItem;
-import net.ye6isu.yebisuRPG.item.custom.TooltipItem;
-import net.ye6isu.yebisuRPG.item.custom.WalkmanItem;
-import net.ye6isu.yebisuRPG.item.custom.Ye6isuItem;
+import net.ye6isu.yebisuRPG.item.custom.*;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
 import java.util.List;
@@ -55,9 +52,23 @@ public class ModItems {
     public static final DeferredItem<HoeItem> YE6ISU_HOE = ITEMS.register("ye6isu_hoe",
             () -> new HoeItem(ModToolTiers.YE6ISU, new Item.Properties()
                     .attributes(HoeItem.createAttributes(ModToolTiers.YE6ISU, 5.5f, -2.8f))));
+
+
+    public static final DeferredItem<ArmorItem> PLANK_HELMET = ITEMS.register("plank_helmet",
+            () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.HELMET,
+                    new Item.Properties().durability(ArmorItem.Type.HELMET.getDurability(19))));
+    public static final DeferredItem<ArmorItem> PLANK_CHESTPLATE = ITEMS.register("plank_chestplate",
+            () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.CHESTPLATE,
+                    new Item.Properties().durability(ArmorItem.Type.CHESTPLATE.getDurability(19))));
+    public static final DeferredItem<ArmorItem> PLANK_LEGGINGS = ITEMS.register("plank_leggings",
+            () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.LEGGINGS,
+                    new Item.Properties().durability(ArmorItem.Type.LEGGINGS.getDurability(19))));
+    public static final DeferredItem<ArmorItem> PLANK_BOOTS = ITEMS.register("plank_boots",
+            () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.BOOTS,
+                    new Item.Properties().durability(ArmorItem.Type.BOOTS.getDurability(19))));
+    
+
 
-
-
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

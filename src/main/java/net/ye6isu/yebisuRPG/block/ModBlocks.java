@@ -1,5 +1,6 @@
 package net.ye6isu.yebisuRPG.block;
 
+import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.*;
@@ -23,6 +24,10 @@ public class ModBlocks {
                     .requiresCorrectToolForDrops()
                     .sound(SoundType.METAL)));
 
+    public static final DeferredBlock<Block> YE6ISU_ORE = registerBlock("ye6isu_ore",
+            () -> new DropExperienceBlock(UniformInt.of(2, 4),
+                    BlockBehaviour.Properties.of().strength(3f).requiresCorrectToolForDrops().sound(SoundType.STONE)));
+
     public static final DeferredBlock<Block> CRATE_BLOCK = registerBlock("crate_block",
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(2.0F)
@@ -33,7 +38,7 @@ public class ModBlocks {
                     BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops()));
 
     public static final DeferredBlock<SlabBlock> CRATE_SLAB = registerBlock("crate_slab",
-            () -> new SlabBlock( BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops()));
+            () -> new SlabBlock(BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops()));
 
     public static final DeferredBlock<PressurePlateBlock> CRATE_PRESSURE_PLATE = registerBlock("crate_pressure_plate",
             () -> new PressurePlateBlock(BlockSetType.IRON, BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops()));
@@ -57,15 +62,13 @@ public class ModBlocks {
     public static final DeferredBlock<TrapDoorBlock> CRATE_TRAPDOOR = registerBlock("crate_trapdoor",
             () -> new TrapDoorBlock(BlockSetType.IRON, BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops().noOcclusion()));
 
-
-
-
-
+    // ─── Cat Block + variants ─────────────────────────────────────────────────
 
     public static final DeferredBlock<Block> CAT_BLOCK = registerBlock("cat_block",
                     () -> new Block(BlockBehaviour.Properties.of()
                                 .strength(2f)
                                 .sound(SoundType.WOOD)));
+
 
     private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
         DeferredBlock<T> toReturn = BLOCKS.register(name, block);

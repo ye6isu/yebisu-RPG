@@ -34,6 +34,12 @@ public class ModItemTagProvider extends ItemTagsProvider {
                 .add(ModItems.YE6ISU_AXE.get());
         tag(ItemTags.HOES)
                 .add(ModItems.YE6ISU_HOE.get());
+        this.tag(ItemTags.TRIMMABLE_ARMOR)
+                .add(ModItems.PLANK_HELMET.get())
+                .add(ModItems.PLANK_CHESTPLATE.get())
+                .add(ModItems.PLANK_LEGGINGS.get())
+                .add(ModItems.PLANK_BOOTS.get());
 
+        // YCS_ITEM_TAGS_INSERT
     }
 }

@@ -411,44 +411,163 @@ app.post('/api/creativetab/remove', (req, res) => {
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
+// ─── Tags ──────────────────────────────────────────────────────────────────────
+// Writes tag entries directly into ModItemTagProvider.java / ModBlockTagProvider.java
+// Uses a simple marker: // YCS_ITEM_TAGS_INSERT and // YCS_BLOCK_TAGS_INSERT
+
+app.post('/api/tags/set', (req, res) => {
+  try {
+    const { id, constName, tags, isBlock=false } = req.body
+    if (!tags || !tags.length) return res.json({ ok:true, skipped:true })
+
+    const file = isBlock
+      ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java')
+      : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
+    let src = rf(file)
+    const marker = isBlock ? '    // YCS_BLOCK_TAGS_INSERT' : '    // YCS_ITEM_TAGS_INSERT'
+
+    if (!src.includes(marker)) {
+      // Insert marker before closing brace of addTags method
+      const addTagsEnd = src.lastIndexOf('}', src.lastIndexOf('}') - 1)
+      if (addTagsEnd === -1) return res.json({ ok:false, reason:'could not find addTags closing brace' })
+      src = src.slice(0, addTagsEnd) + '        ' + marker + '\n    ' + src.slice(addTagsEnd)
+      wf(file, src)
+      src = rf(file)
+    }
+
+    const ref = isBlock ? `ModBlocks.${constName}.get()` : `ModItems.${constName}.get()`
+    const lines = []
+
+    for (const tag of tags) {
+      const [ns, path] = tag.includes(':') ? tag.split(':') : [MODID, tag]
+      const tagConst = resolveTagConst(ns, path, isBlock)
+      const line = `        tag(${tagConst}).add(${ref});`
+      // Skip if already present
+      if (!src.includes(`tag(${tagConst}).add(${ref})`)) lines.push(line)
+    }
+
+    if (lines.length) {
+      wf(file, src.replace(marker, lines.join('\n') + '\n        ' + marker))
+    }
+    markDirty()
+    res.json({ ok:true, added:lines.length })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+function resolveTagConst(ns, path, isBlock) {
+  // Map common tags to their Java constant
+  const itemTagMap = {
+    'minecraft:axes':'ItemTags.AXES','minecraft:hoes':'ItemTags.HOES',
+    'minecraft:pickaxes':'ItemTags.PICKAXES','minecraft:shovels':'ItemTags.SHOVELS',
+    'minecraft:swords':'ItemTags.SWORDS','minecraft:tools':'ItemTags.TOOLS',
+    'minecraft:logs':'ItemTags.LOGS','minecraft:planks':'ItemTags.PLANKS',
+    'minecraft:slabs':'ItemTags.SLABS','minecraft:stairs':'ItemTags.STAIRS',
+    'minecraft:doors':'ItemTags.DOORS','minecraft:flowers':'ItemTags.FLOWERS',
+  }
+  const blockTagMap = {
+    'minecraft:mineable/pickaxe':'BlockTags.MINEABLE_WITH_PICKAXE',
+    'minecraft:mineable/axe':'BlockTags.MINEABLE_WITH_AXE',
+    'minecraft:mineable/shovel':'BlockTags.MINEABLE_WITH_SHOVEL',
+    'minecraft:mineable/hoe':'BlockTags.MINEABLE_WITH_HOE',
+    'minecraft:needs_stone_tool':'BlockTags.NEEDS_STONE_TOOL',
+    'minecraft:needs_iron_tool':'BlockTags.NEEDS_IRON_TOOL',
+    'minecraft:needs_diamond_tool':'BlockTags.NEEDS_DIAMOND_TOOL',
+    'minecraft:logs':'BlockTags.LOGS',
+    'minecraft:planks':'BlockTags.PLANKS',
+    'minecraft:slabs':'BlockTags.SLABS',
+    'minecraft:stairs':'BlockTags.STAIRS',
+    'minecraft:fences':'BlockTags.FENCES',
+    'minecraft:fence_gates':'BlockTags.FENCE_GATES',
+    'minecraft:walls':'BlockTags.WALLS',
+    'minecraft:buttons':'BlockTags.BUTTONS',
+    'minecraft:pressure_plates':'BlockTags.PRESSURE_PLATES',
+    'minecraft:doors':'BlockTags.DOORS',
+    'minecraft:trapdoors':'BlockTags.TRAPDOORS',
+  }
+  const key = `${ns}:${path}`
+  const map = isBlock ? blockTagMap : itemTagMap
+  if (map[key]) return map[key]
+  return `TagKey.create(${isBlock?'Registries.BLOCK':'Registries.ITEM'}, ResourceLocation.fromNamespaceAndPath("${ns}", "${path}"))`
+}
+
+app.post('/api/tags/delete', (req, res) => {
+  try {
+    const { constName, isBlock=false } = req.body
+    const file = isBlock
+      ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java')
+      : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
+    const ref = isBlock ? `ModBlocks.${constName}.get()` : `ModItems.${constName}.get()`
+    removeLines(file, l => l.includes(`.add(${ref})`))
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
 // ─── Blocks ────────────────────────────────────────────────────────────────────
 app.post('/api/blocks/register', (req, res) => {
   try {
-    const { entries } = req.body
+    const { entries, creativeTab } = req.body
     const blockFile = jp(JAVA_ROOT,'block','ModBlocks.java')
     const bspFile   = jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java')
     const lootFile  = jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java')
     const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
     const lang = rl()
     const results = []
-    const bmarker   = '\n    private static <T extends Block> DeferredBlock<T> registerBlock('
-    const bspMarker = '\n        // YCS_BSP_INSERT'
+    const bmarker    = '\n    private static <T extends Block> DeferredBlock<T> registerBlock('
+    const bspMarker  = '\n        // YCS_BSP_INSERT'
     const lootMarker = '\n        // YCS_LOOT_INSERT'
-    const mmarker   = '\n        buttonItem('
+    const modelMarker = '\n        // YCS_MODEL_INSERT'
+    const tabs = readTabsJson()
 
     for (const entry of entries) {
-      const { line, constName:eCN, bspLines, lootLine, modelLine, langKey, langVal } = entry
+      const { line, constName:eCN, bspLines, lootLine, modelLine, langKey, langVal, blockId } = entry
       if (!line) { results.push({constName:eCN, ok:false, reason:'empty line'}); continue }
       let bsrc = rf(blockFile)
       if (bsrc.includes(eCN+' =')) { results.push({constName:eCN, ok:false, reason:'already exists'}); continue }
       if (!bsrc.includes(bmarker)) { results.push({constName:eCN, ok:false, reason:'insertion point not found'}); continue }
+
+      // Insert block registration
       const bindented = line.split('\n').map((l,i) => i===0?'    '+l:'            '+l).join('\n')
       wf(blockFile, rf(blockFile).replace(bmarker, '\n'+bindented+'\n'+bmarker))
-      if (bspLines) { const bsp=rf(bspFile); if(bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker)) }
-      if (lootLine) { const loot=rf(lootFile); if(loot.includes(lootMarker)) wf(lootFile, loot.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker)) }
+
+      // Insert blockstate
+      if (bspLines) {
+        const bsp = rf(bspFile)
+        if (bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker))
+      }
+
+      // Insert loot
+      if (lootLine) {
+        const loot = rf(lootFile)
+        if (loot.includes(lootMarker)) wf(lootFile, loot.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker))
+      }
+
+      // Insert model — use YCS_MODEL_INSERT marker, not buttonItem
       if (modelLine && !modelLine.startsWith('/*')) {
         let msrc = rf(modelFile)
-        const mmarker2 = '\n        // YCS_MODEL_INSERT'
         const firstLine = modelLine.split('\n')[0].trim()
-        if (msrc.includes(mmarker2) && !msrc.includes(firstLine)) {
-          const indented2 = modelLine.split('\n').map(l => '        ' + l.trim()).join('\n')
-          wf(modelFile, msrc.replace(mmarker2, '\n' + indented2 + '\n        // YCS_MODEL_INSERT'))
+        if (msrc.includes(modelMarker) && !msrc.includes(firstLine)) {
+          const indented = modelLine.split('\n').map(l => '        ' + l.trim()).join('\n')
+          wf(modelFile, msrc.replace(modelMarker, '\n' + indented + '\n        // YCS_MODEL_INSERT'))
         }
       }
-      if (langKey&&langVal) { const r=insertLangGrouped(lang,langKey,langVal); if(!r.exists) Object.assign(lang,r.result) }
+
+      // Write lang
+      if (langKey && langVal) {
+        const r = insertLangGrouped(lang, langKey, langVal)
+        if (!r.exists) Object.assign(lang, r.result)
+      }
+
+      // Write creative tab for this variant too (uses same tab as base block)
+      if (creativeTab && blockId) {
+        const tabKey = TAB_VALUE_TO_KEY[creativeTab]
+        if (tabKey) tabs[`block:${blockId}`] = tabKey
+      }
+
       results.push({constName:eCN, ok:true})
     }
-    wl(lang)
+
+    wl(sortLang(lang))
+    writeTabsJson(tabs)
     markDirty()
     res.json({ ok:true, results })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
