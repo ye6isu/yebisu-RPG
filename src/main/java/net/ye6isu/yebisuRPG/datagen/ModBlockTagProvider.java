@@ -20,14 +20,19 @@ public class ModBlockTagProvider extends BlockTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider provider) {
         tag(BlockTags.MINEABLE_WITH_PICKAXE)
-                .add(ModBlocks.YE6ISU_BLOCK.get());
+                .add(ModBlocks.YE6ISU_BLOCK.get())
+                .add(ModBlocks.YE6ISU_ORE.get());
 
         tag(BlockTags.NEEDS_IRON_TOOL)
-                .add(ModBlocks.YE6ISU_BLOCK.get());
+                .add(ModBlocks.YE6ISU_ORE.get());
 
         tag(BlockTags.FENCES).add(ModBlocks.CRATE_FENCE.get());
         tag(BlockTags.FENCE_GATES).add(ModBlocks.CRATE_FENCE_GATE.get());
         tag(BlockTags.WALLS).add(ModBlocks.CRATE_WALL.get());
+        tag(BlockTags.SLABS).add(ModBlocks.CRATE_SLAB.get());
+        tag(BlockTags.STAIRS).add(ModBlocks.CRATE_STAIRS.get());
+        tag(BlockTags.BUTTONS).add(ModBlocks.CRATE_BUTTON.get());
+        tag(BlockTags.PRESSURE_PLATES).add(ModBlocks.CRATE_PRESSURE_PLATE.get());
 
         tag(ModTags.Blocks.NEEDS_YE6ISU_TOOL)
                 .addTag(BlockTags.NEEDS_IRON_TOOL);
@@ -35,5 +40,6 @@ public class ModBlockTagProvider extends BlockTagsProvider {
         tag(ModTags.Blocks.INCORRECT_FOR_YE6ISU_TOOL)
                 .addTag(BlockTags.INCORRECT_FOR_IRON_TOOL)
                 .remove(ModTags.Blocks.NEEDS_YE6ISU_TOOL);
+        // YCS_BLOCK_TAGS_INSERT
     }
 }

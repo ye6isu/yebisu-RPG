@@ -17,6 +17,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
     protected void registerStatesAndModels() {
         blockWithItem(ModBlocks.YE6ISU_BLOCK);
         blockWithItem(ModBlocks.CRATE_BLOCK);
+        blockWithItem(ModBlocks.YE6ISU_ORE);
 
         stairsBlock(ModBlocks.CRATE_STAIRS.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
         slabBlock(ModBlocks.CRATE_SLAB.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()), blockTexture(ModBlocks.CRATE_BLOCK.get()));
