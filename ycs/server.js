@@ -15,7 +15,15 @@ const MODID     = 'yebisurpg'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rf = f => fs.readFileSync(f, 'utf8')
-const wf = (f, s) => fs.writeFileSync(f, s)
+const wf = (f, s) => { fs.writeFileSync(f, s); triggerIdeaReload(f); }
+// Trigger IntelliJ to reload changed files via the file system watcher
+function triggerIdeaReload(filePath) {
+  try {
+    // Touch the file's mtime so IntelliJ FS watcher detects the change
+    const now = new Date();
+    fs.utimesSync(filePath, now, now);
+  } catch {}
+}
 const rl = () => JSON.parse(rf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json')).replace(/^\uFEFF/,''))
 const wl = j => wf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json'), JSON.stringify(j,null,2))
 const jp = (...p) => path.join(...p)
@@ -95,9 +103,14 @@ app.get('/api/items/read', (_req, res) => {
       const burnM = new RegExp(`"${id}"[\\s\\S]{0,200}new FuelItem[^,]+,\\s*(\\d+)`).exec(src)
       if (burnM) { itemType='Fuel'; burnTime=burnM[1] }
       const texPath = jp(MOD_ROOT,'assets',MODID,'textures','item',`${id}.png`)
+      const hasTexture = fs.existsSync(texPath)
+      let textureDataUrl = null
+      if (hasTexture) {
+        try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {}
+      }
       const tabKey = tabs[id] || ''
       const creativeTab = TAB_KEY_TO_VALUE[tabKey] || ''
-      items.push({ id, constName, displayName:lang[`item.${MODID}.${id}`]||id, itemType, toolType, tier, damage, speed, burnTime, hasTexture:fs.existsSync(texPath), creativeTab, source:'mod' })
+      items.push({ id, constName, displayName:lang[`item.${MODID}.${id}`]||id, itemType, toolType, tier, damage, speed, burnTime, hasTexture, textureDataUrl, creativeTab, source:'mod' })
     }
     res.json({ ok:true, items })
   } catch(e) { res.json({ ok:false, reason:e.message, items:[] }) }
@@ -127,9 +140,14 @@ app.get('/api/blocks/read', (_req, res) => {
       else if (ctx.includes('PressurePlate')) blockType='pressure_plate'
       else if (ctx.includes('ButtonBlock')) blockType='button'
       const texPath = jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}.png`)
+      const hasTexture = fs.existsSync(texPath)
+      let textureDataUrl = null
+      if (hasTexture) {
+        try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {}
+      }
       const tabKey = tabs[`block:${id}`] || ''
       const creativeTab = TAB_KEY_TO_VALUE[tabKey] || ''
-      blocks.push({ id, constName:id.toUpperCase(), displayName:lang[`block.${MODID}.${id}`]||id, blockType, hasTexture:fs.existsSync(texPath), creativeTab, source:'mod' })
+      blocks.push({ id, constName:id.toUpperCase(), displayName:lang[`block.${MODID}.${id}`]||id, blockType, hasTexture, textureDataUrl, creativeTab, source:'mod' })
     }
     res.json({ ok:true, blocks })
   } catch(e) { res.json({ ok:false, reason:e.message, blocks:[] }) }
@@ -271,38 +289,35 @@ app.post('/api/items/delete', (req, res) => {
       }
       if (fieldStart!==-1 && end!==-1) wf(modItemsFile, src.slice(0,fieldStart)+src.slice(end))
     }
+    // Clean lang: item.* and tooltip.*
     const lang = rl()
-    for (const k of Object.keys(lang)) { if (k.startsWith(`item.${MODID}.${id}`) || k.startsWith(`tooltip.${MODID}.${id}`)) delete lang[k] }
-    wl(lang)
-    // Remove from ModItemModelProvider — handle multi-line getBuilder blocks
+    for (const k of Object.keys(lang)) {
+      if (k.startsWith(`item.${MODID}.${id}`) || k.startsWith(`tooltip.${MODID}.${id}`)) delete lang[k]
+    }
+    wl(sortLang(lang))
+    // Clean model provider (multi-line safe)
     const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
-    let msrc = rf(modelFile)
-    // Remove any line that directly references this item/constName
-    // AND the following continuation lines (.parent, .texture, .trackGenerated etc) until next statement
-    const modelLines = msrc.split('\n')
+    const modelLines = rf(modelFile).split('\n')
     const cleanedModel = []
     let skipNext = false
     for (let i = 0; i < modelLines.length; i++) {
       const l = modelLines[i]
-      const refersToItem = l.includes(`ModItems.${constName}`) || l.includes(`"${id}"`)
-      if (refersToItem) {
-        skipNext = true
-        continue
-      }
+      if (l.includes(`ModItems.${constName}`) || l.includes(`"${id}"`)) { skipNext = true; continue }
       if (skipNext) {
-        // Skip continuation lines (start with . or are closing ;)
         if (l.trim().startsWith('.') || l.trim() === ';') continue
         skipNext = false
       }
       cleanedModel.push(l)
     }
     wf(modelFile, cleanedModel.join('\n'))
-    // Clean up ycs_tabs.json
+    // Clean tags from ModItemTagProvider
+    removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => l.includes(`ModItems.${constName}.get()`))
+    // Clean ycs_tabs.json
     const tabs = readTabsJson()
     delete tabs[id]
     writeTabsJson(tabs)
-    // Also clean ModCreativeTabEvents (vanilla tabs)
-    removeLines(jp(JAVA_ROOT,'item','ModCreativeTabEvents.java'), l => l.includes(`ModItems.${constName}`))
+    // Clean ModCreativeTabEvents (vanilla tabs)
+    try { removeLines(jp(JAVA_ROOT,'item','ModCreativeTabEvents.java'), l => l.includes(`ModItems.${constName}`)) } catch {}
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -641,7 +656,10 @@ app.post('/api/blocks/delete', (req, res) => {
       jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java'),
       jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java'),
       jp(JAVA_ROOT,'item','ModCreativeModeTabs.java'),
-    ]) removeLines(f, l => l.includes(`ModBlocks.${constName}`))
+    ]) { try { removeLines(f, l => l.includes(`ModBlocks.${constName}`)) } catch {} }
+    // Clean tags from ModBlockTagProvider and ModItemTagProvider (BlockItem tags)
+    try { removeLines(jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java'), l => l.includes(`ModBlocks.${constName}.get()`)) } catch {}
+    try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => l.includes(`ModBlocks.${constName}`)) } catch {}
     // Clean up ycs_tabs.json
     const tabs2 = readTabsJson()
     delete tabs2[`block:${id}`]
