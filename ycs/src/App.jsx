@@ -320,16 +320,11 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
   const faceLabel=highlightFaceKey?highlightFaceKey.replace(/^texture/,"").replace(/Id$/,"")+" face":"Texture";
   if(!activePanel){
     return<div style={{display:"flex",height:"100%",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12,flexDirection:"column",gap:8}}>
-      <span style={{fontSize:20,color:"#2a2a2a"}}>⊹</span>
-      <span>click edit or set on the left</span>
+      <span style={{fontSize:28,color:"#252525"}}>→</span>
+      <span>use edit or set on the left</span>
     </div>;
   }
   return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <div style={{display:"flex",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
-      {["texture","tags","tooltip","recipe","code"].map(id=>(
-        <button key={id} onClick={()=>setActivePanel(p=>p===id?null:id)} style={{flex:1,padding:"6px 2px",fontSize:10,background:activePanel===id?"#1a2438":"transparent",color:activePanel===id?C.accent:C.dim,border:"none",borderRight:"1px solid #1a1a1a",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontWeight:activePanel===id?700:400,textTransform:"capitalize"}}>{id}</button>
-      ))}
-    </div>
     <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
       {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey={highlightFaceKey||"textureId"} label={faceLabel}/>}
       {activePanel==="tags"&&<TagsPanel/>}
@@ -367,6 +362,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
+    await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()});
   };
   const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
@@ -379,12 +375,14 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
     <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Mother Flame"/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Texture</Lbl>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"7px 10px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {(selTex||dUrl)&&<AImg url={selTex?.dataUrl||dUrl} size={22} anim={selTex?.isAnimated} frames={selTex?.frames||1} ticks={selTex?.ticksPerFrame||4}/>}
-          <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          {(selTex||dUrl)
+            ?<AImg url={selTex?.dataUrl||dUrl} size={20} anim={selTex?.isAnimated} frames={selTex?.frames||1} ticks={selTex?.ticksPerFrame||4}/>
+            :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+          <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
         </div>
-        <Btn sm v="g" onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")}>set</Btn>
+        <Btn sm v="g" onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
       </div>
       {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>animated — mcmeta auto-written</span>}
     </div>
@@ -394,10 +392,26 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
     {form.itemType==="Tool"&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
     {form.itemType==="Food"&&<Sect title="Food Properties"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div><Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/></Sect>}
     {form.itemType==="Fuel"&&<Inp label="Burn time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
-    <div style={{display:"flex",flexDirection:"column",gap:0,border:`1px solid #1e1e1e`,borderRadius:C.r,overflow:"hidden",marginTop:4}}>
-      <ER label="Tags" panel="tags" count={tags.length}/>
-      <ER label="Tooltip" panel="tooltip" badge={form.hasTooltip?"on":null}/>
-      <ER label="Recipe" panel="recipe" badge={form.hasRecipe?"on":null}/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:tags.length?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tags.length?tags.slice(0,3).join(", ")+(tags.length>3?` +${tags.length-3}`:""):"none added"}</span>
+        <Btn sm v={activePanel==="tags"?"p":"g"} onClick={()=>setActivePanel(p=>p==="tags"?null:"tags")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Tooltip{form.hasTooltip&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:form.hasTooltip?C.text:C.faint}}>{form.hasTooltip?form.tooltipNormal||"(set)":"disabled"}</span>
+        <Btn sm v={activePanel==="tooltip"?"p":"g"} onClick={()=>setActivePanel(p=>p==="tooltip"?null:"tooltip")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Recipe{form.hasRecipe&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:form.hasRecipe?C.text:C.faint}}>{form.hasRecipe?`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`:"disabled"}</span>
+        <Btn sm v={activePanel==="recipe"?"p":"g"} onClick={()=>setActivePanel(p=>p==="recipe"?null:"recipe")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
     </div>
     {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{tags.map(t=><Pill key={t} onClick={()=>F("tags",tags.filter(x=>x!==t))}>{t} ✕</Pill>)}</div>}
     <Sbar messages={status}/>
@@ -436,6 +450,7 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModBlocks.${CN}`,blockId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     if(form.hasTooltip)for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:isEdit});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
+    await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave(block);
   };
   const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
@@ -451,13 +466,15 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       <Lbl>Block Orientation</Lbl>
       <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{[{v:"simple",l:"Simple"},{v:"pillar",l:"Log/Pillar"},{v:"directional",l:"Directional"}].map(o=><label key={o.v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><div onClick={()=>F("orientationType",o.v)} style={{width:13,height:13,borderRadius:"50%",border:`2px solid ${orient===o.v?C.accent:C.inpB}`,background:orient===o.v?C.accent:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:"#a0a09a"}}>{o.l}</span></label>)}</div>
-      {!isAdv&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:13,color:C.text}}>All Faces</span>
-          {selTex&&<AImg url={selTex.dataUrl} size={22}/>}
-          <span style={{fontSize:11,color:C.dim}}>{selTex?.label||"none"}</span>
+      {!isAdv&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+        <Lbl>All Faces</Lbl>
+        <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+            {selTex?<AImg url={selTex.dataUrl} size={20}/>:<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+            <span style={{fontSize:13,color:selTex?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?.label||"none selected"}</span>
+          </div>
+          <Btn sm v="g" onClick={()=>setFace("textureId")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
         </div>
-        <Btn sm v="g" onClick={()=>setFace("textureId")}>set</Btn>
       </div>}
       {isAdv&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
         <FRow label="Top" fkey="textureTopId"/>
@@ -553,12 +570,8 @@ export default function App(){
   return<>
     <style>{FONT_URL}{G_CSS}</style>
     <div style={{height:"100vh",background:C.bg,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* ROW 1: Window drag bar */}
       <div style={{height:36,background:"#1c1c1c",display:"flex",alignItems:"center",flexShrink:0,WebkitAppRegion:"drag",zIndex:30}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:13,WebkitAppRegion:"no-drag"}}>
-          <Dot color="#e4e5e9" title={rs.dirty?"RunData→RunClient":"RunClient"} disabled={isRunning||running} onClick={()=>run("/run/client")}/>
-          <Dot color="#e4e5e9" title="RunData" disabled={isRunning||running} onClick={()=>run("/run/data")}/>
-          <Dot color="#e4e5e9" title={showCons?"Hide console":"Show console"} onClick={()=>setShowCons(v=>!v)}/>
-        </div>
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,pointerEvents:"none"}}>
           {isRunning&&<span style={{fontSize:10,color:"#5a9fd4",fontFamily:"monospace"}}>⟳ {rs.state}…</span>}
           {rs.state==="error"&&<span style={{fontSize:10,color:"#cc6a6a",fontFamily:"monospace"}}>✗ failed</span>}
@@ -569,8 +582,19 @@ export default function App(){
           {!isElectron&&<span style={{fontSize:10,color:backOk===false?"#cc6a6a":backOk===true?"#5acc5a":"#555",fontFamily:"monospace"}}>{backOk===false?"⚠ offline":backOk===true?"● live":"…"}</span>}
         </div>
       </div>
-      <div style={{height:36,background:C.tabBar,display:"flex",alignItems:"flex-end",paddingLeft:8,flexShrink:0,zIndex:20}}>
-        {TABS.map(t=>{const a=tab===t.id;return<button key={t.id} onClick={()=>switchTab(t.id)} style={{width:TAB_W,height:TAB_H,background:a?C.bg:"#2e2e2e",border:"none",borderRadius:"6.5px 6.5px 0 0",color:C.text,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"pointer",flexShrink:0,marginRight:3,opacity:a?1:0.65}}>{t.l}</button>;})}
+
+      {/* ROW 2: Tab bar — tabs on left, gradle dots on right aligned with window buttons above */}
+      <div style={{height:36,background:C.tabBar,display:"flex",alignItems:"center",paddingLeft:8,flexShrink:0,zIndex:20}}>
+        {/* Tabs sit at bottom of bar */}
+        <div style={{display:"flex",alignItems:"flex-end",alignSelf:"stretch",flex:1}}>
+          {TABS.map(t=>{const a=tab===t.id;return<button key={t.id} onClick={()=>switchTab(t.id)} style={{width:TAB_W,height:TAB_H,background:a?C.bg:"#2e2e2e",border:"none",borderRadius:"6.5px 6.5px 0 0",color:C.text,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"pointer",flexShrink:0,marginRight:3,opacity:a?1:0.65}}>{t.l}</button>;})}
+        </div>
+        {/* Gradle dots — vertically centered in tab bar row, right-aligned with window buttons */}
+        <div style={{display:"flex",alignItems:"center",gap:8,paddingRight:13,WebkitAppRegion:"no-drag",flexShrink:0}}>
+          <Dot color="#e4e5e9" title={showCons?"Hide console":"Show console"} onClick={()=>setShowCons(v=>!v)}/>
+          <Dot color={isRunning||running?"#555":"#e4e5e9"} title="RunData" disabled={isRunning||running} onClick={()=>run("/run/data")}/>
+          <Dot color={isRunning||running?"#555":"#e4e5e9"} title={rs.dirty?"RunData then RunClient":"RunClient"} disabled={isRunning||running} onClick={()=>run("/run/client")}/>
+        </div>
       </div>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,padding:`5px 5px ${showCons?0:5}px 5px`,gap:5}}>
         {renderPane()}
