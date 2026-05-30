@@ -18,21 +18,24 @@ import java.util.function.Supplier;
 public class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(yebisuRPG.MODID);
 
+    //Normal Blocks
     public static final DeferredBlock<Block> YE6ISU_BLOCK = registerBlock("ye6isu_block",
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(4f)
                     .requiresCorrectToolForDrops()
                     .sound(SoundType.METAL)));
 
-    public static final DeferredBlock<Block> YE6ISU_ORE = registerBlock("ye6isu_ore",
-            () -> new DropExperienceBlock(UniformInt.of(2, 4),
-                    BlockBehaviour.Properties.of().strength(3f).requiresCorrectToolForDrops().sound(SoundType.STONE)));
-
     public static final DeferredBlock<Block> CRATE_BLOCK = registerBlock("crate_block",
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(2.0F)
                     .sound(SoundType.WOOD)));
+    //Ore Blocks
+    public static final DeferredBlock<Block> YE6ISU_ORE = registerBlock("ye6isu_ore",
+            () -> new DropExperienceBlock(UniformInt.of(2, 4),
+                    BlockBehaviour.Properties.of().strength(3f).requiresCorrectToolForDrops().sound(SoundType.STONE)));
 
+
+    //Non-Block Blocks (generated from Crate Block)
     public static final DeferredBlock<StairBlock> CRATE_STAIRS = registerBlock("crate_stairs",
             () -> new StairBlock(ModBlocks.CRATE_BLOCK.get().defaultBlockState(),
                     BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops()));
@@ -62,8 +65,7 @@ public class ModBlocks {
     public static final DeferredBlock<TrapDoorBlock> CRATE_TRAPDOOR = registerBlock("crate_trapdoor",
             () -> new TrapDoorBlock(BlockSetType.IRON, BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops().noOcclusion()));
 
-    // ─── Cat Block + variants ─────────────────────────────────────────────────
-
+    //Blocks from creator
     public static final DeferredBlock<Block> CAT_BLOCK = registerBlock("cat_block",
                     () -> new Block(BlockBehaviour.Properties.of()
                                 .strength(2f)

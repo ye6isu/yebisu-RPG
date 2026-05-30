@@ -11,14 +11,20 @@ import net.ye6isu.yebisuRPG.yebisuRPG;
 import java.util.List;
 
 public class ModItems {
-
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(yebisuRPG.MODID);
 
-    public static final DeferredItem<Item> YE6ISU  = ITEMS.register("ye6isu",  () -> new Ye6isuItem(new Item.Properties()));
-    public static final DeferredItem<Item> WALKMAN = ITEMS.register("walkman", () -> new WalkmanItem(new Item.Properties()));
-    public static final DeferredItem<Item> PLANK   = ITEMS.register("plank",   () -> new Item(new Item.Properties()));
+    //Normal Items
+    public static final DeferredItem<Item> PLANK = ITEMS.register("plank",   () -> new Item(new Item.Properties()));
 
-    //Food
+    //Custom Items
+
+    public static final DeferredItem<Item> RAW_YE6ISU = ITEMS.register("raw_ye6isu",   () -> new RawYe6isuItem(new Item.Properties()));
+
+    public static final DeferredItem<Item> YE6ISU  = ITEMS.register("ye6isu",  () -> new Ye6isuItem(new Item.Properties()));
+
+    public static final DeferredItem<Item> WALKMAN = ITEMS.register("walkman", () -> new WalkmanItem(new Item.Properties()));
+
+    //Foods with Tooltip
     public static final DeferredItem<Item> SUKUNA_FINGER = ITEMS.register("sukuna_finger",
             () -> new Item(new Item.Properties().food(ModFoodProperties.SUKUNA_FINGER)) {
                 @Override
@@ -28,7 +34,7 @@ public class ModItems {
                 }
             });
 
-    //Fuel
+    //Fuels
     public static final DeferredItem<Item> MOTHER_FLAME = ITEMS.register("mother_flame",
             () -> new FuelItem(new Item.Properties(), 40000));
 
@@ -53,29 +59,28 @@ public class ModItems {
             () -> new HoeItem(ModToolTiers.YE6ISU, new Item.Properties()
                     .attributes(HoeItem.createAttributes(ModToolTiers.YE6ISU, 5.5f, -2.8f))));
 
-
+    //Armors
     public static final DeferredItem<ArmorItem> PLANK_HELMET = ITEMS.register("plank_helmet",
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.HELMET,
                     new Item.Properties().durability(ArmorItem.Type.HELMET.getDurability(19))));
+
     public static final DeferredItem<ArmorItem> PLANK_CHESTPLATE = ITEMS.register("plank_chestplate",
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.CHESTPLATE,
                     new Item.Properties().durability(ArmorItem.Type.CHESTPLATE.getDurability(19))));
+
     public static final DeferredItem<ArmorItem> PLANK_LEGGINGS = ITEMS.register("plank_leggings",
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.LEGGINGS,
                     new Item.Properties().durability(ArmorItem.Type.LEGGINGS.getDurability(19))));
+
     public static final DeferredItem<ArmorItem> PLANK_BOOTS = ITEMS.register("plank_boots",
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.BOOTS,
                     new Item.Properties().durability(ArmorItem.Type.BOOTS.getDurability(19))));
-    
 
-
-
-
+    //Items from creator
     public static final DeferredItem<Item> SHIKA = ITEMS.register("shika",
                 () -> new Item(new Item.Properties()));
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
     }
-
 }

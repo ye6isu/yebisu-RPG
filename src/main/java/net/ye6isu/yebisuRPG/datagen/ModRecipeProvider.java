@@ -21,6 +21,9 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
     @Override
     protected void buildRecipes(RecipeOutput recipeOutput) {
 
+        List<ItemLike> YE6ISU_SMELTABLES = List.of(ModItems.RAW_YE6ISU);
+
+        //Shapeless recipe
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.YE6ISU_BLOCK.get())
                 .pattern("YYY")
                 .pattern("YYY")
@@ -34,6 +37,7 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
                 .unlockedBy("has_ye6isu_block", has(ModBlocks.YE6ISU_BLOCK))
                 .save(recipeOutput);
 
+        //Shaped recipe
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CRATE_BLOCK.get())
                 .pattern("PPP")
                 .pattern("P P")
@@ -42,44 +46,59 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
                 .unlockedBy("has_plank", has(ModItems.PLANK))
                 .save(recipeOutput);
 
+        //Non-Block Block recipe
         stairBuilder(ModBlocks.CRATE_STAIRS.get(), Ingredient.of(ModItems.PLANK)).group("CRATE")
-                .unlockedBy("has_CRATE", has(ModItems.PLANK)).save(recipeOutput);
+                .unlockedBy("has_crate", has(ModItems.PLANK)).save(recipeOutput);
+
         slab(recipeOutput, RecipeCategory.BUILDING_BLOCKS, ModBlocks.CRATE_SLAB.get(), ModItems.PLANK.get());
 
         buttonBuilder(ModBlocks.CRATE_BUTTON.get(), Ingredient.of(ModItems.PLANK.get())).group("CRATE")
-                .unlockedBy("has_CRATE", has(ModItems.PLANK.get())).save(recipeOutput);
+                .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
+
         pressurePlate(recipeOutput, ModBlocks.CRATE_PRESSURE_PLATE.get(), ModItems.PLANK.get());
 
         fenceBuilder(ModBlocks.CRATE_FENCE.get(), Ingredient.of(ModItems.PLANK.get())).group("CRATE")
-                .unlockedBy("has_CRATE", has(ModItems.PLANK.get())).save(recipeOutput);
+                .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
+
         fenceGateBuilder(ModBlocks.CRATE_FENCE_GATE.get(), Ingredient.of(ModItems.PLANK.get())).group("CRATE")
-                .unlockedBy("has_CRATE", has(ModItems.PLANK.get())).save(recipeOutput);
+                .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
+
         wall(recipeOutput, RecipeCategory.BUILDING_BLOCKS, ModBlocks.CRATE_WALL.get(), ModItems.PLANK.get());
 
         doorBuilder(ModBlocks.CRATE_DOOR.get(), Ingredient.of(ModItems.PLANK.get())).group("CRATE")
-                .unlockedBy("has_CRATE", has(ModItems.PLANK.get())).save(recipeOutput);
+                .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
+
         trapdoorBuilder(ModBlocks.CRATE_TRAPDOOR.get(), Ingredient.of(ModItems.PLANK.get())).group("CRATE")
-                .unlockedBy("has_CRATE", has(ModItems.PLANK.get())).save(recipeOutput);
+                .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
 
+        //Furnace recipe
+        smelting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 200, "ye6isu");
 
+        //Blasting recipe
+        blasting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 100, "ye6isu");
     }
 
-    protected static void oreSmelting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult,
-                                      float pExperience, int pCookingTIme, String pGroup) {
-        oreCooking(recipeOutput, RecipeSerializer.SMELTING_RECIPE, SmeltingRecipe::new, pIngredients, pCategory, pResult,
-                pExperience, pCookingTIme, pGroup, "_from_smelting");
+    protected static void smelting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
+        basicCooking(recipeOutput, RecipeSerializer.SMELTING_RECIPE, SmeltingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_smelting");
     }
 
-    protected static void oreBlasting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult,
-                                      float pExperience, int pCookingTime, String pGroup) {
-        oreCooking(recipeOutput, RecipeSerializer.BLASTING_RECIPE, BlastingRecipe::new, pIngredients, pCategory, pResult,
-                pExperience, pCookingTime, pGroup, "_from_blasting");
+    protected static void blasting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
+        basicCooking(recipeOutput, RecipeSerializer.BLASTING_RECIPE, BlastingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_blasting");
     }
 
-    protected static <T extends AbstractCookingRecipe> void oreCooking(RecipeOutput recipeOutput, RecipeSerializer<T> pCookingSerializer, AbstractCookingRecipe.Factory<T> factory,
-                                                                       List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup, String pRecipeName) {
+    protected static void smoking(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
+        basicCooking(recipeOutput, RecipeSerializer.SMOKING_RECIPE, SmokingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_smoking");
+    }
+
+    protected static void campfire(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
+        basicCooking(recipeOutput, RecipeSerializer.CAMPFIRE_COOKING_RECIPE, CampfireCookingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_campfire");
+    }
+
+    protected static <T extends AbstractCookingRecipe> void basicCooking(RecipeOutput recipeOutput, RecipeSerializer<T> pCookingSerializer, AbstractCookingRecipe.Factory<T> factory, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup, String pRecipeName) {
         for(ItemLike itemlike : pIngredients) {
-            SimpleCookingRecipeBuilder.generic(Ingredient.of(itemlike), pCategory, pResult, pExperience, pCookingTime, pCookingSerializer, factory).group(pGroup).unlockedBy(getHasName(itemlike), has(itemlike))
+            SimpleCookingRecipeBuilder.generic(Ingredient.of(itemlike), pCategory, pResult, pExperience, pCookingTime, pCookingSerializer, factory)
+                    .group(pGroup)
+                    .unlockedBy(getHasName(itemlike), has(itemlike))
                     .save(recipeOutput, yebisuRPG.MODID + ":" + getItemName(pResult) + pRecipeName + "_" + getItemName(itemlike));
         }
     }

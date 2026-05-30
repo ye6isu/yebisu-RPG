@@ -17,12 +17,12 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 
     @Override
     protected void generate() {
+
+        //Same Block drop
         dropSelf(ModBlocks.CRATE_BLOCK.get());
         dropSelf(ModBlocks.YE6ISU_BLOCK.get());
 
-        add(ModBlocks.YE6ISU_ORE.get(),
-                block -> createOreDrop(ModBlocks.YE6ISU_ORE.get(), ModItems.YE6ISU.get()));
-
+        //Non-Block Block drop
         dropSelf(ModBlocks.CRATE_STAIRS.get());
         dropSelf(ModBlocks.CRATE_PRESSURE_PLATE.get());
         dropSelf(ModBlocks.CRATE_BUTTON.get());
@@ -31,14 +31,17 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
         dropSelf(ModBlocks.CRATE_WALL.get());
         dropSelf(ModBlocks.CRATE_TRAPDOOR.get());
 
+        //Special Non-Block Block drop
         add(ModBlocks.CRATE_SLAB.get(), block -> createSlabItemTable(ModBlocks.CRATE_SLAB.get()));
         add(ModBlocks.CRATE_DOOR.get(), block -> createDoorTable(ModBlocks.CRATE_DOOR.get()));
 
+        //Ore drop
+        add(ModBlocks.YE6ISU_ORE.get(),
+                block -> createOreDrop(ModBlocks.YE6ISU_ORE.get(), ModItems.YE6ISU.get()));
 
-
+        //Same Block drop from creator
         dropSelf(ModBlocks.CAT_BLOCK.get());
 
-        // YCS_LOOT_INSERT
     }
 
     @Override
