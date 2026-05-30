@@ -3,7 +3,7 @@ import { useState, useRef, useCallback, useEffect, useMemo, createContext, useCo
 const MODID="yebisurpg", BASE="http://localhost:3001/api";
 const FONT_URL=`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;400;500;700;800&display=swap');`;
 const G_CSS=`*{box-sizing:border-box;margin:0;padding:0;}html,body,#root{height:100%;overflow:hidden;}body{background:#161616;color:#f0f0ec;font-family:'JetBrains Mono',monospace;font-size:13px;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#1a1a1a;}::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:3px;}input[type=number]::-webkit-inner-spin-button{opacity:1;}button:focus{outline:none;}select{appearance:none;-webkit-appearance:none;}select option{background:#212121;color:#f0f0ec;}*{-webkit-user-select:none;user-select:none;}input,textarea,select{-webkit-user-select:text!important;user-select:text!important;}`;
-const TAB_W=116, TAB_H=28;
+const TAB_W=116,TAB_H=28;
 const TIERS=["Wood","Stone","Iron","Diamond","Netherite","YE6ISU"];
 const TIER_MAP={Wood:"Tiers.WOOD",Stone:"Tiers.STONE",Iron:"Tiers.IRON",Diamond:"Tiers.DIAMOND",Netherite:"Tiers.NETHERITE",YE6ISU:"ModToolTiers.YE6ISU"};
 const TOOL_TYPES=["Sword","Pickaxe","Axe","Shovel","Hoe"];
@@ -11,15 +11,14 @@ const SOUND_TYPES=["STONE","WOOD","METAL","GRASS","SAND","GRAVEL","GLASS","CLOTH
 const CREATIVE_TABS=[{value:"",label:"(none)"},{value:"ModCreativeModeTabs.YEBISURPG_ITEMS_TAB",label:"yebisu RPG Items"},{value:"ModCreativeModeTabs.YEBISURPG_BLOCK_TAB",label:"yebisu RPG Blocks"},{value:"vanilla:combat",label:"Combat"},{value:"vanilla:tools_and_utilities",label:"Tools & Utilities"},{value:"vanilla:food_and_drinks",label:"Food & Drinks"},{value:"vanilla:ingredients",label:"Ingredients"},{value:"vanilla:building_blocks",label:"Building Blocks"},{value:"vanilla:redstone",label:"Redstone"},{value:"vanilla:natural_blocks",label:"Natural Blocks"}];
 const COMMON_TAGS=["minecraft:axes","minecraft:hoes","minecraft:pickaxes","minecraft:shovels","minecraft:swords","minecraft:tools","minecraft:logs","minecraft:planks","minecraft:slabs","minecraft:stairs","minecraft:fences","minecraft:doors","minecraft:trapdoors","minecraft:walls","minecraft:buttons","minecraft:pressure_plates","minecraft:flowers","minecraft:saplings","minecraft:coals","minecraft:diamonds","neoforge:foods","neoforge:tools","neoforge:gems","neoforge:ingots","neoforge:nuggets","neoforge:ores","neoforge:storage_blocks","minecraft:mineable/pickaxe","minecraft:mineable/axe","minecraft:mineable/shovel","minecraft:mineable/hoe","minecraft:needs_stone_tool","minecraft:needs_iron_tool","minecraft:needs_diamond_tool"];
 const VANILLA_INGR=["minecraft:air","minecraft:iron_ingot","minecraft:gold_ingot","minecraft:diamond","minecraft:emerald","minecraft:netherite_ingot","minecraft:oak_planks","minecraft:birch_planks","minecraft:stick","minecraft:cobblestone","minecraft:stone","minecraft:obsidian","minecraft:iron_block","minecraft:gold_block","minecraft:diamond_block","minecraft:coal","minecraft:charcoal","minecraft:flint","minecraft:leather","minecraft:string","minecraft:feather","minecraft:bone","minecraft:blaze_rod","minecraft:ender_pearl","minecraft:glass","minecraft:sand","minecraft:gravel","minecraft:redstone","minecraft:lapis_lazuli","minecraft:quartz","minecraft:copper_ingot","minecraft:amethyst_shard","minecraft:oak_log"];
+const TAG_GROUPS=[{label:"Any Wood Planks",tag:"minecraft:planks"},{label:"Any Wood Log",tag:"minecraft:logs"},{label:"Any Stone",tag:"minecraft:stone_crafting_materials"},{label:"Any Iron Ingot",tag:"neoforge:ingots/iron"},{label:"Any Gold Ingot",tag:"neoforge:ingots/gold"},{label:"Any Copper Ingot",tag:"neoforge:ingots/copper"},{label:"Any Diamond",tag:"neoforge:gems/diamond"},{label:"Any Emerald",tag:"neoforge:gems/emerald"},{label:"Any Coal",tag:"minecraft:coals"},{label:"Any Wool",tag:"minecraft:wool"},{label:"Any Glass",tag:"neoforge:glass_blocks"},{label:"Any Stick",tag:"neoforge:rods/wooden"}];
 const C={bg:"#161616",panel:"#141414",pb:"#3a3a3c",tabBar:"#212121",card:"#1e1e1e",prev:"#0e0e0e",text:"#f0f0ec",dim:"#787872",faint:"#343430",accent:"#5a9fd4",inp:"#181818",inpB:"#252528",r:6.5};
 const SI={lbl:{fontSize:11,color:C.dim,textTransform:"uppercase",letterSpacing:.8,fontWeight:400},inp:{background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"7px 10px",color:C.text,fontSize:13,fontFamily:"'JetBrains Mono',monospace",outline:"none",width:"100%"}};
 const FormCtx=createContext(null);
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function useLS(k,i){const[v,sv]=useState(()=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):i;}catch{return i;}});const set=useCallback(nv=>{const n=typeof nv==="function"?nv(v):nv;sv(n);try{localStorage.setItem(k,JSON.stringify(n));}catch{}},[k,v]);return[v,set];}
 async function api(ep,body){try{const r=await fetch(`${BASE}${ep}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});return await r.json();}catch{return{ok:false,reason:"offline"};}}
 
-// ── UI Primitives ──────────────────────────────────────────────────────────────
 const Lbl=({children,c})=><span style={{...SI.lbl,color:c||C.dim}}>{children}</span>;
 function Btn({children,onClick,v="d",sm,dis,style:extStyle={}}){const vs={d:{bg:"#222226",c:C.text},p:{bg:C.accent,c:"#06080e"},dan:{bg:"#200e0e",c:"#ff7777"},g:{bg:"transparent",c:C.dim,b:`1px solid ${C.inpB}`}};const vv=vs[v]||vs.d;return<button disabled={dis} onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:5,padding:sm?"3px 10px":"7px 16px",fontSize:sm?11:13,border:vv.b||"none",borderRadius:4,cursor:dis?"not-allowed":"pointer",fontFamily:"'JetBrains Mono',monospace",fontWeight:500,opacity:dis?0.35:1,background:vv.bg,color:vv.c,whiteSpace:"nowrap",...extStyle}}>{children}</button>;}
 function Inp({label,value,onChange,placeholder,type="text",style={}}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<input type={type} value={value??""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{...SI.inp,...style}}/></div>;}
@@ -35,7 +34,6 @@ function valId(id){if(!id)return"required";if(!/^[a-z0-9_]+$/.test(id))return"a-
 function IdField({label,value,onChange,disabled=false}){const err=valId(value);return<div style={{display:"flex",flexDirection:"column",gap:4}}><Lbl>{label||"ID"}</Lbl><input value={value} onChange={e=>onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} disabled={disabled} style={{...SI.inp,border:`1px solid ${value&&err?"#6a2a2a":C.inpB}`,opacity:disabled?0.5:1}}/>{value&&err&&<span style={{fontSize:10,color:"#cc6a6a"}}>{err}</span>}</div>;}
 function ConstField({form,F}){return<div style={{display:"flex",flexDirection:"column",gap:4}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>Const name</Lbl><Chk label="custom" checked={!!form.customConstName} onChange={v=>F("customConstName",v)}/></div><input value={form.customConstName?form.constName:(form.id||"").toUpperCase()} onChange={e=>F("constName",e.target.value)} disabled={!form.customConstName} style={{...SI.inp,color:form.customConstName?C.text:C.faint,opacity:form.customConstName?1:0.6}}/></div>;}
 
-// ── Animated image ─────────────────────────────────────────────────────────────
 function AImg({url,size=52,anim=false,frames=1,ticks=4}){
   const[f,setF]=useState(0);
   useEffect(()=>{if(!anim||frames<=1)return;const id=setInterval(()=>setF(p=>(p+1)%frames),ticks*50);return()=>clearInterval(id);},[anim,frames,ticks]);
@@ -44,18 +42,16 @@ function AImg({url,size=52,anim=false,frames=1,ticks=4}){
   return<img src={url} alt="" style={{width:size,height:size,imageRendering:"pixelated",borderRadius:4,border:`1px solid ${C.inpB}`,background:C.prev,flexShrink:0,objectFit:"contain"}}/>;
 }
 
-// ── Texture dropdown ───────────────────────────────────────────────────────────
 function TexSel({label,textures,value,onChange}){
   const[srch,setSrch]=useState("");const[open,setOpen]=useState(false);const fRef=useRef();
   const sel=textures.find(t=>t.id===value);
   const filt=useMemo(()=>{const q=srch.toLowerCase();return textures.filter(t=>!q||t.label.toLowerCase().includes(q)||t.id.toLowerCase().includes(q));},[textures,srch]);
   const dUrl=(value||"").startsWith("__direct__")?value.split("__name__")[0].replace("__direct__",""):null;
-  const prevUrl=sel?.dataUrl||dUrl;
   const onFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>onChange("__direct__"+ev.target.result+"__name__"+f.name);r.readAsDataURL(f);};
   return<div style={{display:"flex",flexDirection:"column",gap:4}}>
     {label&&<Lbl>{label}</Lbl>}
     <div style={{display:"flex",alignItems:"center",gap:7}}>
-      <AImg url={prevUrl} size={30} anim={sel?.isAnimated} frames={sel?.frames||1} ticks={sel?.ticksPerFrame||4}/>
+      <AImg url={sel?.dataUrl||dUrl} size={30} anim={sel?.isAnimated} frames={sel?.frames||1} ticks={sel?.ticksPerFrame||4}/>
       <div style={{flex:1,position:"relative"}}>
         <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 9px"}}>
           <span style={{color:sel?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?sel.label:dUrl?"(direct)":"(none)"}</span>
@@ -71,7 +67,7 @@ function TexSel({label,textures,value,onChange}){
             </div>)}
             {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
           </div>
-          <div onClick={()=>{setOpen(false);fRef.current.click();}} style={{padding:"6px 9px",borderTop:`1px solid ${C.inpB}`,cursor:"pointer",color:C.dim,fontSize:12}}>📁 from PC…</div>
+          <div onClick={()=>{setOpen(false);fRef.current.click();}} style={{padding:"6px 9px",borderTop:`1px solid ${C.inpB}`,cursor:"pointer",color:C.dim,fontSize:12}}>from PC…</div>
         </div>}
       </div>
       <input ref={fRef} type="file" accept="image/png" style={{display:"none"}} onChange={onFile}/>
@@ -79,7 +75,6 @@ function TexSel({label,textures,value,onChange}){
   </div>;
 }
 
-// ── Run state ──────────────────────────────────────────────────────────────────
 function useRun(){
   const[rs,setRs]=useState({dirty:false,state:"idle",log:[]});const[running,setRunning]=useState(false);
   useEffect(()=>{const id=setInterval(()=>fetch(`${BASE}/run/state`).then(r=>r.json()).then(setRs).catch(()=>{}),2000);return()=>clearInterval(id);},[]);
@@ -87,7 +82,6 @@ function useRun(){
   return{rs,running,run};
 }
 
-// ── Code generators ────────────────────────────────────────────────────────────
 function gTTKeys(id,f){const ks=[];if(f.hasTooltip&&f.tooltipNormal)ks.push({key:`tooltip.${MODID}.${id}.normal`,value:f.tooltipNormal});if(f.hasTooltip&&f.hasHiddenTooltip){if(!f.useDefaultShiftHint&&f.tooltipShiftHint)ks.push({key:`tooltip.${MODID}.${id}.shift_hint`,value:f.tooltipShiftHint});if(f.tooltipHidden)ks.push({key:`tooltip.${MODID}.${id}.hidden`,value:f.tooltipHidden});}return ks;}
 function gRecipe(id,form){if(!form.hasRecipe||!form.recipe)return null;const r=form.recipe,CN=form.constName||(form.id||"").toUpperCase();if(r.type==="shaped"){const pl=r.pattern.map(row=>`        "${row}"`).join(",\n");const dl=Object.entries(r.keys||{}).map(([ch,item])=>`        .define('${ch}', ForgeRegistries.ITEMS.getValue(ResourceLocation.parse("${item}")))`).join("\n");return`ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.${CN}, ${r.result||1})\n        .pattern(\n${pl})\n${dl}\n        .unlockedBy("has_item", has(Items.IRON_INGOT))\n        .save(output);`;}const il=Object.values(r.keys||{}).map(item=>`        .requires(ForgeRegistries.ITEMS.getValue(ResourceLocation.parse("${item}")))`).join("\n");return`ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ModItems.${CN}, ${r.result||1})\n${il}\n        .unlockedBy("has_item", has(Items.IRON_INGOT))\n        .save(output);`;}
 function gTagCode(id,form,isBlock=false){if(!form.tags?.length)return[];const CN=form.constName||(form.id||"").toUpperCase();const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;return form.tags.map(tag=>{const[ns,path]=tag.includes(":")?tag.split(":"):[MODID,tag];return`tag(TagKey.create(Registries.${isBlock?"BLOCK":"ITEM"}, ResourceLocation.fromNamespaceAndPath("${ns}", "${path}"))).add(${ref});`;});}
@@ -130,17 +124,14 @@ function gBlockEntries(block,textures=[]){
   return entries;
 }
 
-// ── Default form values ────────────────────────────────────────────────────────
 const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"None",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",requiresTool:false,createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
-// ── Form context providers ─────────────────────────────────────────────────────
 function ItemProv({initial,children}){const[form,setForm]=useState(initial?{...ITEM_DEF,...initial}:ITEM_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 function BlockProv({initial,children}){const[form,setForm]=useState(initial?{...BLOCK_DEF,...initial}:BLOCK_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 function TexProv({initial,children}){const[form,setForm]=useState(initial?{...TEX_DEF,...initial}:TEX_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 
-// ── Card grid (home view) ──────────────────────────────────────────────────────
 function CardGrid({entries,onDelete,onOpen,emptyLabel}){
   const[hov,setHov]=useState(null);
   return<div style={{flex:1,padding:"20px 20px 90px",overflowY:"auto",position:"relative"}}>
@@ -161,16 +152,28 @@ function CardGrid({entries,onDelete,onOpen,emptyLabel}){
   </div>;
 }
 
-// ── Save/Cancel fixed buttons (shared by all forms) ────────────────────────────
-function FormActions({onCancel,onSave,saving,canSave,onCode}){
-  return<div style={{position:"fixed",bottom:30,right:30,display:"flex",gap:16,zIndex:200}}>
-    {onCode&&<Btn v="g" sm onClick={onCode}>code</Btn>}
-    <Btn v="g" onClick={onCancel}>✕</Btn>
-    <Btn v="p" dis={saving||!canSave} onClick={onSave}>{saving?"…":"↓"}</Btn>
+function FormActions({onCancel,onSave,saving,canSave,consoleH=0,showCons=false,onCode}){
+  const bottom=showCons?consoleH+5+30:30;
+  const SQ={width:52,height:52,borderRadius:C.r,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:18,cursor:"pointer",flexShrink:0,fontFamily:"'JetBrains Mono',monospace"};
+  return<div style={{position:"fixed",bottom,right:30,display:"flex",gap:10,zIndex:200,transition:"bottom .15s"}}>
+    {onCode&&<button onClick={onCode} style={{...SQ,background:"#2a2a2e",border:`1px solid ${C.inpB}`,color:C.dim}}>⌨</button>}
+    <button onClick={onCancel} style={{...SQ,background:"#2a2a2e",border:`1px solid ${C.inpB}`,color:C.dim}}>✕</button>
+    <button onClick={onSave} disabled={saving||!canSave} style={{...SQ,background:saving||!canSave?"#2a2a2e":C.accent,border:"none",color:saving||!canSave?C.faint:"#06080e",opacity:saving||!canSave?0.35:1,cursor:saving||!canSave?"not-allowed":"pointer"}}>↓</button>
   </div>;
 }
 
-// ── Texture form left pane ─────────────────────────────────────────────────────
+function EditRow({label,panel,badge,count,activePanel,setActivePanel}){
+  const isActive=activePanel===panel;
+  return<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderBottom:`1px solid #1e1e1e`,background:isActive?"#1a2438":"transparent"}}>
+    <div style={{display:"flex",alignItems:"center",gap:7}}>
+      <span style={{fontSize:13,color:C.text}}>{label}</span>
+      {badge&&<Pill color="#1e3020">{badge}</Pill>}
+      {(count>0)&&<Pill color="#1a2438">{count}</Pill>}
+    </div>
+    <Btn sm v={isActive?"p":"g"} onClick={()=>setActivePanel(p=>p===panel?null:panel)}>edit</Btn>
+  </div>;
+}
+
 function TexLeft({initial,onSave,onCancel}){
   const{form,F}=useContext(FormCtx);
   const mRef=useRef(),sRef=useRef(),eRef=useRef();
@@ -190,8 +193,7 @@ function TexLeft({initial,onSave,onCancel}){
       <Lbl>Shape Texture File</Lbl>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         {form.shapeUrl&&<AImg url={form.shapeUrl} size={26}/>}
-        <div onClick={()=>sRef.current.click()} style={{flex:1,height:42,background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:form.shapeUrl?"#5acc5a":C.dim,fontSize:12}}>{form.shapeUrl?"✓ shape set":"+"}
-        </div>
+        <div onClick={()=>sRef.current.click()} style={{flex:1,height:42,background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:form.shapeUrl?"#5acc5a":C.dim,fontSize:12}}>{form.shapeUrl?"✓ shape set":"+"}</div>
         {form.shapeUrl&&<Btn sm v="g" onClick={()=>F("shapeUrl",null)}>✕</Btn>}
       </div>
       <input ref={sRef} type="file" accept="image/png" style={{display:"none"}} onChange={()=>load(sRef,"shapeUrl")}/>
@@ -206,96 +208,146 @@ function TexLeft({initial,onSave,onCancel}){
       <input ref={eRef} type="file" accept="image/png" style={{display:"none"}} onChange={()=>load(eRef,"emissiveUrl")}/>
     </div>
     <div style={{display:"flex",alignItems:"center",gap:10}}><Lbl>Animation Properties</Lbl><Chk label="" checked={form.isAnimated} onChange={v=>F("isAnimated",v)}/></div>
-    {form.isAnimated&&<div style={{display:"flex",gap:12}}>
-      <Inp label="Frames" type="number" value={form.frames} onChange={v=>F("frames",parseInt(v)||1)} style={{width:80}}/>
-      <Inp label="Ticks/frame" type="number" value={form.ticksPerFrame} onChange={v=>F("ticksPerFrame",parseInt(v)||1)} style={{width:80}}/>
-    </div>}
+    {form.isAnimated&&<div style={{display:"flex",gap:12}}><Inp label="Frames" type="number" value={form.frames} onChange={v=>F("frames",parseInt(v)||1)} style={{width:80}}/><Inp label="Ticks/frame" type="number" value={form.ticksPerFrame} onChange={v=>F("ticksPerFrame",parseInt(v)||1)} style={{width:80}}/></div>}
     <FormActions onCancel={onCancel} onSave={()=>onSave(form)} saving={false} canSave={!!(form.label.trim()&&form.dataUrl)}/>
   </div>;
 }
 
-// ── Texture form right pane (live preview) ─────────────────────────────────────
 function TexRight(){
   const{form}=useContext(FormCtx);
   return<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20}}>
-    {form.dataUrl
-      ?<div style={{width:220,height:220,background:C.prev,borderRadius:C.r,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <AImg url={form.dataUrl} size={180} anim={form.isAnimated} frames={form.frames||1} ticks={form.ticksPerFrame||4}/>
-      </div>
-      :<div style={{width:200,height:200,background:C.prev,borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>preview</div>}
+    {form.dataUrl?<div style={{width:220,height:220,background:C.prev,borderRadius:C.r,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}><AImg url={form.dataUrl} size={180} anim={form.isAnimated} frames={form.frames||1} ticks={form.ticksPerFrame||4}/></div>:<div style={{width:200,height:200,background:C.prev,borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>preview</div>}
     {form.label&&<div style={{fontSize:14,fontWeight:500,color:C.text}}>{form.label}</div>}
     {form.isAnimated&&form.frames>1&&<div style={{fontSize:11,color:C.dim}}>{form.frames} frames · {form.ticksPerFrame} ticks/f</div>}
   </div>;
 }
 
-// ── Recipe right panel ─────────────────────────────────────────────────────────
-function RecipeRight({modItems=[],modBlocks=[]}){
+function RecipePanel({modItems=[],modBlocks=[]}){
   const{form,F}=useContext(FormCtx);
-  const[srch,setSrch]=useState("");const[sel,setSel]=useState("");
+  const[srch,setSrch]=useState("");const[sel,setSel]=useState("");const[showTags,setShowTags]=useState(false);
   const recipe=form.recipe||{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1};
   const setR=upd=>F("recipe",{...recipe,...upd});
-  const allIngr=useMemo(()=>{const mod=modItems.map(x=>`${MODID}:${x.id}`).concat(modBlocks.map(x=>`${MODID}:${x.id}`));const all=[...VANILLA_INGR,...mod];const q=srch.toLowerCase();return q?all.filter(x=>x.includes(q)):all;},[srch,modItems,modBlocks]);
+  const allIngr=useMemo(()=>{const mod=modItems.map(x=>`${MODID}:${x.id}`).concat(modBlocks.map(x=>`${MODID}:${x.id}`));const tagE=TAG_GROUPS.map(g=>`#${g.tag}`);const all=[...tagE,...VANILLA_INGR,...mod];const q=srch.toLowerCase();return q?all.filter(x=>x.toLowerCase().includes(q)):all;},[srch,modItems,modBlocks]);
   const cells=Array.from({length:9},(_,i)=>{const row=Math.floor(i/3),col=i%3,ch=recipe.pattern[row][col];return ch===" "?null:recipe.keys[ch]||null;});
   const setCell=(i,item)=>{const row=Math.floor(i/3),col=i%3;const pat=recipe.pattern.map(r=>[...r]);const keys={...recipe.keys};if(!item||item==="minecraft:air"){pat[row][col]=" ";const used=new Set(pat.flat().filter(c=>c!==" "));for(const k of Object.keys(keys))if(!used.has(k))delete keys[k];}else{const ex=Object.entries(keys).find(([,v])=>v===item)?.[0];const used=new Set(pat.flat().filter(c=>c!==" "));let ch=ex;if(!ch){ch="ABCDEFGHIJKLMNOPQRSTUVWXYZ#@$%&".split("").find(c=>!used.has(c))||"?";keys[ch]=item;}pat[row][col]=ch;}setR({pattern:pat.map(r=>r.join("")),keys});};
-  if(!form.hasRecipe)return<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>enable recipe in left pane</div>;
-  return<div style={{flex:1,padding:"12px 14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:9}}>
-    <Lbl>Recipe</Lbl>
-    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-      <div>
-        <div style={{display:"flex",gap:4,marginBottom:5}}><Sel label="" value={recipe.type||"shaped"} onChange={v=>setR({type:v})} options={["shaped","shapeless"]}/><Inp label="" value={recipe.result||1} onChange={v=>setR({result:parseInt(v)||1})} type="number" style={{width:52}}/></div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,48px)",gap:2}}>
-          {cells.map((item,i)=>{const e=!item||item==="minecraft:air";return<div key={i} onClick={()=>{if(sel)setCell(i,sel);}} onDragOver={ev=>ev.preventDefault()} onDrop={ev=>{ev.preventDefault();setCell(i,ev.dataTransfer.getData("item"));}} style={{width:48,height:48,background:e?"#141414":"#192a19",border:`1px solid ${C.inpB}`,borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sel?"crosshair":"default",position:"relative",overflow:"hidden"}}>{!e&&<><div style={{fontSize:9,color:"#aaa",textAlign:"center",padding:2,lineHeight:1.1}}>{item.split(":")[1]}</div><span onClick={ev=>{ev.stopPropagation();setCell(i,null);}} style={{position:"absolute",top:1,right:2,fontSize:8,cursor:"pointer",color:"#cc6a6a"}}>✕</span></>}{e&&<span style={{color:"#222",fontSize:15}}>+</span>}</div>;})}
-        </div>
-        {sel&&<div style={{fontSize:10,color:"#5acc5a",marginTop:3}}>→ {sel.split(":")[1]}</div>}
-      </div>
-      <div style={{flex:1,minWidth:130,display:"flex",flexDirection:"column",gap:4}}>
-        <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,fontSize:11}}/>
-        <div style={{flex:1,maxHeight:170,overflowY:"auto",display:"flex",flexDirection:"column",gap:1}}>
-          {allIngr.slice(0,80).map(item=><div key={item} draggable onDragStart={e=>e.dataTransfer.setData("item",item)} onClick={()=>setSel(item===sel?"":item)} style={{padding:"3px 6px",fontSize:11,fontFamily:"monospace",cursor:"pointer",borderRadius:2,background:sel===item?"#192a19":"#141414",color:sel===item?"#5acc5a":C.text,border:`1px solid ${sel===item?"#2a5a2a":"#1a1a1a"}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item}</div>)}
-        </div>
-      </div>
+  const dN=item=>item.startsWith("#")?TAG_GROUPS.find(g=>`#${g.tag}`===item)?.label||item:item.split(":")[1]||item;
+  return<div style={{flex:1,padding:"14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:10}}>
+    <div style={{display:"flex",gap:4}}><Sel label="" value={recipe.type||"shaped"} onChange={v=>setR({type:v})} options={["shaped","shapeless"]}/><Inp label="" value={recipe.result||1} onChange={v=>setR({result:parseInt(v)||1})} type="number" style={{width:56}}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,52px)",gap:3}}>
+      {cells.map((item,i)=>{const e=!item||item==="minecraft:air";const iT=item&&item.startsWith("#");return<div key={i} onClick={()=>{if(sel)setCell(i,sel);}} onDragOver={ev=>ev.preventDefault()} onDrop={ev=>{ev.preventDefault();setCell(i,ev.dataTransfer.getData("item"));}} style={{width:52,height:52,background:e?"#141414":iT?"#1a1a2e":"#192a19",border:`1px solid ${e?C.inpB:iT?"#2a2a5a":"#2a5a2a"}`,borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sel?"crosshair":"default",position:"relative",overflow:"hidden"}}>{!e&&<><div style={{fontSize:9,color:iT?"#8888ff":"#aaa",textAlign:"center",padding:2,lineHeight:1.1}}>{dN(item)}</div><span onClick={ev=>{ev.stopPropagation();setCell(i,null);}} style={{position:"absolute",top:1,right:2,fontSize:8,cursor:"pointer",color:"#cc6a6a"}}>✕</span></>}{e&&<span style={{color:"#222",fontSize:18}}>+</span>}</div>;})}
+    </div>
+    {sel&&<div style={{fontSize:10,color:"#5acc5a"}}>→ {dN(sel)}</div>}
+    <div style={{display:"flex",gap:6,alignItems:"center"}}><input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,fontSize:11,flex:1}}/><Btn sm v={showTags?"p":"g"} onClick={()=>setShowTags(v=>!v)}>#tags</Btn></div>
+    {showTags&&<div style={{display:"flex",flexDirection:"column",gap:1}}>{TAG_GROUPS.map(g=><div key={g.tag} draggable onDragStart={e=>e.dataTransfer.setData("item",`#${g.tag}`)} onClick={()=>setSel(sel===`#${g.tag}`?"":(`#${g.tag}`))} style={{padding:"3px 8px",fontSize:11,fontFamily:"monospace",cursor:"pointer",borderRadius:2,background:sel===`#${g.tag}`?"#1a1a2e":"#141414",color:sel===`#${g.tag}`?"#8888ff":C.dim,border:`1px solid ${sel===`#${g.tag}`?"#2a2a5a":"#1a1a1a"}`}}>{g.label}</div>)}</div>}
+    <div style={{maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:1}}>
+      {allIngr.filter(x=>!x.startsWith("#")).slice(0,80).map(item=><div key={item} draggable onDragStart={e=>e.dataTransfer.setData("item",item)} onClick={()=>setSel(item===sel?"":item)} style={{padding:"3px 6px",fontSize:11,fontFamily:"monospace",cursor:"pointer",borderRadius:2,background:sel===item?"#192a19":"#141414",color:sel===item?"#5acc5a":C.text,border:`1px solid ${sel===item?"#2a5a2a":"#1a1a1a"}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item}</div>)}
     </div>
   </div>;
 }
 
-// ── Tooltip section ────────────────────────────────────────────────────────────
-function TooltipSect({form,F}){
-  return<Sect title="Tooltip" open={false}>
-    <Chk label="Add tooltip?" checked={!!form.hasTooltip} onChange={v=>F("hasTooltip",v)}/>
-    {form.hasTooltip&&<>
-      <Txta label="Normal" value={form.tooltipNormal||""} onChange={v=>F("tooltipNormal",v)} rows={2}/>
-      <Chk label="Shift-to-reveal?" checked={!!form.hasHiddenTooltip} onChange={v=>F("hasHiddenTooltip",v)}/>
-      {form.hasHiddenTooltip&&<>
-        <Chk label="Default hint" checked={!!form.useDefaultShiftHint} onChange={v=>F("useDefaultShiftHint",v)}/>
-        {!form.useDefaultShiftHint&&<Inp label="Custom hint" value={form.tooltipShiftHint||""} onChange={v=>F("tooltipShiftHint",v)}/>}
-        <Txta label="Hidden" value={form.tooltipHidden||""} onChange={v=>F("tooltipHidden",v)} rows={2}/>
-      </>}
-    </>}
-  </Sect>;
-}
-
-// ── Tags right panel ───────────────────────────────────────────────────────────
-function TagsRight(){
+function TagsPanel(){
   const{form,F}=useContext(FormCtx);
   const tags=form.tags||[];
   const add=t=>{if(!t||tags.includes(t))return;F("tags",[...tags,t]);};
-  return<div style={{padding:"10px 14px",borderBottom:`1px solid #1a1a1a`,flexShrink:0}}>
+  return<div style={{padding:"14px",overflowY:"auto",flex:1}}>
     <Lbl>Tags — click to add</Lbl>
-    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:6}}>
-      {COMMON_TAGS.map(t=><div key={t} onClick={()=>add(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}</div>)}
+    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:8}}>{COMMON_TAGS.map(t=><div key={t} onClick={()=>add(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}</div>)}</div>
+  </div>;
+}
+
+function TooltipPanel(){
+  const{form,F}=useContext(FormCtx);
+  const dis=!form.hasTooltip;
+  return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:10}}>
+    <Chk label="Add tooltip?" checked={!!form.hasTooltip} onChange={v=>F("hasTooltip",v)}/>
+    <div style={{opacity:dis?0.35:1,pointerEvents:dis?"none":"auto",display:"flex",flexDirection:"column",gap:10}}>
+      <Txta label="Normal text" value={form.tooltipNormal||""} onChange={v=>F("tooltipNormal",v)} rows={2}/>
+      <Chk label="Shift-to-reveal?" checked={!!form.hasHiddenTooltip} onChange={v=>F("hasHiddenTooltip",v)}/>
+      <div style={{opacity:form.hasHiddenTooltip?1:0.35,pointerEvents:form.hasHiddenTooltip?"auto":"none",display:"flex",flexDirection:"column",gap:10}}>
+        <Chk label="Use default shift hint" checked={!!form.useDefaultShiftHint} onChange={v=>F("useDefaultShiftHint",v)}/>
+        <Inp label="Custom hint" value={form.tooltipShiftHint||""} onChange={v=>F("tooltipShiftHint",v)} style={{opacity:form.useDefaultShiftHint?0.35:1}}/>
+        <Txta label="Hidden text" value={form.tooltipHidden||""} onChange={v=>F("tooltipHidden",v)} rows={3}/>
+      </div>
     </div>
   </div>;
 }
 
-// ── Item left pane ─────────────────────────────────────────────────────────────
-function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[]}){
+function RecipePanelWrapper({modItems,modBlocks}){
   const{form,F}=useContext(FormCtx);
-  const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);const[showCode,setShowCode]=useState(false);
+  return<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+    <div style={{padding:"10px 14px",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
+      <Chk label="Add custom recipe?" checked={!!form.hasRecipe} onChange={v=>F("hasRecipe",v)}/>
+    </div>
+    {form.hasRecipe?<RecipePanel modItems={modItems} modBlocks={modBlocks}/>:<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>enable above to edit</div>}
+  </div>;
+}
+
+function CodePanel({textures,isBlock=false}){
+  const{form}=useContext(FormCtx);
+  if(isBlock){const entries=gBlockEntries(form,textures);return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>{entries.map((e,i)=><CopyB key={i} title={e.constName} code={e.line}/>)}{gTagCode(form.id,form,true).map((t,i)=><CopyB key={"t"+i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;}
+  const c=gItemCode(form,textures);
+  return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}><CopyB title="ModItems" code={c.reg}/><CopyB title="lang" code={`  "${c.langKey}": "${c.langVal}",`}/><CopyB title="model" code={`        ${c.modelLine}`}/>{gTagCode(form.id,form).map((t,i)=><CopyB key={i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;
+}
+
+function TexturePickerPanel({textures,fkey="textureId",label="Texture"}){
+  const{form,F}=useContext(FormCtx);
+  const[srch,setSrch]=useState("");const fRef=useRef();
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return textures.filter(t=>!q||t.label.toLowerCase().includes(q)||t.id.toLowerCase().includes(q));},[textures,srch]);
+  const sel=form[fkey];
+  const onFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>F(fkey,"__direct__"+ev.target.result+"__name__"+f.name);r.readAsDataURL(f);};
+  return<div style={{flex:1,padding:"12px 14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:9}}>
+    <Lbl>{label}</Lbl>
+    <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search bank…" style={{...SI.inp,fontSize:11}}/>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+      <div onClick={()=>fRef.current.click()} style={{width:90,height:100,background:C.card,border:`1px dashed ${C.inpB}`,borderRadius:C.r,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",gap:4,flexShrink:0}}>
+        <span style={{fontSize:20,color:C.dim}}>+</span>
+        <span style={{fontSize:10,color:C.dim}}>from PC</span>
+      </div>
+      <input ref={fRef} type="file" accept="image/png" style={{display:"none"}} onChange={onFile}/>
+      {sel&&<div onClick={()=>F(fkey,"")} style={{width:90,height:100,background:C.card,border:`1px solid #3a1a1a`,borderRadius:C.r,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",gap:4,flexShrink:0}}>
+        <span style={{fontSize:16,color:"#cc6a6a"}}>✕</span>
+        <span style={{fontSize:10,color:"#cc6a6a"}}>clear</span>
+      </div>}
+      {filt.map(t=><div key={t.id} onClick={()=>F(fkey,t.id)} style={{width:90,height:100,background:sel===t.id?"#1a2438":C.card,border:`1px solid ${sel===t.id?C.accent:"#252525"}`,borderRadius:C.r,display:"flex",flexDirection:"column",cursor:"pointer",overflow:"hidden",flexShrink:0}}>
+        <div style={{flex:1,background:C.prev,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}><AImg url={t.dataUrl} size={64} anim={t.isAnimated} frames={t.frames||1} ticks={t.ticksPerFrame||4}/></div>
+        <div style={{padding:"0 4px 4px",fontSize:10,color:sel===t.id?C.accent:C.dim,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.label}</div>
+      </div>)}
+    </div>
+  </div>;
+}
+
+function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,activePanel,setActivePanel,highlightFaceKey}){
+  const faceLabel=highlightFaceKey?highlightFaceKey.replace(/^texture/,"").replace(/Id$/,"")+" face":"Texture";
+  if(!activePanel){
+    return<div style={{display:"flex",height:"100%",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12,flexDirection:"column",gap:8}}>
+      <span style={{fontSize:20,color:"#2a2a2a"}}>⊹</span>
+      <span>click edit or set on the left</span>
+    </div>;
+  }
+  return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+    <div style={{display:"flex",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
+      {["texture","tags","tooltip","recipe","code"].map(id=>(
+        <button key={id} onClick={()=>setActivePanel(p=>p===id?null:id)} style={{flex:1,padding:"6px 2px",fontSize:10,background:activePanel===id?"#1a2438":"transparent",color:activePanel===id?C.accent:C.dim,border:"none",borderRight:"1px solid #1a1a1a",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontWeight:activePanel===id?700:400,textTransform:"capitalize"}}>{id}</button>
+      ))}
+    </div>
+    <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey={highlightFaceKey||"textureId"} label={faceLabel}/>}
+      {activePanel==="tags"&&<TagsPanel/>}
+      {activePanel==="tooltip"&&<TooltipPanel/>}
+      {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks}/>}
+      {activePanel==="code"&&<CodePanel textures={textures} isBlock={isBlock}/>}
+    </div>
+  </div>;
+}
+
+function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,consoleH,activePanel,setActivePanel}){
+  const{form,F}=useContext(FormCtx);
+  const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
   const texId=(form.textureId||"").startsWith("__direct__")?null:form.textureId;
   const selTex=textures.find(t=>t.id===texId);
   const dUrl=(form.textureId||"").startsWith("__direct__")?form.textureId.split("__name__")[0].replace("__direct__",""):null;
   const dName=(form.textureId||"").startsWith("__direct__")?form.textureId.split("__name__")[1]:null;
-  const tags=form.tags||[];const remTag=t=>F("tags",tags.filter(x=>x!==t));
+  const tags=form.tags||[];
   const save=async()=>{
     if(!form.id.trim())return;setSaving(true);setStatus([]);
     const CN=form.customConstName?form.constName:form.id.toUpperCase();
@@ -317,6 +369,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[]}){
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()});
   };
+  const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Item":"New Item"}</span>{isEdit&&<Pill color="#1a2438">editing</Pill>}</div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -324,78 +377,44 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[]}){
       <ConstField form={form} F={F}/>
     </div>
     <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Mother Flame"/>
-    <TexSel label="Texture" textures={textures} value={form.textureId} onChange={v=>F("textureId",v)}/>
-    {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>⚡ animated — mcmeta auto-written</span>}
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Texture</Lbl>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"7px 10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {(selTex||dUrl)&&<AImg url={selTex?.dataUrl||dUrl} size={22} anim={selTex?.isAnimated} frames={selTex?.frames||1} ticks={selTex?.ticksPerFrame||4}/>}
+          <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
+        </div>
+        <Btn sm v="g" onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")}>set</Btn>
+      </div>
+      {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>animated — mcmeta auto-written</span>}
+    </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
     <Sel label="Item Type" value={form.itemType} onChange={v=>F("itemType",v)} options={["None","Tool","Food","Fuel"]}/>
+    <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
     {form.itemType==="Tool"&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
     {form.itemType==="Food"&&<Sect title="Food Properties"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div><Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/></Sect>}
     {form.itemType==="Fuel"&&<Inp label="Burn time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
-    {form.itemType==="None"&&<Sect title="Holding Mode" open={false}><Sel label="Style" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default"},{value:"handheld",label:"Tool style"}]}/></Sect>}
-    <TooltipSect form={form} F={F}/>
-    <div style={{display:"flex",alignItems:"flex-start",gap:6,flexWrap:"wrap"}}>
-      <span style={{fontSize:13,color:C.text,marginTop:2}}>Tags</span>
-      {tags.map(t=><Pill key={t} onClick={()=>remTag(t)}>{t} ✕</Pill>)}
-      {!tags.length&&<span style={{fontSize:11,color:C.faint,marginTop:4}}>none — click tags in right pane</span>}
+    <div style={{display:"flex",flexDirection:"column",gap:0,border:`1px solid #1e1e1e`,borderRadius:C.r,overflow:"hidden",marginTop:4}}>
+      <ER label="Tags" panel="tags" count={tags.length}/>
+      <ER label="Tooltip" panel="tooltip" badge={form.hasTooltip?"on":null}/>
+      <ER label="Recipe" panel="recipe" badge={form.hasRecipe?"on":null}/>
     </div>
-    <Chk label="Add custom recipe?" checked={!!form.hasRecipe} onChange={v=>F("hasRecipe",v)}/>
+    {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{tags.map(t=><Pill key={t} onClick={()=>F("tags",tags.filter(x=>x!==t))}>{t} ✕</Pill>)}</div>}
     <Sbar messages={status}/>
-    {showCode&&(()=>{const c=gItemCode(form,textures);return<div style={{display:"flex",flexDirection:"column",gap:7}}><div style={{display:"flex",justifyContent:"space-between"}}><Lbl>Generated</Lbl><Btn sm v="g" onClick={()=>setShowCode(false)}>hide</Btn></div><CopyB title="ModItems" code={c.reg}/><CopyB title="lang" code={`  "${c.langKey}": "${c.langVal}",`}/><CopyB title="model" code={`        ${c.modelLine}`}/>{gTagCode(form.id,form).map((t,i)=><CopyB key={i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;})()}
-    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} onCode={()=>setShowCode(v=>!v)}/>
+    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} showCons={showCons} consoleH={consoleH} onCode={()=>setActivePanel(p=>p==="code"?null:"code")}/>
   </div>;
 }
 
-// ── Item right pane ────────────────────────────────────────────────────────────
-function ItemRight({textures,modItems=[]}){
-  const{form}=useContext(FormCtx);
-  const texId=(form.textureId||"").startsWith("__direct__")?null:form.textureId;
-  const selTex=textures.find(t=>t.id===texId);
-  const dUrl=(form.textureId||"").startsWith("__direct__")?form.textureId.split("__name__")[0].replace("__direct__",""):null;
-  const prevUrl=selTex?.dataUrl||dUrl;
-  return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <div style={{padding:"14px 16px",display:"flex",gap:14,alignItems:"center",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
-      <div style={{width:88,height:88,background:C.prev,borderRadius:5,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-        {prevUrl?<AImg url={prevUrl} size={70} anim={selTex?.isAnimated} frames={selTex?.frames||1} ticks={selTex?.ticksPerFrame||4}/>:<div style={{color:C.faint,fontSize:11}}>no tex</div>}
-      </div>
-      <div><div style={{fontSize:13,fontWeight:500}}>{form.displayName||<span style={{color:C.faint}}>name</span>}</div><div style={{fontSize:11,color:C.dim,marginTop:3}}>{form.id?`${MODID}:${form.id}`:<span style={{color:C.faint}}>id</span>}</div></div>
-    </div>
-    <TagsRight/>
-    <RecipeRight modItems={modItems}/>
-  </div>;
+function ItemRight({textures,modItems=[],activePanel,setActivePanel}){
+  return<RightPaneShell modItems={modItems} textures={textures} isBlock={false} activePanel={activePanel} setActivePanel={setActivePanel}/>;
 }
 
-// ── Block left pane ────────────────────────────────────────────────────────────
-function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlocks=[]}){
+function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlocks=[],showCons,consoleH,activePanel,setActivePanel,setHighlightFaceKey}){
   const{form,F}=useContext(FormCtx);
-  const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);const[showCode,setShowCode]=useState(false);
-  const[pickFace,setPickFace]=useState(null);const[faceSrch,setFaceSrch]=useState("");
-  const faceTxs=useMemo(()=>{const q=faceSrch.toLowerCase();return q?textures.filter(t=>t.label.toLowerCase().includes(q)||t.id.toLowerCase().includes(q)):textures;},[textures,faceSrch]);
+  const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
   const orient=form.orientationType||"simple",isAdv=orient==="pillar"||orient==="directional";
-  const tags=form.tags||[];const remTag=t=>F("tags",tags.filter(x=>x!==t));
-  const FaceModal=()=>!pickFace?null:(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500}} onClick={()=>setPickFace(null)}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:C.r,padding:13,width:260,maxHeight:370,display:"flex",flexDirection:"column",gap:7}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:500}}>{pickFace.label}</span><Btn sm v="g" onClick={()=>setPickFace(null)}>✕</Btn></div>
-        <input autoFocus value={faceSrch} onChange={e=>setFaceSrch(e.target.value)} placeholder="search…" style={{...SI.inp,fontSize:11}}/>
-        <div style={{overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:1}}>
-          <div onClick={()=>{F(pickFace.fkey,"");setPickFace(null);}} style={{padding:"5px 8px",cursor:"pointer",color:C.faint,fontSize:11,borderBottom:"1px solid #181818"}}>(none)</div>
-          {faceTxs.map(t=><div key={t.id} onClick={()=>{F(pickFace.fkey,t.id);setPickFace(null);}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,borderBottom:"1px solid #181818",background:form[pickFace.fkey]===t.id?"#1a2438":"transparent"}}>
-            <AImg url={t.dataUrl} size={22}/><div><div style={{fontSize:11}}>{t.label}</div><div style={{fontSize:9,color:C.dim}}>{t.id}</div></div>
-          </div>)}
-        </div>
-      </div>
-    </div>
-  );
-  const FC2=({label,fkey})=>{const t=textures.find(x=>x.id===form[fkey]);return<div onClick={()=>{setPickFace({fkey,label});setFaceSrch("");}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,cursor:"pointer",padding:4,borderRadius:4,background:"#191919",border:`1px solid ${form[fkey]?"#2a3454":C.inpB}`,minWidth:56}}>
-    <div style={{width:40,height:40,background:C.prev,borderRadius:3,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>{t?.dataUrl?<img src={t.dataUrl} alt="" style={{width:40,height:40,imageRendering:"pixelated",objectFit:"contain"}}/>:<div/>}</div>
-    <span style={{fontSize:8,color:C.dim,textTransform:"uppercase"}}>{label}</span>
-  </div>;};
-  const TexCross=()=><div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-start"}}>
-    <FaceModal/>
-    <div style={{paddingLeft:60}}><FC2 label="Top" fkey="textureTopId"/></div>
-    <div style={{display:"flex",gap:4}}><FC2 label={orient==="directional"?"Right":"Side"} fkey="textureSideId"/><FC2 label="Front" fkey="textureFrontId"/><FC2 label={orient==="directional"?"Left":"Side"} fkey="textureSideId"/><FC2 label="Back" fkey="textureBackId"/></div>
-    <div style={{paddingLeft:60}}><FC2 label="Bottom" fkey="textureBottomId"/></div>
-  </div>;
+  const tags=form.tags||[];
+  const selTex=textures.find(t=>t.id===form.textureId);
   const save=async()=>{
     if(!form.id.trim())return;setSaving(true);setStatus([]);
     const CN=form.customConstName?form.constName:form.id.toUpperCase();
@@ -419,6 +438,9 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     if(form.hasTooltip)for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:isEdit});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
     setStatus(msgs);setSaving(false);onSave(block);
   };
+  const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
+  const setFace=(fkey)=>{setHighlightFaceKey(fkey);setActivePanel("texture");};
+  const FRow=({label,fkey})=>{const t=textures.find(x=>x.id===form[fkey]);return<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 0"}}><div style={{display:"flex",alignItems:"center",gap:7}}>{t?.dataUrl?<AImg url={t.dataUrl} size={22}/>:<div style={{width:22,height:22,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`}}/>}<span style={{fontSize:12,color:C.dim,textTransform:"uppercase",letterSpacing:.5}}>{label}</span></div><Btn sm v="g" onClick={()=>setFace(fkey)}>set</Btn></div>;};
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Block":"New Block"}</span>{isEdit&&<Pill color="#1a2438">editing</Pill>}</div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -426,164 +448,104 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
       <ConstField form={form} F={F}/>
     </div>
     <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Obsidian Bricks"/>
-    <Sect title="Block Orientation">
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <Lbl>Block Orientation</Lbl>
       <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{[{v:"simple",l:"Simple"},{v:"pillar",l:"Log/Pillar"},{v:"directional",l:"Directional"}].map(o=><label key={o.v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><div onClick={()=>F("orientationType",o.v)} style={{width:13,height:13,borderRadius:"50%",border:`2px solid ${orient===o.v?C.accent:C.inpB}`,background:orient===o.v?C.accent:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:"#a0a09a"}}>{o.l}</span></label>)}</div>
-      {isAdv?<TexCross/>:<TexSel label="All faces" textures={textures} value={form.textureId} onChange={v=>F("textureId",v)}/>}
-    </Sect>
-    <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-      <Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/>
-      <Sel label="Sound" value={form.soundType} onChange={v=>F("soundType",v)} options={SOUND_TYPES}/>
+      {!isAdv&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:13,color:C.text}}>All Faces</span>
+          {selTex&&<AImg url={selTex.dataUrl} size={22}/>}
+          <span style={{fontSize:11,color:C.dim}}>{selTex?.label||"none"}</span>
+        </div>
+        <Btn sm v="g" onClick={()=>setFace("textureId")}>set</Btn>
+      </div>}
+      {isAdv&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
+        <FRow label="Top" fkey="textureTopId"/>
+        <FRow label="Front" fkey="textureFrontId"/>
+        <FRow label="Side" fkey="textureSideId"/>
+        <FRow label="Back" fkey="textureBackId"/>
+        <FRow label="Bottom" fkey="textureBottomId"/>
+      </div>}
     </div>
+    <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/><Sel label="Sound" value={form.soundType} onChange={v=>F("soundType",v)} options={SOUND_TYPES}/></div>
     <Chk label="Requires correct tool for drops?" checked={form.requiresTool} onChange={v=>F("requiresTool",v)}/>
     <Sect title="Variants (auto-generated)">
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].map(([k,l])=><Chk key={k} label={l} checked={!!form[k]} onChange={v=>F(k,v)}/>)}</div>
-      {form.createDoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`,display:"flex",flexDirection:"column",gap:8}}>
+      {form.createDoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`,display:"flex",flexDirection:"column",gap:6}}>
         <Lbl>Door Textures</Lbl>
-        <TexSel label="Door Top" textures={textures} value={form.textureDoorTopId||""} onChange={v=>F("textureDoorTopId",v)}/>
-        <TexSel label="Door Bottom" textures={textures} value={form.textureDoorBottomId||""} onChange={v=>F("textureDoorBottomId",v)}/>
-        <TexSel label="Door Item" textures={textures} value={form.textureDoorItemId||""} onChange={v=>F("textureDoorItemId",v)}/>
+        <FRow label="Door Top" fkey="textureDoorTopId"/>
+        <FRow label="Door Bottom" fkey="textureDoorBottomId"/>
+        <FRow label="Door Item" fkey="textureDoorItemId"/>
       </div>}
-      {form.createTrapdoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`}}>
-        <TexSel label="Trapdoor" textures={textures} value={form.textureTrapdoorId||""} onChange={v=>F("textureTrapdoorId",v)}/>
-      </div>}
+      {form.createTrapdoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`}}><FRow label="Trapdoor" fkey="textureTrapdoorId"/></div>}
     </Sect>
-    <TooltipSect form={form} F={F}/>
-    <div style={{display:"flex",alignItems:"flex-start",gap:6,flexWrap:"wrap"}}>
-      <span style={{fontSize:13,color:C.text,marginTop:2}}>Tags</span>
-      {tags.map(t=><Pill key={t} onClick={()=>remTag(t)}>{t} ✕</Pill>)}
-      {!tags.length&&<span style={{fontSize:11,color:C.faint,marginTop:4}}>none — click tags in right pane</span>}
+    <div style={{display:"flex",flexDirection:"column",gap:0,border:`1px solid #1e1e1e`,borderRadius:C.r,overflow:"hidden",marginTop:4}}>
+      <ER label="Tags" panel="tags" count={tags.length}/>
+      <ER label="Tooltip" panel="tooltip" badge={form.hasTooltip?"on":null}/>
+      <ER label="Recipe" panel="recipe" badge={form.hasRecipe?"on":null}/>
     </div>
-    <Chk label="Add custom recipe?" checked={!!form.hasRecipe} onChange={v=>F("hasRecipe",v)}/>
+    {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{tags.map(t=><Pill key={t} onClick={()=>F("tags",tags.filter(x=>x!==t))}>{t} ✕</Pill>)}</div>}
     <Sbar messages={status}/>
-    {showCode&&<div style={{display:"flex",flexDirection:"column",gap:7}}><div style={{display:"flex",justifyContent:"space-between"}}><Lbl>Generated</Lbl><Btn sm v="g" onClick={()=>setShowCode(false)}>hide</Btn></div>{gBlockEntries(form,textures).map((e,i)=><CopyB key={i} title={e.constName} code={e.line}/>)}{gTagCode(form.id,form,true).map((t,i)=><CopyB key={"t"+i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>}
-    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} onCode={()=>setShowCode(v=>!v)}/>
+    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} showCons={showCons} consoleH={consoleH} onCode={()=>setActivePanel(p=>p==="code"?null:"code")}/>
   </div>;
 }
 
-// ── Block right pane ───────────────────────────────────────────────────────────
-function BlockRight({textures,modItems=[],modBlocks=[]}){
-  const{form}=useContext(FormCtx);
-  const texPreview=textures.find(t=>t.id===form.textureId);
-  return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <div style={{padding:"14px 16px",display:"flex",gap:14,alignItems:"center",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
-      <div style={{width:88,height:88,background:C.prev,borderRadius:5,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-        {texPreview?.dataUrl?<img src={texPreview.dataUrl} alt="" style={{width:70,height:70,imageRendering:"pixelated",objectFit:"contain"}}/>:<div style={{color:C.faint,fontSize:11}}>no tex</div>}
-      </div>
-      <div><div style={{fontSize:13,fontWeight:500}}>{form.displayName||<span style={{color:C.faint}}>name</span>}</div><div style={{fontSize:11,color:C.dim,marginTop:3}}>{form.id?`${MODID}:${form.id}`:<span style={{color:C.faint}}>id</span>}</div></div>
-    </div>
-    <TagsRight/>
-    <RecipeRight modItems={modItems} modBlocks={modBlocks}/>
-  </div>;
+function BlockRight({textures,modItems=[],modBlocks=[],activePanel,setActivePanel,highlightFaceKey}){
+  return<RightPaneShell modItems={modItems} modBlocks={modBlocks} textures={textures} isBlock={true} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/>;
 }
 
-// ── Root App ───────────────────────────────────────────────────────────────────
 export default function App(){
   const[tab,setTab]=useState("textures");
   const[textures,setTextures]=useLS("ycs_textures",[]);
   const[items,setItems]=useLS("ycs_items",[]);
   const[blocks,setBlocks]=useLS("ycs_blocks",[]);
-  // editor state: null=home, object=editing
   const[texEd,setTexEd]=useState(null);
   const[itemEd,setItemEd]=useState(null);
   const[blockEd,setBlockEd]=useState(null);
   const[modItems,setModItems]=useState([]);const[modBlocks,setModBlocks]=useState([]);
   const[backOk,setBackOk]=useState(null);
   const[showCons,setShowCons]=useState(false);const[consH,setConsH]=useState(200);
+  const[activePanel,setActivePanel]=useState(null);
+  const[highlightFaceKey,setHighlightFaceKey]=useState("textureId");
   const{rs,running,run}=useRun();
   const isElectron=typeof window!=="undefined"&&window.ycsNative?.isElectron;
   const native=typeof window!=="undefined"?window.ycsNative:null;
   const isRunning=rs.state!=="idle";
 
   useEffect(()=>{fetch(`${BASE}/health`).then(r=>r.json()).then(()=>setBackOk(true)).catch(()=>setBackOk(false));},[]);
-  const reloadMod=()=>{
-    fetch(`${BASE}/items/read`).then(r=>r.json()).then(j=>{if(j.ok)setModItems(j.items||[]);}).catch(()=>{});
-    fetch(`${BASE}/blocks/read`).then(r=>r.json()).then(j=>{if(j.ok)setModBlocks(j.blocks||[]);}).catch(()=>{});
-  };
+  useEffect(()=>{setActivePanel(null);setHighlightFaceKey("textureId");},[texEd,itemEd,blockEd]);
+  const reloadMod=()=>{fetch(`${BASE}/items/read`).then(r=>r.json()).then(j=>{if(j.ok)setModItems(j.items||[]);}).catch(()=>{});fetch(`${BASE}/blocks/read`).then(r=>r.json()).then(j=>{if(j.ok)setModBlocks(j.blocks||[]);}).catch(()=>{});};
   useEffect(()=>{ reloadMod(); },[]);
-
   const onConsDrag=e=>{e.preventDefault();const sy=e.clientY,sh=consH;const mv=ev=>setConsH(Math.max(80,Math.min(480,sh-(ev.clientY-sy))));const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);};
-
   const allItems=useMemo(()=>{const m=new Map();modItems.forEach(x=>m.set(x.id,{...x,source:"mod"}));items.forEach(x=>m.set(x.id,{...x,source:"local"}));return[...m.values()];},[items,modItems]);
   const allBlocks=useMemo(()=>{const m=new Map();modBlocks.forEach(x=>m.set(x.id,{...x,source:"mod"}));blocks.forEach(x=>m.set(x.id,{...x,source:"local"}));return[...m.values()];},[blocks,modBlocks]);
   const texEntries=useMemo(()=>textures.map(t=>({...t,displayName:t.label,previewDataUrl:t.dataUrl})),[textures]);
-  const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl};}), [allItems,textures]);
-  const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl};}), [allBlocks,textures]);
-
+  const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allItems,textures]);
+  const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allBlocks,textures]);
   const delTex=id=>setTextures(arr=>arr.filter(x=>x.id!==id));
   const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const delBlock=async id=>{const b=allBlocks.find(x=>x.id===id);if(!b)return;await api("/blocks/delete",{id,constName:b.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"block"});setBlocks(arr=>arr.filter(x=>x.id!==id));reloadMod();};
-
   const saveItem=item=>{setItems(arr=>{const i=arr.findIndex(x=>x.id===item.id);return i>=0?arr.map((x,j)=>j===i?item:x):[...arr,item];});reloadMod();setItemEd(null);};
   const saveBlock=block=>{setBlocks(arr=>{const i=arr.findIndex(x=>x.id===block.id);return i>=0?arr.map((x,j)=>j===i?block:x):[...arr,block];});reloadMod();setBlockEd(null);};
-  const saveTex=tex=>{
-    const id=tex.label.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
-    if(texEd?.mode==="edit"){setTextures(arr=>arr.map(x=>x.id===texEd.target?.id?{...tex,id,savedAt:Date.now()}:x));}
-    else setTextures(arr=>[...arr,{...tex,id,savedAt:Date.now()}]);
-    setTexEd(null);
-  };
-
-  const switchTab=t=>{setTab(t);setTexEd(null);setItemEd(null);setBlockEd(null);};
+  const saveTex=tex=>{const id=tex.label.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");if(texEd?.mode==="edit"){setTextures(arr=>arr.map(x=>x.id===texEd.target?.id?{...tex,id,savedAt:Date.now()}:x));}else setTextures(arr=>[...arr,{...tex,id,savedAt:Date.now()}]);setTexEd(null);};
+  const switchTab=t=>{setTab(t);setTexEd(null);setItemEd(null);setBlockEd(null);setActivePanel(null);};
   const inEd=(tab==="textures"&&texEd!=null)||(tab==="items"&&itemEd!=null)||(tab==="blocks"&&blockEd!=null);
   const fabBottom=showCons?consH+5+30:30;
-
   const TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"}];
 
-  // Render editor or home based on tab+edit state
   const renderPane=()=>{
     if(tab==="textures"){
-      if(texEd){
-        const init=texEd.target||null;
-        return<TexProv initial={init}>
-          <div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
-            <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <div style={{flex:1,overflowY:"auto"}}><TexLeft initial={init} onSave={saveTex} onCancel={()=>setTexEd(null)}/></div>
-            </div>
-            <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <TexRight/>
-            </div>
-          </div>
-        </TexProv>;
-      }
-      return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}>
-        <CardGrid entries={texEntries} emptyLabel="No textures yet." onDelete={delTex} onOpen={e=>setTexEd({mode:"edit",target:e})}/>
-      </div>;
+      if(texEd){const init=texEd.target||null;return<TexProv initial={init}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><TexLeft initial={init} onSave={saveTex} onCancel={()=>setTexEd(null)}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><TexRight/></div></div></TexProv>;}
+      return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={texEntries} emptyLabel="No textures yet." onDelete={delTex} onOpen={e=>setTexEd({mode:"edit",target:e})}/></div>;
     }
     if(tab==="items"){
-      if(itemEd){
-        const init=itemEd.target||null;
-        return<ItemProv initial={init}>
-          <div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
-            <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={()=>setItemEd(null)} modItems={allItems}/></div>
-            </div>
-            <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <ItemRight textures={textures} modItems={allItems}/>
-            </div>
-          </div>
-        </ItemProv>;
-      }
-      return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}>
-        <CardGrid entries={itemEntries} emptyLabel="No items yet." onDelete={delItem} onOpen={e=>setItemEd({target:e})}/>
-      </div>;
+      if(itemEd){const init=itemEd.target||null;return<ItemProv initial={init}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={()=>setItemEd(null)} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div></ItemProv>;}
+      return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={itemEntries} emptyLabel="No items yet." onDelete={delItem} onOpen={e=>setItemEd({target:e})}/></div>;
     }
     if(tab==="blocks"){
-      if(blockEd){
-        const init=blockEd.target||null;
-        return<BlockProv initial={init}>
-          <div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
-            <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={()=>setBlockEd(null)} modItems={allItems} modBlocks={allBlocks}/></div>
-            </div>
-            <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks}/>
-            </div>
-          </div>
-        </BlockProv>;
-      }
-      return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}>
-        <CardGrid entries={blockEntries} emptyLabel="No blocks yet." onDelete={delBlock} onOpen={e=>setBlockEd({target:e})}/>
-      </div>;
+      if(blockEd){const init=blockEd.target||null;return<BlockProv initial={init}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={()=>setBlockEd(null)} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
+      return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={blockEntries} emptyLabel="No blocks yet." onDelete={delBlock} onOpen={e=>setBlockEd({target:e})}/></div>;
     }
     return null;
   };
@@ -591,8 +553,6 @@ export default function App(){
   return<>
     <style>{FONT_URL}{G_CSS}</style>
     <div style={{height:"100vh",background:C.bg,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-
-      {/* ROW 1: Dots bar (draggable title bar) */}
       <div style={{height:36,background:"#1c1c1c",display:"flex",alignItems:"center",flexShrink:0,WebkitAppRegion:"drag",zIndex:30}}>
         <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:13,WebkitAppRegion:"no-drag"}}>
           <Dot color="#e4e5e9" title={rs.dirty?"RunData→RunClient":"RunClient"} disabled={isRunning||running} onClick={()=>run("/run/client")}/>
@@ -609,34 +569,21 @@ export default function App(){
           {!isElectron&&<span style={{fontSize:10,color:backOk===false?"#cc6a6a":backOk===true?"#5acc5a":"#555",fontFamily:"monospace"}}>{backOk===false?"⚠ offline":backOk===true?"● live":"…"}</span>}
         </div>
       </div>
-
-      {/* ROW 2: Tab bar — all tabs same size, active bleeds into workspace */}
       <div style={{height:36,background:C.tabBar,display:"flex",alignItems:"flex-end",paddingLeft:8,flexShrink:0,zIndex:20}}>
-        {TABS.map(t=>{const a=tab===t.id;return<button key={t.id} onClick={()=>switchTab(t.id)} style={{width:TAB_W,height:TAB_H,background:a?C.bg:"#2e2e2e",border:"none",borderRadius:a?"6.5px 6.5px 0 0":"6.5px 6.5px 0 0",color:C.text,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"pointer",flexShrink:0,marginRight:3,position:"relative",zIndex:a?25:15,bottom:0,paddingBottom:a?1:0,opacity:a?1:0.65}}>{t.l}</button>;})}
+        {TABS.map(t=>{const a=tab===t.id;return<button key={t.id} onClick={()=>switchTab(t.id)} style={{width:TAB_W,height:TAB_H,background:a?C.bg:"#2e2e2e",border:"none",borderRadius:"6.5px 6.5px 0 0",color:C.text,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"pointer",flexShrink:0,marginRight:3,opacity:a?1:0.65}}>{t.l}</button>;})}
       </div>
-
-      {/* ROW 3: Workspace */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,padding:`5px 5px ${showCons?0:5}px 5px`,gap:5}}>
         {renderPane()}
       </div>
-
-      {/* FAB — only on home, rises above console */}
-      {!inEd&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else setBlockEd({});}}
-        style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}}
-        onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
-
-      {/* Console */}
-      {showCons&&<div style={{flexShrink:0,padding:`0 5px 5px`}}>
-        <div onMouseDown={onConsDrag} style={{height:7,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{width:36,height:3,borderRadius:2,background:"#2e2e2e"}}/>
-        </div>
+      {!inEd&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else setBlockEd({});}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
+      {showCons&&<div style={{flexShrink:0,padding:"0 5px 5px"}}>
+        <div onMouseDown={onConsDrag} style={{height:7,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:36,height:3,borderRadius:2,background:"#2e2e2e"}}/></div>
         <div style={{height:consH,background:"#0a0a0a",border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{display:"flex",alignItems:"center",padding:"4px 12px",borderBottom:"1px solid #181818",background:"#141414",flexShrink:0,gap:8}}>
-            <span style={{fontSize:11,color:C.dim,fontFamily:"monospace"}}>Console</span>
+          <div style={{display:"flex",alignItems:"center",padding:"3px 10px",borderBottom:"1px solid #181818",background:"#141414",flexShrink:0,gap:6}}>
             {rs.state==="error"&&<span style={{fontSize:10,background:"#200e0e",color:"#ff7777",padding:"1px 6px",borderRadius:3}}>error</span>}
             {rs.dirty&&<span style={{fontSize:10,background:"#181408",color:C.accent,padding:"1px 6px",borderRadius:3}}>dirty</span>}
             {!rs.dirty&&rs.state==="idle"&&<span style={{fontSize:10,background:"#091409",color:"#5acc5a",padding:"1px 6px",borderRadius:3}}>clean</span>}
-            <button onClick={()=>setShowCons(false)} style={{marginLeft:"auto",background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:13,padding:"0 2px"}}>✕</button>
+            {isRunning&&<span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>⟳ {rs.state}…</span>}
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"6px 12px",fontFamily:"monospace",fontSize:11,lineHeight:1.7}}>
             {!rs.log.length&&<div style={{color:"#1e1e1e"}}>No output yet.</div>}
@@ -644,8 +591,6 @@ export default function App(){
           </div>
         </div>
       </div>}
-
     </div>
   </>;
 }
-

@@ -76,6 +76,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "item/cat"), TEXTURE);
         getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "item/cra"), TEXTURE);
+        handheldItem(ModItems.SHIKA);
         // YCS_MODEL_INSERT
         buttonItem(ModBlocks.CRATE_BUTTON, ModBlocks.CRATE_BLOCK);
         fenceItem(ModBlocks.CRATE_FENCE, ModBlocks.CRATE_BLOCK);
