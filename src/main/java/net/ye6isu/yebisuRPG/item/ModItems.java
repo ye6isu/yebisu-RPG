@@ -76,9 +76,9 @@ public class ModItems {
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.BOOTS,
                     new Item.Properties().durability(ArmorItem.Type.BOOTS.getDurability(19))));
 
-    //Items from creator
-    public static final DeferredItem<Item> SHIKA = ITEMS.register("shika",
-                () -> new Item(new Item.Properties()));
+    //Items from creator
+
+
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

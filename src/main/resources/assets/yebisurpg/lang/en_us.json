@@ -5,7 +5,7 @@
   "item.yebisurpg.plank_chestplate": "Plank Chestplate",
   "item.yebisurpg.plank_helmet": "Plank Helmet",
   "item.yebisurpg.plank_leggings": "Plank Leggings",
-  "item.yebisurpg.shika": "Shika",
+  "item.yebisurpg.raw_ye6isu": "Raw ye6isu",
   "item.yebisurpg.sukuna_finger": "Sukuna's Finger",
   "item.yebisurpg.walkman": "Walkman",
   "item.yebisurpg.ye6isu": "ye6isu",
@@ -14,8 +14,6 @@
   "item.yebisurpg.ye6isu_pickaxe": "ye6isu Pickaxe",
   "item.yebisurpg.ye6isu_shovel": "ye6isu Shovel",
   "item.yebisurpg.ye6isu_sword": "ye6isu Sword",
-  "item.yebisurpg.raw_ye6isu": "Raw ye6isu",
-
   "block.yebisurpg.cat_block": "Cat Block",
   "block.yebisurpg.crate_block": "Crate Block",
   "block.yebisurpg.crate_button": "Crate Button",
@@ -29,15 +27,12 @@
   "block.yebisurpg.crate_wall": "Crate Wall",
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
   "block.yebisurpg.ye6isu_ore": "ye6isu Ore",
-
   "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info",
   "tooltip.yebisurpg.sukuna_finger.tooltip": "Finger of the the King of Curses",
   "tooltip.yebisurpg.ye6isu": "NO",
   "tooltip.yebisurpg.ye6isu.shift_down": "YES",
-
   "creativetab.yebisurpg.yebisurpg_blocks": "yebisu RPG Blocks",
   "creativetab.yebisurpg.yebisurpg_items": "yebisu RPG Items",
-
   "key.categories.yebisurpg": "yebisu RPG",
   "key.yebisurpg.use_ability": "Use Ability"
 }

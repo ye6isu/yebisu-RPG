@@ -671,6 +671,90 @@ app.post('/api/blocks/delete', (req, res) => {
 
 app.listen(3001, () => {
   console.log('ycs backend :3001  mod:', MOD_ROOT)
+  // On startup: auto-write missing model JSONs for all items that have textures
+  autoWriteMissingModelJsons()
+})
+
+// ─── Auto-write missing model JSONs ────────────────────────────────────────────
+const GEN_ROOT = 'D:/Projects/Mods/yebisu-RPG/src/generated/resources'
+
+function writeModelJson(id, isHandheld=false) {
+  const modelDir = jp(GEN_ROOT,'assets',MODID,'models','item')
+  const modelPath = jp(modelDir,`${id}.json`)
+  if (!fs.existsSync(modelDir)) fs.mkdirSync(modelDir, { recursive:true })
+  if (fs.existsSync(modelPath)) return // don't overwrite existing
+  const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated'
+  fs.writeFileSync(modelPath, JSON.stringify({
+    parent,
+    textures: { layer0: `${MODID}:item/${id}` }
+  }, null, 2))
+}
+
+function writeBlockStateJson(id) {
+  const bsDir = jp(GEN_ROOT,'assets',MODID,'blockstates')
+  const bsPath = jp(bsDir,`${id}.json`)
+  if (!fs.existsSync(bsDir)) fs.mkdirSync(bsDir, { recursive:true })
+  if (fs.existsSync(bsPath)) return
+  fs.writeFileSync(bsPath, JSON.stringify({
+    variants: { "": { model: `${MODID}:block/${id}` } }
+  }, null, 2))
+}
+
+function writeBlockModelJsons(id) {
+  const blockModelDir = jp(GEN_ROOT,'assets',MODID,'models','block')
+  const itemModelDir  = jp(GEN_ROOT,'assets',MODID,'models','item')
+  if (!fs.existsSync(blockModelDir)) fs.mkdirSync(blockModelDir, { recursive:true })
+  if (!fs.existsSync(itemModelDir))  fs.mkdirSync(itemModelDir,  { recursive:true })
+  const blockModel = jp(blockModelDir,`${id}.json`)
+  const itemModel  = jp(itemModelDir,`${id}.json`)
+  if (!fs.existsSync(blockModel)) {
+    fs.writeFileSync(blockModel, JSON.stringify({
+      parent: 'minecraft:block/cube_all',
+      textures: { all: `${MODID}:block/${id}` }
+    }, null, 2))
+  }
+  if (!fs.existsSync(itemModel)) {
+    fs.writeFileSync(itemModel, JSON.stringify({
+      parent: `${MODID}:block/${id}`
+    }, null, 2))
+  }
+}
+
+function autoWriteMissingModelJsons() {
+  try {
+    // Items
+    const itemTexDir = jp(MOD_ROOT,'assets',MODID,'textures','item')
+    const modelProvSrc = fs.existsSync(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java'))
+      ? rf(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')) : ''
+    if (fs.existsSync(itemTexDir)) {
+      for (const f of fs.readdirSync(itemTexDir)) {
+        if (!f.endsWith('.png')) continue
+        const id = f.replace('.png','')
+        const isHandheld = modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()})`)
+          || modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()};`)
+        writeModelJson(id, isHandheld)
+      }
+    }
+    // Blocks
+    const blockTexDir = jp(MOD_ROOT,'assets',MODID,'textures','block')
+    if (fs.existsSync(blockTexDir)) {
+      for (const f of fs.readdirSync(blockTexDir)) {
+        if (!f.endsWith('.png')) continue
+        const id = f.replace('.png','')
+        writeBlockModelJsons(id)
+        writeBlockStateJson(id)
+      }
+    }
+    console.log('[ycs] auto-generated missing model/blockstate JSONs')
+  } catch(e) {
+    console.error('[ycs] autoWriteMissingModelJsons error:', e.message)
+  }
+}
+
+// Also expose as an API endpoint so YCS can trigger it after saving textures
+app.post('/api/models/sync', (_req, res) => {
+  try { autoWriteMissingModelJsons(); res.json({ ok:true }) }
+  catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
 

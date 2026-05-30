@@ -97,7 +97,6 @@ public class ModItemModelProvider extends ItemModelProvider {
         getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
 
         //Items from creator
-        handheldItem(ModItems.SHIKA);
     }
 
     public void buttonItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
