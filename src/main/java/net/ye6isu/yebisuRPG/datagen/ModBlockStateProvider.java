@@ -15,34 +15,32 @@ public class ModBlockStateProvider extends BlockStateProvider {
 
     @Override
     protected void registerStatesAndModels() {
+
+        //Normal Blockss
         blockWithItem(ModBlocks.YE6ISU_BLOCK);
         blockWithItem(ModBlocks.CRATE_BLOCK);
         blockWithItem(ModBlocks.YE6ISU_ORE);
 
-        stairsBlock(ModBlocks.CRATE_STAIRS.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-        slabBlock(ModBlocks.CRATE_SLAB.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-
-        buttonBlock(ModBlocks.CRATE_BUTTON.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-        pressurePlateBlock(ModBlocks.CRATE_PRESSURE_PLATE.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-
-        fenceBlock(ModBlocks.CRATE_FENCE.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-        fenceGateBlock(ModBlocks.CRATE_FENCE_GATE.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-        wallBlock(ModBlocks.CRATE_WALL.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
-
-        doorBlockWithRenderType(ModBlocks.CRATE_DOOR.get(), modLoc("block/crate_door_bottom"), modLoc("block/crate_door_top"), "cutout");
-        trapdoorBlockWithRenderType(ModBlocks.CRATE_TRAPDOOR.get(), modLoc("block/crate_trapdoor"), true, "cutout");
-
+        //Non-Block Blocks
         blockItem(ModBlocks.CRATE_STAIRS);
         blockItem(ModBlocks.CRATE_SLAB);
         blockItem(ModBlocks.CRATE_PRESSURE_PLATE);
         blockItem(ModBlocks.CRATE_FENCE_GATE);
         blockItem(ModBlocks.CRATE_TRAPDOOR, "_bottom");
 
+        //Special Non-Block Blocks
+        stairsBlock(ModBlocks.CRATE_STAIRS.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        slabBlock(ModBlocks.CRATE_SLAB.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        buttonBlock(ModBlocks.CRATE_BUTTON.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        pressurePlateBlock(ModBlocks.CRATE_PRESSURE_PLATE.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        fenceBlock(ModBlocks.CRATE_FENCE.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        fenceGateBlock(ModBlocks.CRATE_FENCE_GATE.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        wallBlock(ModBlocks.CRATE_WALL.get(), blockTexture(ModBlocks.CRATE_BLOCK.get()));
+        doorBlockWithRenderType(ModBlocks.CRATE_DOOR.get(), modLoc("block/crate_door_bottom"), modLoc("block/crate_door_top"), "cutout");
+        trapdoorBlockWithRenderType(ModBlocks.CRATE_TRAPDOOR.get(), modLoc("block/crate_trapdoor"), true, "cutout");
 
-
+        //Block from creator
         blockWithItem(ModBlocks.CAT_BLOCK);
-
-        // YCS_BSP_INSERT
     }
 
     private void blockWithItem(DeferredBlock<?> deferredBlock) {

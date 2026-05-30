@@ -22,16 +22,15 @@ public class ModItemTagProvider extends ItemTagsProvider {
     protected void addTags(HolderLookup.Provider provider) {
         tag(ModTags.Items.CURSED_ITEMS)
                 .add(ModItems.SUKUNA_FINGER.get());
-
         tag(ItemTags.SWORDS)
-                .add(ModItems.YE6ISU_SWORD.get())
-                .add(ModItems.YE6ISU_HOE.get());;
+                .add(ModItems.YE6ISU_SWORD.get());
         tag(ItemTags.PICKAXES)
                 .add(ModItems.YE6ISU_PICKAXE.get());
         tag(ItemTags.SHOVELS)
                 .add(ModItems.YE6ISU_SHOVEL.get());
         tag(ItemTags.AXES)
-                .add(ModItems.YE6ISU_AXE.get());
+                .add(ModItems.YE6ISU_AXE.get())
+                .add(ModItems.YE6ISU_SWORD.get());
         tag(ItemTags.HOES)
                 .add(ModItems.YE6ISU_HOE.get());
         this.tag(ItemTags.TRIMMABLE_ARMOR)
@@ -39,7 +38,5 @@ public class ModItemTagProvider extends ItemTagsProvider {
                 .add(ModItems.PLANK_CHESTPLATE.get())
                 .add(ModItems.PLANK_LEGGINGS.get())
                 .add(ModItems.PLANK_BOOTS.get());
-
-        // YCS_ITEM_TAGS_INSERT
     }
 }

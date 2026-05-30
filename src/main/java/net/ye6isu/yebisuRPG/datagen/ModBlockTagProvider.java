@@ -40,6 +40,5 @@ public class ModBlockTagProvider extends BlockTagsProvider {
         tag(ModTags.Blocks.INCORRECT_FOR_YE6ISU_TOOL)
                 .addTag(BlockTags.INCORRECT_FOR_IRON_TOOL)
                 .remove(ModTags.Blocks.NEEDS_YE6ISU_TOOL);
-        // YCS_BLOCK_TAGS_INSERT
     }
 }

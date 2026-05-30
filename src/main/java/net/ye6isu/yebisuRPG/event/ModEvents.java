@@ -21,10 +21,7 @@ public class ModEvents {
         if(event.getEntity() instanceof LivingEntity livingEntity && event.getSource().getDirectEntity() instanceof Player player) {
             if(player.getMainHandItem().getItem() == ModItems.PLANK.get()) {
                 player.sendSystemMessage(Component.literal(livingEntity.getName().getString().toUpperCase() + " HAS BEEN SPANKED WITH A PLANK!"));
-                //sheep.addEffect(new MobEffectInstance(MobEffects.POISON, 600, 6));
-                //player.getMainHandItem().shrink(1);
             }
         }
     }
-
 }

@@ -10,7 +10,6 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
@@ -18,6 +17,7 @@ import net.ye6isu.yebisuRPG.data.EntityVarCapability;
 import net.ye6isu.yebisuRPG.item.ModCreativeModeTabs;
 import net.ye6isu.yebisuRPG.item.ModItems;
 import net.ye6isu.yebisuRPG.item.YCSTabRegistry;
+import net.ye6isu.yebisuRPG.sound.ModSounds;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -28,18 +28,25 @@ public class yebisuRPG {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public yebisuRPG(IEventBus modEventBus, ModContainer modContainer) {
-        modEventBus.addListener(this::commonSetup);
 
+        modEventBus.addListener(this::commonSetup);
         NeoForge.EVENT_BUS.register(this);
 
         ModCreativeModeTabs.register(modEventBus);
-        ModItems.register(modEventBus);
+
+        ModItems.register(modEventBus); //Item Register
+
         ModBlocks.register(modEventBus);
+
         ModDataComponents.register(modEventBus);
+
+        ModSounds.register(modEventBus);
+
         EntityVarCapability.register(modEventBus);
+
         YCSTabRegistry.register(modEventBus);
 
-        modEventBus.addListener(this::addCreative);
+        //modEventBus.addListener(this::addCreative); To be decided if needed
 
         // Client-only setup (keybinds, client-side registrations, etc.)
         if (FMLEnvironment.dist == Dist.CLIENT) {
@@ -60,9 +67,11 @@ public class yebisuRPG {
         // Add other client-only setup here (screen registration, renderer registration, etc.)
     }
 
+    /* To be decided if needed
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         // Add items to creative tabs here if not handled in ModCreativeModeTabs.
     }
+    */
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {

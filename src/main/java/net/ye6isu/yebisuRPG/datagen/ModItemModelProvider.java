@@ -69,33 +69,37 @@ public class ModItemModelProvider extends ItemModelProvider {
                 .model(new ModelFile.UncheckedModelFile("yebisurpg:item/walkman_frame1"))
                 .end();
 
+        //Normal Items
         basicItem(ModItems.PLANK.get());
         basicItem(ModItems.SUKUNA_FINGER.get());
         basicItem(ModItems.MOTHER_FLAME.get());
+        basicItem(ModItems.RAW_YE6ISU.get());
 
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "item/cat"), TEXTURE);
-        getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "item/cra"), TEXTURE);
-        handheldItem(ModItems.SHIKA);
-        // YCS_MODEL_INSERT
-        buttonItem(ModBlocks.CRATE_BUTTON, ModBlocks.CRATE_BLOCK);
-        fenceItem(ModBlocks.CRATE_FENCE, ModBlocks.CRATE_BLOCK);
-        wallItem(ModBlocks.CRATE_WALL, ModBlocks.CRATE_BLOCK);
-
-        basicItem(ModBlocks.CRATE_DOOR.asItem());
-
+        //Tool Items
         handheldItem(ModItems.YE6ISU_SWORD);
         handheldItem(ModItems.YE6ISU_PICKAXE);
         handheldItem(ModItems.YE6ISU_SHOVEL);
         handheldItem(ModItems.YE6ISU_AXE);
         handheldItem(ModItems.YE6ISU_HOE);
 
+        //Non-Block Block Items
+        buttonItem(ModBlocks.CRATE_BUTTON, ModBlocks.CRATE_BLOCK);
+        fenceItem(ModBlocks.CRATE_FENCE, ModBlocks.CRATE_BLOCK);
+        wallItem(ModBlocks.CRATE_WALL, ModBlocks.CRATE_BLOCK);
+        basicItem(ModBlocks.CRATE_DOOR.asItem());
+
+        //Armor Trim Items
         trimmedArmorItem(ModItems.PLANK_HELMET);
         trimmedArmorItem(ModItems.PLANK_CHESTPLATE);
         trimmedArmorItem(ModItems.PLANK_LEGGINGS);
         trimmedArmorItem(ModItems.PLANK_BOOTS);
 
+        getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
+
+        //Items from creator
+        handheldItem(ModItems.SHIKA);
     }
+
     public void buttonItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
         this.withExistingParent(block.getId().getPath(), mcLoc("block/button_inventory"))
                 .texture("texture",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,
@@ -164,6 +168,4 @@ public class ModItemModelProvider extends ItemModelProvider {
             });
         }
     }
-
-
 }

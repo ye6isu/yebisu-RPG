@@ -1,4 +1,5 @@
 {
+  "raw_ye6isu": "yebisurpg_items_tab",
   "ye6isu": "yebisurpg_items_tab",
   "walkman": "yebisurpg_items_tab",
   "plank": "yebisurpg_items_tab",
@@ -13,7 +14,6 @@
   "ye6isu_shovel": "yebisurpg_items_tab",
   "ye6isu_axe": "yebisurpg_items_tab",
   "ye6isu_hoe": "yebisurpg_items_tab",
-  "tess": "yebisurpg_blocks_tab",
   "block:ye6isu_block": "yebisurpg_blocks_tab",
   "block:ye6isu_ore": "yebisurpg_blocks_tab",
   "block:crate_block": "yebisurpg_blocks_tab",
