@@ -3,6 +3,8 @@ package net.ye6isu.yebisuRPG.datagen;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.recipes.*;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.*;
 import net.minecraft.world.level.ItemLike;
 import net.neoforged.neoforge.common.conditions.IConditionBuilder;
@@ -76,6 +78,8 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 
         //Blasting recipe
         blasting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 100, "ye6isu");
+
+        // YCS_RECIPE_INSERT
     }
 
     protected static void smelting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {

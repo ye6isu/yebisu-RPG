@@ -1,5 +1,4 @@
 {
-  "item.yebisurpg.kolaaaaaa": "Kolasdadsadada",
   "item.yebisurpg.mother_flame": "Mother Flame",
   "item.yebisurpg.plank": "Plank",
   "item.yebisurpg.plank_boots": "Plank Boots",
@@ -30,6 +29,8 @@
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
   "block.yebisurpg.ye6isu_ore": "ye6isu Ore",
 
+  "tooltip.yebisurpg.ratatatat.hidden": "BBG",
+  "tooltip.yebisurpg.ratatatat.normal": "Wusyaname",
   "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info",
   "tooltip.yebisurpg.sukuna_finger.tooltip": "Finger of the the King of Curses",
   "tooltip.yebisurpg.ye6isu": "NO",
