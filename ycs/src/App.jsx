@@ -90,11 +90,12 @@ function gItemCode(item,textures){
   const id=item.id||"my_item",CN=item.customConstName?item.constName:id.toUpperCase(),dn=item.displayName||id;
   const tt=()=>{if(!item.hasTooltip)return null;const n=item.tooltipNormal?`"tooltip.${MODID}.${id}.normal"`:"null";const h=item.hasHiddenTooltip&&item.tooltipHidden?`"tooltip.${MODID}.${id}.hidden"`:"null";const s=item.hasHiddenTooltip?(item.useDefaultShiftHint?`"tooltip.${MODID}.shift_to_see"`:(item.tooltipShiftHint?`"tooltip.${MODID}.${id}.shift_hint"`:"null")):"null";return{n,h,s};};
   const cls=props=>{const t=tt();if(!t||(t.n==="null"&&t.h==="null"))return`new Item(${props})`;return`new TooltipItem(${props},\n                ${t.n},\n                ${t.h},\n                ${t.s})`;};
+  const stackOpt=(item.maxStackSize&&parseInt(item.maxStackSize)!==64)?`.stacksTo(${parseInt(item.maxStackSize)})`:"";
   let reg="",ml2;
   if(item.itemType==="Tool"){const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,c=`${item.toolType}Item`;reg=`public static final DeferredItem<${c}> ${CN} = ITEMS.register("${id}",\n        () -> new ${c}(${tier}, new Item.Properties()\n                .attributes(${c}.createAttributes(${tier}, ${dmg}f, ${spd}f))));`;}
-  else if(item.itemType==="Food"){const al=item.foodAlwaysEdible?".alwaysEat()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties().food(new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}.build())`)});`;}
-  else if(item.itemType==="Fuel"){const t=tt();if(t&&(t.n!=="null"||t.h!=="null"))reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new TooltipItem(new Item.Properties(), ${t.n}, ${t.h}, ${t.s}));`;else reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new FuelItem(new Item.Properties(), ${item.burnTime||1600}));`;}
-  else{if((item.holdingMode||"none")==="handheld")ml2=`handheldItem(ModItems.${CN});`;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls("new Item.Properties()")});`;}
+  else if(item.itemType==="Food"){const al=item.foodAlwaysEdible?".alwaysEat()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}.food(new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}.build())`)});`;}
+  else if(item.itemType==="Fuel"){const t=tt();if(t&&(t.n!=="null"||t.h!=="null"))reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new TooltipItem(new Item.Properties()${stackOpt}, ${t.n}, ${t.h}, ${t.s}));`;else reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new FuelItem(new Item.Properties()${stackOpt}, ${item.burnTime||1600}));`;}
+  else{if((item.holdingMode||"none")==="handheld")ml2=`handheldItem(ModItems.${CN});`;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}`)});`;}
   const modelLine=ml2||(item.itemType==="Tool"?`handheldItem(ModItems.${CN});`:tex?.isAnimated?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");`:`basicItem(ModItems.${CN}.get());`);
   return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN};
 }
@@ -124,12 +125,12 @@ function gBlockEntries(block,textures=[]){
   return entries;
 }
 
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"None",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",requiresTool:false,createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
-function ItemProv({initial,children}){const[form,setForm]=useState(initial?{...ITEM_DEF,...initial}:ITEM_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
-function BlockProv({initial,children}){const[form,setForm]=useState(initial?{...BLOCK_DEF,...initial}:BLOCK_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
+function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
+function BlockProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...BLOCK_DEF,...initial}:BLOCK_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 function TexProv({initial,children}){const[form,setForm]=useState(initial?{...TEX_DEF,...initial}:TEX_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 
 function CardGrid({entries,onDelete,onOpen,emptyLabel}){
@@ -248,10 +249,13 @@ function RecipePanel({modItems=[],modBlocks=[]}){
 function TagsPanel(){
   const{form,F}=useContext(FormCtx);
   const tags=form.tags||[];
-  const add=t=>{if(!t||tags.includes(t))return;F("tags",[...tags,t]);};
+  const toggle=t=>{
+    if(tags.includes(t)) F("tags",tags.filter(x=>x!==t));
+    else F("tags",[...tags,t]);
+  };
   return<div style={{padding:"14px",overflowY:"auto",flex:1}}>
-    <Lbl>Tags — click to add</Lbl>
-    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:8}}>{COMMON_TAGS.map(t=><div key={t} onClick={()=>add(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}</div>)}</div>
+    <Lbl>Tags — click to toggle</Lbl>
+    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:8}}>{COMMON_TAGS.map(t=><div key={t} onClick={()=>toggle(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}{tags.includes(t)&&<span style={{marginLeft:3,opacity:.6}}>✕</span>}</div>)}</div>
   </div>;
 }
 
@@ -356,14 +360,14 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}
     }else{
-      const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
+      const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
       if(selTex?.dataUrl){const jt=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"item"});msgs.push({ok:jt.ok,label:"texture",msg:jt.ok?"ok":jt.reason});}
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     await api("/models/sync",{});
-    setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()});
+    setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()},initial?.id);
   };
   const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
@@ -387,8 +391,9 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>animated — mcmeta auto-written</span>}
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
-    <Sel label="Item Type" value={form.itemType} onChange={v=>F("itemType",v)} options={["None","Tool","Food","Fuel"]}/>
+    <Sel label="Item Type" value={form.itemType} onChange={v=>F("itemType",v)} options={["Generic","Tool","Food","Fuel"]}/>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
+    <Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>
     {form.itemType==="Tool"&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
     {form.itemType==="Food"&&<Sect title="Food Properties"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div><Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/></Sect>}
     {form.itemType==="Fuel"&&<Inp label="Burn time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
@@ -451,7 +456,7 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModBlocks.${CN}`,blockId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     if(form.hasTooltip)for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:isEdit});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
     await api("/models/sync",{});
-    setStatus(msgs);setSaving(false);onSave(block);
+    setStatus(msgs);setSaving(false);onSave(block,initial?.id);
   };
   const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
   const setFace=(fkey)=>{setHighlightFaceKey(fkey);setActivePanel("texture");};
@@ -520,6 +525,8 @@ export default function App(){
   const[texEd,setTexEd]=useState(null);
   const[itemEd,setItemEd]=useState(null);
   const[blockEd,setBlockEd]=useState(null);
+  // Persist editor state per tab so switching away and back restores it
+  const savedEdState=useRef({textures:null,items:null,blocks:null,activePanel:{textures:null,items:null,blocks:null},highlightFaceKey:{textures:"textureId",items:"textureId",blocks:"textureId"}});
   const[modItems,setModItems]=useState([]);const[modBlocks,setModBlocks]=useState([]);
   const[backOk,setBackOk]=useState(null);
   const[showCons,setShowCons]=useState(false);const[consH,setConsH]=useState(200);
@@ -537,16 +544,50 @@ export default function App(){
   const onConsDrag=e=>{e.preventDefault();const sy=e.clientY,sh=consH;const mv=ev=>setConsH(Math.max(80,Math.min(480,sh-(ev.clientY-sy))));const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);};
   const allItems=useMemo(()=>{const m=new Map();modItems.forEach(x=>m.set(x.id,{...x,source:"mod"}));items.forEach(x=>m.set(x.id,{...x,source:"local"}));return[...m.values()];},[items,modItems]);
   const allBlocks=useMemo(()=>{const m=new Map();modBlocks.forEach(x=>m.set(x.id,{...x,source:"mod"}));blocks.forEach(x=>m.set(x.id,{...x,source:"local"}));return[...m.values()];},[blocks,modBlocks]);
+
+  // On startup: if localStorage has an item id that no longer exists in the mod, remove it
+  useEffect(()=>{
+    if(!modItems.length)return;
+    const modIds=new Set(modItems.map(x=>x.id));
+    setItems(arr=>{
+      const filtered=arr.filter(x=>modIds.has(x.id)||!x.id);
+      return filtered.length!==arr.length?filtered:arr;
+    });
+  },[modItems]);
+  useEffect(()=>{
+    if(!modBlocks.length)return;
+    const modIds=new Set(modBlocks.map(x=>x.id));
+    setBlocks(arr=>{
+      const filtered=arr.filter(x=>modIds.has(x.id)||!x.id);
+      return filtered.length!==arr.length?filtered:arr;
+    });
+  },[modBlocks]);
   const texEntries=useMemo(()=>textures.map(t=>({...t,displayName:t.label,previewDataUrl:t.dataUrl})),[textures]);
   const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allItems,textures]);
   const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allBlocks,textures]);
   const delTex=id=>setTextures(arr=>arr.filter(x=>x.id!==id));
   const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const delBlock=async id=>{const b=allBlocks.find(x=>x.id===id);if(!b)return;await api("/blocks/delete",{id,constName:b.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"block"});setBlocks(arr=>arr.filter(x=>x.id!==id));reloadMod();};
-  const saveItem=item=>{setItems(arr=>{const i=arr.findIndex(x=>x.id===item.id);return i>=0?arr.map((x,j)=>j===i?item:x):[...arr,item];});reloadMod();setItemEd(null);};
-  const saveBlock=block=>{setBlocks(arr=>{const i=arr.findIndex(x=>x.id===block.id);return i>=0?arr.map((x,j)=>j===i?block:x):[...arr,block];});reloadMod();setBlockEd(null);};
-  const saveTex=tex=>{const id=tex.label.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");if(texEd?.mode==="edit"){setTextures(arr=>arr.map(x=>x.id===texEd.target?.id?{...tex,id,savedAt:Date.now()}:x));}else setTextures(arr=>[...arr,{...tex,id,savedAt:Date.now()}]);setTexEd(null);};
-  const switchTab=t=>{setTab(t);setTexEd(null);setItemEd(null);setBlockEd(null);setActivePanel(null);};
+  const saveItem=(item,oldId)=>{setItems(arr=>{const searchId=oldId||item.id;const i=arr.findIndex(x=>x.id===searchId);return i>=0?arr.map((x,j)=>j===i?item:x):[...arr,item];});reloadMod();setItemEd(null);savedEdState.current.items=null;};
+  const saveBlock=(block,oldId)=>{setBlocks(arr=>{const searchId=oldId||block.id;const i=arr.findIndex(x=>x.id===searchId);return i>=0?arr.map((x,j)=>j===i?block:x):[...arr,block];});reloadMod();setBlockEd(null);savedEdState.current.blocks=null;};
+  const saveTex=tex=>{const id=tex.label.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");if(texEd?.mode==="edit"){setTextures(arr=>arr.map(x=>x.id===texEd.target?.id?{...tex,id,savedAt:Date.now()}:x));}else setTextures(arr=>[...arr,{...tex,id,savedAt:Date.now()}]);setTexEd(null);savedEdState.current.textures=null;};
+  const switchTab=t=>{
+    // Save current tab's editor state
+    const cur=tab;
+    savedEdState.current[cur]=cur==="textures"?texEd:cur==="items"?itemEd:blockEd;
+    savedEdState.current.activePanel[cur]=activePanel;
+    savedEdState.current.highlightFaceKey[cur]=highlightFaceKey;
+    // Restore target tab's state
+    const saved=savedEdState.current[t];
+    const savedPanel=savedEdState.current.activePanel[t];
+    const savedFaceKey=savedEdState.current.highlightFaceKey[t]||"textureId";
+    setTab(t);
+    if(t==="textures")setTexEd(saved||null);
+    else if(t==="items")setItemEd(saved||null);
+    else setBlockEd(saved||null);
+    setActivePanel(savedPanel||null);
+    setHighlightFaceKey(savedFaceKey);
+  };
   const inEd=(tab==="textures"&&texEd!=null)||(tab==="items"&&itemEd!=null)||(tab==="blocks"&&blockEd!=null);
   const fabBottom=showCons?consH+5+30:30;
   const TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"}];
@@ -557,11 +598,11 @@ export default function App(){
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={texEntries} emptyLabel="No textures yet." onDelete={delTex} onOpen={e=>setTexEd({mode:"edit",target:e})}/></div>;
     }
     if(tab==="items"){
-      if(itemEd){const init=itemEd.target||null;return<ItemProv initial={init}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={()=>setItemEd(null)} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div></ItemProv>;}
+      if(itemEd){const init=itemEd.target||null;return<ItemProv initial={init} formOverride={itemEd.liveForm||null} onFormChange={f=>setItemEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={()=>{setItemEd(null);savedEdState.current.items=null;}} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div></ItemProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={itemEntries} emptyLabel="No items yet." onDelete={delItem} onOpen={e=>setItemEd({target:e})}/></div>;
     }
     if(tab==="blocks"){
-      if(blockEd){const init=blockEd.target||null;return<BlockProv initial={init}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={()=>setBlockEd(null)} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
+      if(blockEd){const init=blockEd.target||null;return<BlockProv initial={init} formOverride={blockEd.liveForm||null} onFormChange={f=>setBlockEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={()=>{setBlockEd(null);savedEdState.current.blocks=null;}} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={blockEntries} emptyLabel="No blocks yet." onDelete={delBlock} onOpen={e=>setBlockEd({target:e})}/></div>;
     }
     return null;

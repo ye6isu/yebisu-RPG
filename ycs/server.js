@@ -24,8 +24,16 @@ function triggerIdeaReload(filePath) {
     fs.utimesSync(filePath, now, now);
   } catch {}
 }
-const rl = () => JSON.parse(rf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json')).replace(/^\uFEFF/,''))
-const wl = j => wf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json'), JSON.stringify(j,null,2))
+const rl = () => {
+  const raw = rf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json')).replace(/^\uFEFF/,'')
+  // Strip blank lines before parsing, then filter out any __BLANK__ keys
+  const stripped = raw.split('\n').filter(l => l.trim() !== '').join('\n')
+  const parsed = JSON.parse(stripped)
+  // Remove any __BLANK__ sentinel keys that may have been written
+  for (const k of Object.keys(parsed)) if (k === '__BLANK__') delete parsed[k]
+  return parsed
+}
+const wl = arr => wf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json'), writeLangJson(arr))
 const jp = (...p) => path.join(...p)
 
 function removeLines(file, pred) {
@@ -185,7 +193,7 @@ app.post('/api/texture/mcmeta', (req, res) => {
 const LANG_PREFIX_ORDER = ['item.','block.','tooltip.','creativetab.','key.','enchantment.','entity.']
 
 function sortLang(json) {
-  const entries = Object.entries(json)
+  const entries = Object.entries(json).filter(([k]) => k !== '__BLANK__')
   const groups = {}
   const other = []
   for (const [k, v] of entries) {
@@ -197,15 +205,39 @@ function sortLang(json) {
       other.push([k, v])
     }
   }
-  // Sort each group alphabetically by key
   for (const g of Object.values(groups)) g.sort((a, b) => a[0].localeCompare(b[0]))
   other.sort((a, b) => a[0].localeCompare(b[0]))
+  // Return a plain array (not an object) so we preserve blank line positions
   const sorted = []
   for (const prefix of LANG_PREFIX_ORDER) {
-    if (groups[prefix]) sorted.push(...groups[prefix])
+    if (groups[prefix]) {
+      if (sorted.length > 0) sorted.push(null) // null = blank line
+      sorted.push(...groups[prefix])
+    }
   }
-  sorted.push(...other)
-  return Object.fromEntries(sorted)
+  if (other.length) {
+    if (sorted.length > 0) sorted.push(null)
+    sorted.push(...other)
+  }
+  return sorted
+}
+
+function writeLangJson(entries) {
+  const lines = ['{']
+  const realEntries = entries.filter(e => e !== null)
+  let realIdx = 0
+  for (const entry of entries) {
+    if (entry === null) {
+      lines.push('')
+    } else {
+      const [k, v] = entry
+      const isLast = realIdx === realEntries.length - 1
+      lines.push(`  ${JSON.stringify(k)}: ${JSON.stringify(v)}${isLast ? '' : ','}`)
+      realIdx++
+    }
+  }
+  lines.push('}')
+  return lines.join('\n')
 }
 
 app.post('/api/lang/set', (req, res) => {
@@ -246,7 +278,7 @@ app.post('/api/items/register', (req, res) => {
 
 app.post('/api/items/update', (req, res) => {
   try {
-    const { oldConstName, oldId, newLine, newConstName, newId, langKey, langVal } = req.body
+    const { oldConstName, oldId, newLine, newConstName, newId, langKey, langVal, newModelLine } = req.body
     const file = jp(JAVA_ROOT,'item','ModItems.java')
     let src = rf(file)
     const startMarker = `ITEMS.register("${oldId}"`
@@ -269,6 +301,34 @@ app.post('/api/items/update', (req, res) => {
     if (oldId!==newId) delete lang[`item.${MODID}.${oldId}`]
     lang[langKey] = langVal
     wl(sortLang(lang))
+    // Update model line in ModItemModelProvider if newModelLine provided
+    if (newModelLine) {
+      const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
+      let msrc = rf(modelFile)
+      const CN = newConstName || (newId||'').toUpperCase()
+      const oldCN = oldConstName || (oldId||'').toUpperCase()
+      // Find and replace any existing line referencing this item's const name
+      const mlines = msrc.split('\n')
+      let replaced = false
+      const newMlines = mlines.map(l => {
+        if ((l.includes(`ModItems.${oldCN}`) || l.includes(`ModItems.${CN}`)) &&
+            (l.trim().startsWith('basicItem') || l.trim().startsWith('handheldItem'))) {
+          replaced = true
+          return '        ' + newModelLine.trim()
+        }
+        return l
+      })
+      if (replaced) {
+        wf(modelFile, newMlines.join('\n'))
+      } else {
+        // Not found — insert at marker
+        const marker = '\n        // YCS_MODEL_INSERT'
+        if (msrc.includes(marker)) {
+          const indentedModel = '        ' + newModelLine.trim()
+          wf(modelFile, msrc.replace(marker, '\n' + indentedModel + '\n        // YCS_MODEL_INSERT'))
+        }
+      }
+    }
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -607,7 +667,7 @@ app.post('/api/blocks/update', (req, res) => {
     wf(file, src.slice(0,fieldStart)+indented+src.slice(end))
     const lang=rl()
     if (oldId!==newId) delete lang[`block.${MODID}.${oldId}`]
-    lang[langKey]=langVal; wl(lang)
+    lang[langKey]=langVal; wl(sortLang(lang))
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -630,7 +690,7 @@ app.post('/api/blocks/delete', (req, res) => {
     }
     const lang=rl()
     for (const k of Object.keys(lang)) { if (k===`block.${MODID}.${id}`) delete lang[k] }
-    wl(lang)
+    wl(sortLang(lang))
     // Remove from ModItemModelProvider — handle both single-line and multi-line getBuilder blocks
     const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
     let msrc = rf(modelFile)

@@ -80,6 +80,9 @@ public class ModItems {
 
 
 
+    public static final DeferredItem<Item> KOLAAAAAA = ITEMS.register("kolaaaaaa",
+                () -> new Item(new Item.Properties().stacksTo(1)));
+
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
     }

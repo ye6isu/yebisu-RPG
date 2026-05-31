@@ -95,8 +95,9 @@ public class ModItemModelProvider extends ItemModelProvider {
         trimmedArmorItem(ModItems.PLANK_BOOTS);
 
         getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
-
-        //Items from creator
+        
+        basicItem(ModItems.KOLAAAAAA.get());
+        // YCS_MODEL_INSERT
     }
 
     public void buttonItem(DeferredBlock<?> block, DeferredBlock<Block> baseBlock) {
