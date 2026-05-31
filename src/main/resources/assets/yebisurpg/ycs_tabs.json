@@ -26,5 +26,8 @@
   "block:crate_wall": "yebisurpg_blocks_tab",
   "block:crate_door": "yebisurpg_blocks_tab",
   "block:crate_trapdoor": "yebisurpg_blocks_tab",
-  "block:cat_block": "yebisurpg_blocks_tab"
+  "block:cat_block": "yebisurpg_blocks_tab",
+  "kol": "yebisurpg_items_tab",
+  "kola": "yebisurpg_items_tab",
+  "kolaaaaaa": "yebisurpg_items_tab"
 }

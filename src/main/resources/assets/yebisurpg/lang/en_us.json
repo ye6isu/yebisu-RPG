@@ -1,4 +1,5 @@
 {
+  "item.yebisurpg.kolaaaaaa": "Kolasdadsadada",
   "item.yebisurpg.mother_flame": "Mother Flame",
   "item.yebisurpg.plank": "Plank",
   "item.yebisurpg.plank_boots": "Plank Boots",
@@ -14,6 +15,7 @@
   "item.yebisurpg.ye6isu_pickaxe": "ye6isu Pickaxe",
   "item.yebisurpg.ye6isu_shovel": "ye6isu Shovel",
   "item.yebisurpg.ye6isu_sword": "ye6isu Sword",
+
   "block.yebisurpg.cat_block": "Cat Block",
   "block.yebisurpg.crate_block": "Crate Block",
   "block.yebisurpg.crate_button": "Crate Button",
@@ -27,12 +29,15 @@
   "block.yebisurpg.crate_wall": "Crate Wall",
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
   "block.yebisurpg.ye6isu_ore": "ye6isu Ore",
+
   "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info",
   "tooltip.yebisurpg.sukuna_finger.tooltip": "Finger of the the King of Curses",
   "tooltip.yebisurpg.ye6isu": "NO",
   "tooltip.yebisurpg.ye6isu.shift_down": "YES",
+
   "creativetab.yebisurpg.yebisurpg_blocks": "yebisu RPG Blocks",
   "creativetab.yebisurpg.yebisurpg_items": "yebisu RPG Items",
+
   "key.categories.yebisurpg": "yebisu RPG",
   "key.yebisurpg.use_ability": "Use Ability"
 }
