@@ -34,7 +34,6 @@ public class ModBlocks {
             () -> new DropExperienceBlock(UniformInt.of(2, 4),
                     BlockBehaviour.Properties.of().strength(3f).requiresCorrectToolForDrops().sound(SoundType.STONE)));
 
-
     //Non-Block Blocks (generated from Crate Block)
     public static final DeferredBlock<StairBlock> CRATE_STAIRS = registerBlock("crate_stairs",
             () -> new StairBlock(ModBlocks.CRATE_BLOCK.get().defaultBlockState(),
@@ -71,7 +70,10 @@ public class ModBlocks {
                                 .strength(2f)
                                 .sound(SoundType.WOOD)));
 
-
+    public static final DeferredBlock<Block> SHIKA = registerBlock("shika",
+                    () -> new Block(BlockBehaviour.Properties.of()
+                                .strength(1f)
+                                .sound(SoundType.STONE)));
 
     private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
         DeferredBlock<T> toReturn = BLOCKS.register(name, block);

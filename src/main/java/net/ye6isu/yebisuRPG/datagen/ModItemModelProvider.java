@@ -73,7 +73,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(ModItems.PLANK.get());
         basicItem(ModItems.SUKUNA_FINGER.get());
         basicItem(ModItems.MOTHER_FLAME.get());
-        basicItem(ModItems.RAW_YE6ISU.get());
+        handheldItem(ModItems.RAW_YE6ISU);
 
         //Tool Items
         handheldItem(ModItems.YE6ISU_SWORD);
@@ -95,7 +95,9 @@ public class ModItemModelProvider extends ItemModelProvider {
         trimmedArmorItem(ModItems.PLANK_BOOTS);
 
         getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
-        
+
+        getBuilder(ModBlocks.SHIKA.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/shika"));
+
         // YCS_MODEL_INSERT
     }
 

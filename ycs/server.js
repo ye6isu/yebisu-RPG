@@ -37,7 +37,8 @@ const wl = arr => wf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json'), wri
 const jp = (...p) => path.join(...p)
 
 function removeLines(file, pred) {
-  wf(file, rf(file).split('\n').filter(l => !pred(l)).join('\n'))
+  const newSrc = rf(file).split('\n').filter(l => !pred(l)).join('\n');
+  wf(file, newSrc.replace(/\n\s*\n\s*\n/g, '\n\n'));
 }
 
 function insertLangGrouped(json, key, value) {
@@ -263,7 +264,7 @@ app.post('/api/lang/delete', (req, res) => {
 // ─── Items ─────────────────────────────────────────────────────────────────────
 app.post('/api/items/register', (req, res) => {
   try {
-    const { line, constName } = req.body
+    const { line, constName, fpReg } = req.body
     const file = jp(JAVA_ROOT,'item','ModItems.java')
     let src = rf(file)
     if (src.includes(constName+' =')) return res.json({ ok:false, reason:'already exists' })
@@ -271,6 +272,15 @@ app.post('/api/items/register', (req, res) => {
     if (!src.includes(marker)) return res.json({ ok:false, reason:'insertion point not found' })
     const indented = line.split('\n').map((l,i) => i===0?'    '+l:'        '+l).join('\n')
     wf(file, src.replace(marker, '\n'+indented+'\n'+marker))
+    if (fpReg) {
+      const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
+      if (fs.existsSync(fpFile)) {
+        const fp = rf(fpFile)
+        wf(fpFile, fp.replace('}', '    ' + fpReg + '\n}'))
+      } else {
+        wf(fpFile, `package ${PKG}.item;\n\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.effect.MobEffects;\nimport net.minecraft.world.food.FoodProperties;\n\npublic class ModFoodProperties {\n    ${fpReg}\n}\n`)
+      }
+    }
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -278,7 +288,7 @@ app.post('/api/items/register', (req, res) => {
 
 app.post('/api/items/update', (req, res) => {
   try {
-    const { oldConstName, oldId, newLine, newConstName, newId, langKey, langVal, newModelLine } = req.body
+    const { oldConstName, oldId, newLine, newConstName, newId, langKey, langVal, newModelLine, fpReg } = req.body
     const file = jp(JAVA_ROOT,'item','ModItems.java')
     let src = rf(file)
     const startMarker = `ITEMS.register("${oldId}"`
@@ -347,6 +357,20 @@ app.post('/api/items/update', (req, res) => {
         if (fs.existsSync(tPath)) { fs.unlinkSync(tPath); triggerIdeaReload(tPath); }
       } catch {}
     }
+    const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
+    if (fpReg) {
+      if (fs.existsSync(fpFile)) {
+        try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${oldConstName || (oldId||'').toUpperCase()} =`)) } catch {}
+        const fp = rf(fpFile)
+        wf(fpFile, fp.replace('}', '    ' + fpReg + '\n}'))
+      } else {
+        wf(fpFile, `package ${PKG}.item;\n\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.effect.MobEffects;\nimport net.minecraft.world.food.FoodProperties;\n\npublic class ModFoodProperties {\n    ${fpReg}\n}\n`)
+      }
+    } else if (oldConstName || oldId) {
+      if (fs.existsSync(fpFile)) {
+        try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${oldConstName || (oldId||'').toUpperCase()} =`)) } catch {}
+      }
+    }
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -398,6 +422,11 @@ app.post('/api/items/delete', (req, res) => {
     writeTabsJson(tabs)
     // Clean ModCreativeTabEvents (vanilla tabs)
     try { removeLines(jp(JAVA_ROOT,'item','ModCreativeTabEvents.java'), l => l.includes(`ModItems.${constName}`)) } catch {}
+    // Clean ModFoodProperties
+    const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
+    if (fs.existsSync(fpFile)) {
+      try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${constName} =`)) } catch {}
+    }
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -533,7 +562,7 @@ app.post('/api/tags/set', (req, res) => {
       ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java')
       : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
     let src = rf(file)
-    const marker = isBlock ? '    // YCS_BLOCK_TAGS_INSERT' : '    // YCS_ITEM_TAGS_INSERT'
+    const marker = isBlock ? '// YCS_BLOCK_TAGS_INSERT' : '// YCS_ITEM_TAGS_INSERT'
 
     if (!src.includes(marker)) {
       // Insert marker before closing brace of addTags method
@@ -545,21 +574,53 @@ app.post('/api/tags/set', (req, res) => {
     }
 
     const ref = isBlock ? `ModBlocks.${constName}.get()` : `ModItems.${constName}.get()`
+    let modifiedSrc = src
+
+    // First, remove all existing references to this item to cleanly handle edits
+    const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const removeRegex = new RegExp(`\\s*\\.add\\(\\s*${escapedRef}\\s*\\)`, 'g')
+    modifiedSrc = modifiedSrc.replace(removeRegex, '')
+
+    // Cleanup any empty tags left behind (e.g. tag(ItemTags.AXES);)
+    const emptyTagRegex = /[ \t]*(?:this\.)?tag\([\s\S]*?\)\s*;/g
+    modifiedSrc = modifiedSrc.replace(emptyTagRegex, match => match.includes('.add(') ? match : '')
+
     const lines = []
+    let addedCount = 0
 
     for (const tag of tags) {
       const [ns, path] = tag.includes(':') ? tag.split(':') : [MODID, tag]
       const tagConst = resolveTagConst(ns, path, isBlock)
-      const line = `        tag(${tagConst}).add(${ref});`
-      // Skip if already present
-      if (!src.includes(`tag(${tagConst}).add(${ref})`)) lines.push(line)
+      
+      const tagStartIdx = modifiedSrc.indexOf(`tag(${tagConst})`)
+      if (tagStartIdx !== -1) {
+        const semiIdx = modifiedSrc.indexOf(';', tagStartIdx)
+        if (semiIdx !== -1) {
+          const statement = modifiedSrc.substring(tagStartIdx, semiIdx)
+          if (!statement.includes(`.add(${ref})`)) {
+            modifiedSrc = modifiedSrc.substring(0, semiIdx) + `\n                .add(${ref})` + modifiedSrc.substring(semiIdx)
+            addedCount++
+          }
+        }
+      } else {
+        lines.push(`        tag(${tagConst})\n                .add(${ref});`)
+        addedCount++
+      }
     }
 
     if (lines.length) {
-      wf(file, src.replace(marker, lines.join('\n') + '\n        ' + marker))
+      const regex = new RegExp(`[ \\t]*${marker}`)
+      modifiedSrc = modifiedSrc.replace(regex, '\n' + lines.join('\n\n') + '\n        ' + marker)
     }
-    markDirty()
-    res.json({ ok:true, added:lines.length })
+
+    // Prevent blank lines from accumulating
+    modifiedSrc = modifiedSrc.replace(/\n([ \t]*\n)+/g, '\n\n')
+
+    if (modifiedSrc !== src) {
+      wf(file, modifiedSrc)
+      markDirty()
+    }
+    res.json({ ok:true, added:addedCount })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
@@ -606,7 +667,22 @@ app.post('/api/tags/delete', (req, res) => {
       ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java')
       : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
     const ref = isBlock ? `ModBlocks.${constName}.get()` : `ModItems.${constName}.get()`
-    removeLines(file, l => l.includes(`.add(${ref})`))
+    if (fs.existsSync(file)) {
+      let src = rf(file)
+      const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(`\\s*\\.add\\(\\s*${escapedRef}\\s*\\)`, 'g')
+      let modified = src.replace(regex, '')
+      
+      const emptyTagRegex = /[ \t]*(?:this\.)?tag\([\s\S]*?\)\s*;/g
+      modified = modified.replace(emptyTagRegex, match => match.includes('.add(') ? match : '')
+
+      modified = modified.replace(/\n([ \t]*\n)+/g, '\n\n')
+
+      if (modified !== src) {
+        wf(file, modified)
+        markDirty()
+      }
+    }
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -645,6 +721,33 @@ app.post('/api/recipes/set', (req, res) => {
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
+
+function hasExactBlock(line, constName) {
+  const target = `ModBlocks.${constName}`;
+  let idx = line.indexOf(target);
+  while (idx !== -1) {
+    const after = line[idx + target.length];
+    // If the next character is not a letter/number (or doesn't exist), it's a valid match!
+    if (!after || !/^[A-Z0-9]$/i.test(after)) return true;
+    idx = line.indexOf(target, idx + target.length);
+  }
+  return false;
+}
+
+function cleanBuilderPatternProvider(file, constName, id) {
+  if (!fs.existsSync(file)) return
+  let src = rf(file)
+  const lines = src.split('\n')
+  const out = []
+  let skip = false
+  for (const l of lines) {
+    if (hasExactBlock(l, constName) || l.includes(`"${id}"`) || l.includes(`${id}Model`)) { skip = true; continue }
+    if (skip) { if (l.trim().startsWith('.') || l.trim() === ';' || l.includes(`${id}Model`)) continue; skip = false }
+    out.push(l)
+  }
+  wf(file, out.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n'))
+}
+
 function deleteRecipeFromProvider(constName) {
   const file = jp(JAVA_ROOT,'datagen','ModRecipeProvider.java')
   try {
@@ -750,38 +853,90 @@ app.post('/api/blocks/register', (req, res) => {
 
 app.post('/api/blocks/update', (req, res) => {
   try {
-    const { oldConstName, oldId, newLine, newConstName, newId, langKey, langVal } = req.body
-    const file = jp(JAVA_ROOT,'block','ModBlocks.java')
-    let src = rf(file)
+    const { oldConstName, oldId, entries, newConstName, newId, langKey, langVal, creativeTab } = req.body
+    const blockFile = jp(JAVA_ROOT,'block','ModBlocks.java')
+    const bspFile   = jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java')
+    const lootFile  = jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java')
+    const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
+    
+    // 1. Delete old from ModBlocks.java
+    let src = rf(blockFile)
     const startIdx = src.indexOf(`registerBlock("${oldId}"`)
-    if (startIdx===-1) return res.json({ ok:false, reason:`registerBlock("${oldId}") not found` })
-    const fieldStart = src.lastIndexOf('\n    public static final ', startIdx)
-    if (fieldStart===-1) return res.json({ ok:false, reason:'field declaration not found' })
-    let depth=0, end=-1
-    for (let i=startIdx; i<src.length; i++) {
-      if(src[i]==='('||src[i]==='{') depth++
-      else if(src[i]===')'||src[i]==='}') { depth--; if(depth===0){const semi=src.indexOf(';',i);if(semi!==-1){end=semi+1;break}} }
+    if (startIdx !== -1) {
+      const fieldStart = src.lastIndexOf('\n    public static final ', startIdx)
+      let depth=0, end=-1
+      for (let i=startIdx; i<src.length; i++) {
+        if(src[i]==='('||src[i]==='{') depth++
+        else if(src[i]===')'||src[i]==='}') { depth--; if(depth===0){const semi=src.indexOf(';',i);if(semi!==-1){end=semi+1;break}} }
+      }
+      if (fieldStart!==-1&&end!==-1) wf(blockFile, src.slice(0,fieldStart)+src.slice(end))
     }
-    if (end===-1) return res.json({ ok:false, reason:'end not found' })
-    const indented = '\n    '+newLine.split('\n').map((l,i)=>i===0?l:'            '+l).join('\n')
-    wf(file, src.slice(0,fieldStart)+indented+src.slice(end))
+    
+    // Delete all old variants from ModBlocks.java (e.g. SLAB, STAIRS)
+    try { removeLines(blockFile, l => l.includes(`public static final DeferredBlock<`) && l.includes(` ${oldConstName}_`)) } catch {}
+
+    // 2. Delete old from Datagen providers
+    for (const f of [lootFile, jp(JAVA_ROOT,'item','ModCreativeModeTabs.java')]) {
+      try { removeLines(f, l => hasExactBlock(l, oldConstName)) } catch {}
+    }
+    try { removeLines(jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java'), l => l.includes(`ModBlocks.${oldConstName}.get()`)) } catch {}
+    try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => hasExactBlock(l, oldConstName)) } catch {}
+    
+    // Clean multi-line provider files
+    cleanBuilderPatternProvider(modelFile, oldConstName, oldId)
+    cleanBuilderPatternProvider(bspFile, oldConstName, oldId)
+
+    // 3. Clean lang file and tooltips
     const lang=rl()
     if (oldId!==newId) {
-      delete lang[`block.${MODID}.${oldId}`]
       for (const k of Object.keys(lang)) {
-        if (k.startsWith(`tooltip.${MODID}.${oldId}.`)) delete lang[k]
+        if (k === `block.${MODID}.${oldId}` || k.startsWith(`block.${MODID}.${oldId}_`) || k.startsWith(`tooltip.${MODID}.${oldId}.`)) delete lang[k]
       }
     }
-    lang[langKey]=langVal
+
+    // 4. Register new entries
+    const results = []
+    const bmarker    = '\n    private static <T extends Block> DeferredBlock<T> registerBlock('
+    const bspMarker  = '\n        // YCS_BSP_INSERT'
+    const lootMarker = '\n        // YCS_LOOT_INSERT'
+    const modelMarker = '\n        // YCS_MODEL_INSERT'
+    const tabs = readTabsJson()
+
+    for (const entry of entries) {
+      const { line, constName:eCN, bspLines, lootLine, modelLine, langKey:eLangKey, langVal:eLangVal, blockId } = entry
+      if (!line) continue
+      let bsrc2 = rf(blockFile)
+      if (!bsrc2.includes(eCN+' =') && bsrc2.includes(bmarker)) {
+        const bindented = line.split('\n').map((l,i) => i===0?'    '+l:'            '+l).join('\n')
+        wf(blockFile, rf(blockFile).replace(bmarker, '\n'+bindented+'\n'+bmarker))
+      }
+      if (bspLines) {
+        const bsp = rf(bspFile)
+        if (bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker))
+      }
+      if (lootLine) {
+        const lp = rf(lootFile)
+        if (lp.includes(lootMarker)) wf(lootFile, lp.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker))
+      }
+      if (modelLine) {
+        const mp = rf(modelFile)
+        if (mp.includes(modelMarker)) wf(modelFile, mp.replace(modelMarker, '\n        '+modelLine+'\n'+modelMarker))
+      }
+      if (eLangKey && eLangVal) {
+        const r = insertLangGrouped(lang, eLangKey, eLangVal)
+        if (!r.exists) Object.assign(lang, r.result)
+      }
+      if (creativeTab && blockId) {
+        const tabKey = TAB_VALUE_TO_KEY[creativeTab]
+        if (tabKey) tabs[`block:${blockId}`] = tabKey
+      }
+    }
     wl(sortLang(lang))
     
+    // Cleanup old files/tabs/recipes if renamed
     if (oldId && oldId !== newId) {
-      const tabs = readTabsJson()
-      if (tabs[`block:${oldId}`]) {
-        tabs[`block:${newId}`] = tabs[`block:${oldId}`]
-        delete tabs[`block:${oldId}`]
-        writeTabsJson(tabs)
-      }
+      if (tabs[`block:${oldId}`]) { tabs[`block:${newId}`] = tabs[`block:${oldId}`]; delete tabs[`block:${oldId}`] }
+      writeTabsJson(tabs)
       if (oldConstName) deleteRecipeFromProvider(oldConstName)
       try {
         const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
@@ -791,13 +946,18 @@ app.post('/api/blocks/update', (req, res) => {
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_side.png`))
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_front.png`))
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_back.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_left.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_right.png`))
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_door_top.png`))
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_door_bottom.png`))
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','item',`${oldId}_door.png`))
         tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_trapdoor.png`))
       } catch {}
+    } else {
+      writeTabsJson(tabs)
     }
 
+    markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -817,39 +977,45 @@ app.post('/api/blocks/delete', (req, res) => {
       }
       if (fieldStart!==-1&&end!==-1) wf(blockFile, src.slice(0,fieldStart)+src.slice(end))
     }
+    
+    try { removeLines(blockFile, l => l.includes(`public static final DeferredBlock<`) && l.includes(` ${constName}_`)) } catch {}
+
     const lang=rl()
-    for (const k of Object.keys(lang)) { if (k===`block.${MODID}.${id}`) delete lang[k] }
-    wl(sortLang(lang))
-    // Remove from ModItemModelProvider — handle both single-line and multi-line getBuilder blocks
-    const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
-    let msrc = rf(modelFile)
-    const modelLines = msrc.split('\n')
-    const cleanedModel = []
-    let skipContinuation = false
-    for (let i = 0; i < modelLines.length; i++) {
-      const l = modelLines[i]
-      const refersToBlock = l.includes(`ModBlocks.${constName}`) || l.includes(`"${id}"`)
-      if (refersToBlock) {
-        skipContinuation = true
-        continue
-      }
-      if (skipContinuation) {
-        if (l.trim().startsWith('.') || l.trim() === ';') continue
-        skipContinuation = false
-      }
-      cleanedModel.push(l)
+    for (const k of Object.keys(lang)) {
+      if (k === `block.${MODID}.${id}` || k.startsWith(`block.${MODID}.${id}_`) || k.startsWith(`tooltip.${MODID}.${id}.`)) delete lang[k]
     }
-    wf(modelFile, cleanedModel.join('\n'))
+    wl(sortLang(lang))
+    const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
+    const bspFile = jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java')
+    cleanBuilderPatternProvider(modelFile, constName, id)
+    cleanBuilderPatternProvider(bspFile, constName, id)
 
     for (const f of [
-      jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java'),
       jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java'),
       jp(JAVA_ROOT,'item','ModCreativeModeTabs.java'),
-    ]) { try { removeLines(f, l => l.includes(`ModBlocks.${constName}`)) } catch {} }
+    ]) { try { removeLines(f, l => hasExactBlock(l, constName)) } catch {} }
     // Clean tags from ModBlockTagProvider and ModItemTagProvider (BlockItem tags)
     try { removeLines(jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java'), l => l.includes(`ModBlocks.${constName}.get()`)) } catch {}
     deleteRecipeFromProvider(constName)
-    try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => l.includes(`ModBlocks.${constName}`)) } catch {}
+    try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => hasExactBlock(l, constName)) } catch {}
+    
+    // Clean up all textures
+    try {
+      const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_top.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_bottom.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_side.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_front.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_back.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_left.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_right.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_door_top.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_door_bottom.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','item',`${id}_door.png`))
+      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_trapdoor.png`))
+    } catch {}
+
     // Clean up ycs_tabs.json
     const tabs2 = readTabsJson()
     delete tabs2[`block:${id}`]

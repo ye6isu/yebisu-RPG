@@ -1,6 +1,7 @@
 package net.ye6isu.yebisuRPG.datagen;
 
 import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.neoforged.neoforge.client.model.generators.BlockStateProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
@@ -41,6 +42,10 @@ public class ModBlockStateProvider extends BlockStateProvider {
 
         //Block from creator
         blockWithItem(ModBlocks.CAT_BLOCK);
+
+        blockWithItem(ModBlocks.SHIKA);
+
+        // YCS_BSP_INSERT
     }
 
     private void blockWithItem(DeferredBlock<?> deferredBlock) {
@@ -56,3 +61,4 @@ public class ModBlockStateProvider extends BlockStateProvider {
     }
 
 }
+
