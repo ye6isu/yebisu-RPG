@@ -10,9 +10,11 @@
   "block:crate_stairs": "yebisurpg_blocks_tab",
   "block:crate_trapdoor": "yebisurpg_blocks_tab",
   "block:crate_wall": "yebisurpg_blocks_tab",
+  "block:shika": "yebisurpg_blocks_tab",
   "block:ye6isu_block": "yebisurpg_blocks_tab",
   "block:ye6isu_ore": "yebisurpg_blocks_tab",
 
+  "block:undefined": "yebisurpg_items_tab",
   "mother_flame": "yebisurpg_items_tab",
   "plank": "yebisurpg_items_tab",
   "plank_boots": "yebisurpg_items_tab",

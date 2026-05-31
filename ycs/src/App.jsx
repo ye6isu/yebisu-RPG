@@ -11,6 +11,7 @@ const SOUND_TYPES=["STONE","WOOD","METAL","GRASS","SAND","GRAVEL","GLASS","CLOTH
 const CREATIVE_TABS=[{value:"",label:"(none)"},{value:"ModCreativeModeTabs.YEBISURPG_ITEMS_TAB",label:"yebisu RPG Items"},{value:"ModCreativeModeTabs.YEBISURPG_BLOCK_TAB",label:"yebisu RPG Blocks"},{value:"vanilla:combat",label:"Combat"},{value:"vanilla:tools_and_utilities",label:"Tools & Utilities"},{value:"vanilla:food_and_drinks",label:"Food & Drinks"},{value:"vanilla:ingredients",label:"Ingredients"},{value:"vanilla:building_blocks",label:"Building Blocks"},{value:"vanilla:redstone",label:"Redstone"},{value:"vanilla:natural_blocks",label:"Natural Blocks"}];
 const COMMON_TAGS=["minecraft:axes","minecraft:hoes","minecraft:pickaxes","minecraft:shovels","minecraft:swords","minecraft:tools","minecraft:logs","minecraft:planks","minecraft:slabs","minecraft:stairs","minecraft:fences","minecraft:doors","minecraft:trapdoors","minecraft:walls","minecraft:buttons","minecraft:pressure_plates","minecraft:flowers","minecraft:saplings","minecraft:coals","minecraft:diamonds","neoforge:foods","neoforge:tools","neoforge:gems","neoforge:ingots","neoforge:nuggets","neoforge:ores","neoforge:storage_blocks","minecraft:mineable/pickaxe","minecraft:mineable/axe","minecraft:mineable/shovel","minecraft:mineable/hoe","minecraft:needs_stone_tool","minecraft:needs_iron_tool","minecraft:needs_diamond_tool"];
 const VANILLA_INGR=["minecraft:air","minecraft:iron_ingot","minecraft:gold_ingot","minecraft:diamond","minecraft:emerald","minecraft:netherite_ingot","minecraft:oak_planks","minecraft:birch_planks","minecraft:stick","minecraft:cobblestone","minecraft:stone","minecraft:obsidian","minecraft:iron_block","minecraft:gold_block","minecraft:diamond_block","minecraft:coal","minecraft:charcoal","minecraft:flint","minecraft:leather","minecraft:string","minecraft:feather","minecraft:bone","minecraft:blaze_rod","minecraft:ender_pearl","minecraft:glass","minecraft:sand","minecraft:gravel","minecraft:redstone","minecraft:lapis_lazuli","minecraft:quartz","minecraft:copper_ingot","minecraft:amethyst_shard","minecraft:oak_log"];
+const VANILLA_EFFECTS=["MobEffects.MOVEMENT_SPEED","MobEffects.MOVEMENT_SLOWDOWN","MobEffects.DIG_SPEED","MobEffects.DIG_SLOWDOWN","MobEffects.DAMAGE_BOOST","MobEffects.HEAL","MobEffects.HARM","MobEffects.DAMAGE_RESISTANCE","MobEffects.JUMP","MobEffects.CONFUSION","MobEffects.REGENERATION","MobEffects.FIRE_RESISTANCE","MobEffects.WATER_BREATHING","MobEffects.INVISIBILITY","MobEffects.BLINDNESS","MobEffects.NIGHT_VISION","MobEffects.HUNGER","MobEffects.WEAKNESS","MobEffects.POISON","MobEffects.WITHER","MobEffects.HEALTH_BOOST","MobEffects.ABSORPTION","MobEffects.SATURATION","MobEffects.GLOWING","MobEffects.LEVITATION","MobEffects.LUCK","MobEffects.UNLUCK","MobEffects.SLOW_FALLING","MobEffects.CONDUIT_POWER","MobEffects.DOLPHINS_GRACE","MobEffects.BAD_OMEN","MobEffects.HERO_OF_THE_VILLAGE","MobEffects.DARKNESS","MobEffects.TRIAL_OMEN","MobEffects.RAID_OMEN","MobEffects.WIND_CHARGED","MobEffects.WEAVING","MobEffects.OOZING","MobEffects.INFESTED"];
 const TAG_GROUPS=[{label:"Any Wood Planks",tag:"minecraft:planks"},{label:"Any Wood Log",tag:"minecraft:logs"},{label:"Any Stone",tag:"minecraft:stone_crafting_materials"},{label:"Any Iron Ingot",tag:"neoforge:ingots/iron"},{label:"Any Gold Ingot",tag:"neoforge:ingots/gold"},{label:"Any Copper Ingot",tag:"neoforge:ingots/copper"},{label:"Any Diamond",tag:"neoforge:gems/diamond"},{label:"Any Emerald",tag:"neoforge:gems/emerald"},{label:"Any Coal",tag:"minecraft:coals"},{label:"Any Wool",tag:"minecraft:wool"},{label:"Any Glass",tag:"neoforge:glass_blocks"},{label:"Any Stick",tag:"neoforge:rods/wooden"}];
 const C={bg:"#161616",panel:"#141414",pb:"#3a3a3c",tabBar:"#212121",card:"#1e1e1e",prev:"#0e0e0e",text:"#f0f0ec",dim:"#787872",faint:"#343430",accent:"#5a9fd4",inp:"#181818",inpB:"#252528",r:6.5};
 const SI={lbl:{fontSize:11,color:C.dim,textTransform:"uppercase",letterSpacing:.8,fontWeight:400},inp:{background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"7px 10px",color:C.text,fontSize:13,fontFamily:"'JetBrains Mono',monospace",outline:"none",width:"100%"}};
@@ -75,6 +76,33 @@ function TexSel({label,textures,value,onChange}){
   </div>;
 }
 
+function EffectSel({ value, onChange, label }) {
+  const [srch, setSrch] = useState(value || "");
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setSrch(value || "") }, [value]);
+  const filt = useMemo(() => {
+    const q = srch.toLowerCase();
+    return VANILLA_EFFECTS.filter(e => e.toLowerCase().includes(q));
+  }, [srch]);
+  return <div style={{display:"flex", flexDirection:"column", gap:4}}>
+    {label && <Lbl>{label}</Lbl>}
+    <div style={{position:"relative", flex: 1}}>
+      <input 
+        value={srch} 
+        onChange={e => { setSrch(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="e.g. MobEffects.REGENERATION"
+        style={{...SI.inp, width:"100%"}}
+      />
+      {open && <div style={{position:"absolute", top:"calc(100% + 2px)", left:0, right:0, zIndex:400, background:"#1c1c1c", border:`1px solid ${C.pb}`, borderRadius:4, maxHeight:200, overflowY:"auto"}}>
+        {filt.map(e => <div key={e} onMouseDown={() => { onChange(e); setSrch(e); setOpen(false); }} style={{padding:"6px 10px", cursor:"pointer", borderBottom:"1px solid #181818", fontSize:12, color:C.text}}>{e}</div>)}
+        {!filt.length && <div style={{padding:"6px 10px", color:C.faint, fontSize:12}}>Custom effect</div>}
+      </div>}
+    </div>
+  </div>;
+}
+
 function useRun(){
   const[rs,setRs]=useState({dirty:false,state:"idle",log:[]});const[running,setRunning]=useState(false);
   useEffect(()=>{const id=setInterval(()=>fetch(`${BASE}/run/state`).then(r=>r.json()).then(setRs).catch(()=>{}),2000);return()=>clearInterval(id);},[]);
@@ -106,42 +134,81 @@ function gItemCode(item,textures){
   const tt=()=>{if(!item.hasTooltip)return null;const n=item.tooltipNormal?`"tooltip.${MODID}.${id}.normal"`:"null";const h=item.hasHiddenTooltip&&item.tooltipHidden?`"tooltip.${MODID}.${id}.hidden"`:"null";const s=item.hasHiddenTooltip?(item.useDefaultShiftHint?`"tooltip.${MODID}.shift_to_see"`:(item.tooltipShiftHint?`"tooltip.${MODID}.${id}.shift_hint"`:"null")):"null";return{n,h,s};};
   const cls=props=>{const t=tt();if(!t||(t.n==="null"&&t.h==="null"))return`new Item(${props})`;return`new TooltipItem(${props},\n                ${t.n},\n                ${t.h},\n                ${t.s})`;};
   const stackOpt=(item.maxStackSize&&parseInt(item.maxStackSize)!==64)?`.stacksTo(${parseInt(item.maxStackSize)})`:"";
-  let reg="",ml2;
+  let reg="",ml2,fpReg;
   if(item.itemType==="Tool"){const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,c=`${item.toolType}Item`;reg=`public static final DeferredItem<${c}> ${CN} = ITEMS.register("${id}",\n        () -> new ${c}(${tier}, new Item.Properties()\n                .attributes(${c}.createAttributes(${tier}, ${dmg}f, ${spd}f))));`;}
-  else if(item.itemType==="Food"){const al=item.foodAlwaysEdible?".alwaysEat()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}.food(new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}.build())`)});`;}
+  else if(item.itemType==="Food"){
+    const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
+    let fx="";
+    if(item.foodEffects?.length){
+      fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");
+    }
+    fpReg=`public static final FoodProperties ${CN} = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}.food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN})`)});`;
+  }
   else if(item.itemType==="Fuel"){const t=tt();if(t&&(t.n!=="null"||t.h!=="null"))reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new TooltipItem(new Item.Properties()${stackOpt}, ${t.n}, ${t.h}, ${t.s}));`;else reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new FuelItem(new Item.Properties()${stackOpt}, ${item.burnTime||1600}));`;}
   else{if((item.holdingMode||"none")==="handheld")ml2=`handheldItem(ModItems.${CN});`;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}`)});`;}
   const modelLine=ml2||(item.itemType==="Tool"?`handheldItem(ModItems.${CN});`:tex?.isAnimated?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");`:`basicItem(ModItems.${CN}.get());`);
-  return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN};
+  return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN,fpReg};
 }
 function gBlockEntries(block,textures=[]){
   const id=block.id||"my_block",CN=block.customConstName?block.constName:id.toUpperCase(),dn=block.displayName||id;
-  const str=parseFloat(block.strength)||2.0,snd=block.soundType||"WOOD",tf=block.requiresTool?"\n                    .requiresCorrectToolForDrops()":"";
+  const str=parseFloat(block.strength)||2.0,snd=block.soundType||"WOOD",tf="";
   const props=`BlockBehaviour.Properties.of()\n                    .strength(${str}f)\n                    .sound(SoundType.${snd})${tf}`;
-  const orient=block.orientationType||"simple";const entries=[];
-  let ml="",bsp="",loot="",mdl="";
-  if(orient==="pillar"){ml=`public static final DeferredBlock<RotatedPillarBlock> ${CN} = registerBlock("${id}",\n        () -> new RotatedPillarBlock(${props}));`;bsp=`logBlock((RotatedPillarBlock)ModBlocks.${CN}.get());\n        simpleBlockItem(ModBlocks.${CN}.get(), new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;loot=`dropSelf(ModBlocks.${CN}.get());`;mdl=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;}
-  else if(orient==="directional"){ml=`public static final DeferredBlock<Block> ${CN} = registerBlock("${id}",\n        () -> new HorizontalDirectionalBlock(${props}));`;bsp=`horizontalBlock(ModBlocks.${CN}.get(),modLoc("block/${id}_front"),modLoc("block/${id}_side"),modLoc("block/${id}_top"));\n        simpleBlockItem(ModBlocks.${CN}.get(), new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;loot=`dropSelf(ModBlocks.${CN}.get());`;mdl=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;}
-  else{ml=`public static final DeferredBlock<Block> ${CN} = registerBlock("${id}",\n        () -> new Block(${props}));`;bsp=`blockWithItem(ModBlocks.${CN});`;loot=`dropSelf(ModBlocks.${CN}.get());`;mdl=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;}
+  const orient=block.orientationType||"simple";
+  const dropType=orient==="simple"?(block.dropType||"Self"):"Self";
+  let lt=`dropSelf(ModBlocks.${CN}.get());`;
+  if(dropType==="Ore"||dropType==="Custom"){
+    const itemRef=block.dropItem?`net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("${block.dropItem}"))`:`net.minecraft.world.item.Items.COAL`;
+    if(dropType==="Ore"){
+      lt=`add(ModBlocks.${CN}.get(), block -> createOreDrop(ModBlocks.${CN}.get(), ${itemRef}));`;
+    } else {
+      lt=`add(ModBlocks.${CN}.get(), block -> createSingleItemTableWithSilkTouch(ModBlocks.${CN}.get(), ${itemRef}));`;
+    }
+  }
+  let bp=props;
+  let cls="Block";
+  if(dropType==="Ore"){
+    cls="DropExperienceBlock";
+    const xp=block.dropXp||"1";
+    const [minXp,maxXp]=xp.includes("-")?xp.split("-"):[xp,xp];
+    bp=`net.minecraft.util.valueproviders.UniformInt.of(${parseInt(minXp)||1}, ${parseInt(maxXp)||1}), ${props}`;
+  }
+  const entries=[];
+  let ml="",bsp="",loot=lt,mdl="";
+  if(orient==="pillar"){
+    ml=`public static final DeferredBlock<RotatedPillarBlock> ${CN} = registerBlock("${id}",\n        () -> new RotatedPillarBlock(${bp}));`;
+    bsp=`ModelFile ${id}Model = models().cubeBottomTop("${id}", modLoc("block/${id}_side"), modLoc("block/${id}_bottom"), modLoc("block/${id}_top"));\n        axisBlock((RotatedPillarBlock)ModBlocks.${CN}.get(), ${id}Model, ${id}Model);\n        simpleBlockItem(ModBlocks.${CN}.get(), ${id}Model);`;
+    mdl=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;
+  }
+  else if(orient==="directional"){
+    ml=`public static final DeferredBlock<Block> ${CN} = registerBlock("${id}",\n        () -> new Block(${bp}) {\n            {\n                this.registerDefaultState(this.stateDefinition.any().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.NORTH));\n            }\n            @Override\n            protected void createBlockStateDefinition(net.minecraft.world.level.block.state.StateDefinition.Builder<Block, net.minecraft.world.level.block.state.BlockState> builder) {\n                builder.add(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING);\n            }\n            @Override\n            public net.minecraft.world.level.block.state.BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext context) {\n                return this.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, context.getHorizontalDirection().getOpposite());\n            }\n        });`;
+    bsp=`ModelFile ${id}Model = models().withExistingParent("${id}", "minecraft:block/cube")\n            .texture("particle", modLoc("block/${id}_front"))\n            .texture("down", modLoc("block/${id}_bottom"))\n            .texture("up", modLoc("block/${id}_top"))\n            .texture("north", modLoc("block/${id}_front"))\n            .texture("south", modLoc("block/${id}_back"))\n            .texture("east", modLoc("block/${id}_right"))\n            .texture("west", modLoc("block/${id}_left"));\n        horizontalBlock(ModBlocks.${CN}.get(), ${id}Model);\n        simpleBlockItem(ModBlocks.${CN}.get(), ${id}Model);`;
+    mdl=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;
+  }
+  else{
+    ml=`public static final DeferredBlock<${cls}> ${CN} = registerBlock("${id}",\n        () -> new ${cls}(${bp}));`;
+    bsp=`blockWithItem(ModBlocks.${CN});`;
+    mdl=`getBuilder(ModBlocks.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("${MODID}:block/${id}"));`;
+  }
   entries.push({line:ml,constName:CN,bspLines:bsp,lootLine:loot,modelLine:mdl,langKey:`block.${MODID}.${id}`,langVal:dn,blockId:id});
   const bt=`blockTexture(ModBlocks.${CN}.get())`;
   const bId=id.endsWith("_block")?id.slice(0,-6):id,bCN=CN.endsWith("_BLOCK")?CN.slice(0,-6):CN;
-  const bp=`BlockBehaviour.Properties.of().strength(${str}f).sound(SoundType.${snd})${tf}`;
-  const mk=(sfx,cls,extra,bs,lt,mod,lv)=>{const nId=`${bId}${sfx}`,nCN=`${bCN}${sfx.toUpperCase()}`;entries.push({line:`public static final DeferredBlock<${cls}> ${nCN} = registerBlock("${nId}",\n        () -> new ${cls}(${extra}));`,constName:nCN,bspLines:bs,lootLine:lt,modelLine:mod,langKey:`block.${MODID}.${nId}`,langVal:`${dn} ${lv}`,blockId:nId});};
-  if(block.createSlab)mk("_slab","SlabBlock",bp,`slabBlock(ModBlocks.${bCN}_SLAB.get(),${bt},${bt});\n        blockItem(ModBlocks.${bCN}_SLAB);`,`add(ModBlocks.${bCN}_SLAB.get(),b->createSlabItemTable(ModBlocks.${bCN}_SLAB.get()));`,"/*slab*/","Slab");
-  if(block.createStairs)mk("_stairs","StairBlock",`ModBlocks.${CN}.get().defaultBlockState(),${bp}`,`stairsBlock(ModBlocks.${bCN}_STAIRS.get(),${bt});\n        blockItem(ModBlocks.${bCN}_STAIRS);`,`dropSelf(ModBlocks.${bCN}_STAIRS.get());`,"/*stairs*/","Stairs");
-  if(block.createFence)mk("_fence","FenceBlock",bp,`fenceBlock(ModBlocks.${bCN}_FENCE.get(),${bt});`,`dropSelf(ModBlocks.${bCN}_FENCE.get());`,`fenceItem(ModBlocks.${bCN}_FENCE,ModBlocks.${CN});`,"Fence");
-  if(block.createFenceGate)mk("_fence_gate","FenceGateBlock",`WoodType.OAK,${bp}`,`fenceGateBlock(ModBlocks.${bCN}_FENCE_GATE.get(),${bt});\n        blockItem(ModBlocks.${bCN}_FENCE_GATE);`,`dropSelf(ModBlocks.${bCN}_FENCE_GATE.get());`,"/*fgate*/","Fence Gate");
-  if(block.createWall)mk("_wall","WallBlock",bp,`wallBlock(ModBlocks.${bCN}_WALL.get(),${bt});`,`dropSelf(ModBlocks.${bCN}_WALL.get());`,`wallItem(ModBlocks.${bCN}_WALL,ModBlocks.${CN});`,"Wall");
-  if(block.createPressurePlate)mk("_pressure_plate","PressurePlateBlock",`BlockSetType.IRON,${bp}`,`pressurePlateBlock(ModBlocks.${bCN}_PRESSURE_PLATE.get(),${bt});\n        blockItem(ModBlocks.${bCN}_PRESSURE_PLATE);`,`dropSelf(ModBlocks.${bCN}_PRESSURE_PLATE.get());`,"/*pp*/","Pressure Plate");
+  const sbp=`BlockBehaviour.Properties.of().strength(${str}f).sound(SoundType.${snd})${tf}`;
+  const mk=(sfx,scls,extra,bs,slt,mod,lv)=>{const nId=`${bId}${sfx}`,nCN=`${bCN}${sfx.toUpperCase()}`;entries.push({line:`public static final DeferredBlock<${scls}> ${nCN} = registerBlock("${nId}",\n        () -> new ${scls}(${extra}));`,constName:nCN,bspLines:bs,lootLine:slt,modelLine:mod,langKey:`block.${MODID}.${nId}`,langVal:`${dn} ${lv}`,blockId:nId});};
+  if(block.createSlab)mk("_slab","SlabBlock",sbp,`slabBlock(ModBlocks.${bCN}_SLAB.get(),${bt},${bt});\n        blockItem(ModBlocks.${bCN}_SLAB);`,`add(ModBlocks.${bCN}_SLAB.get(),b->createSlabItemTable(ModBlocks.${bCN}_SLAB.get()));`,"/*slab*/","Slab");
+  if(block.createStairs)mk("_stairs","StairBlock",`ModBlocks.${CN}.get().defaultBlockState(),${sbp}`,`stairsBlock(ModBlocks.${bCN}_STAIRS.get(),${bt});\n        blockItem(ModBlocks.${bCN}_STAIRS);`,`dropSelf(ModBlocks.${bCN}_STAIRS.get());`,"/*stairs*/","Stairs");
+  if(block.createFence)mk("_fence","FenceBlock",sbp,`fenceBlock(ModBlocks.${bCN}_FENCE.get(),${bt});`,`dropSelf(ModBlocks.${bCN}_FENCE.get());`,`fenceItem(ModBlocks.${bCN}_FENCE,ModBlocks.${CN});`,"Fence");
+  if(block.createFenceGate)mk("_fence_gate","FenceGateBlock",`WoodType.OAK,${sbp}`,`fenceGateBlock(ModBlocks.${bCN}_FENCE_GATE.get(),${bt});\n        blockItem(ModBlocks.${bCN}_FENCE_GATE);`,`dropSelf(ModBlocks.${bCN}_FENCE_GATE.get());`,"/*fgate*/","Fence Gate");
+  if(block.createWall)mk("_wall","WallBlock",sbp,`wallBlock(ModBlocks.${bCN}_WALL.get(),${bt});`,`dropSelf(ModBlocks.${bCN}_WALL.get());`,`wallItem(ModBlocks.${bCN}_WALL,ModBlocks.${CN});`,"Wall");
+  if(block.createPressurePlate)mk("_pressure_plate","PressurePlateBlock",`BlockSetType.IRON,${sbp}`,`pressurePlateBlock(ModBlocks.${bCN}_PRESSURE_PLATE.get(),${bt});\n        blockItem(ModBlocks.${bCN}_PRESSURE_PLATE);`,`dropSelf(ModBlocks.${bCN}_PRESSURE_PLATE.get());`,"/*pp*/","Pressure Plate");
   if(block.createButton)mk("_button","ButtonBlock",`BlockSetType.IRON,20,BlockBehaviour.Properties.of().strength(${str}f).sound(SoundType.${snd}).noCollission()${tf}`,`buttonBlock(ModBlocks.${bCN}_BUTTON.get(),${bt});`,`dropSelf(ModBlocks.${bCN}_BUTTON.get());`,`buttonItem(ModBlocks.${bCN}_BUTTON,ModBlocks.${CN});`,"Button");
   if(block.createDoor)mk("_door","DoorBlock",`BlockSetType.IRON,BlockBehaviour.Properties.of().strength(${str}f).sound(SoundType.${snd}).noOcclusion()${tf}`,`doorBlockWithRenderType(ModBlocks.${bCN}_DOOR.get(),modLoc("block/${bId}_door_bottom"),modLoc("block/${bId}_door_top"),"cutout");`,`add(ModBlocks.${bCN}_DOOR.get(),b->createDoorTable(ModBlocks.${bCN}_DOOR.get()));`,`basicItem(ModBlocks.${bCN}_DOOR.asItem());`,"Door");
   if(block.createTrapdoor)mk("_trapdoor","TrapDoorBlock",`BlockSetType.IRON,BlockBehaviour.Properties.of().strength(${str}f).sound(SoundType.${snd}).noOcclusion()${tf}`,`trapdoorBlockWithRenderType(ModBlocks.${bCN}_TRAPDOOR.get(),modLoc("block/${bId}_trapdoor"),true,"cutout");\n        blockItem(ModBlocks.${bCN}_TRAPDOOR,'_bottom');`,`dropSelf(ModBlocks.${bCN}_TRAPDOOR.get());`,"/*trapdoor*/","Trapdoor");
   return entries;
 }
 
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
-const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",requiresTool:false,createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false};
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
+const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
 function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
@@ -326,7 +393,7 @@ function CodePanel({textures,isBlock=false}){
   const{form}=useContext(FormCtx);
   if(isBlock){const entries=gBlockEntries(form,textures);return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>{entries.map((e,i)=><CopyB key={i} title={e.constName} code={e.line}/>)}{gTagCode(form.id,form,true).map((t,i)=><CopyB key={"t"+i} title="tag" code={t}/>)}{gRecipe(form.id,form,true)&&<CopyB title="recipe" code={gRecipe(form.id,form,true)}/>}</div>;}
   const c=gItemCode(form,textures);
-  return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}><CopyB title="ModItems" code={c.reg}/><CopyB title="lang" code={`  "${c.langKey}": "${c.langVal}",`}/><CopyB title="model" code={`        ${c.modelLine}`}/>{gTagCode(form.id,form).map((t,i)=><CopyB key={i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;
+  return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}><CopyB title="ModItems" code={c.reg}/>{c.fpReg&&<CopyB title="ModFoodProperties" code={c.fpReg}/>}<CopyB title="lang" code={`  "${c.langKey}": "${c.langVal}",`}/><CopyB title="model" code={`        ${c.modelLine}`}/>{gTagCode(form.id,form).map((t,i)=><CopyB key={i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;
 }
 
 function TexturePickerPanel({textures,fkey="textureId",label="Texture"}){
@@ -413,25 +480,31 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
     };
     if(!isEdit){
       await wtItem();
-      const j2=await api("/items/register",{line:code.reg,constName:CN});msgs.push({ok:j2.ok,label:"ModItems",msg:j2.ok?"ok":j2.reason});
+      const j2=await api("/items/register",{line:code.reg,constName:CN,fpReg:code.fpReg});msgs.push({ok:j2.ok,label:"ModItems",msg:j2.ok?"ok":j2.reason});
       const j3=await api("/lang/set",{key:code.langKey,value:code.langVal});msgs.push({ok:j3.ok,label:"lang",msg:j3.ok?"ok":j3.reason});
       const j4=await api("/items/model",{line:code.modelLine});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}
       if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
     }else{
-      const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
+      const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine,fpReg:code.fpReg});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
       await wtItem();
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
       if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
       else{const jr=await api("/recipes/delete",{constName:initial.constName||initial.id?.toUpperCase()});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
+      if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:false});}
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()},initial?.id);
   };
   const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
+  const effs=form.foodEffects||[];
+  const addEff=()=>F("foodEffects",[...effs,{effect:"MobEffects.REGENERATION",duration:600,level:1,probability:1.0}]);
+  const rmEff=i=>F("foodEffects",effs.filter((_,idx)=>idx!==i));
+  const updEff=(i,k,v)=>F("foodEffects",effs.map((e,idx)=>idx===i?{...e,[k]:v}:e));
+
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Item":"New Item"}</span>{isEdit&&<Pill color="#1a2438">editing</Pill>}</div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -455,9 +528,24 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
     <Sel label="Item Type" value={form.itemType} onChange={v=>F("itemType",v)} options={["Generic","Tool","Food","Fuel"]}/>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
-    <Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>
+    {form.itemType!=="Tool"&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
     {form.itemType==="Tool"&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
-    {form.itemType==="Food"&&<Sect title="Food Properties"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div><Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/></Sect>}
+    {form.itemType==="Food"&&<Sect title="Food Properties">
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div>
+      <Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><Lbl>Status Effects</Lbl><Btn sm v="g" onClick={addEff}>+ add</Btn></div>
+        {effs.map((e,i)=><div key={i} style={{background:C.inp,padding:10,borderRadius:C.r,display:"flex",flexDirection:"column",gap:8,position:"relative",border:`1px solid ${C.inpB}`}}>
+          <Btn sm v="dan" onClick={()=>rmEff(i)} style={{position:"absolute",top:6,right:6,padding:"2px 5px"}}>✕</Btn>
+          <EffectSel label="Effect" value={e.effect} onChange={v=>updEff(i,"effect",v)}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+            <Inp label="Duration (ticks)" value={e.duration} type="number" onChange={v=>updEff(i,"duration",v)}/>
+            <Inp label="Level (1=I, 2=II)" value={e.level} type="number" onChange={v=>updEff(i,"level",v)}/>
+            <Inp label="Probability (0.0-1.0)" value={e.probability} type="number" onChange={v=>updEff(i,"probability",v)}/>
+          </div>
+        </div>)}
+      </div>
+    </Sect>}
     {form.itemType==="Fuel"&&<Inp label="Burn time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
@@ -514,11 +602,14 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
       const j=await api("/texture",{filename:fname,dataUrl,folder:folder||"block"});
       msgs.push({ok:j.ok,label:`tex:${fname}`,msg:j.ok?"ok":j.reason});
     };
+
+    await wt(form.textureId,`${form.id}.png`,"block");
+    if(orient==="pillar"){await wt(form.textureTopId,`${form.id}_top.png`,"block");await wt(form.textureBottomId,`${form.id}_bottom.png`,"block");await wt(form.textureSideId,`${form.id}_side.png`,"block");}
+    if(orient==="directional"){await wt(form.textureTopId,`${form.id}_top.png`,"block");await wt(form.textureBottomId,`${form.id}_bottom.png`,"block");await wt(form.textureFrontId,`${form.id}_front.png`,"block");await wt(form.textureBackId,`${form.id}_back.png`,"block");await wt(form.textureLeftId,`${form.id}_left.png`,"block");await wt(form.textureRightId,`${form.id}_right.png`,"block");}
+    if(form.createDoor){await wt(form.textureDoorTopId,`${form.id}_door_top.png`,"block");await wt(form.textureDoorBottomId||form.textureId,`${form.id}_door_bottom.png`,"block");await wt(form.textureDoorItemId,`${form.id}_door.png`,"item");}
+    if(form.createTrapdoor)await wt(form.textureTrapdoorId||form.textureId,`${form.id}_trapdoor.png`,"block");
+
     if(!isEdit){
-      await wt(form.textureId,`${form.id}.png`,"block");
-      if(isAdv){await wt(form.textureTopId,`${form.id}_top.png`,"block");await wt(form.textureBottomId,`${form.id}_bottom.png`,"block");await wt(form.textureSideId,`${form.id}_side.png`,"block");await wt(form.textureFrontId,`${form.id}_front.png`,"block");await wt(form.textureBackId,`${form.id}_back.png`,"block");}
-      if(form.createDoor){await wt(form.textureDoorTopId,`${form.id}_door_top.png`,"block");await wt(form.textureDoorBottomId||form.textureId,`${form.id}_door_bottom.png`,"block");await wt(form.textureDoorItemId,`${form.id}_door.png`,"item");}
-      if(form.createTrapdoor)await wt(form.textureTrapdoorId||form.textureId,`${form.id}_trapdoor.png`,"block");
       const j2=await api("/blocks/register",{entries,creativeTab:form.creativeTab});
       msgs.push({ok:j2.ok,label:`ModBlocks(${entries.length})`,msg:j2.ok?"ok":j2.reason});
       if(j2.results)j2.results.forEach(r=>msgs.push({ok:r.ok,label:r.constName,msg:r.ok?"ok":r.reason}));
@@ -526,8 +617,9 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
       if(form.hasRecipe&&gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
       else{const jr=await api("/recipes/delete",{constName:CN});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
     }else{
-      const code=entries[0];const j=await api("/blocks/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.line,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
-      const t=textures.find(x=>x.id===form.textureId);if(t?.dataUrl){const jt=await api("/texture",{filename:`${form.id}.png`,dataUrl:t.dataUrl,folder:"block"});msgs.push({ok:jt.ok,label:"texture",msg:jt.ok?"ok":jt.reason});}
+      const j=await api("/blocks/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,entries,newConstName:CN,newId:form.id,langKey:entries[0].langKey,langVal:entries[0].langVal,creativeTab:form.creativeTab});
+      msgs.push({ok:j.ok,label:`ModBlocks(${entries.length}) update`,msg:j.ok?"ok":j.reason});
+      if(j.results)j.results.forEach(r=>msgs.push({ok:r.ok,label:r.constName,msg:r.ok?"ok":r.reason}));
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:true});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:true});}
       if(form.hasRecipe&&gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
       else{const jr=await api("/recipes/delete",{constName:CN});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
@@ -539,7 +631,24 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
   };
   const ER=({label,panel,badge,count})=><EditRow label={label} panel={panel} badge={badge} count={count} activePanel={activePanel} setActivePanel={setActivePanel}/>;
   const setFace=(fkey)=>{setHighlightFaceKey(fkey);setActivePanel("texture");};
-  const FRow=({label,fkey})=>{const t=textures.find(x=>x.id===form[fkey]);return<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 0"}}><div style={{display:"flex",alignItems:"center",gap:7}}>{t?.dataUrl?<AImg url={t.dataUrl} size={22}/>:<div style={{width:22,height:22,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`}}/>}<span style={{fontSize:12,color:C.dim,textTransform:"uppercase",letterSpacing:.5}}>{label}</span></div><Btn sm v="g" onClick={()=>setFace(fkey)}>set</Btn></div>;};
+  const TexRow=({label,fkey})=>{
+    const t=textures.find(x=>x.id===form[fkey]);
+    const dUrl=(form[fkey]||"").startsWith("__direct__")?form[fkey].split("__name__")[0].replace("__direct__",""):null;
+    return<div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
+      <Lbl>{label}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          {(t||dUrl)
+            ?<AImg url={t?.dataUrl||dUrl} size={20}/>
+            :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>
+          }
+          <span style={{fontSize:13,color:t||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?t.label:dUrl?"(direct)":"none selected"}</span>
+        </div>
+        <Btn sm v="g" onClick={()=>setFace(fkey)} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+      </div>
+    </div>;
+  };
+  const dropType=orient==="simple"?(form.dropType||"Self"):"Self";
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Block":"New Block"}</span>{isEdit&&<Pill color="#1a2438">editing</Pill>}</div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -549,42 +658,63 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Obsidian Bricks"/>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       <Lbl>Block Orientation</Lbl>
-      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{[{v:"simple",l:"Simple"},{v:"pillar",l:"Log/Pillar"},{v:"directional",l:"Directional"}].map(o=><label key={o.v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><div onClick={()=>F("orientationType",o.v)} style={{width:13,height:13,borderRadius:"50%",border:`2px solid ${orient===o.v?C.accent:C.inpB}`,background:orient===o.v?C.accent:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:"#a0a09a"}}>{o.l}</span></label>)}</div>
-      {!isAdv&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
-        <Lbl>All Faces</Lbl>
-        <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-            {selTex?<AImg url={selTex.dataUrl} size={20}/>:<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
-            <span style={{fontSize:13,color:selTex?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?.label||"none selected"}</span>
-          </div>
-          <Btn sm v="g" onClick={()=>setFace("textureId")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
-        </div>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{[{v:"simple",l:"Simple"},{v:"pillar",l:"Rotated Pillar"},{v:"directional",l:"Directional"}].map(o=><label key={o.v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><div onClick={()=>F("orientationType",o.v)} style={{width:13,height:13,borderRadius:"50%",border:`2px solid ${orient===o.v?C.accent:C.inpB}`,background:orient===o.v?C.accent:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:"#a0a09a"}}>{o.l}</span></label>)}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
+        <Lbl>Drop</Lbl>
+        <Sel value={dropType} onChange={v=>F("dropType",v)} options={["Self","Ore","Custom"]} disabled={orient!=="simple"}/>
+        {(dropType==="Ore"||dropType==="Custom")&&<div style={{display:"grid",gridTemplateColumns:dropType==="Ore"?"1fr 100px":"1fr",gap:10,marginTop:4}}>
+          <Inp label="Drop Item/Block (ResourceLocation)" value={form.dropItem} onChange={v=>F("dropItem",v)} placeholder="yebisurpg:shika"/>
+          {dropType==="Ore"&&<Inp label="XP (e.g. 1-3)" value={form.dropXp} onChange={v=>F("dropXp",v)} placeholder="1-3"/>}
+        </div>}
+      </div>
+      {orient==="simple"&&<TexRow label="All Faces" fkey="textureId"/>}
+      {orient==="pillar"&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
+        <TexRow label="Top" fkey="textureTopId"/>
+        <TexRow label="Side" fkey="textureSideId"/>
+        <TexRow label="Bottom" fkey="textureBottomId"/>
       </div>}
-      {isAdv&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
-        <FRow label="Top" fkey="textureTopId"/>
-        <FRow label="Front" fkey="textureFrontId"/>
-        <FRow label="Side" fkey="textureSideId"/>
-        <FRow label="Back" fkey="textureBackId"/>
-        <FRow label="Bottom" fkey="textureBottomId"/>
+      {orient==="directional"&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
+        <TexRow label="Top" fkey="textureTopId"/>
+        <TexRow label="Bottom" fkey="textureBottomId"/>
+        <TexRow label="Front" fkey="textureFrontId"/>
+        <TexRow label="Back" fkey="textureBackId"/>
+        <TexRow label="Left" fkey="textureLeftId"/>
+        <TexRow label="Right" fkey="textureRightId"/>
       </div>}
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/><Sel label="Sound" value={form.soundType} onChange={v=>F("soundType",v)} options={SOUND_TYPES}/></div>
-    <Chk label="Requires correct tool for drops?" checked={form.requiresTool} onChange={v=>F("requiresTool",v)}/>
-    <Sect title="Variants (auto-generated)">
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].map(([k,l])=><Chk key={k} label={l} checked={!!form[k]} onChange={v=>F(k,v)}/>)}</div>
-      {form.createDoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`,display:"flex",flexDirection:"column",gap:6}}>
-        <Lbl>Door Textures</Lbl>
-        <FRow label="Door Top" fkey="textureDoorTopId"/>
-        <FRow label="Door Bottom" fkey="textureDoorBottomId"/>
-        <FRow label="Door Item" fkey="textureDoorItemId"/>
+    {orient==="simple"&&<Sect title={<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",margin:"-4px 0"}}><input type="checkbox" checked={!!form.showVariants} onChange={e=>F("showVariants",e.target.checked)} style={{cursor:"pointer",margin:0}}/><span style={{fontSize:13,fontWeight:500,color:C.text}}>Add Variants</span></label>}>
+      {form.showVariants&&<div style={{marginTop:8}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].map(([k,l])=><Chk key={k} label={l} checked={!!form[k]} onChange={v=>F(k,v)}/>)}</div>
+        {form.createDoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`,display:"flex",flexDirection:"column",gap:2}}>
+          <TexRow label="Door Top" fkey="textureDoorTopId"/>
+          <TexRow label="Door Bottom" fkey="textureDoorBottomId"/>
+          <TexRow label="Door Item" fkey="textureDoorItemId"/>
+        </div>}
+        {form.createTrapdoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`}}><TexRow label="Trapdoor" fkey="textureTrapdoorId"/></div>}
       </div>}
-      {form.createTrapdoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`}}><FRow label="Trapdoor" fkey="textureTrapdoorId"/></div>}
-    </Sect>
-    <div style={{display:"flex",flexDirection:"column",gap:0,border:`1px solid #1e1e1e`,borderRadius:C.r,overflow:"hidden",marginTop:4}}>
-      <ER label="Tags" panel="tags" count={tags.length}/>
-      <ER label="Tooltip" panel="tooltip" badge={form.hasTooltip?"on":null}/>
-      <ER label="Recipe" panel="recipe" badge={form.hasRecipe?"on":null}/>
+    </Sect>}
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:4}}>
+      <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:tags.length?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tags.length?tags.slice(0,3).join(", ")+(tags.length>3?` +${tags.length-3}`:""):"none added"}</span>
+        <Btn sm v={activePanel==="tags"?"p":"g"} onClick={()=>setActivePanel(p=>p==="tags"?null:"tags")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Tooltip{form.hasTooltip&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:form.hasTooltip?C.text:C.faint}}>{form.hasTooltip?form.tooltipNormal||"(set)":"disabled"}</span>
+        <Btn sm v={activePanel==="tooltip"?"p":"g"} onClick={()=>setActivePanel(p=>p==="tooltip"?null:"tooltip")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Recipe{form.hasRecipe&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:form.hasRecipe?C.text:C.faint}}>{form.hasRecipe?`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`:"disabled"}</span>
+        <Btn sm v={activePanel==="recipe"?"p":"g"} onClick={()=>setActivePanel(p=>p==="recipe"?null:"recipe")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
     </div>
     {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{tags.map(t=><Pill key={t} onClick={()=>F("tags",tags.filter(x=>x!==t))}>{t} ✕</Pill>)}</div>}
     <Sbar messages={status}/>

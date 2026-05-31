@@ -3,6 +3,7 @@ package net.ye6isu.yebisuRPG.datagen;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.loot.BlockLootSubProvider;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.block.Block;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
@@ -42,6 +43,9 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
         //Same Block drop from creator
         dropSelf(ModBlocks.CAT_BLOCK.get());
 
+        dropSelf(ModBlocks.SHIKA.get());
+
+        // YCS_LOOT_INSERT
     }
 
     @Override

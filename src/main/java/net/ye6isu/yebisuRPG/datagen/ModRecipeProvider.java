@@ -79,6 +79,13 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
         //Blasting recipe
         blasting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 100, "ye6isu");
 
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.SHIKA.get(), 1)
+                .pattern(" A ")
+                .pattern("A A")
+                .pattern(" A ")
+                .define('A', net.minecraft.tags.ItemTags.create(ResourceLocation.parse("minecraft:planks")))
+                .unlockedBy("has_planks", has(net.minecraft.tags.ItemTags.create(ResourceLocation.parse("minecraft:planks"))))
+                .save(recipeOutput);
         // YCS_RECIPE_INSERT
     }
 
