@@ -83,8 +83,23 @@ function useRun(){
 }
 
 function gTTKeys(id,f){const ks=[];if(f.hasTooltip&&f.tooltipNormal)ks.push({key:`tooltip.${MODID}.${id}.normal`,value:f.tooltipNormal});if(f.hasTooltip&&f.hasHiddenTooltip){if(!f.useDefaultShiftHint&&f.tooltipShiftHint)ks.push({key:`tooltip.${MODID}.${id}.shift_hint`,value:f.tooltipShiftHint});if(f.tooltipHidden)ks.push({key:`tooltip.${MODID}.${id}.hidden`,value:f.tooltipHidden});}return ks;}
-function gRecipe(id,form){if(!form.hasRecipe||!form.recipe)return null;const r=form.recipe,CN=form.constName||(form.id||"").toUpperCase();if(r.type==="shaped"){const pl=r.pattern.map(row=>`        "${row}"`).join(",\n");const dl=Object.entries(r.keys||{}).map(([ch,item])=>`        .define('${ch}', ForgeRegistries.ITEMS.getValue(ResourceLocation.parse("${item}")))`).join("\n");return`ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.${CN}, ${r.result||1})\n        .pattern(\n${pl})\n${dl}\n        .unlockedBy("has_item", has(Items.IRON_INGOT))\n        .save(output);`;}const il=Object.values(r.keys||{}).map(item=>`        .requires(ForgeRegistries.ITEMS.getValue(ResourceLocation.parse("${item}")))`).join("\n");return`ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ModItems.${CN}, ${r.result||1})\n${il}\n        .unlockedBy("has_item", has(Items.IRON_INGOT))\n        .save(output);`;}
-function gTagCode(id,form,isBlock=false){if(!form.tags?.length)return[];const CN=form.constName||(form.id||"").toUpperCase();const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;return form.tags.map(tag=>{const[ns,path]=tag.includes(":")?tag.split(":"):[MODID,tag];return`tag(TagKey.create(Registries.${isBlock?"BLOCK":"ITEM"}, ResourceLocation.fromNamespaceAndPath("${ns}", "${path}"))).add(${ref});`;});}
+function gRecipe(id,form,isBlock=false){
+  if(!form.hasRecipe||!form.recipe)return null;
+  const r=form.recipe,CN=form.customConstName?form.constName:(form.id||"").toUpperCase();
+  const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;
+  const getIng=(item)=>item.startsWith("#")?`net.minecraft.tags.ItemTags.create(ResourceLocation.parse("${item.slice(1)}"))`:`net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("${item}"))`;
+  const firstItem=Object.values(r.keys||{})[0]||"minecraft:air";
+  const itemPath=firstItem.split(":")[1]||firstItem.replace("#","");
+  const unlockName=`has_${itemPath.replace(/[^a-z0-9_]/g,"")}`;
+  if(r.type==="shaped"){
+    const pl=r.pattern.map(row=>`        .pattern("${row}")`).join("\n");
+    const dl=Object.entries(r.keys||{}).map(([ch,item])=>`        .define('${ch}', ${getIng(item)})`).join("\n");
+    return`ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${pl}\n${dl}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`;
+  }
+  const il=Object.values(r.keys||{}).map(item=>`        .requires(${getIng(item)})`).join("\n");
+  return`ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${il}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`;
+}
+function gTagCode(id,form,isBlock=false){if(!form.tags?.length)return[];const CN=form.customConstName?form.constName:(form.id||"").toUpperCase();const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;return form.tags.map(tag=>{const[ns,path]=tag.includes(":")?tag.split(":"):[MODID,tag];return`tag(TagKey.create(Registries.${isBlock?"BLOCK":"ITEM"}, ResourceLocation.fromNamespaceAndPath("${ns}", "${path}"))).add(${ref});`;});}
 function gItemCode(item,textures){
   const texId=(item.textureId||"").startsWith("__direct__")?null:item.textureId;const tex=textures.find(t=>t.id===texId);
   const id=item.id||"my_item",CN=item.customConstName?item.constName:id.toUpperCase(),dn=item.displayName||id;
@@ -178,7 +193,18 @@ function EditRow({label,panel,badge,count,activePanel,setActivePanel}){
 function TexLeft({initial,onSave,onCancel}){
   const{form,F}=useContext(FormCtx);
   const mRef=useRef(),sRef=useRef(),eRef=useRef();
-  const load=(ref,key)=>{const f=ref.current.files[0];if(!f)return;const r=new FileReader();r.onload=e=>F(key,e.target.result);r.readAsDataURL(f);};
+  const load=(ref,key)=>{
+    const f=ref.current.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=e=>{
+      F(key,e.target.result);
+      if(key==="dataUrl"){
+        let base=f.name.replace(/\.[^/.]+$/,"").toLowerCase().replace(/[^a-z0-9_]/g,"_");
+        if(base)F("label",base);
+      }
+    };
+    r.readAsDataURL(f);
+  };
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:16}}>
     <div style={{fontSize:14,fontWeight:500,color:C.text}}>{initial?"Edit Texture":"Add Texture"}</div>
     <Inp label="Texture Name" value={form.label} onChange={v=>F("label",v)} placeholder="Enter name…"/>
@@ -248,14 +274,24 @@ function RecipePanel({modItems=[],modBlocks=[]}){
 
 function TagsPanel(){
   const{form,F}=useContext(FormCtx);
+  const[srch,setSrch]=useState("");
   const tags=form.tags||[];
   const toggle=t=>{
     if(tags.includes(t)) F("tags",tags.filter(x=>x!==t));
     else F("tags",[...tags,t]);
   };
-  return<div style={{padding:"14px",overflowY:"auto",flex:1}}>
-    <Lbl>Tags — click to toggle</Lbl>
-    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:8}}>{COMMON_TAGS.map(t=><div key={t} onClick={()=>toggle(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}{tags.includes(t)&&<span style={{marginLeft:3,opacity:.6}}>✕</span>}</div>)}</div>
+  const q=srch.toLowerCase().trim();
+  const allTags=Array.from(new Set([...COMMON_TAGS,...tags]));
+  const visTags=allTags.filter(t=>!q||t.toLowerCase().includes(q));
+  const isCustom=q&&!allTags.some(t=>t.toLowerCase()===q);
+  const addCustom=()=>{if(q&&isCustom){toggle(q);setSrch("");}};
+  return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>
+    <Lbl>Tags — search or add custom</Lbl>
+    <div style={{display:"flex",gap:6}}>
+      <input value={srch} onChange={e=>setSrch(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCustom();}} placeholder="search or type custom tag..." style={{...SI.inp,fontSize:11,flex:1}}/>
+      {isCustom&&<Btn sm v="p" onClick={addCustom}>add</Btn>}
+    </div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:4}}>{visTags.map(t=><div key={t} onClick={()=>toggle(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}{tags.includes(t)&&<span style={{marginLeft:3,opacity:.6}}>✕</span>}</div>)}</div>
   </div>;
 }
 
@@ -288,7 +324,7 @@ function RecipePanelWrapper({modItems,modBlocks}){
 
 function CodePanel({textures,isBlock=false}){
   const{form}=useContext(FormCtx);
-  if(isBlock){const entries=gBlockEntries(form,textures);return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>{entries.map((e,i)=><CopyB key={i} title={e.constName} code={e.line}/>)}{gTagCode(form.id,form,true).map((t,i)=><CopyB key={"t"+i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;}
+  if(isBlock){const entries=gBlockEntries(form,textures);return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>{entries.map((e,i)=><CopyB key={i} title={e.constName} code={e.line}/>)}{gTagCode(form.id,form,true).map((t,i)=><CopyB key={"t"+i} title="tag" code={t}/>)}{gRecipe(form.id,form,true)&&<CopyB title="recipe" code={gRecipe(form.id,form,true)}/>}</div>;}
   const c=gItemCode(form,textures);
   return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}><CopyB title="ModItems" code={c.reg}/><CopyB title="lang" code={`  "${c.langKey}": "${c.langVal}",`}/><CopyB title="model" code={`        ${c.modelLine}`}/>{gTagCode(form.id,form).map((t,i)=><CopyB key={i} title="tag" code={t}/>)}{gRecipe(form.id,form)&&<CopyB title="recipe" code={gRecipe(form.id,form)}/>}</div>;
 }
@@ -298,7 +334,18 @@ function TexturePickerPanel({textures,fkey="textureId",label="Texture"}){
   const[srch,setSrch]=useState("");const fRef=useRef();
   const filt=useMemo(()=>{const q=srch.toLowerCase();return textures.filter(t=>!q||t.label.toLowerCase().includes(q)||t.id.toLowerCase().includes(q));},[textures,srch]);
   const sel=form[fkey];
-  const onFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>F(fkey,"__direct__"+ev.target.result+"__name__"+f.name);r.readAsDataURL(f);};
+  const onFile=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      F(fkey,"__direct__"+ev.target.result+"__name__"+f.name);
+      if(fkey==="textureId" || fkey==="frontUrl" || fkey==="sideUrl" || fkey==="topUrl" || fkey==="bottomUrl"){
+        let base=f.name.replace(/\.[^/.]+$/,"").toLowerCase().replace(/[^a-z0-9_]/g,"_");
+        if(base)F("id",base);
+      }
+    };
+    r.readAsDataURL(f);
+  };
   return<div style={{flex:1,padding:"12px 14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:9}}>
     <Lbl>{label}</Lbl>
     <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search bank…" style={{...SI.inp,fontSize:11}}/>
@@ -351,19 +398,34 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
     if(!form.id.trim())return;setSaving(true);setStatus([]);
     const CN=form.customConstName?form.constName:form.id.toUpperCase();
     const item={...form,constName:CN,savedAt:Date.now()};const code=gItemCode(item,textures);const msgs=[];
+    const wtItem=async()=>{
+      if(dUrl){
+        const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:dUrl,folder:"item"});
+        msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
+      }else if(selTex?.dataUrl){
+        const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"item"});
+        msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
+        if(selTex.isAnimated){
+          const jm=await api("/texture/mcmeta",{filename:`${form.id}.png`,frametime:selTex.ticksPerFrame||4,folder:"item"});
+          msgs.push({ok:jm.ok,label:"mcmeta",msg:jm.ok?"ok":jm.reason});
+        }
+      }
+    };
     if(!isEdit){
-      if(dUrl&&dName){const j=await api("/texture",{filename:dName,dataUrl:dUrl,folder:"item"});msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});}
-      else if(selTex?.dataUrl){const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"item"});msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});if(selTex.isAnimated){const jm=await api("/texture/mcmeta",{filename:`${form.id}.png`,frametime:selTex.ticksPerFrame||4,folder:"item"});msgs.push({ok:jm.ok,label:"mcmeta",msg:jm.ok?"ok":jm.reason});}}
+      await wtItem();
       const j2=await api("/items/register",{line:code.reg,constName:CN});msgs.push({ok:j2.ok,label:"ModItems",msg:j2.ok?"ok":j2.reason});
       const j3=await api("/lang/set",{key:code.langKey,value:code.langVal});msgs.push({ok:j3.ok,label:"lang",msg:j3.ok?"ok":j3.reason});
       const j4=await api("/items/model",{line:code.modelLine});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}
+      if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
     }else{
       const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
-      if(selTex?.dataUrl){const jt=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"item"});msgs.push({ok:jt.ok,label:"texture",msg:jt.ok?"ok":jt.reason});}
+      await wtItem();
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
+      if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      else{const jr=await api("/recipes/delete",{constName:initial.constName||initial.id?.toUpperCase()});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     await api("/models/sync",{});
@@ -439,7 +501,19 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     const CN=form.customConstName?form.constName:form.id.toUpperCase();
     const block={...form,constName:CN,savedAt:Date.now()};
     const entries=gBlockEntries(block,textures);const msgs=[];
-    const wt=async(texId,fname,folder)=>{const t=textures.find(x=>x.id===texId);if(!t?.dataUrl)return;const j=await api("/texture",{filename:fname,dataUrl:t.dataUrl,folder:folder||"block"});msgs.push({ok:j.ok,label:`tex:${fname}`,msg:j.ok?"ok":j.reason});};
+    const wt=async(texId,fname,folder)=>{
+      if(!texId)return;
+      let dataUrl;
+      if(texId.startsWith("__direct__")){
+        dataUrl = texId.split("__name__")[0].replace("__direct__","");
+      }else{
+        const t=textures.find(x=>x.id===texId);
+        if(t) dataUrl = t.dataUrl;
+      }
+      if(!dataUrl)return;
+      const j=await api("/texture",{filename:fname,dataUrl,folder:folder||"block"});
+      msgs.push({ok:j.ok,label:`tex:${fname}`,msg:j.ok?"ok":j.reason});
+    };
     if(!isEdit){
       await wt(form.textureId,`${form.id}.png`,"block");
       if(isAdv){await wt(form.textureTopId,`${form.id}_top.png`,"block");await wt(form.textureBottomId,`${form.id}_bottom.png`,"block");await wt(form.textureSideId,`${form.id}_side.png`,"block");await wt(form.textureFrontId,`${form.id}_front.png`,"block");await wt(form.textureBackId,`${form.id}_back.png`,"block");}
@@ -448,10 +522,15 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
       const j2=await api("/blocks/register",{entries,creativeTab:form.creativeTab});
       msgs.push({ok:j2.ok,label:`ModBlocks(${entries.length})`,msg:j2.ok?"ok":j2.reason});
       if(j2.results)j2.results.forEach(r=>msgs.push({ok:r.ok,label:r.constName,msg:r.ok?"ok":r.reason}));
-      if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:true});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}
+      if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:true});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:true});}
+      if(form.hasRecipe&&gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      else{const jr=await api("/recipes/delete",{constName:CN});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
     }else{
       const code=entries[0];const j=await api("/blocks/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.line,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       const t=textures.find(x=>x.id===form.textureId);if(t?.dataUrl){const jt=await api("/texture",{filename:`${form.id}.png`,dataUrl:t.dataUrl,folder:"block"});msgs.push({ok:jt.ok,label:"texture",msg:jt.ok?"ok":jt.reason});}
+      if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:true});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:true});}
+      if(form.hasRecipe&&gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      else{const jr=await api("/recipes/delete",{constName:CN});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModBlocks.${CN}`,blockId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     if(form.hasTooltip)for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:isEdit});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
@@ -538,7 +617,7 @@ export default function App(){
   const isRunning=rs.state!=="idle";
 
   useEffect(()=>{fetch(`${BASE}/health`).then(r=>r.json()).then(()=>setBackOk(true)).catch(()=>setBackOk(false));},[]);
-  useEffect(()=>{setActivePanel(null);setHighlightFaceKey("textureId");},[texEd,itemEd,blockEd]);
+  useEffect(()=>{setActivePanel(null);setHighlightFaceKey("textureId");},[!!texEd,!!itemEd,!!blockEd,texEd?.target?.id,itemEd?.target?.id,blockEd?.target?.id]);
   const reloadMod=()=>{fetch(`${BASE}/items/read`).then(r=>r.json()).then(j=>{if(j.ok)setModItems(j.items||[]);}).catch(()=>{});fetch(`${BASE}/blocks/read`).then(r=>r.json()).then(j=>{if(j.ok)setModBlocks(j.blocks||[]);}).catch(()=>{});};
   useEffect(()=>{ reloadMod(); },[]);
   const onConsDrag=e=>{e.preventDefault();const sy=e.clientY,sh=consH;const mv=ev=>setConsH(Math.max(80,Math.min(480,sh-(ev.clientY-sy))));const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);};

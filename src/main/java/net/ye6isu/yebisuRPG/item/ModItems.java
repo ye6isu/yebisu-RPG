@@ -76,12 +76,10 @@ public class ModItems {
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.BOOTS,
                     new Item.Properties().durability(ArmorItem.Type.BOOTS.getDurability(19))));
 
-    //Items from creator
+    //Items from creator
 
 
 
-    public static final DeferredItem<Item> KOLAAAAAA = ITEMS.register("kolaaaaaa",
-                () -> new Item(new Item.Properties().stacksTo(1)));
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

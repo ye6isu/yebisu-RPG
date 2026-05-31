@@ -298,7 +298,12 @@ app.post('/api/items/update', (req, res) => {
     const indented = '\n    '+newLine.split('\n').map((l,i)=>i===0?l:'        '+l).join('\n')
     wf(file, src.slice(0,fieldStart)+indented+src.slice(end))
     const lang = rl()
-    if (oldId!==newId) delete lang[`item.${MODID}.${oldId}`]
+    if (oldId!==newId) {
+      delete lang[`item.${MODID}.${oldId}`]
+      for (const k of Object.keys(lang)) {
+        if (k.startsWith(`tooltip.${MODID}.${oldId}.`)) delete lang[k]
+      }
+    }
     lang[langKey] = langVal
     wl(sortLang(lang))
     // Update model line in ModItemModelProvider if newModelLine provided
@@ -328,6 +333,19 @@ app.post('/api/items/update', (req, res) => {
           wf(modelFile, msrc.replace(marker, '\n' + indentedModel + '\n        // YCS_MODEL_INSERT'))
         }
       }
+    }
+    if (oldId && oldId !== newId) {
+      const tabs = readTabsJson()
+      if (tabs[oldId]) {
+        tabs[newId] = tabs[oldId]
+        delete tabs[oldId]
+        writeTabsJson(tabs)
+      }
+      if (oldConstName) deleteRecipeFromProvider(oldConstName)
+      try {
+        const tPath = path.join(MOD_ROOT,'assets',MODID,'textures','item',`${oldId}.png`)
+        if (fs.existsSync(tPath)) { fs.unlinkSync(tPath); triggerIdeaReload(tPath); }
+      } catch {}
     }
     markDirty()
     res.json({ ok:true })
@@ -372,6 +390,8 @@ app.post('/api/items/delete', (req, res) => {
     wf(modelFile, cleanedModel.join('\n'))
     // Clean tags from ModItemTagProvider
     removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => l.includes(`ModItems.${constName}.get()`))
+    // Clean recipes from ModRecipeProvider
+    deleteRecipeFromProvider(constName)
     // Clean ycs_tabs.json
     const tabs = readTabsJson()
     delete tabs[id]
@@ -422,7 +442,21 @@ function readTabsJson() {
   try { return JSON.parse(rf(TABS_JSON)) } catch { return {} }
 }
 function writeTabsJson(obj) {
-  wf(TABS_JSON, JSON.stringify(obj, null, 2))
+  const entries = Object.entries(obj).sort((a,b) => {
+    if (a[1] !== b[1]) return a[1].localeCompare(b[1])
+    return a[0].localeCompare(b[0])
+  })
+  let out = "{\n"
+  let lastTab = null
+  for (let i = 0; i < entries.length; i++) {
+    const [k, v] = entries[i]
+    if (lastTab !== null && lastTab !== v) out += "\n"
+    lastTab = v
+    const isLast = (i === entries.length - 1)
+    out += `  "${k}": "${v}"${isLast ? "" : ","}\n`
+  }
+  out += "}"
+  wf(TABS_JSON, out)
 }
 
 app.post('/api/creativetab', (req, res) => {
@@ -577,6 +611,72 @@ app.post('/api/tags/delete', (req, res) => {
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
+// ─── Recipes ───────────────────────────────────────────────────────────────────
+app.post('/api/recipes/set', (req, res) => {
+  try {
+    const { id, constName, recipeCode } = req.body
+    if (!recipeCode) return res.json({ ok:true, skipped:true })
+
+    // Delete any existing recipe for this item first so we don't duplicate
+    deleteRecipeFromProvider(constName)
+
+    const file = jp(JAVA_ROOT,'datagen','ModRecipeProvider.java')
+    let src = rf(file)
+    const marker = '        // YCS_RECIPE_INSERT'
+
+    if (!src.includes(marker)) {
+      // Insert marker before closing brace of buildRecipes method
+      const buildRecipesStart = src.indexOf('protected void buildRecipes')
+      if (buildRecipesStart === -1) return res.json({ ok:false, reason:'could not find buildRecipes' })
+      let depth = 0, endIdx = -1
+      for (let i = src.indexOf('{', buildRecipesStart); i < src.length; i++) {
+        if (src[i] === '{') depth++
+        else if (src[i] === '}') { depth--; if (depth === 0) { endIdx = i; break } }
+      }
+      if (endIdx === -1) return res.json({ ok:false, reason:'could not find buildRecipes closing brace' })
+      src = src.slice(0, endIdx) + marker + '\n    ' + src.slice(endIdx)
+      wf(file, src)
+      src = rf(file)
+    }
+
+    const lines = recipeCode.split('\n').map(l => '        ' + l).join('\n')
+    wf(file, src.replace(marker, lines + '\n' + marker))
+    markDirty()
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+function deleteRecipeFromProvider(constName) {
+  const file = jp(JAVA_ROOT,'datagen','ModRecipeProvider.java')
+  try {
+    let src = rf(file)
+    const lines = src.split('\n')
+    let out = []
+    let skip = false
+    for (let i=0; i<lines.length; i++) {
+      if (lines[i].includes(`ModItems.${constName}.get(),`) || lines[i].includes(`ModBlocks.${constName}.get(),`)) {
+        skip = true
+        while(out.length && out[out.length-1].trim().length > 0 && !out[out.length-1].includes('save(') && !out[out.length-1].includes('// YCS')) {
+           out.pop()
+        }
+        continue
+      }
+      if (skip) {
+        if (lines[i].includes('.save(')) skip = false
+        continue
+      }
+      out.push(lines[i])
+    }
+    wf(file, out.join('\n'))
+  } catch(e) {}
+}
+
+app.post('/api/recipes/delete', (req, res) => {
+  try {
+    const { constName } = req.body
+    deleteRecipeFromProvider(constName)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
 // ─── Blocks ────────────────────────────────────────────────────────────────────
 app.post('/api/blocks/register', (req, res) => {
   try {
@@ -666,9 +766,38 @@ app.post('/api/blocks/update', (req, res) => {
     const indented = '\n    '+newLine.split('\n').map((l,i)=>i===0?l:'            '+l).join('\n')
     wf(file, src.slice(0,fieldStart)+indented+src.slice(end))
     const lang=rl()
-    if (oldId!==newId) delete lang[`block.${MODID}.${oldId}`]
-    lang[langKey]=langVal; wl(sortLang(lang))
-    markDirty()
+    if (oldId!==newId) {
+      delete lang[`block.${MODID}.${oldId}`]
+      for (const k of Object.keys(lang)) {
+        if (k.startsWith(`tooltip.${MODID}.${oldId}.`)) delete lang[k]
+      }
+    }
+    lang[langKey]=langVal
+    wl(sortLang(lang))
+    
+    if (oldId && oldId !== newId) {
+      const tabs = readTabsJson()
+      if (tabs[`block:${oldId}`]) {
+        tabs[`block:${newId}`] = tabs[`block:${oldId}`]
+        delete tabs[`block:${oldId}`]
+        writeTabsJson(tabs)
+      }
+      if (oldConstName) deleteRecipeFromProvider(oldConstName)
+      try {
+        const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_top.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_bottom.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_side.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_front.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_back.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_door_top.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_door_bottom.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','item',`${oldId}_door.png`))
+        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_trapdoor.png`))
+      } catch {}
+    }
+
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -719,6 +848,7 @@ app.post('/api/blocks/delete', (req, res) => {
     ]) { try { removeLines(f, l => l.includes(`ModBlocks.${constName}`)) } catch {} }
     // Clean tags from ModBlockTagProvider and ModItemTagProvider (BlockItem tags)
     try { removeLines(jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java'), l => l.includes(`ModBlocks.${constName}.get()`)) } catch {}
+    deleteRecipeFromProvider(constName)
     try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => l.includes(`ModBlocks.${constName}`)) } catch {}
     // Clean up ycs_tabs.json
     const tabs2 = readTabsJson()
