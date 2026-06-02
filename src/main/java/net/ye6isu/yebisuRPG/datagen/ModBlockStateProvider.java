@@ -43,9 +43,9 @@ public class ModBlockStateProvider extends BlockStateProvider {
         //Block from creator
         blockWithItem(ModBlocks.CAT_BLOCK);
 
-        blockWithItem(ModBlocks.SHIKA);
+        //YCS_Mod_Block_State_START
 
-        // YCS_BSP_INSERT
+        //YCS_Mod_Block_State_END
     }
 
     private void blockWithItem(DeferredBlock<?> deferredBlock) {

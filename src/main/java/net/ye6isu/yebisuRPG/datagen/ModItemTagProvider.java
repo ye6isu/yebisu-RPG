@@ -51,6 +51,8 @@ public class ModItemTagProvider extends ItemTagsProvider {
 
         tag(TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("yebisurpg", "test_items")))
                 .add(ModItems.RAW_YE6ISU.get());
-        // YCS_ITEM_TAGS_INSERT
+        //YCS_Mod_Item_Tags_START
+
+        //YCS_Mod_Item_Tags_END
     }
 }

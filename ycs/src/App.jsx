@@ -128,14 +128,34 @@ function gRecipe(id,form,isBlock=false){
   return`ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${il}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`;
 }
 function gTagCode(id,form,isBlock=false){if(!form.tags?.length)return[];const CN=form.customConstName?form.constName:(form.id||"").toUpperCase();const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;return form.tags.map(tag=>{const[ns,path]=tag.includes(":")?tag.split(":"):[MODID,tag];return`tag(TagKey.create(Registries.${isBlock?"BLOCK":"ITEM"}, ResourceLocation.fromNamespaceAndPath("${ns}", "${path}"))).add(${ref});`;});}
+function idToClassName(id){return id.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join("")+"Item";}
 function gItemCode(item,textures){
   const texId=(item.textureId||"").startsWith("__direct__")?null:item.textureId;const tex=textures.find(t=>t.id===texId);
   const id=item.id||"my_item",CN=item.customConstName?item.constName:id.toUpperCase(),dn=item.displayName||id;
   const tt=()=>{if(!item.hasTooltip)return null;const n=item.tooltipNormal?`"tooltip.${MODID}.${id}.normal"`:"null";const h=item.hasHiddenTooltip&&item.tooltipHidden?`"tooltip.${MODID}.${id}.hidden"`:"null";const s=item.hasHiddenTooltip?(item.useDefaultShiftHint?`"tooltip.${MODID}.shift_to_see"`:(item.tooltipShiftHint?`"tooltip.${MODID}.${id}.shift_hint"`:"null")):"null";return{n,h,s};};
-  const cls=props=>{const t=tt();if(!t||(t.n==="null"&&t.h==="null"))return`new Item(${props})`;return`new TooltipItem(${props},\n                ${t.n},\n                ${t.h},\n                ${t.s})`;};
+  const addTooltip = (baseInst) => {
+    const t=tt();
+    if(!t||(t.n==="null"&&t.h==="null")) return baseInst;
+    let stmts = [];
+    if(t.n!=="null") stmts.push(`                    tooltipComponents.add(Component.translatable(${t.n}));`);
+    if(t.h!=="null"){
+      stmts.push(`                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);
+      stmts.push(`                        tooltipComponents.add(Component.translatable(${t.h}));`);
+      stmts.push(`                    } else {`);
+      stmts.push(`                        tooltipComponents.add(Component.translatable(${t.s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);
+      stmts.push(`                    }`);
+    }
+    return `${baseInst} {
+                @Override
+                public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
+${stmts.join('\n')}
+                    super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+                }
+            }`;
+  };
   const stackOpt=(item.maxStackSize&&parseInt(item.maxStackSize)!==64)?`.stacksTo(${parseInt(item.maxStackSize)})`:"";
-  let reg="",ml2,fpReg;
-  if(item.itemType==="Tool"){const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,c=`${item.toolType}Item`;reg=`public static final DeferredItem<${c}> ${CN} = ITEMS.register("${id}",\n        () -> new ${c}(${tier}, new Item.Properties()\n                .attributes(${c}.createAttributes(${tier}, ${dmg}f, ${spd}f))));`;}
+  let reg="",fpReg;
+  if(item.itemType==="Tool"){const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,c=`${item.toolType}Item`;reg=`public static final DeferredItem<${c}> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${c}(${tier}, new Item.Properties()\n                .attributes(${c}.createAttributes(${tier}, ${dmg}f, ${spd}f)))`)});`;}
   else if(item.itemType==="Food"){
     const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
     let fx="";
@@ -143,11 +163,17 @@ function gItemCode(item,textures){
       fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");
     }
     fpReg=`public static final FoodProperties ${CN} = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
-    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}.food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN})`)});`;
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new Item(new Item.Properties()${stackOpt}.food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN}))`)});`;
   }
-  else if(item.itemType==="Fuel"){const t=tt();if(t&&(t.n!=="null"||t.h!=="null"))reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new TooltipItem(new Item.Properties()${stackOpt}, ${t.n}, ${t.h}, ${t.s}));`;else reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new FuelItem(new Item.Properties()${stackOpt}, ${item.burnTime||1600}));`;}
-  else{if((item.holdingMode||"none")==="handheld")ml2=`handheldItem(ModItems.${CN});`;reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${cls(`new Item.Properties()${stackOpt}`)});`;}
-  const modelLine=ml2||(item.itemType==="Tool"?`handheldItem(ModItems.${CN});`:tex?.isAnimated?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");`:`basicItem(ModItems.${CN}.get());`);
+  else if(item.itemType==="Fuel"){reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new FuelItem(new Item.Properties()${stackOpt}, ${item.burnTime||1600})`)});`;}
+  else if(item.itemType==="Custom"){
+    const cls2=item.customItemClass||idToClassName(id);
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${cls2}(new Item.Properties()${stackOpt})`)});`;
+  }
+  else{reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new Item(new Item.Properties()${stackOpt})`)});`;}
+  
+  const isHandheld = item.holdingMode === "handheld" || (item.holdingMode !== "none" && item.itemType === "Tool");
+  const modelLine = isHandheld ? `handheldItem(ModItems.${CN});` : (tex?.isAnimated ? `existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");` : `basicItem(ModItems.${CN}.get());`);
   return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN,fpReg};
 }
 function gBlockEntries(block,textures=[]){
@@ -207,7 +233,7 @@ function gBlockEntries(block,textures=[]){
   return entries;
 }
 
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
@@ -434,6 +460,23 @@ function TexturePickerPanel({textures,fkey="textureId",label="Texture"}){
   </div>;
 }
 
+function CustomClassPanel(){
+  const{form}=useContext(FormCtx);
+  const[code,setCode]=useState("// loading…");
+  const cls=form.customItemClass||idToClassName(form.id||"item");
+  useEffect(()=>{
+    if(!cls)return;
+    api("/items/custom-class/read",{className:cls}).then(j=>{
+      if(j.ok)setCode(j.code);
+      else setCode(`// ${j.reason||"not found"}`);
+    }).catch(()=>setCode("// error reading file"));
+  },[cls]);
+  return<div style={{flex:1,padding:14,overflow:"hidden",display:"flex",flexDirection:"column",gap:8}}>
+    <Lbl>{cls}.java</Lbl>
+    <pre style={{flex:1,background:"#0a0a0c",border:`1px solid ${C.inpB}`,borderRadius:4,padding:"10px 12px",fontSize:11,lineHeight:1.7,color:"#a8a8a0",whiteSpace:"pre",overflowY:"auto",overflowX:"auto"}}>{code}</pre>
+  </div>;
+}
+
 function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,activePanel,setActivePanel,highlightFaceKey}){
   const faceLabel=highlightFaceKey?highlightFaceKey.replace(/^texture/,"").replace(/Id$/,"")+" face":"Texture";
   if(!activePanel){
@@ -444,6 +487,7 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
   }
   return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
     <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      {activePanel==="customclass"&&<CustomClassPanel/>}
       {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey={highlightFaceKey||"textureId"} label={faceLabel}/>}
       {activePanel==="tags"&&<TagsPanel/>}
       {activePanel==="tooltip"&&<TooltipPanel/>}
@@ -526,7 +570,30 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>animated — mcmeta auto-written</span>}
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
-    <Sel label="Item Type" value={form.itemType} onChange={v=>F("itemType",v)} options={["Generic","Tool","Food","Fuel"]}/>
+    <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
+      <div style={{flex:1}}>
+        <Sel label="Item Type" value={form.itemType} onChange={v=>{
+          const prev=form.itemType;
+          F("itemType",v);
+          if (v === "Tool" && form.holdingMode !== "handheld") F("holdingMode", "handheld");
+          if(prev==="Custom"&&v!=="Custom"&&form.customItemClass){
+            api("/items/custom-class/delete",{className:form.customItemClass}).catch(()=>{});
+            F("customItemClass","");
+          }
+          if(v==="Custom"&&form.id){
+            const cls2=idToClassName(form.id);
+            F("customItemClass",cls2);
+            api("/items/custom-class",{className:cls2}).catch(()=>{});
+          }
+        }} options={["Generic","Tool","Food","Fuel","Custom"]}/>
+      </div>
+      {form.itemType==="Custom"&&<Btn sm v={activePanel==="customclass"?"p":"g"} style={{marginBottom:1}} onClick={async()=>{
+        if(activePanel==="customclass"){setActivePanel(null);return;}
+        const cls2=form.customItemClass||idToClassName(form.id||"item");
+        if(!form.customItemClass){F("customItemClass",cls2);await api("/items/custom-class",{className:cls2});}
+        setActivePanel("customclass");
+      }}>edit</Btn>}
+    </div>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
     {form.itemType!=="Tool"&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
     {form.itemType==="Tool"&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
@@ -775,7 +842,7 @@ export default function App(){
   const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allItems,textures]);
   const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allBlocks,textures]);
   const delTex=id=>setTextures(arr=>arr.filter(x=>x.id!==id));
-  const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
+  const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});if(item.itemType==="Custom"&&item.customItemClass)await api("/items/custom-class/delete",{className:item.customItemClass});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const delBlock=async id=>{const b=allBlocks.find(x=>x.id===id);if(!b)return;await api("/blocks/delete",{id,constName:b.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"block"});setBlocks(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const saveItem=(item,oldId)=>{setItems(arr=>{const searchId=oldId||item.id;const i=arr.findIndex(x=>x.id===searchId);return i>=0?arr.map((x,j)=>j===i?item:x):[...arr,item];});reloadMod();setItemEd(null);savedEdState.current.items=null;};
   const saveBlock=(block,oldId)=>{setBlocks(arr=>{const searchId=oldId||block.id;const i=arr.findIndex(x=>x.id===searchId);return i>=0?arr.map((x,j)=>j===i?block:x):[...arr,block];});reloadMod();setBlockEd(null);savedEdState.current.blocks=null;};
@@ -841,7 +908,8 @@ export default function App(){
         </div>
         {/* Gradle dots — vertically centered in tab bar row, right-aligned with window buttons */}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingRight:13,WebkitAppRegion:"no-drag",flexShrink:0}}>
-          <Dot color="#e4e5e9" title={showCons?"Hide console":"Show console"} onClick={()=>setShowCons(v=>!v)}/>
+          <Dot color={showCons?"#e4e5e9":"#3a3a3c"} title={showCons?"Hide console":"Show console"} onClick={()=>setShowCons(v=>!v)}/>
+          <Dot color="#3a3a3c" title="Refresh YCS" onClick={async()=>{await fetch(`${BASE}/refresh`,{method:"POST"});reloadMod();}} />
           <Dot color={isRunning||running?"#555":"#e4e5e9"} title="RunData" disabled={isRunning||running} onClick={()=>run("/run/data")}/>
           <Dot color={isRunning||running?"#555":"#e4e5e9"} title={rs.dirty?"RunData then RunClient":"RunClient"} disabled={isRunning||running} onClick={()=>run("/run/client")}/>
         </div>
