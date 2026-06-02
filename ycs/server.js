@@ -15,21 +15,32 @@ const MODID     = 'yebisurpg'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rf = f => fs.readFileSync(f, 'utf8')
-const wf = (f, s) => { fs.writeFileSync(f, s); triggerIdeaReload(f); }
-// Trigger IntelliJ to reload changed files via the file system watcher
+const YCS_MARKERS = [
+  ['//YCS_Mod_Items_START', '//YCS_Mod_Items_END'],
+  ['//YCS_Mod_Item_Tags_START', '//YCS_Mod_Item_Tags_END'],
+  ['//YCS_Mod_Block_Tags_START', '//YCS_Mod_Block_Tags_END'],
+  ['//YCS_Mod_Recipe_Provider_START', '//YCS_Mod_Recipe_Provider_END'],
+  ['//YCS_Mod_Blocks_START', '//YCS_Mod_Blocks_END'],
+  ['//YCS_Mod_Block_State_START', '//YCS_Mod_Block_State_END'],
+  ['//YCS_Mod_Block_Loot_START', '//YCS_Mod_Block_Loot_END'],
+  ['//YCS_Mod_Item_Model_START', '//YCS_Mod_Item_Model_END']
+]
+const wf = (f, s) => {
+  if (typeof s === 'string') {
+    for (const [start, end] of YCS_MARKERS) {
+      if (s.includes(start)) s = formatYCSSection(s, start, end);
+    }
+  }
+  fs.writeFileSync(f, s);
+  triggerIdeaReload(f);
+}
 function triggerIdeaReload(filePath) {
-  try {
-    // Touch the file's mtime so IntelliJ FS watcher detects the change
-    const now = new Date();
-    fs.utimesSync(filePath, now, now);
-  } catch {}
+  try { const now = new Date(); fs.utimesSync(filePath, now, now); } catch {}
 }
 const rl = () => {
   const raw = rf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json')).replace(/^\uFEFF/,'')
-  // Strip blank lines before parsing, then filter out any __BLANK__ keys
   const stripped = raw.split('\n').filter(l => l.trim() !== '').join('\n')
   const parsed = JSON.parse(stripped)
-  // Remove any __BLANK__ sentinel keys that may have been written
   for (const k of Object.keys(parsed)) if (k === '__BLANK__') delete parsed[k]
   return parsed
 }
@@ -37,8 +48,18 @@ const wl = arr => wf(path.join(MOD_ROOT,'assets',MODID,'lang','en_us.json'), wri
 const jp = (...p) => path.join(...p)
 
 function removeLines(file, pred) {
-  const newSrc = rf(file).split('\n').filter(l => !pred(l)).join('\n');
-  wf(file, newSrc.replace(/\n\s*\n\s*\n/g, '\n\n'));
+  const lines = rf(file).split('\n');
+  const keep = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (pred(lines[i])) {
+      if (lines[i].trim().endsWith(';')) {
+         if (keep.length > 0) keep[keep.length - 1] += ';';
+      }
+    } else {
+      keep.push(lines[i]);
+    }
+  }
+  wf(file, keep.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n'));
 }
 
 function insertLangGrouped(json, key, value) {
@@ -79,32 +100,36 @@ function runGradle(task, label) {
 }
 
 app.post('/api/run/data', async (_req, res) => {
-  if (runState !== 'idle') return res.json({ ok: false, reason: 'already running' })
+  if (runState.startsWith('running')) return res.json({ ok: false, reason: 'already running' })
   res.json(await runGradle('runData', 'data'))
 })
 app.post('/api/run/client', async (_req, res) => {
-  if (runState !== 'idle') return res.json({ ok: false, reason: 'already running' })
+  if (runState.startsWith('running')) return res.json({ ok: false, reason: 'already running' })
   if (datagenDirty) { const r = await runGradle('runData', 'data'); if (!r.ok) return res.json({ ok: false, reason: 'runData failed' }) }
   res.json(await runGradle('runClient', 'client'))
 })
 
-// ─── Health ────────────────────────────────────────────────────────────────────
+// ─── Health & Refresh ─────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
+app.post('/api/refresh', (_req, res) => {
+  runState = 'idle'
+  res.json({ ok: true })
+})
 
 // ─── Read items ────────────────────────────────────────────────────────────────
 app.get('/api/items/read', (_req, res) => {
   try {
     const src  = rf(jp(JAVA_ROOT,'item','ModItems.java'))
     const lang = rl()
-    const tabs = readTabsJson()  // { "tess": "yebisurpg_blocks_tab", ... }
-
+    const tabs = readTabsJson()
     const re = /public static final DeferredItem<(\w+)>\s+(\w+)\s*=\s*ITEMS\.register\("([^"]+)"/g
     const items = []
     let m
     while ((m = re.exec(src)) !== null) {
       const javaType = m[1], constName = m[2], id = m[3]
-      let itemType='None', toolType='Sword', tier='Iron', damage='3', speed='-2.4', burnTime='1600'
+      let itemType='Generic', toolType='Sword', tier='Iron', damage='3', speed='-2.4', burnTime='1600', customItemClass=''
       if (['SwordItem','PickaxeItem','AxeItem','ShovelItem','HoeItem'].includes(javaType)) { itemType='Tool'; toolType=javaType.replace('Item','') }
+      else if (javaType !== 'Item' && javaType !== 'FuelItem') { itemType='Custom'; customItemClass=javaType; }
       const attrM = new RegExp(`"${id}"[\\s\\S]{0,400}createAttributes\\([^,]+,\\s*([\\d.]+)f,\\s*(-?[\\d.]+)f\\)`).exec(src)
       if (attrM) { damage=attrM[1]; speed=attrM[2] }
       const tierM = new RegExp(`"${id}"[\\s\\S]{0,200}(ModToolTiers\\.\\w+|Tiers\\.\\w+)`).exec(src)
@@ -114,12 +139,10 @@ app.get('/api/items/read', (_req, res) => {
       const texPath = jp(MOD_ROOT,'assets',MODID,'textures','item',`${id}.png`)
       const hasTexture = fs.existsSync(texPath)
       let textureDataUrl = null
-      if (hasTexture) {
-        try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {}
-      }
+      if (hasTexture) { try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {} }
       const tabKey = tabs[id] || ''
       const creativeTab = TAB_KEY_TO_VALUE[tabKey] || ''
-      items.push({ id, constName, displayName:lang[`item.${MODID}.${id}`]||id, itemType, toolType, tier, damage, speed, burnTime, hasTexture, textureDataUrl, creativeTab, source:'mod' })
+      items.push({ id, constName, displayName:lang[`item.${MODID}.${id}`]||id, itemType, customItemClass, toolType, tier, damage, speed, burnTime, hasTexture, textureDataUrl, creativeTab, source:'mod' })
     }
     res.json({ ok:true, items })
   } catch(e) { res.json({ ok:false, reason:e.message, items:[] }) }
@@ -131,7 +154,6 @@ app.get('/api/blocks/read', (_req, res) => {
     const src  = rf(jp(JAVA_ROOT,'block','ModBlocks.java'))
     const lang = rl()
     const tabs = readTabsJson()
-
     const re = /registerBlock\("([^"]+)"/g
     const blocks = []
     let m
@@ -151,9 +173,7 @@ app.get('/api/blocks/read', (_req, res) => {
       const texPath = jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}.png`)
       const hasTexture = fs.existsSync(texPath)
       let textureDataUrl = null
-      if (hasTexture) {
-        try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {}
-      }
+      if (hasTexture) { try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {} }
       const tabKey = tabs[`block:${id}`] || ''
       const creativeTab = TAB_KEY_TO_VALUE[tabKey] || ''
       blocks.push({ id, constName:id.toUpperCase(), displayName:lang[`block.${MODID}.${id}`]||id, blockType, hasTexture, textureDataUrl, creativeTab, source:'mod' })
@@ -189,8 +209,6 @@ app.post('/api/texture/mcmeta', (req, res) => {
 })
 
 // ─── Lang ──────────────────────────────────────────────────────────────────────
-
-// Prefix order for sorted lang output
 const LANG_PREFIX_ORDER = ['item.','block.','tooltip.','creativetab.','key.','enchantment.','entity.']
 
 function sortLang(json) {
@@ -202,17 +220,14 @@ function sortLang(json) {
     if (prefix) {
       if (!groups[prefix]) groups[prefix] = []
       groups[prefix].push([k, v])
-    } else {
-      other.push([k, v])
-    }
+    } else { other.push([k, v]) }
   }
   for (const g of Object.values(groups)) g.sort((a, b) => a[0].localeCompare(b[0]))
   other.sort((a, b) => a[0].localeCompare(b[0]))
-  // Return a plain array (not an object) so we preserve blank line positions
   const sorted = []
   for (const prefix of LANG_PREFIX_ORDER) {
     if (groups[prefix]) {
-      if (sorted.length > 0) sorted.push(null) // null = blank line
+      if (sorted.length > 0) sorted.push(null)
       sorted.push(...groups[prefix])
     }
   }
@@ -228,9 +243,8 @@ function writeLangJson(entries) {
   const realEntries = entries.filter(e => e !== null)
   let realIdx = 0
   for (const entry of entries) {
-    if (entry === null) {
-      lines.push('')
-    } else {
+    if (entry === null) { lines.push('') }
+    else {
       const [k, v] = entry
       const isLast = realIdx === realEntries.length - 1
       lines.push(`  ${JSON.stringify(k)}: ${JSON.stringify(v)}${isLast ? '' : ','}`)
@@ -261,23 +275,83 @@ app.post('/api/lang/delete', (req, res) => {
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
-// ─── Items ─────────────────────────────────────────────────────────────────────
+// Safe item field slicer: finds the field declaration start without consuming any YCS marker lines above it
+function sliceItemField(src, oldId) {
+  const startMarker = `ITEMS.register("${oldId}"`
+  const startIdx = src.indexOf(startMarker)
+  if (startIdx === -1) return null
+
+  // Walk backward from startIdx line-by-line to find the `public static final` line,
+  // but STOP if we hit a YCS marker — never cross it
+  const before = src.slice(0, startIdx)
+  const lines = before.split('\n')
+  let fieldLineIdx = -1
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i]
+    if (l.includes('//YCS_')) break  // never eat a marker line
+    if (/^\s*public static final /.test(l)) { fieldLineIdx = i; break }
+  }
+  if (fieldLineIdx === -1) return null
+
+  // Reconstruct fieldStart as char offset — account for the newline before the line
+  const fieldStart = lines.slice(0, fieldLineIdx).join('\n').length  // offset just before the \n that starts the field line
+
+  // Find end of statement
+  let depth = 0, end = -1
+  for (let i = startIdx; i < src.length; i++) {
+    if (src[i]==='('||src[i]==='{') depth++
+    else if (src[i]===')'||src[i]==='}') {
+      depth--
+      if (depth===0) { const semi=src.indexOf(';',i); if(semi!==-1){end=semi+1;break} }
+    }
+  }
+  if (end === -1) return null
+  return { fieldStart, end }
+}
+
+function formatYCSSection(src, startMarker, endMarker) {
+  const sIdx = src.indexOf(startMarker)
+  const eIdx = src.indexOf(endMarker)
+  if (sIdx === -1 || eIdx === -1) return src
+  
+  const lastNewline = src.lastIndexOf('\n', eIdx)
+  const indent = lastNewline !== -1 ? src.slice(lastNewline + 1, eIdx).replace(/[^\s]/g, '') : '    '
+  
+  const before = src.slice(0, sIdx + startMarker.length)
+  const after = src.slice(eIdx)
+  let middle = src.slice(sIdx + startMarker.length, eIdx)
+  
+  middle = middle.replace(/\n\s*\n\s*\n+/g, '\n\n')
+  
+  if (!middle.trim()) {
+    middle = '\n\n' + indent
+  } else {
+    if (!middle.startsWith('\n\n')) middle = '\n\n' + middle.trimStart()
+    if (!middle.endsWith('\n\n' + indent)) middle = middle.trimEnd() + '\n\n' + indent
+  }
+  return before + middle + after
+}
+
 app.post('/api/items/register', (req, res) => {
   try {
     const { line, constName, fpReg } = req.body
     const file = jp(JAVA_ROOT,'item','ModItems.java')
     let src = rf(file)
     if (src.includes(constName+' =')) return res.json({ ok:false, reason:'already exists' })
-    const marker = '\n    public static void register('
-    if (!src.includes(marker)) return res.json({ ok:false, reason:'insertion point not found' })
-    const indented = line.split('\n').map((l,i) => i===0?'    '+l:'        '+l).join('\n')
-    wf(file, src.replace(marker, '\n'+indented+'\n'+marker))
+    const startMarker = '//YCS_Mod_Items_START'
+    const endMarker   = '//YCS_Mod_Items_END'
+    if (!src.includes(startMarker) || !src.includes(endMarker)) return res.json({ ok:false, reason:'YCS_Mod_Items markers not found' })
+    const indented = '    ' + line.split('\n').map((l,i) => i===0?l:'        '+l).join('\n')
+    const insertPos = src.indexOf(endMarker)
+    src = src.slice(0, insertPos) + indented + '\n\n    ' + src.slice(insertPos)
+    wf(file, formatYCSSection(src, '//YCS_Mod_Items_START', '//YCS_Mod_Items_END'))
     if (fpReg) {
       const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
       if (fs.existsSync(fpFile)) {
         const fp = rf(fpFile)
         wf(fpFile, fp.replace('}', '    ' + fpReg + '\n}'))
       } else {
+        const PKG = 'net.ye6isu.yebisuRPG'
         wf(fpFile, `package ${PKG}.item;\n\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.effect.MobEffects;\nimport net.minecraft.world.food.FoodProperties;\n\npublic class ModFoodProperties {\n    ${fpReg}\n}\n`)
       }
     }
@@ -291,38 +365,26 @@ app.post('/api/items/update', (req, res) => {
     const { oldConstName, oldId, newLine, newConstName, newId, langKey, langVal, newModelLine, fpReg } = req.body
     const file = jp(JAVA_ROOT,'item','ModItems.java')
     let src = rf(file)
-    const startMarker = `ITEMS.register("${oldId}"`
-    const startIdx = src.indexOf(startMarker)
+    const startIdx = src.indexOf(`ITEMS.register("${oldId}"`)
     if (startIdx === -1) return res.json({ ok:false, reason:`ITEMS.register("${oldId}") not found` })
-    const fieldStart = src.lastIndexOf('\n    public static final ', startIdx)
-    if (fieldStart === -1) return res.json({ ok:false, reason:'field declaration not found' })
-    let depth = 0, end = -1
-    for (let i = startIdx; i < src.length; i++) {
-      if (src[i]==='('||src[i]==='{') depth++
-      else if (src[i]===')'||src[i]==='}') {
-        depth--
-        if (depth===0) { const semi=src.indexOf(';',i); if(semi!==-1){end=semi+1;break} }
-      }
-    }
-    if (end===-1) return res.json({ ok:false, reason:'end of statement not found' })
+    const slice = sliceItemField(src, oldId)
+    if (!slice) return res.json({ ok:false, reason:'field declaration not found' })
+    const { fieldStart, end } = slice
     const indented = '\n    '+newLine.split('\n').map((l,i)=>i===0?l:'        '+l).join('\n')
-    wf(file, src.slice(0,fieldStart)+indented+src.slice(end))
+    src = src.slice(0,fieldStart)+indented+src.slice(end)
+    wf(file, formatYCSSection(src, '//YCS_Mod_Items_START', '//YCS_Mod_Items_END'))
     const lang = rl()
     if (oldId!==newId) {
       delete lang[`item.${MODID}.${oldId}`]
-      for (const k of Object.keys(lang)) {
-        if (k.startsWith(`tooltip.${MODID}.${oldId}.`)) delete lang[k]
-      }
+      for (const k of Object.keys(lang)) if (k.startsWith(`tooltip.${MODID}.${oldId}.`)) delete lang[k]
     }
     lang[langKey] = langVal
     wl(sortLang(lang))
-    // Update model line in ModItemModelProvider if newModelLine provided
     if (newModelLine) {
       const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
       let msrc = rf(modelFile)
       const CN = newConstName || (newId||'').toUpperCase()
       const oldCN = oldConstName || (oldId||'').toUpperCase()
-      // Find and replace any existing line referencing this item's const name
       const mlines = msrc.split('\n')
       let replaced = false
       const newMlines = mlines.map(l => {
@@ -336,21 +398,16 @@ app.post('/api/items/update', (req, res) => {
       if (replaced) {
         wf(modelFile, newMlines.join('\n'))
       } else {
-        // Not found — insert at marker
-        const marker = '\n        // YCS_MODEL_INSERT'
-        if (msrc.includes(marker)) {
+        const modelMarker = '\n        //YCS_Mod_Item_Model_END'
+        if (msrc.includes(modelMarker)) {
           const indentedModel = '        ' + newModelLine.trim()
-          wf(modelFile, msrc.replace(marker, '\n' + indentedModel + '\n        // YCS_MODEL_INSERT'))
+          wf(modelFile, msrc.replace(modelMarker, '\n' + indentedModel + '\n        //YCS_Mod_Item_Model_END'))
         }
       }
     }
     if (oldId && oldId !== newId) {
       const tabs = readTabsJson()
-      if (tabs[oldId]) {
-        tabs[newId] = tabs[oldId]
-        delete tabs[oldId]
-        writeTabsJson(tabs)
-      }
+      if (tabs[oldId]) { tabs[newId] = tabs[oldId]; delete tabs[oldId]; writeTabsJson(tabs) }
       if (oldConstName) deleteRecipeFromProvider(oldConstName)
       try {
         const tPath = path.join(MOD_ROOT,'assets',MODID,'textures','item',`${oldId}.png`)
@@ -358,6 +415,7 @@ app.post('/api/items/update', (req, res) => {
       } catch {}
     }
     const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
+    const PKG = 'net.ye6isu.yebisuRPG'
     if (fpReg) {
       if (fs.existsSync(fpFile)) {
         try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${oldConstName || (oldId||'').toUpperCase()} =`)) } catch {}
@@ -383,21 +441,21 @@ app.post('/api/items/delete', (req, res) => {
     let src = rf(modItemsFile)
     const startIdx = src.indexOf(`ITEMS.register("${id}"`)
     if (startIdx !== -1) {
-      const fieldStart = src.lastIndexOf('\n    public static final ', startIdx)
-      let depth=0, end=-1
-      for (let i=startIdx; i<src.length; i++) {
-        if(src[i]==='('||src[i]==='{') depth++
-        else if(src[i]===')'||src[i]==='}') { depth--; if(depth===0){const semi=src.indexOf(';',i);if(semi!==-1){end=semi+1;break}} }
+      const slice = sliceItemField(src, id)
+      if (slice) {
+        let { fieldStart, end } = slice
+        // Remove trailing or leading blank lines cleanly
+        let before = src.slice(0, fieldStart)
+        let after = src.slice(end)
+        src = before + after
+        wf(modItemsFile, formatYCSSection(src, '//YCS_Mod_Items_START', '//YCS_Mod_Items_END'))
       }
-      if (fieldStart!==-1 && end!==-1) wf(modItemsFile, src.slice(0,fieldStart)+src.slice(end))
     }
-    // Clean lang: item.* and tooltip.*
     const lang = rl()
     for (const k of Object.keys(lang)) {
       if (k.startsWith(`item.${MODID}.${id}`) || k.startsWith(`tooltip.${MODID}.${id}`)) delete lang[k]
     }
     wl(sortLang(lang))
-    // Clean model provider (multi-line safe)
     const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
     const modelLines = rf(modelFile).split('\n')
     const cleanedModel = []
@@ -405,24 +463,16 @@ app.post('/api/items/delete', (req, res) => {
     for (let i = 0; i < modelLines.length; i++) {
       const l = modelLines[i]
       if (l.includes(`ModItems.${constName}`) || l.includes(`"${id}"`)) { skipNext = true; continue }
-      if (skipNext) {
-        if (l.trim().startsWith('.') || l.trim() === ';') continue
-        skipNext = false
-      }
+      if (skipNext) { if (l.trim().startsWith('.') || l.trim() === ';') continue; skipNext = false }
       cleanedModel.push(l)
     }
     wf(modelFile, cleanedModel.join('\n'))
-    // Clean tags from ModItemTagProvider
     removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => l.includes(`ModItems.${constName}.get()`))
-    // Clean recipes from ModRecipeProvider
     deleteRecipeFromProvider(constName)
-    // Clean ycs_tabs.json
     const tabs = readTabsJson()
     delete tabs[id]
     writeTabsJson(tabs)
-    // Clean ModCreativeTabEvents (vanilla tabs)
     try { removeLines(jp(JAVA_ROOT,'item','ModCreativeTabEvents.java'), l => l.includes(`ModItems.${constName}`)) } catch {}
-    // Clean ModFoodProperties
     const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
     if (fs.existsSync(fpFile)) {
       try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${constName} =`)) } catch {}
@@ -439,23 +489,65 @@ app.post('/api/items/model', (req, res) => {
     let src = rf(file)
     const firstLine = line.split('\n')[0].trim()
     if (src.includes(firstLine)) return res.json({ ok:false, reason:'already exists' })
-    const marker = '\n        // YCS_MODEL_INSERT'
-    if (!src.includes(marker)) return res.json({ ok:false, reason:'YCS_MODEL_INSERT marker not found' })
+    const marker = '\n        //YCS_Mod_Item_Model_END'
+    if (!src.includes(marker)) return res.json({ ok:false, reason:'YCS_Mod_Item_Model_END marker not found' })
     const indented = line.split('\n').map(l => '        ' + l.trim()).join('\n')
-    wf(file, src.replace(marker, '\n' + indented + '\n        // YCS_MODEL_INSERT'))
+    wf(file, src.replace(marker, '\n' + indented + '\n        //YCS_Mod_Item_Model_END'))
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
-// ─── Creative tab — JSON-based via ycs_tabs.json ──────────────────────────────
+// ─── Custom Item Class ─────────────────────────────────────────────────────────
+// Creates/deletes/reads custom item class files under item/custom/
 
+app.post('/api/items/custom-class', (req, res) => {
+  try {
+    const { className } = req.body
+    const dir = jp(JAVA_ROOT,'item','custom')
+    const file = jp(dir, `${className}.java`)
+    const PKG2 = 'net.ye6isu.yebisuRPG'
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive:true })
+    if (fs.existsSync(file)) return res.json({ ok:true, existed:true })
+    const content = `package ${PKG2}.item.custom;\n\nimport net.minecraft.world.item.Item;\n\npublic class ${className} extends Item {\n    public ${className}(Properties properties) {\n        super(properties);\n    }\n}\n`
+    wf(file, content)
+    res.json({ ok:true, existed:false })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+app.post('/api/items/custom-class/delete', (req, res) => {
+  try {
+    const { className } = req.body
+    const file = jp(JAVA_ROOT,'item','custom', `${className}.java`)
+    if (fs.existsSync(file)) fs.unlinkSync(file)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+app.post('/api/items/custom-class/read', (req, res) => {
+  try {
+    const { className } = req.body
+    const file = jp(JAVA_ROOT,'item','custom', `${className}.java`)
+    if (!fs.existsSync(file)) return res.json({ ok:false, reason:'not found' })
+    res.json({ ok:true, code: rf(file) })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+app.get('/api/items/custom-class/list', (req, res) => {
+  try {
+    const dir = jp(JAVA_ROOT,'item','custom')
+    if (!fs.existsSync(dir)) return res.json({ ok:true, classes:[] })
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.java')).map(f => f.replace('.java',''))
+    res.json({ ok:true, classes:files })
+  } catch(e) { res.json({ ok:false, reason:e.message, classes:[] }) }
+})
+
+// ─── Creative tab — JSON-based via ycs_tabs.json ──────────────────────────────
 const TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_tabs.json'
 
-// Map from UI tab const value to the tab key string used in ycs_tabs.json
 const TAB_VALUE_TO_KEY = {
-  'ModCreativeModeTabs.YEBISURPG_ITEMS_TAB':  'yebisurpg_items_tab',
-  'ModCreativeModeTabs.YEBISURPG_BLOCK_TAB':  'yebisurpg_blocks_tab',
+  'ModCreativeModeTabs.YEBISURPG_ITEMS_TAB': 'yebisurpg_items_tab',
+  'ModCreativeModeTabs.YEBISURPG_BLOCK_TAB': 'yebisurpg_blocks_tab',
   'vanilla:combat':              'combat',
   'vanilla:tools_and_utilities': 'tools_and_utilities',
   'vanilla:food_and_drinks':     'food_and_drinks',
@@ -464,25 +556,17 @@ const TAB_VALUE_TO_KEY = {
   'vanilla:redstone':            'redstone_blocks',
   'vanilla:natural_blocks':      'natural_blocks',
 }
-// Reverse: tab key -> UI tab const value (for items/read)
 const TAB_KEY_TO_VALUE = Object.fromEntries(Object.entries(TAB_VALUE_TO_KEY).map(([k,v])=>[v,k]))
 
-function readTabsJson() {
-  try { return JSON.parse(rf(TABS_JSON)) } catch { return {} }
-}
+function readTabsJson() { try { return JSON.parse(rf(TABS_JSON)) } catch { return {} } }
 function writeTabsJson(obj) {
-  const entries = Object.entries(obj).sort((a,b) => {
-    if (a[1] !== b[1]) return a[1].localeCompare(b[1])
-    return a[0].localeCompare(b[0])
-  })
-  let out = "{\n"
-  let lastTab = null
+  const entries = Object.entries(obj).sort((a,b) => a[1]!==b[1]?a[1].localeCompare(b[1]):a[0].localeCompare(b[0]))
+  let out = "{\n", lastTab = null
   for (let i = 0; i < entries.length; i++) {
     const [k, v] = entries[i]
     if (lastTab !== null && lastTab !== v) out += "\n"
     lastTab = v
-    const isLast = (i === entries.length - 1)
-    out += `  "${k}": "${v}"${isLast ? "" : ","}\n`
+    out += `  "${k}": "${v}"${i===entries.length-1?"":","}\n`
   }
   out += "}"
   wf(TABS_JSON, out)
@@ -494,16 +578,10 @@ app.post('/api/creativetab', (req, res) => {
     if (!tabConst) return res.json({ ok:false, reason:'no tab selected' })
     const tabKey = TAB_VALUE_TO_KEY[tabConst]
     if (!tabKey) return res.json({ ok:false, reason:`unknown tab: ${tabConst}` })
-
     let entryKey
-    if (blockId) {
-      // Block ID passed directly — most reliable
-      entryKey = `block:${blockId}`
-    } else if (itemId) {
-      // Item ID passed directly
-      entryKey = itemId
-    } else if (ref.startsWith('ModBlocks.')) {
-      // Fall back to regex lookup
+    if (blockId) { entryKey = `block:${blockId}` }
+    else if (itemId) { entryKey = itemId }
+    else if (ref.startsWith('ModBlocks.')) {
       const cn = ref.replace('ModBlocks.','')
       const bsrc = rf(jp(JAVA_ROOT,'block','ModBlocks.java'))
       const idM = new RegExp(`${cn}\\s*=\\s*registerBlock\\("([^"]+)"`).exec(bsrc)
@@ -516,13 +594,11 @@ app.post('/api/creativetab', (req, res) => {
       if (!idM) return res.json({ ok:false, reason:`could not find item ${cn} in ModItems.java` })
       entryKey = idM[1]
     }
-
     const tabs = readTabsJson()
     tabs[entryKey] = tabKey
     writeTabsJson(tabs)
-    console.log(`[creativetab] ${entryKey} -> ${tabKey}`)
     res.json({ ok:true })
-  } catch(e) { console.error(e); res.json({ ok:false, reason:e.message }) }
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
 app.post('/api/creativetab/remove', (req, res) => {
@@ -540,58 +616,35 @@ app.post('/api/creativetab/remove', (req, res) => {
       const idM = new RegExp(`${cn}\\s*=\\s*ITEMS\\.register\\("([^"]+)"`).exec(isrc)
       if (idM) entryKey = idM[1]
     }
-    if (entryKey) {
-      const tabs = readTabsJson()
-      delete tabs[entryKey]
-      writeTabsJson(tabs)
-    }
+    if (entryKey) { const tabs = readTabsJson(); delete tabs[entryKey]; writeTabsJson(tabs) }
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
 // ─── Tags ──────────────────────────────────────────────────────────────────────
-// Writes tag entries directly into ModItemTagProvider.java / ModBlockTagProvider.java
-// Uses a simple marker: // YCS_ITEM_TAGS_INSERT and // YCS_BLOCK_TAGS_INSERT
+// Markers: //YCS_Mod_Item_Tags_START / //YCS_Mod_Item_Tags_END in ModItemTagProvider.java
+//          //YCS_Mod_Block_Tags_START / //YCS_Mod_Block_Tags_END in ModBlockTagProvider.java
 
 app.post('/api/tags/set', (req, res) => {
   try {
     const { id, constName, tags, isBlock=false } = req.body
     if (!tags || !tags.length) return res.json({ ok:true, skipped:true })
-
-    const file = isBlock
-      ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java')
-      : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
+    const file = isBlock ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java') : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
     let src = rf(file)
-    const marker = isBlock ? '// YCS_BLOCK_TAGS_INSERT' : '// YCS_ITEM_TAGS_INSERT'
-
-    if (!src.includes(marker)) {
-      // Insert marker before closing brace of addTags method
-      const addTagsEnd = src.lastIndexOf('}', src.lastIndexOf('}') - 1)
-      if (addTagsEnd === -1) return res.json({ ok:false, reason:'could not find addTags closing brace' })
-      src = src.slice(0, addTagsEnd) + '        ' + marker + '\n    ' + src.slice(addTagsEnd)
-      wf(file, src)
-      src = rf(file)
-    }
-
+    const marker = isBlock ? '//YCS_Mod_Block_Tags_END' : '//YCS_Mod_Item_Tags_END'
+    if (!src.includes(marker)) return res.json({ ok:false, reason:`${marker} not found in file` })
     const ref = isBlock ? `ModBlocks.${constName}.get()` : `ModItems.${constName}.get()`
     let modifiedSrc = src
-
-    // First, remove all existing references to this item to cleanly handle edits
     const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const removeRegex = new RegExp(`\\s*\\.add\\(\\s*${escapedRef}\\s*\\)`, 'g')
     modifiedSrc = modifiedSrc.replace(removeRegex, '')
-
-    // Cleanup any empty tags left behind (e.g. tag(ItemTags.AXES);)
     const emptyTagRegex = /[ \t]*(?:this\.)?tag\([\s\S]*?\)\s*;/g
     modifiedSrc = modifiedSrc.replace(emptyTagRegex, match => match.includes('.add(') ? match : '')
-
     const lines = []
     let addedCount = 0
-
     for (const tag of tags) {
       const [ns, path] = tag.includes(':') ? tag.split(':') : [MODID, tag]
       const tagConst = resolveTagConst(ns, path, isBlock)
-      
       const tagStartIdx = modifiedSrc.indexOf(`tag(${tagConst})`)
       if (tagStartIdx !== -1) {
         const semiIdx = modifiedSrc.indexOf(';', tagStartIdx)
@@ -607,52 +660,32 @@ app.post('/api/tags/set', (req, res) => {
         addedCount++
       }
     }
-
     if (lines.length) {
       const regex = new RegExp(`[ \\t]*${marker}`)
       modifiedSrc = modifiedSrc.replace(regex, '\n' + lines.join('\n\n') + '\n        ' + marker)
     }
-
-    // Prevent blank lines from accumulating
     modifiedSrc = modifiedSrc.replace(/\n([ \t]*\n)+/g, '\n\n')
-
-    if (modifiedSrc !== src) {
-      wf(file, modifiedSrc)
-      markDirty()
-    }
+    if (modifiedSrc !== src) { wf(file, modifiedSrc); markDirty() }
     res.json({ ok:true, added:addedCount })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
 function resolveTagConst(ns, path, isBlock) {
-  // Map common tags to their Java constant
   const itemTagMap = {
-    'minecraft:axes':'ItemTags.AXES','minecraft:hoes':'ItemTags.HOES',
-    'minecraft:pickaxes':'ItemTags.PICKAXES','minecraft:shovels':'ItemTags.SHOVELS',
-    'minecraft:swords':'ItemTags.SWORDS','minecraft:tools':'ItemTags.TOOLS',
-    'minecraft:logs':'ItemTags.LOGS','minecraft:planks':'ItemTags.PLANKS',
-    'minecraft:slabs':'ItemTags.SLABS','minecraft:stairs':'ItemTags.STAIRS',
-    'minecraft:doors':'ItemTags.DOORS','minecraft:flowers':'ItemTags.FLOWERS',
+    'minecraft:axes':'ItemTags.AXES','minecraft:hoes':'ItemTags.HOES','minecraft:pickaxes':'ItemTags.PICKAXES',
+    'minecraft:shovels':'ItemTags.SHOVELS','minecraft:swords':'ItemTags.SWORDS','minecraft:tools':'ItemTags.TOOLS',
+    'minecraft:logs':'ItemTags.LOGS','minecraft:planks':'ItemTags.PLANKS','minecraft:slabs':'ItemTags.SLABS',
+    'minecraft:stairs':'ItemTags.STAIRS','minecraft:doors':'ItemTags.DOORS','minecraft:flowers':'ItemTags.FLOWERS',
   }
   const blockTagMap = {
-    'minecraft:mineable/pickaxe':'BlockTags.MINEABLE_WITH_PICKAXE',
-    'minecraft:mineable/axe':'BlockTags.MINEABLE_WITH_AXE',
-    'minecraft:mineable/shovel':'BlockTags.MINEABLE_WITH_SHOVEL',
-    'minecraft:mineable/hoe':'BlockTags.MINEABLE_WITH_HOE',
-    'minecraft:needs_stone_tool':'BlockTags.NEEDS_STONE_TOOL',
-    'minecraft:needs_iron_tool':'BlockTags.NEEDS_IRON_TOOL',
-    'minecraft:needs_diamond_tool':'BlockTags.NEEDS_DIAMOND_TOOL',
-    'minecraft:logs':'BlockTags.LOGS',
-    'minecraft:planks':'BlockTags.PLANKS',
-    'minecraft:slabs':'BlockTags.SLABS',
-    'minecraft:stairs':'BlockTags.STAIRS',
-    'minecraft:fences':'BlockTags.FENCES',
-    'minecraft:fence_gates':'BlockTags.FENCE_GATES',
-    'minecraft:walls':'BlockTags.WALLS',
-    'minecraft:buttons':'BlockTags.BUTTONS',
-    'minecraft:pressure_plates':'BlockTags.PRESSURE_PLATES',
-    'minecraft:doors':'BlockTags.DOORS',
-    'minecraft:trapdoors':'BlockTags.TRAPDOORS',
+    'minecraft:mineable/pickaxe':'BlockTags.MINEABLE_WITH_PICKAXE','minecraft:mineable/axe':'BlockTags.MINEABLE_WITH_AXE',
+    'minecraft:mineable/shovel':'BlockTags.MINEABLE_WITH_SHOVEL','minecraft:mineable/hoe':'BlockTags.MINEABLE_WITH_HOE',
+    'minecraft:needs_stone_tool':'BlockTags.NEEDS_STONE_TOOL','minecraft:needs_iron_tool':'BlockTags.NEEDS_IRON_TOOL',
+    'minecraft:needs_diamond_tool':'BlockTags.NEEDS_DIAMOND_TOOL','minecraft:logs':'BlockTags.LOGS',
+    'minecraft:planks':'BlockTags.PLANKS','minecraft:slabs':'BlockTags.SLABS','minecraft:stairs':'BlockTags.STAIRS',
+    'minecraft:fences':'BlockTags.FENCES','minecraft:fence_gates':'BlockTags.FENCE_GATES','minecraft:walls':'BlockTags.WALLS',
+    'minecraft:buttons':'BlockTags.BUTTONS','minecraft:pressure_plates':'BlockTags.PRESSURE_PLATES',
+    'minecraft:doors':'BlockTags.DOORS','minecraft:trapdoors':'BlockTags.TRAPDOORS',
   }
   const key = `${ns}:${path}`
   const map = isBlock ? blockTagMap : itemTagMap
@@ -663,60 +696,39 @@ function resolveTagConst(ns, path, isBlock) {
 app.post('/api/tags/delete', (req, res) => {
   try {
     const { constName, isBlock=false } = req.body
-    const file = isBlock
-      ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java')
-      : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
+    const file = isBlock ? jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java') : jp(JAVA_ROOT,'datagen','ModItemTagProvider.java')
     const ref = isBlock ? `ModBlocks.${constName}.get()` : `ModItems.${constName}.get()`
     if (fs.existsSync(file)) {
       let src = rf(file)
       const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const regex = new RegExp(`\\s*\\.add\\(\\s*${escapedRef}\\s*\\)`, 'g')
       let modified = src.replace(regex, '')
-      
       const emptyTagRegex = /[ \t]*(?:this\.)?tag\([\s\S]*?\)\s*;/g
       modified = modified.replace(emptyTagRegex, match => match.includes('.add(') ? match : '')
-
       modified = modified.replace(/\n([ \t]*\n)+/g, '\n\n')
-
-      if (modified !== src) {
-        wf(file, modified)
-        markDirty()
-      }
+      if (modified !== src) { wf(file, modified); markDirty() }
     }
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
 // ─── Recipes ───────────────────────────────────────────────────────────────────
+// Markers: //YCS_Mod_Recipe_Provider_START and //YCS_Mod_Recipe_Provider_END in ModRecipeProvider.java
+
 app.post('/api/recipes/set', (req, res) => {
   try {
     const { id, constName, recipeCode } = req.body
     if (!recipeCode) return res.json({ ok:true, skipped:true })
-
-    // Delete any existing recipe for this item first so we don't duplicate
     deleteRecipeFromProvider(constName)
-
     const file = jp(JAVA_ROOT,'datagen','ModRecipeProvider.java')
     let src = rf(file)
-    const marker = '        // YCS_RECIPE_INSERT'
-
-    if (!src.includes(marker)) {
-      // Insert marker before closing brace of buildRecipes method
-      const buildRecipesStart = src.indexOf('protected void buildRecipes')
-      if (buildRecipesStart === -1) return res.json({ ok:false, reason:'could not find buildRecipes' })
-      let depth = 0, endIdx = -1
-      for (let i = src.indexOf('{', buildRecipesStart); i < src.length; i++) {
-        if (src[i] === '{') depth++
-        else if (src[i] === '}') { depth--; if (depth === 0) { endIdx = i; break } }
-      }
-      if (endIdx === -1) return res.json({ ok:false, reason:'could not find buildRecipes closing brace' })
-      src = src.slice(0, endIdx) + marker + '\n    ' + src.slice(endIdx)
-      wf(file, src)
-      src = rf(file)
-    }
-
+    const startMarker = '        //YCS_Mod_Recipe_Provider_START'
+    const endMarker   = '        //YCS_Mod_Recipe_Provider_END'
+    if (!src.includes(startMarker) || !src.includes(endMarker)) return res.json({ ok:false, reason:'YCS_Mod_Recipe_Provider markers not found' })
     const lines = recipeCode.split('\n').map(l => '        ' + l).join('\n')
-    wf(file, src.replace(marker, lines + '\n' + marker))
+    const insertPos = src.indexOf(endMarker)
+    let newSrc = src.slice(0, insertPos) + lines + '\n\n' + src.slice(insertPos)
+    wf(file, formatYCSSection(newSrc, '//YCS_Mod_Recipe_Provider_START', '//YCS_Mod_Recipe_Provider_END'))
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -727,7 +739,6 @@ function hasExactBlock(line, constName) {
   let idx = line.indexOf(target);
   while (idx !== -1) {
     const after = line[idx + target.length];
-    // If the next character is not a letter/number (or doesn't exist), it's a valid match!
     if (!after || !/^[A-Z0-9]$/i.test(after)) return true;
     idx = line.indexOf(target, idx + target.length);
   }
@@ -758,29 +769,28 @@ function deleteRecipeFromProvider(constName) {
     for (let i=0; i<lines.length; i++) {
       if (lines[i].includes(`ModItems.${constName}.get(),`) || lines[i].includes(`ModBlocks.${constName}.get(),`)) {
         skip = true
-        while(out.length && out[out.length-1].trim().length > 0 && !out[out.length-1].includes('save(') && !out[out.length-1].includes('// YCS')) {
-           out.pop()
-        }
+        while(out.length && out[out.length-1].trim().length > 0 && !out[out.length-1].includes('save(') && !out[out.length-1].includes('YCS')) out.pop()
         continue
       }
-      if (skip) {
-        if (lines[i].includes('.save(')) skip = false
-        continue
-      }
+      if (skip) { if (lines[i].includes('.save(')) skip = false; continue }
       out.push(lines[i])
     }
-    wf(file, out.join('\n'))
+    let newSrc = out.join('\n')
+    wf(file, formatYCSSection(newSrc, '//YCS_Mod_Recipe_Provider_START', '//YCS_Mod_Recipe_Provider_END'))
   } catch(e) {}
 }
 
 app.post('/api/recipes/delete', (req, res) => {
-  try {
-    const { constName } = req.body
-    deleteRecipeFromProvider(constName)
-    res.json({ ok:true })
-  } catch(e) { res.json({ ok:false, reason:e.message }) }
+  try { deleteRecipeFromProvider(req.body.constName); res.json({ ok:true }) }
+  catch(e) { res.json({ ok:false, reason:e.message }) }
 })
+
 // ─── Blocks ────────────────────────────────────────────────────────────────────
+// Markers: //YCS_Mod_Blocks_START / //YCS_Mod_Blocks_END in ModBlocks.java
+//          //YCS_Mod_Block_State_START / //YCS_Mod_Block_State_END in ModBlockStateProvider.java
+//          //YCS_Mod_Block_Loot_START / //YCS_Mod_Block_Loot_END in ModBlockLootTableProvider.java
+//          //YCS_Mod_Item_Model_START / //YCS_Mod_Item_Model_END in ModItemModelProvider.java
+
 app.post('/api/blocks/register', (req, res) => {
   try {
     const { entries, creativeTab } = req.body
@@ -790,10 +800,10 @@ app.post('/api/blocks/register', (req, res) => {
     const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
     const lang = rl()
     const results = []
-    const bmarker    = '\n    private static <T extends Block> DeferredBlock<T> registerBlock('
-    const bspMarker  = '\n        // YCS_BSP_INSERT'
-    const lootMarker = '\n        // YCS_LOOT_INSERT'
-    const modelMarker = '\n        // YCS_MODEL_INSERT'
+    const bmarker    = '//YCS_Mod_Blocks_END'
+    const bspMarker  = '\n        //YCS_Mod_Block_State_END'
+    const lootMarker = '\n        //YCS_Mod_Block_Loot_END'
+    const modelMarker = '\n        //YCS_Mod_Item_Model_END'
     const tabs = readTabsJson()
 
     for (const entry of entries) {
@@ -803,44 +813,23 @@ app.post('/api/blocks/register', (req, res) => {
       if (bsrc.includes(eCN+' =')) { results.push({constName:eCN, ok:false, reason:'already exists'}); continue }
       if (!bsrc.includes(bmarker)) { results.push({constName:eCN, ok:false, reason:'insertion point not found'}); continue }
 
-      // Insert block registration
       const bindented = line.split('\n').map((l,i) => i===0?'    '+l:'            '+l).join('\n')
       wf(blockFile, rf(blockFile).replace(bmarker, '\n'+bindented+'\n'+bmarker))
 
-      // Insert blockstate
-      if (bspLines) {
-        const bsp = rf(bspFile)
-        if (bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker))
-      }
+      if (bspLines) { const bsp = rf(bspFile); if (bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker)) }
+      if (lootLine) { const loot = rf(lootFile); if (loot.includes(lootMarker)) wf(lootFile, loot.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker)) }
 
-      // Insert loot
-      if (lootLine) {
-        const loot = rf(lootFile)
-        if (loot.includes(lootMarker)) wf(lootFile, loot.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker))
-      }
-
-      // Insert model — use YCS_MODEL_INSERT marker, not buttonItem
       if (modelLine && !modelLine.startsWith('/*')) {
         let msrc = rf(modelFile)
         const firstLine = modelLine.split('\n')[0].trim()
         if (msrc.includes(modelMarker) && !msrc.includes(firstLine)) {
           const indented = modelLine.split('\n').map(l => '        ' + l.trim()).join('\n')
-          wf(modelFile, msrc.replace(modelMarker, '\n' + indented + '\n        // YCS_MODEL_INSERT'))
+          wf(modelFile, msrc.replace(modelMarker, '\n' + indented + '\n        //YCS_Mod_Item_Model_END'))
         }
       }
 
-      // Write lang
-      if (langKey && langVal) {
-        const r = insertLangGrouped(lang, langKey, langVal)
-        if (!r.exists) Object.assign(lang, r.result)
-      }
-
-      // Write creative tab for this variant too (uses same tab as base block)
-      if (creativeTab && blockId) {
-        const tabKey = TAB_VALUE_TO_KEY[creativeTab]
-        if (tabKey) tabs[`block:${blockId}`] = tabKey
-      }
-
+      if (langKey && langVal) { const r = insertLangGrouped(lang, langKey, langVal); if (!r.exists) Object.assign(lang, r.result) }
+      if (creativeTab && blockId) { const tabKey = TAB_VALUE_TO_KEY[creativeTab]; if (tabKey) tabs[`block:${blockId}`] = tabKey }
       results.push({constName:eCN, ok:true})
     }
 
@@ -858,8 +847,7 @@ app.post('/api/blocks/update', (req, res) => {
     const bspFile   = jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java')
     const lootFile  = jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java')
     const modelFile = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
-    
-    // 1. Delete old from ModBlocks.java
+
     let src = rf(blockFile)
     const startIdx = src.indexOf(`registerBlock("${oldId}"`)
     if (startIdx !== -1) {
@@ -871,22 +859,14 @@ app.post('/api/blocks/update', (req, res) => {
       }
       if (fieldStart!==-1&&end!==-1) wf(blockFile, src.slice(0,fieldStart)+src.slice(end))
     }
-    
-    // Delete all old variants from ModBlocks.java (e.g. SLAB, STAIRS)
     try { removeLines(blockFile, l => l.includes(`public static final DeferredBlock<`) && l.includes(` ${oldConstName}_`)) } catch {}
 
-    // 2. Delete old from Datagen providers
-    for (const f of [lootFile, jp(JAVA_ROOT,'item','ModCreativeModeTabs.java')]) {
-      try { removeLines(f, l => hasExactBlock(l, oldConstName)) } catch {}
-    }
+    for (const f of [lootFile, jp(JAVA_ROOT,'item','ModCreativeModeTabs.java')]) { try { removeLines(f, l => hasExactBlock(l, oldConstName)) } catch {} }
     try { removeLines(jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java'), l => l.includes(`ModBlocks.${oldConstName}.get()`)) } catch {}
     try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => hasExactBlock(l, oldConstName)) } catch {}
-    
-    // Clean multi-line provider files
     cleanBuilderPatternProvider(modelFile, oldConstName, oldId)
     cleanBuilderPatternProvider(bspFile, oldConstName, oldId)
 
-    // 3. Clean lang file and tooltips
     const lang=rl()
     if (oldId!==newId) {
       for (const k of Object.keys(lang)) {
@@ -894,12 +874,10 @@ app.post('/api/blocks/update', (req, res) => {
       }
     }
 
-    // 4. Register new entries
-    const results = []
-    const bmarker    = '\n    private static <T extends Block> DeferredBlock<T> registerBlock('
-    const bspMarker  = '\n        // YCS_BSP_INSERT'
-    const lootMarker = '\n        // YCS_LOOT_INSERT'
-    const modelMarker = '\n        // YCS_MODEL_INSERT'
+    const bmarker    = '//YCS_Mod_Blocks_END'
+    const bspMarker  = '\n        //YCS_Mod_Block_State_END'
+    const lootMarker = '\n        //YCS_Mod_Block_Loot_END'
+    const modelMarker = '\n        //YCS_Mod_Item_Model_END'
     const tabs = readTabsJson()
 
     for (const entry of entries) {
@@ -910,52 +888,26 @@ app.post('/api/blocks/update', (req, res) => {
         const bindented = line.split('\n').map((l,i) => i===0?'    '+l:'            '+l).join('\n')
         wf(blockFile, rf(blockFile).replace(bmarker, '\n'+bindented+'\n'+bmarker))
       }
-      if (bspLines) {
-        const bsp = rf(bspFile)
-        if (bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker))
-      }
-      if (lootLine) {
-        const lp = rf(lootFile)
-        if (lp.includes(lootMarker)) wf(lootFile, lp.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker))
-      }
-      if (modelLine) {
-        const mp = rf(modelFile)
-        if (mp.includes(modelMarker)) wf(modelFile, mp.replace(modelMarker, '\n        '+modelLine+'\n'+modelMarker))
-      }
-      if (eLangKey && eLangVal) {
-        const r = insertLangGrouped(lang, eLangKey, eLangVal)
-        if (!r.exists) Object.assign(lang, r.result)
-      }
-      if (creativeTab && blockId) {
-        const tabKey = TAB_VALUE_TO_KEY[creativeTab]
-        if (tabKey) tabs[`block:${blockId}`] = tabKey
-      }
+      if (bspLines) { const bsp = rf(bspFile); if (bsp.includes(bspMarker)) wf(bspFile, bsp.replace(bspMarker, '\n        '+bspLines+'\n'+bspMarker)) }
+      if (lootLine) { const lp = rf(lootFile); if (lp.includes(lootMarker)) wf(lootFile, lp.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker)) }
+      if (modelLine) { const mp = rf(modelFile); if (mp.includes(modelMarker)) wf(modelFile, mp.replace(modelMarker, '\n        '+modelLine+'\n'+modelMarker)) }
+      if (eLangKey && eLangVal) { const r = insertLangGrouped(lang, eLangKey, eLangVal); if (!r.exists) Object.assign(lang, r.result) }
+      if (creativeTab && blockId) { const tabKey = TAB_VALUE_TO_KEY[creativeTab]; if (tabKey) tabs[`block:${blockId}`] = tabKey }
     }
     wl(sortLang(lang))
-    
-    // Cleanup old files/tabs/recipes if renamed
+
     if (oldId && oldId !== newId) {
       if (tabs[`block:${oldId}`]) { tabs[`block:${newId}`] = tabs[`block:${oldId}`]; delete tabs[`block:${oldId}`] }
       writeTabsJson(tabs)
       if (oldConstName) deleteRecipeFromProvider(oldConstName)
-      try {
-        const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_top.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_bottom.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_side.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_front.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_back.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_left.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_right.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_door_top.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_door_bottom.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','item',`${oldId}_door.png`))
-        tryDel(path.join(MOD_ROOT,'assets',MODID,'textures','block',`${oldId}_trapdoor.png`))
-      } catch {}
-    } else {
-      writeTabsJson(tabs)
-    }
+      const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
+      const btp = (n) => path.join(MOD_ROOT,'assets',MODID,'textures','block',n)
+      const itp = (n) => path.join(MOD_ROOT,'assets',MODID,'textures','item',n)
+      ;[btp(`${oldId}.png`),btp(`${oldId}_top.png`),btp(`${oldId}_bottom.png`),btp(`${oldId}_side.png`),
+        btp(`${oldId}_front.png`),btp(`${oldId}_back.png`),btp(`${oldId}_left.png`),btp(`${oldId}_right.png`),
+        btp(`${oldId}_door_top.png`),btp(`${oldId}_door_bottom.png`),itp(`${oldId}_door.png`),btp(`${oldId}_trapdoor.png`)
+      ].forEach(tryDel)
+    } else { writeTabsJson(tabs) }
 
     markDirty()
     res.json({ ok:true })
@@ -977,9 +929,7 @@ app.post('/api/blocks/delete', (req, res) => {
       }
       if (fieldStart!==-1&&end!==-1) wf(blockFile, src.slice(0,fieldStart)+src.slice(end))
     }
-    
     try { removeLines(blockFile, l => l.includes(`public static final DeferredBlock<`) && l.includes(` ${constName}_`)) } catch {}
-
     const lang=rl()
     for (const k of Object.keys(lang)) {
       if (k === `block.${MODID}.${id}` || k.startsWith(`block.${MODID}.${id}_`) || k.startsWith(`tooltip.${MODID}.${id}.`)) delete lang[k]
@@ -989,37 +939,20 @@ app.post('/api/blocks/delete', (req, res) => {
     const bspFile = jp(JAVA_ROOT,'datagen','ModBlockStateProvider.java')
     cleanBuilderPatternProvider(modelFile, constName, id)
     cleanBuilderPatternProvider(bspFile, constName, id)
-
-    for (const f of [
-      jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java'),
-      jp(JAVA_ROOT,'item','ModCreativeModeTabs.java'),
-    ]) { try { removeLines(f, l => hasExactBlock(l, constName)) } catch {} }
-    // Clean tags from ModBlockTagProvider and ModItemTagProvider (BlockItem tags)
+    for (const f of [jp(JAVA_ROOT,'datagen','ModBlockLootTableProvider.java'),jp(JAVA_ROOT,'item','ModCreativeModeTabs.java')]) {
+      try { removeLines(f, l => hasExactBlock(l, constName)) } catch {}
+    }
     try { removeLines(jp(JAVA_ROOT,'datagen','ModBlockTagProvider.java'), l => l.includes(`ModBlocks.${constName}.get()`)) } catch {}
     deleteRecipeFromProvider(constName)
     try { removeLines(jp(JAVA_ROOT,'datagen','ModItemTagProvider.java'), l => hasExactBlock(l, constName)) } catch {}
-    
-    // Clean up all textures
-    try {
-      const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_top.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_bottom.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_side.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_front.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_back.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_left.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_right.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_door_top.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_door_bottom.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','item',`${id}_door.png`))
-      tryDel(jp(MOD_ROOT,'assets',MODID,'textures','block',`${id}_trapdoor.png`))
-    } catch {}
-
-    // Clean up ycs_tabs.json
-    const tabs2 = readTabsJson()
-    delete tabs2[`block:${id}`]
-    writeTabsJson(tabs2)
+    const tryDel = f => { try { if (fs.existsSync(f)) { fs.unlinkSync(f); triggerIdeaReload(f); } } catch {} }
+    const btp = (n) => jp(MOD_ROOT,'assets',MODID,'textures','block',n)
+    const itp = (n) => jp(MOD_ROOT,'assets',MODID,'textures','item',n)
+    ;[btp(`${id}.png`),btp(`${id}_top.png`),btp(`${id}_bottom.png`),btp(`${id}_side.png`),
+      btp(`${id}_front.png`),btp(`${id}_back.png`),btp(`${id}_left.png`),btp(`${id}_right.png`),
+      btp(`${id}_door_top.png`),btp(`${id}_door_bottom.png`),itp(`${id}_door.png`),btp(`${id}_trapdoor.png`)
+    ].forEach(tryDel)
+    const tabs2 = readTabsJson(); delete tabs2[`block:${id}`]; writeTabsJson(tabs2)
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -1027,7 +960,6 @@ app.post('/api/blocks/delete', (req, res) => {
 
 app.listen(3001, () => {
   console.log('ycs backend :3001  mod:', MOD_ROOT)
-  // On startup: auto-write missing model JSONs for all items that have textures
   autoWriteMissingModelJsons()
 })
 
@@ -1038,12 +970,9 @@ function writeModelJson(id, isHandheld=false) {
   const modelDir = jp(GEN_ROOT,'assets',MODID,'models','item')
   const modelPath = jp(modelDir,`${id}.json`)
   if (!fs.existsSync(modelDir)) fs.mkdirSync(modelDir, { recursive:true })
-  if (fs.existsSync(modelPath)) return // don't overwrite existing
+  if (fs.existsSync(modelPath)) return
   const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated'
-  fs.writeFileSync(modelPath, JSON.stringify({
-    parent,
-    textures: { layer0: `${MODID}:item/${id}` }
-  }, null, 2))
+  fs.writeFileSync(modelPath, JSON.stringify({ parent, textures: { layer0: `${MODID}:item/${id}` } }, null, 2))
 }
 
 function writeBlockStateJson(id) {
@@ -1051,9 +980,7 @@ function writeBlockStateJson(id) {
   const bsPath = jp(bsDir,`${id}.json`)
   if (!fs.existsSync(bsDir)) fs.mkdirSync(bsDir, { recursive:true })
   if (fs.existsSync(bsPath)) return
-  fs.writeFileSync(bsPath, JSON.stringify({
-    variants: { "": { model: `${MODID}:block/${id}` } }
-  }, null, 2))
+  fs.writeFileSync(bsPath, JSON.stringify({ variants: { "": { model: `${MODID}:block/${id}` } } }, null, 2))
 }
 
 function writeBlockModelJsons(id) {
@@ -1063,35 +990,22 @@ function writeBlockModelJsons(id) {
   if (!fs.existsSync(itemModelDir))  fs.mkdirSync(itemModelDir,  { recursive:true })
   const blockModel = jp(blockModelDir,`${id}.json`)
   const itemModel  = jp(itemModelDir,`${id}.json`)
-  if (!fs.existsSync(blockModel)) {
-    fs.writeFileSync(blockModel, JSON.stringify({
-      parent: 'minecraft:block/cube_all',
-      textures: { all: `${MODID}:block/${id}` }
-    }, null, 2))
-  }
-  if (!fs.existsSync(itemModel)) {
-    fs.writeFileSync(itemModel, JSON.stringify({
-      parent: `${MODID}:block/${id}`
-    }, null, 2))
-  }
+  if (!fs.existsSync(blockModel)) fs.writeFileSync(blockModel, JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: `${MODID}:block/${id}` } }, null, 2))
+  if (!fs.existsSync(itemModel))  fs.writeFileSync(itemModel,  JSON.stringify({ parent: `${MODID}:block/${id}` }, null, 2))
 }
 
 function autoWriteMissingModelJsons() {
   try {
-    // Items
     const itemTexDir = jp(MOD_ROOT,'assets',MODID,'textures','item')
-    const modelProvSrc = fs.existsSync(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java'))
-      ? rf(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')) : ''
+    const modelProvSrc = fs.existsSync(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')) ? rf(jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')) : ''
     if (fs.existsSync(itemTexDir)) {
       for (const f of fs.readdirSync(itemTexDir)) {
         if (!f.endsWith('.png')) continue
         const id = f.replace('.png','')
-        const isHandheld = modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()})`)
-          || modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()};`)
+        const isHandheld = modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()})`) || modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()};`)
         writeModelJson(id, isHandheld)
       }
     }
-    // Blocks
     const blockTexDir = jp(MOD_ROOT,'assets',MODID,'textures','block')
     if (fs.existsSync(blockTexDir)) {
       for (const f of fs.readdirSync(blockTexDir)) {
@@ -1102,15 +1016,10 @@ function autoWriteMissingModelJsons() {
       }
     }
     console.log('[ycs] auto-generated missing model/blockstate JSONs')
-  } catch(e) {
-    console.error('[ycs] autoWriteMissingModelJsons error:', e.message)
-  }
+  } catch(e) { console.error('[ycs] autoWriteMissingModelJsons error:', e.message) }
 }
 
-// Also expose as an API endpoint so YCS can trigger it after saving textures
 app.post('/api/models/sync', (_req, res) => {
   try { autoWriteMissingModelJsons(); res.json({ ok:true }) }
   catch(e) { res.json({ ok:false, reason:e.message }) }
 })
-
-

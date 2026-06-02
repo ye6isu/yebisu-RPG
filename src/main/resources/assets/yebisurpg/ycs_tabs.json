@@ -10,7 +10,6 @@
   "block:crate_stairs": "yebisurpg_blocks_tab",
   "block:crate_trapdoor": "yebisurpg_blocks_tab",
   "block:crate_wall": "yebisurpg_blocks_tab",
-  "block:shika": "yebisurpg_blocks_tab",
   "block:ye6isu_block": "yebisurpg_blocks_tab",
   "block:ye6isu_ore": "yebisurpg_blocks_tab",
 
@@ -23,6 +22,7 @@
   "plank_leggings": "yebisurpg_items_tab",
   "raw_ye6isu": "yebisurpg_items_tab",
   "sukuna_finger": "yebisurpg_items_tab",
+  "test3": "yebisurpg_items_tab",
   "walkman": "yebisurpg_items_tab",
   "ye6isu": "yebisurpg_items_tab",
   "ye6isu_axe": "yebisurpg_items_tab",

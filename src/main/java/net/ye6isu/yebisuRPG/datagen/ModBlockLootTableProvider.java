@@ -43,9 +43,9 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
         //Same Block drop from creator
         dropSelf(ModBlocks.CAT_BLOCK.get());
 
-        dropSelf(ModBlocks.SHIKA.get());
+        //YCS_Mod_Block_Loot_START
 
-        // YCS_LOOT_INSERT
+        //YCS_Mod_Block_Loot_END
     }
 
     @Override

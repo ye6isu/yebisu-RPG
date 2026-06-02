@@ -79,11 +79,9 @@ public class ModItems {
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.BOOTS,
                     new Item.Properties().durability(ArmorItem.Type.BOOTS.getDurability(19))));
 
-    //Items from creator
+    //YCS_Mod_Items_START
 
-
-
-
+    //YCS_Mod_Items_END
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
