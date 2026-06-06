@@ -509,7 +509,7 @@ app.post('/api/items/custom-class', (req, res) => {
     const PKG2 = 'net.ye6isu.yebisuRPG'
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive:true })
     if (fs.existsSync(file)) return res.json({ ok:true, existed:true })
-    const content = `package ${PKG2}.item.custom;\n\nimport net.minecraft.world.item.Item;\n\npublic class ${className} extends Item {\n    public ${className}(Properties properties) {\n        super(properties);\n    }\n}\n`
+    const content = `package ${PKG2}.item.custom;\n\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.ItemStack;\n\npublic class ${className} extends Item {\n    public ${className}(Properties properties) {\n        super(properties);\n    }\n}\n`
     wf(file, content)
     res.json({ ok:true, existed:false })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -540,6 +540,17 @@ app.get('/api/items/custom-class/list', (req, res) => {
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.java')).map(f => f.replace('.java',''))
     res.json({ ok:true, classes:files })
   } catch(e) { res.json({ ok:false, reason:e.message, classes:[] }) }
+})
+
+app.post('/api/items/custom-class/write', (req, res) => {
+  try {
+    const { className, code } = req.body
+    if (!className || typeof code !== 'string') return res.json({ ok:false, reason:'missing className or code' })
+    const file = jp(JAVA_ROOT,'item','custom', `${className}.java`)
+    if (!fs.existsSync(file)) return res.json({ ok:false, reason:'file not found — create it first' })
+    wf(file, code)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
 // ─── Creative tab — JSON-based via ycs_tabs.json ──────────────────────────────

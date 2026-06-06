@@ -97,6 +97,7 @@ public class ModItemModelProvider extends ItemModelProvider {
         getBuilder(ModBlocks.CAT_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/cat_block"));
 
         //YCS_Mod_Item_Model_START
+
         //YCS_Mod_Item_Model_END
     }
 
