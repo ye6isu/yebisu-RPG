@@ -81,6 +81,10 @@ public class ModItems {
 
     //YCS_Mod_Items_START
 
+    public static final DeferredItem<Item> YAYAYAYA = ITEMS.register("yayayaya",
+                () -> new YayayayaItem(new Item.Properties()
+                        .attributes(SwordItem.createAttributes(Tiers.IRON, 3f, -2.4f))));
+
     //YCS_Mod_Items_END
 
     public static void register(IEventBus eventBus) {

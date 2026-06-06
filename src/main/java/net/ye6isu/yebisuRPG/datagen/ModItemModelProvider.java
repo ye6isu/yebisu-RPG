@@ -98,6 +98,8 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         //YCS_Mod_Item_Model_START
 
+        handheldItem(ModItems.YAYAYAYA);
+
         //YCS_Mod_Item_Model_END
     }
 

@@ -133,47 +133,57 @@ function gItemCode(item,textures){
   const texId=(item.textureId||"").startsWith("__direct__")?null:item.textureId;const tex=textures.find(t=>t.id===texId);
   const id=item.id||"my_item",CN=item.customConstName?item.constName:id.toUpperCase(),dn=item.displayName||id;
   const tt=()=>{if(!item.hasTooltip)return null;const n=item.tooltipNormal?`"tooltip.${MODID}.${id}.normal"`:"null";const h=item.hasHiddenTooltip&&item.tooltipHidden?`"tooltip.${MODID}.${id}.hidden"`:"null";const s=item.hasHiddenTooltip?(item.useDefaultShiftHint?`"tooltip.${MODID}.shift_to_see"`:(item.tooltipShiftHint?`"tooltip.${MODID}.${id}.shift_hint"`:"null")):"null";return{n,h,s};};
-  const addTooltip = (baseInst) => {
+  const addTooltip=(baseInst)=>{
     const t=tt();
-    if(!t||(t.n==="null"&&t.h==="null")) return baseInst;
-    let stmts = [];
-    if(t.n!=="null") stmts.push(`                    tooltipComponents.add(Component.translatable(${t.n}));`);
-    if(t.h!=="null"){
-      stmts.push(`                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);
-      stmts.push(`                        tooltipComponents.add(Component.translatable(${t.h}));`);
-      stmts.push(`                    } else {`);
-      stmts.push(`                        tooltipComponents.add(Component.translatable(${t.s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);
-      stmts.push(`                    }`);
-    }
-    return `${baseInst} {
-                @Override
-                public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
-${stmts.join('\n')}
-                    super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-                }
-            }`;
+    if(!t||(t.n==="null"&&t.h==="null"))return baseInst;
+    let stmts=[];
+    if(t.n!=="null")stmts.push(`                    tooltipComponents.add(Component.translatable(${t.n}));`);
+    if(t.h!=="null"){stmts.push(`                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);stmts.push(`                        tooltipComponents.add(Component.translatable(${t.h}));`);stmts.push(`                    } else {`);stmts.push(`                        tooltipComponents.add(Component.translatable(${t.s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);stmts.push(`                    }`);}
+    return`${baseInst} {\n                @Override\n                public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {\n${stmts.join('\n')}\n                    super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);\n                }\n            }`;
   };
   const stackOpt=(item.maxStackSize&&parseInt(item.maxStackSize)!==64)?`.stacksTo(${parseInt(item.maxStackSize)})`:"";
   let reg="",fpReg;
-  if(item.itemType==="Tool"){const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,c=`${item.toolType}Item`;reg=`public static final DeferredItem<${c}> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${c}(${tier}, new Item.Properties()\n                .attributes(${c}.createAttributes(${tier}, ${dmg}f, ${spd}f)))`)});`;}
-  else if(item.itemType==="Food"){
-    const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
-    let fx="";
-    if(item.foodEffects?.length){
-      fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");
+  // Compose class name and properties from flags
+  const cls2=item.customItemClass||null;
+  const isTool=!!item.isTool;
+  const isFood=!!item.isFood;
+  const isFuel=!!item.isFuel;
+
+  if(isTool){
+    // Tool: uses SwordItem / PickaxeItem etc. with attributes; food/fuel can stack on top via .food() / FuelItem wrapping is not standard for tools, so we just add food props inline
+    const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,tc=`${item.toolType||"Sword"}Item`;
+    let props=`new Item.Properties()\n                .attributes(${tc}.createAttributes(${tier}, ${dmg}f, ${spd}f))${stackOpt}`;
+    if(isFood){
+      const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
+      let fx="";if(item.foodEffects?.length){fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");}
+      fpReg=`public static final FoodProperties ${CN}_FOOD = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
+      props+=`\n                .food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN}_FOOD)`;
     }
-    fpReg=`public static final FoodProperties ${CN} = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
-    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new Item(new Item.Properties()${stackOpt}.food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN}))`)});`;
+    const instCls=cls2||tc;
+    const baseNew=cls2?`new ${cls2}(${props})`:`new ${tc}(${tier}, ${props})`;
+    reg=`public static final DeferredItem<${cls2?`Item`:tc}> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(baseNew)});`;
+  } else {
+    // Plain Item base — compose properties
+    let props=`new Item.Properties()${stackOpt}`;
+    if(isFood){
+      const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
+      let fx="";if(item.foodEffects?.length){fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");}
+      fpReg=`public static final FoodProperties ${CN} = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
+      props+=`.food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN})`;
+    }
+    if(isFuel){
+      // FuelItem wraps the base item — takes Properties + burnTime
+      const bt=item.burnTime||1600;
+      const instCls=cls2||"FuelItem";
+      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${instCls}(${props}, ${bt})`)});`;
+    } else if(cls2){
+      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${cls2}(${props})`)});`;
+    } else {
+      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new Item(${props})`)});`;
+    }
   }
-  else if(item.itemType==="Fuel"){reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new FuelItem(new Item.Properties()${stackOpt}, ${item.burnTime||1600})`)});`;}
-  else if(item.itemType==="Custom"){
-    const cls2=item.customItemClass||idToClassName(id);
-    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${cls2}(new Item.Properties()${stackOpt})`)});`;
-  }
-  else{reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new Item(new Item.Properties()${stackOpt})`)});`;}
-  
-  const isHandheld = item.holdingMode === "handheld" || (item.holdingMode !== "none" && item.itemType === "Tool");
-  const modelLine = isHandheld ? `handheldItem(ModItems.${CN});` : (tex?.isAnimated ? `existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");` : `basicItem(ModItems.${CN}.get());`);
+  const isHandheld=item.holdingMode==="handheld";
+  const modelLine=isHandheld?`handheldItem(ModItems.${CN});`:(tex?.isAnimated?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");`:`basicItem(ModItems.${CN}.get());`);
   return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN,fpReg};
 }
 function gBlockEntries(block,textures=[]){
@@ -444,7 +454,7 @@ function compileMethodBlocks(nodes) {
   return nodes.flatMap(n => compileBlock(n));
 }
 
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
@@ -844,8 +854,25 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
     setSaving(true);setSaveStatus(null);
     const j=await api("/items/custom-class/read",{className});
     if(!j.ok){setSaving(false);setSaveStatus({ok:false,msg:j.reason});return;}
+    // Restore the body marker first (replace any previously compiled body between start/end)
+    // then inject the freshly compiled body so changes to block fields are always reflected
+    const bodyMarker=`//YCS:${methodKey}:body`;
+    const startTag=`//YCS:${methodKey}:start`;
+    const endTag=`//YCS:${methodKey}:end`;
+    let code=j.code;
+    // If the body marker is already gone (was compiled before), reset the method stub fresh
+    if(!code.includes(bodyMarker)&&code.includes(startTag)){
+      const def=ITEM_METHODS.find(m=>m.key===methodKey);
+      if(def){
+        // Re-inject a fresh stub (which contains the body marker) over the old compiled one
+        code=ycsRemoveMethod(code,methodKey);
+        code=ycsInjectMethod(code,methodKey);
+        const enabledKeys=ycsGetEnabledMethods(code);
+        code=ycsSyncImports(code,enabledKeys);
+      }
+    }
     const bodyLines=compileMethodBlocks(nodes);
-    const updated=ycsInjectCompiledBody(j.code,methodKey,bodyLines);
+    const updated=ycsInjectCompiledBody(code,methodKey,bodyLines);
     const j2=await api("/items/custom-class/write",{className,code:updated});
     setSaving(false);
     setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
@@ -1063,37 +1090,36 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
     <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
       <div style={{flex:1}}>
-        <Sel label="Item Type" value={form.itemType} onChange={v=>{
-          const prev=form.itemType;
-          F("itemType",v);
-          if (v === "Tool" && form.holdingMode !== "handheld") F("holdingMode", "handheld");
-          if(prev==="Custom"&&v!=="Custom"&&form.customItemClass){
-            api("/items/custom-class/delete",{className:form.customItemClass}).catch(()=>{});
-            F("customItemClass","");
-            F("enabledMethods",[]);
-            F("methodBlocks",{});
-            setActivePanel(null);
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <Lbl>Properties</Lbl>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+            <Chk label="Tool" checked={!!form.isTool} onChange={v=>{F("isTool",v);if(v&&form.holdingMode==="none")F("holdingMode","handheld");}}/>
+            <Chk label="Food" checked={!!form.isFood} onChange={v=>F("isFood",v)}/>
+            <Chk label="Fuel" checked={!!form.isFuel} onChange={v=>F("isFuel",v)}/>
+          </div>
+        </div>
+        {form.isTool&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType||"Sword"} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier||"Iron"} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
+        {form.isFuel&&<Inp label="Burn Time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
+
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:activePanel==="customclass"?"#0e1820":"#141416",border:`1px solid ${activePanel==="customclass"?"#1a3040":C.inpB}`,borderRadius:4}}>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            <Lbl>Override Methods</Lbl>
+            {form.customItemClass&&<span style={{fontSize:10,color:"#2a5a7a",fontFamily:"monospace"}}>{form.customItemClass}.java</span>}
+          </div>
+          <Btn sm v={activePanel==="customclass"?"p":"g"} onClick={async()=>{
+            if(activePanel==="customclass"){setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});return;}
+            const cls2=form.customItemClass||(form.id?idToClassName(form.id):null);
+            if(!cls2)return;
+            if(!form.customItemClass){F("customItemClass",cls2);await api("/items/custom-class",{className:cls2});}
             setRightView({mode:"methodList",editingMethod:null});
-          }
-          if(v==="Custom"&&form.id){
-            const cls2=idToClassName(form.id);
-            F("customItemClass",cls2);
-            api("/items/custom-class",{className:cls2}).catch(()=>{});
-          }
-        }} options={["Generic","Tool","Food","Fuel","Custom"]}/>
+            setActivePanel("customclass");
+          }} dis={!form.id}>edit methods</Btn>
+        </div>
       </div>
-      {form.itemType==="Custom"&&<Btn sm v={activePanel==="customclass"?"p":"g"} style={{marginBottom:1}} onClick={async()=>{
-        if(activePanel==="customclass"){setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});return;}
-        const cls2=form.customItemClass||idToClassName(form.id||"item");
-        if(!form.customItemClass){F("customItemClass",cls2);await api("/items/custom-class",{className:cls2});}
-        setRightView({mode:"methodList",editingMethod:null});
-        setActivePanel("customclass");
-      }}>Edit Custom Class</Btn>}
     </div>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
-    {form.itemType!=="Tool"&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
-    {form.itemType==="Tool"&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
-    {form.itemType==="Food"&&<Sect title="Food Properties">
+    <Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>
+    {form.isFood && <Sect title="Food Properties">
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div>
       <Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/>
       <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
@@ -1109,7 +1135,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
         </div>)}
       </div>
     </Sect>}
-    {form.itemType==="Fuel"&&<Inp label="Burn time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
+    
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>

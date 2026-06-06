@@ -6,5 +6,7 @@ import net.minecraft.world.food.FoodProperties;
 
 public class ModFoodProperties {
     public static final FoodProperties SUKUNA_FINGER = new FoodProperties.Builder().nutrition(3).saturationModifier(0.25f).alwaysEdible()
-            .effect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 3600), 1).build();
+            .effect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 3600), 1).build();;;
+    public static final FoodProperties YAYAYAYA_FOOD = new FoodProperties.Builder().nutrition(3).saturationModifier(0.3f).alwaysEdible().build();
+    public static final FoodProperties YAYAYAYA_FOOD = new FoodProperties.Builder().nutrition(3).saturationModifier(0.3f).alwaysEdible().build();
 }
