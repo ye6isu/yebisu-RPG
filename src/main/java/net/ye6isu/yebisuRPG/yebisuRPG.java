@@ -68,7 +68,7 @@ public class yebisuRPG {
     }
 
     /* To be decided if needed
-    private void addCreative(BuildCreativeModeTabContentsEvent event) {
+    priv the te void addCreative(BuildCreativeModeTabContentsEvent event) {
         // Add items to creative tabs here if not handled in ModCreativeModeTabs.
     }
     */

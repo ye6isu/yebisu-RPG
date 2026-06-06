@@ -81,9 +81,6 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 
         //YCS_Mod_Recipe_Provider_START
 
-
-
-
         //YCS_Mod_Recipe_Provider_END
     }
 

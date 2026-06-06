@@ -233,7 +233,218 @@ function gBlockEntries(block,textures=[]){
   return entries;
 }
 
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:""};
+// ─── Visual Scripting: Method Definitions ─────────────────────────────────────
+const ITEM_METHODS=[
+  {key:"useOn",label:"Block Interaction",sig:"useOn(UseOnContext context)",
+   params:[{name:"context",type:"UseOnContext"}],
+   returnType:"InteractionResult",
+   imports:["net.minecraft.world.item.context.UseOnContext","net.minecraft.world.InteractionResult","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   stub:`    @Override\n    public InteractionResult useOn(UseOnContext context) {\n        //YCS:useOn:body\n        return super.useOn(context);\n    }`},
+  {key:"use",label:"Air Interaction",sig:"use(Level level, Player player, InteractionHand usedHand)",
+   params:[{name:"level",type:"Level"},{name:"player",type:"Player"},{name:"usedHand",type:"InteractionHand"}],
+   returnType:"InteractionResultHolder<ItemStack>",
+   imports:["net.minecraft.world.InteractionResultHolder","net.minecraft.world.InteractionHand","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   stub:`    @Override\n    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {\n        //YCS:use:body\n        return super.use(level, player, usedHand);\n    }`},
+  {key:"continuousUse",label:"Continuous Use",sig:"onUseTick(...) + releaseUsing(...)",
+   params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"entity",type:"LivingEntity"},{name:"remainingUseDuration",type:"int"}],
+   returnType:"void",
+   imports:["net.minecraft.world.entity.LivingEntity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   stub:`    @Override\n    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingUseDuration) {\n        //YCS:continuousUse:body\n    }\n\n    @Override\n    public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeCharged) {\n    }`},
+  {key:"finishUsingItem",label:"Finished Using",sig:"finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity)",
+   params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"}],
+   returnType:"ItemStack",
+   imports:["net.minecraft.world.entity.LivingEntity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   stub:`    @Override\n    public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity) {\n        //YCS:finishUsingItem:body\n        return super.finishUsingItem(stack, level, livingEntity);\n    }`},
+  {key:"inventoryTick",label:"Inventory Tick",sig:"inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected)",
+   params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"entity",type:"Entity"},{name:"slotId",type:"int"},{name:"isSelected",type:"boolean"}],
+   returnType:"void",
+   imports:["net.minecraft.world.entity.Entity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   stub:`    @Override\n    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {\n        //YCS:inventoryTick:body\n    }`},
+  {key:"hurtEnemy",label:"Combat / Hurt Entity",sig:"hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker)",
+   params:[{name:"stack",type:"ItemStack"},{name:"target",type:"LivingEntity"},{name:"attacker",type:"LivingEntity"}],
+   returnType:"boolean",
+   imports:["net.minecraft.world.entity.LivingEntity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   stub:`    @Override\n    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {\n        //YCS:hurtEnemy:body\n        return super.hurtEnemy(stack, target, attacker);\n    }`},
+];
+
+// Block palette: categories of draggable action blocks
+const BLOCK_PALETTE=[
+  {category:"Effects",color:"#1a2e3a",blocks:[
+    {opcode:"effect.apply",label:"Apply Effect",color:"#1a3a2e",inputs:{entity:null},fields:{effect:"MobEffects.REGENERATION",duration:200,level:1},hint:"Apply a status effect to an entity"},
+    {opcode:"effect.remove",label:"Remove Effect",color:"#2e1a1a",inputs:{entity:null},fields:{effect:"MobEffects.POISON"},hint:"Remove a status effect"},
+  ]},
+  {category:"Damage",color:"#3a1a1a",blocks:[
+    {opcode:"entity.damage",label:"Deal Damage",color:"#3a1a1a",inputs:{target:null},fields:{amount:"2.0",damageType:"generic"},hint:"Damage an entity"},
+    {opcode:"stack.damage",label:"Damage Item",color:"#2a1a2e",inputs:{},fields:{amount:1},hint:"Damage the item stack"},
+  ]},
+  {category:"Particles / Sound",color:"#1a1a3a",blocks:[
+    {opcode:"level.particle",label:"Spawn Particle",color:"#1a1a3a",inputs:{},fields:{particle:"ParticleTypes.FLAME",x:"entity.getX()",y:"entity.getY()",z:"entity.getZ()",count:5},hint:"Spawn particles at position"},
+    {opcode:"level.sound",label:"Play Sound",color:"#1a2a1a",inputs:{},fields:{sound:"SoundEvents.ITEM_FIRECHARGE_USE",volume:"1.0f",pitch:"1.0f"},hint:"Play a sound at entity position"},
+  ]},
+  {category:"Logic",color:"#2a2a1a",blocks:[
+    {opcode:"if.serverside",label:"Server Side Only",color:"#2a2218",inputs:{body:null},fields:{},hint:"Wrap code in !level.isClientSide"},
+    {opcode:"if.condition",label:"If / Condition",color:"#252520",inputs:{body:null},fields:{condition:"isSelected"},hint:"Simple boolean guard"},
+  ]},
+];
+
+// ─── Visual Scripting: Code Engine ────────────────────────────────────────────
+function ycsInjectMethod(code, methodKey) {
+  const def = ITEM_METHODS.find(m => m.key === methodKey);
+  if (!def) return code;
+  if (code.includes(`//YCS:${methodKey}:start`)) return code; // already present
+  const block = `\n    //YCS:${methodKey}:start\n${def.stub}\n    //YCS:${methodKey}:end\n`;
+  return code.replace(/\n\}\s*$/, block + '\n}');
+}
+
+function ycsRemoveMethod(code, methodKey) {
+  return code.replace(
+    new RegExp(`\\n    \\/\\/YCS:${methodKey}:start[\\s\\S]*?\\/\\/YCS:${methodKey}:end\\n`, 'g'),
+    '\n'
+  ).replace(/\n{3,}/g, '\n\n');
+}
+
+function ycsGetEnabledMethods(code) {
+  return ITEM_METHODS.filter(m => code.includes(`//YCS:${m.key}:start`)).map(m => m.key);
+}
+
+function ycsSyncImports(code, enabledKeys) {
+  const needed = new Set();
+  for (const key of enabledKeys) {
+    const def = ITEM_METHODS.find(m => m.key === key);
+    if (def) def.imports.forEach(i => needed.add(i));
+  }
+
+  // 1. Remove the entire YCS import block if it exists
+  let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');
+
+  // 2. Also strip any loose per-line sentinel imports from the old format
+  result = result.replace(/\/\/YCS:import:[^\n]+\n?import [^;]+;\n?/g, '');
+
+  // 3. Strip bare duplicates of anything we're about to inject
+  for (const imp of needed) {
+    const escaped = imp.replace(/\./g, '\\.');
+    result = result.replace(new RegExp(`^import ${escaped};\\n?`, 'm'), '');
+  }
+
+  // 4. Collapse excess blank lines
+  result = result.replace(/\n{3,}/g, '\n\n');
+
+  if (!needed.size) return result;
+
+  // 5. Build a clean single block
+  const importBlock =
+    `//YCS_Import_START\n` +
+    [...needed].map(imp => `import ${imp};`).join('\n') +
+    `\n//YCS_Import_END`;
+
+  return result.replace(/(^package [^;]+;)/m, `$1\n\n${importBlock}`);
+}
+
+function ycsToggleMethod(code, methodKey, enable) {
+  let result = enable ? ycsInjectMethod(code, methodKey) : ycsRemoveMethod(code, methodKey);
+  const enabledKeys = ycsGetEnabledMethods(result);
+  return ycsSyncImports(result, enabledKeys);
+}
+
+function ycsInjectCompiledBody(code, methodKey, bodyLines) {
+  const bodyMarker = `//YCS:${methodKey}:body`;
+  if (!code.includes(bodyMarker)) return code;
+  const compiled = bodyLines.length
+    ? bodyLines.map(l => '        ' + l).join('\n')
+    : '        // (empty)';
+  return code.replace(bodyMarker, compiled);
+}
+
+// ─── Block AST compiler: BlockNode[] → Java string[] ─────────────────────────
+function resolveSlot(node, slot) {
+  // A slot can hold a var.context block (inline expr) or an action block (statement)
+  const child = node.inputs?.[slot];
+  if (!child) return null;
+  if (child.opcode === 'var.context') return child.fields?.varName || null;
+  return null; // non-inline blocks in slots are not supported as expressions
+}
+
+function compileBlock(node) {
+  if (!node) return [];
+  const lines = [];
+  const slot = (s) => resolveSlot(node, s); // returns varName string or null
+  switch (node.opcode) {
+    case 'effect.apply': {
+      const ent = slot('entity') || 'entity';
+      const eff = node.fields?.effect || 'MobEffects.REGENERATION';
+      const dur = node.fields?.duration ?? 200;
+      const amp = Math.max(0, (node.fields?.level ?? 1) - 1);
+      lines.push(`${ent}.addEffect(new MobEffectInstance(${eff}, ${dur}, ${amp}));`);
+      break;
+    }
+    case 'effect.remove': {
+      const ent = slot('entity') || 'entity';
+      const eff = node.fields?.effect || 'MobEffects.POISON';
+      lines.push(`${ent}.removeEffect(${eff});`);
+      break;
+    }
+    case 'entity.damage': {
+      const tgt = slot('target') || 'target';
+      const amt = node.fields?.amount ?? '1.0';
+      lines.push(`if (${tgt} instanceof LivingEntity _le) { _le.hurt(_le.damageSources().generic(), ${amt}f); }`);
+      break;
+    }
+    case 'stack.damage':
+      lines.push(`stack.hurtAndBreak(${node.fields?.amount ?? 1}, attacker instanceof LivingEntity le ? le : null, stack.getEquipmentSlot());`);
+      break;
+    case 'level.particle': {
+      const p = node.fields?.particle || 'ParticleTypes.FLAME';
+      const x = node.fields?.x || 'entity.getX()';
+      const y = node.fields?.y || 'entity.getY()';
+      const z = node.fields?.z || 'entity.getZ()';
+      const cnt = node.fields?.count ?? 5;
+      lines.push(`if (level instanceof net.minecraft.server.level.ServerLevel sl) { sl.sendParticles(${p}, ${x}, ${y}, ${z}, ${cnt}, 0.2, 0.2, 0.2, 0.0); }`);
+      break;
+    }
+    case 'level.sound': {
+      const snd = node.fields?.sound || 'SoundEvents.ITEM_FIRECHARGE_USE';
+      const vol = node.fields?.volume || '1.0f';
+      const pit = node.fields?.pitch || '1.0f';
+      lines.push(`level.playSound(null, entity.blockPosition(), ${snd}, net.minecraft.sounds.SoundSource.PLAYERS, ${vol}, ${pit});`);
+      break;
+    }
+    case 'if.serverside': {
+      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
+      lines.push('if (!level.isClientSide) {');
+      body.forEach(l => lines.push('    ' + l));
+      lines.push('}');
+      break;
+    }
+    case 'if.condition': {
+      const cond = node.fields?.condition || 'isSelected';
+      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
+      lines.push(`if (${cond}) {`);
+      body.forEach(l => lines.push('    ' + l));
+      lines.push('}');
+      break;
+    }
+    case 'var.context':
+      // var.context blocks dropped directly on the canvas as statements are no-ops
+      break;
+    default:
+      lines.push(`// unknown block: ${node.opcode}`);
+  }
+  if (node.next) compileBlock(node.next).forEach(l => lines.push(l));
+  return lines;
+}
+
+function compileInlineExpr(node) {
+  if (!node) return null;
+  if (node.opcode === 'var.context') return node.fields?.varName || null;
+  return null;
+}
+
+function compileMethodBlocks(nodes) {
+  if (!nodes?.length) return [];
+  return nodes.flatMap(n => compileBlock(n));
+}
+
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",itemType:"Generic",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
@@ -477,7 +688,274 @@ function CustomClassPanel(){
   </div>;
 }
 
-function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,activePanel,setActivePanel,highlightFaceKey}){
+// ─── Visual Scripting UI ──────────────────────────────────────────────────────
+
+function BlockChip({block,onDragStart,style={}}){
+  const isCtx=block.type==="variable"||block.isContext;
+  return<div
+    draggable
+    onDragStart={e=>{e.dataTransfer.setData("block",JSON.stringify({...block,id:crypto.randomUUID()}));if(onDragStart)onDragStart(e);}}
+    title={isCtx?`Drop into a slot (entity:, target:, etc.)\n${block.hint||""}`:block.hint||block.label}
+    style={{display:"flex",alignItems:"center",gap:5,padding:"5px 9px",borderRadius:4,
+      background:block.color||C.card,
+      border:`1px solid ${isCtx?"#1a3a5a":"#252530"}`,
+      cursor:"grab",fontSize:11,fontFamily:"monospace",
+      color:isCtx?"#7ab0d4":C.text,
+      userSelect:"none",whiteSpace:"nowrap",
+      boxShadow:isCtx?"inset 0 0 0 1px #0d1e2e":undefined,
+      ...style}}>
+    {isCtx
+      ?<span style={{fontSize:9,color:"#4a7a9a",fontWeight:700,marginRight:1}}>$</span>
+      :<span style={{fontSize:9,color:"#3a4a3a",marginRight:1}}>▶</span>}
+    {block.label}
+    {isCtx&&<span style={{fontSize:8,color:"#2a5a7a",marginLeft:2,opacity:.7}}>→slot</span>}
+  </div>;
+}
+
+function DroppableSlot({value,label,onDrop,onClear}){
+  const[over,setOver]=useState(false);
+  const[varHover,setVarHover]=useState(false);
+
+  const handleCanvasDragOver=e=>{
+    e.preventDefault();
+    // Peek at what's being dragged to show correct hint
+    try{
+      const raw=e.dataTransfer.types.includes("block");
+      setOver(true);
+    }catch{}
+  };
+
+  const handleCanvasDrop=e=>{
+    e.preventDefault();setOver(false);setVarHover(false);
+    try{
+      const b=JSON.parse(e.dataTransfer.getData("block"));
+      // Reject var.context at canvas level — must go into a slot
+      if(b.opcode==="var.context")return;
+      addBlock(b);
+    }catch{}
+  };
+  return<div
+    onDragOver={e=>{e.preventDefault();e.stopPropagation();setOver(true);}}
+    onDragLeave={e=>{e.stopPropagation();setOver(false);}}
+    onDrop={e=>{
+      e.preventDefault();e.stopPropagation();setOver(false);
+      try{
+        const b=JSON.parse(e.dataTransfer.getData("block"));
+        // Only accept var.context blocks in slots
+        if(b.opcode==="var.context")onDrop(b);
+      }catch{}
+    }}
+    style={{display:"inline-flex",alignItems:"center",gap:4,minWidth:64,padding:"3px 8px",borderRadius:3,
+      background:over?"#1a2438":value?"#0d1c2a":"#0c0c0e",
+      border:`1px dashed ${over?"#5a9fd4":value?"#1a3a50":"#252528"}`,
+      fontSize:11,cursor:"default",verticalAlign:"middle",transition:"all .1s"}}>
+    {value
+      ?<><span style={{color:"#7ab0d4",fontFamily:"monospace",fontWeight:500}}>{value.fields?.varName||value.label}</span>
+         <span onClick={onClear} style={{color:"#cc5a5a",cursor:"pointer",marginLeft:3,fontSize:10,lineHeight:1}}>✕</span></>
+      :<span style={{color:"#3a4a5a",fontSize:10,fontStyle:"italic"}}>{label||"drop $var"}</span>}
+  </div>;
+}
+
+function BlockCard({node,onChange,onDelete,depth=0}){
+  const def=BLOCK_PALETTE.flatMap(c=>c.blocks).find(b=>b.opcode===node.opcode)||{inputs:{},fields:{}};
+  const updField=(k,v)=>onChange({...node,fields:{...node.fields,[k]:v}});
+  const updInput=(k,v)=>onChange({...node,inputs:{...node.inputs,[k]:v}});
+  const isContainer=node.opcode==="if.serverside"||node.opcode==="if.condition";
+  const indent=depth*10;
+
+  return<div style={{marginLeft:indent,marginBottom:4,borderRadius:5,border:`1px solid ${node.color||"#252530"}`,background:node.color||C.card,overflow:"visible"}}>
+    {/* Header row */}
+    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderBottom:isContainer?`1px solid #252530`:"none"}}>
+      <span style={{fontSize:11,fontWeight:500,color:C.text,flex:1,fontFamily:"monospace"}}>{node.label}</span>
+      <span onClick={onDelete} style={{color:"#cc5a5a",cursor:"pointer",fontSize:11,padding:"0 3px"}}>✕</span>
+    </div>
+    {/* Fields row */}
+    <div style={{padding:"5px 8px",display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",fontSize:11}}>
+      {/* Render each input slot */}
+      {Object.keys(def.inputs||{}).map(slotKey=><span key={slotKey} style={{display:"inline-flex",alignItems:"center",gap:4}}>
+        <span style={{color:C.dim,fontSize:10}}>{slotKey}:</span>
+        <DroppableSlot
+          label={slotKey}
+          value={node.inputs?.[slotKey]||null}
+          onDrop={b=>updInput(slotKey,b)}
+          onClear={()=>updInput(slotKey,null)}
+        />
+      </span>)}
+      {/* Render each primitive field */}
+      {Object.entries(node.fields||{}).map(([fk,fv])=><span key={fk} style={{display:"inline-flex",alignItems:"center",gap:3}}>
+        <span style={{color:C.dim,fontSize:10}}>{fk}:</span>
+        <input value={fv} onChange={e=>updField(fk,e.target.value)}
+          style={{background:"#0c0e12",border:`1px solid #252530`,borderRadius:3,padding:"2px 5px",
+            fontSize:11,color:C.text,fontFamily:"monospace",width:Math.max(60,String(fv).length*7+16)}}/>
+      </span>)}
+    </div>
+    {/* Container body drop zone */}
+    {isContainer&&<div style={{padding:"4px 8px 6px",marginLeft:8}}>
+      <span style={{fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:.6}}>body</span>
+      {node.inputs?.body
+        ?<BlockCard node={node.inputs.body} depth={depth+1}
+            onChange={b=>updInput("body",b)} onDelete={()=>updInput("body",null)}/>
+        :<div onDragOver={e=>e.preventDefault()}
+            onDrop={e=>{e.preventDefault();try{const b=JSON.parse(e.dataTransfer.getData("block"));updInput("body",b);}catch{}}}
+            style={{marginTop:3,padding:"6px",borderRadius:3,border:"1px dashed #252530",
+              background:"#0c0c0e",color:C.faint,fontSize:10,textAlign:"center"}}>drop block here</div>}
+    </div>}
+  </div>;
+}
+
+function VisualEditorPanel({methodKey,form,F,onBack,className}){
+  const def=ITEM_METHODS.find(m=>m.key===methodKey);
+  const[saving,setSaving]=useState(false);
+  const[saveStatus,setSaveStatus]=useState(null);
+  const ctxBlocks=def.params.map(p=>({id:`ctx_${p.name}`,type:"variable",isContext:true,
+    opcode:"var.context",label:p.name,color:"#0e1820",
+    hint:`${p.type} ${p.name}`,inputs:{},fields:{varName:p.name,varType:p.type},next:null}));
+  const nodes=(form.methodBlocks||{})[methodKey]||[];
+  const setNodes=nv=>F("methodBlocks",{...(form.methodBlocks||{}),[methodKey]:nv});
+  const[over,setOver]=useState(false);
+  const[varHover,setVarHover]=useState(false);
+
+  const handleCanvasDragOver=e=>{
+    e.preventDefault();
+    // Peek at what's being dragged to show correct hint
+    try{
+      const raw=e.dataTransfer.types.includes("block");
+      setOver(true);
+    }catch{}
+  };
+
+  const handleCanvasDrop=e=>{
+    e.preventDefault();setOver(false);setVarHover(false);
+    try{
+      const b=JSON.parse(e.dataTransfer.getData("block"));
+      // Reject var.context at canvas level — must go into a slot
+      if(b.opcode==="var.context")return;
+      addBlock(b);
+    }catch{}
+  };
+
+  const addBlock=b=>{
+    setNodes([...nodes,{...b,id:crypto.randomUUID(),next:null,inputs:Object.fromEntries(Object.keys(b.inputs||{}).map(k=>[k,null])),fields:{...(b.fields||{})}}]);
+  };
+  const updateNode=(idx,nb)=>setNodes(nodes.map((n,i)=>i===idx?nb:n));
+  const deleteNode=idx=>setNodes(nodes.filter((_,i)=>i!==idx));
+
+  const save=async()=>{
+    setSaving(true);setSaveStatus(null);
+    const j=await api("/items/custom-class/read",{className});
+    if(!j.ok){setSaving(false);setSaveStatus({ok:false,msg:j.reason});return;}
+    const bodyLines=compileMethodBlocks(nodes);
+    const updated=ycsInjectCompiledBody(j.code,methodKey,bodyLines);
+    const j2=await api("/items/custom-class/write",{className,code:updated});
+    setSaving(false);
+    setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
+    if(j2.ok)setTimeout(()=>{setSaveStatus(null);onBack();},700);
+  };
+
+  return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+    {/* Header */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+      padding:"7px 12px",borderBottom:`1px solid ${C.inpB}`,flexShrink:0,background:"#101218"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+        <Btn sm v="g" onClick={onBack}>← Back</Btn>
+        <span style={{color:C.accent,fontSize:12,fontWeight:500,flexShrink:0}}>{def.label}</span>
+        <span style={{color:C.dim,fontSize:10,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{def.sig}</span>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+        {saveStatus&&<span style={{fontSize:10,color:saveStatus.ok?"#5acc5a":"#cc5a5a"}}>{saveStatus.msg}</span>}
+        <Btn sm v="p" onClick={save} dis={saving}>{saving?"saving…":"Save"}</Btn>
+      </div>
+    </div>
+
+    <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+      {/* Left: palette */}
+      <div style={{width:148,borderRight:`1px solid ${C.inpB}`,overflowY:"auto",background:"#0d0f12",flexShrink:0}}>
+        {/* Context variables */}
+        <div style={{padding:"8px 8px 4px",fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:.8}}>Parameters</div>
+        <div style={{padding:"0 6px 8px",display:"flex",flexDirection:"column",gap:3}}>
+          {ctxBlocks.map(b=><BlockChip key={b.id} block={b}/>)}
+        </div>
+        {/* Action block categories */}
+        {BLOCK_PALETTE.map(cat=><div key={cat.category}>
+          <div style={{padding:"6px 8px 3px",fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:.8,background:cat.color+"22",borderTop:`1px solid ${C.inpB}`}}>{cat.category}</div>
+          <div style={{padding:"3px 6px 6px",display:"flex",flexDirection:"column",gap:3}}>
+            {cat.blocks.map(b=><BlockChip key={b.opcode} block={b}/>)}
+          </div>
+        </div>)}
+      </div>
+
+      {/* Right: canvas */}
+      <div
+        onDragOver={handleCanvasDragOver}
+        onDragLeave={()=>{setOver(false);setVarHover(false);}}
+        onDrop={handleCanvasDrop}
+        style={{flex:1,overflowY:"auto",padding:12,background:over?"#0f1218":"#0d0e10",
+          display:"flex",flexDirection:"column",gap:4,transition:"background .1s"}}>
+        {nodes.length===0&&<div style={{margin:"auto",textAlign:"center",color:C.faint,fontSize:12,userSelect:"none",pointerEvents:"none"}}>
+          <div style={{fontSize:28,marginBottom:8,color:"#1e2030"}}>⟨/⟩</div>
+          <div>drag action blocks here</div>
+          <div style={{fontSize:10,color:"#2a3a4a",marginTop:6}}>drop <span style={{color:"#3a5a7a"}}>$params</span> into block slots → not onto canvas</div>
+        </div>}
+        {nodes.map((n,i)=><BlockCard key={n.id} node={n} depth={0}
+          onChange={nb=>updateNode(i,nb)} onDelete={()=>deleteNode(i)}/>)}
+      </div>
+    </div>
+  </div>;
+}
+
+function MethodListPanel({form,F,onEnterEditor,className}){
+  const[busyKey,setBusyKey]=useState(null);
+  const enabled=form.enabledMethods||[];
+
+  const toggle=async(key,checked)=>{
+    setBusyKey(key);
+    // Ensure the class file exists before trying to patch it
+    await api("/items/custom-class",{className});
+    const j=await api("/items/custom-class/read",{className});
+    if(j.ok){
+      const updated=ycsToggleMethod(j.code,key,checked);
+      await api("/items/custom-class/write",{className,code:updated});
+    }
+    const next=checked?[...enabled,key]:enabled.filter(k=>k!==key);
+    F("enabledMethods",next);
+    if(!checked){const mb={...(form.methodBlocks||{})};delete mb[key];F("methodBlocks",mb);}
+    setBusyKey(null);
+  };
+
+  return<div style={{padding:"14px 12px",display:"flex",flexDirection:"column",gap:7}}>
+    <div style={{fontSize:10,color:C.dim,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Override Methods</div>
+    {ITEM_METHODS.map(m=>{
+      const isOn=enabled.includes(m.key);
+      const busy=busyKey===m.key;
+      const hasBlocks=((form.methodBlocks||{})[m.key]||[]).length>0;
+      return<div key={m.key} style={{
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"9px 11px",borderRadius:5,
+        background:isOn?"#0f1820":C.card,
+        border:`1px solid ${isOn?"#1a3040":C.inpB}`,
+        opacity:busy?0.6:1,transition:"all .15s"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
+          <div onClick={()=>!busy&&toggle(m.key,!isOn)} style={{
+            width:14,height:14,border:`1px solid ${isOn?C.accent:C.inpB}`,borderRadius:3,
+            background:isOn?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",
+            cursor:busy?"wait":"pointer",flexShrink:0}}>
+            {isOn&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+          </div>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:12,color:isOn?C.text:"#787872",fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+              {m.label}
+              {hasBlocks&&<span style={{fontSize:9,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
+            </div>
+            <div style={{fontSize:10,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>
+          </div>
+        </div>
+        {isOn&&<Btn sm v="p" onClick={()=>onEnterEditor(m.key)} style={{marginLeft:8,flexShrink:0}}>Edit</Btn>}
+      </div>;
+    })}
+  </div>;
+}
+
+function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,activePanel,setActivePanel,highlightFaceKey,rightView,setRightView,itemForm,itemF}){
   const faceLabel=highlightFaceKey?highlightFaceKey.replace(/^texture/,"").replace(/Id$/,"")+" face":"Texture";
   if(!activePanel){
     return<div style={{display:"flex",height:"100%",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12,flexDirection:"column",gap:8}}>
@@ -487,7 +965,20 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
   }
   return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
     <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-      {activePanel==="customclass"&&<CustomClassPanel/>}
+      {activePanel==="customclass"&&(
+        rightView?.mode==="visualEditor"
+          ?<VisualEditorPanel
+              methodKey={rightView.editingMethod}
+              form={itemForm}
+              F={itemF}
+              className={itemForm?.customItemClass||idToClassName(itemForm?.id||"item")}
+              onBack={()=>setRightView({mode:"methodList",editingMethod:null})}/>
+          :<MethodListPanel
+              form={itemForm}
+              F={itemF}
+              className={itemForm?.customItemClass||idToClassName(itemForm?.id||"item")}
+              onEnterEditor={key=>setRightView({mode:"visualEditor",editingMethod:key})}/>
+      )}
       {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey={highlightFaceKey||"textureId"} label={faceLabel}/>}
       {activePanel==="tags"&&<TagsPanel/>}
       {activePanel==="tooltip"&&<TooltipPanel/>}
@@ -497,7 +988,7 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
   </div>;
 }
 
-function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,consoleH,activePanel,setActivePanel}){
+function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,consoleH,activePanel,setActivePanel,rightView,setRightView}){
   const{form,F}=useContext(FormCtx);
   const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
   const texId=(form.textureId||"").startsWith("__direct__")?null:form.textureId;
@@ -579,6 +1070,10 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
           if(prev==="Custom"&&v!=="Custom"&&form.customItemClass){
             api("/items/custom-class/delete",{className:form.customItemClass}).catch(()=>{});
             F("customItemClass","");
+            F("enabledMethods",[]);
+            F("methodBlocks",{});
+            setActivePanel(null);
+            setRightView({mode:"methodList",editingMethod:null});
           }
           if(v==="Custom"&&form.id){
             const cls2=idToClassName(form.id);
@@ -588,11 +1083,12 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
         }} options={["Generic","Tool","Food","Fuel","Custom"]}/>
       </div>
       {form.itemType==="Custom"&&<Btn sm v={activePanel==="customclass"?"p":"g"} style={{marginBottom:1}} onClick={async()=>{
-        if(activePanel==="customclass"){setActivePanel(null);return;}
+        if(activePanel==="customclass"){setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});return;}
         const cls2=form.customItemClass||idToClassName(form.id||"item");
         if(!form.customItemClass){F("customItemClass",cls2);await api("/items/custom-class",{className:cls2});}
+        setRightView({mode:"methodList",editingMethod:null});
         setActivePanel("customclass");
-      }}>edit</Btn>}
+      }}>Edit Custom Class</Btn>}
     </div>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
     {form.itemType!=="Tool"&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
@@ -641,8 +1137,9 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
   </div>;
 }
 
-function ItemRight({textures,modItems=[],activePanel,setActivePanel}){
-  return<RightPaneShell modItems={modItems} textures={textures} isBlock={false} activePanel={activePanel} setActivePanel={setActivePanel}/>;
+function ItemRight({textures,modItems=[],activePanel,setActivePanel,rightView,setRightView}){
+  const{form,F}=useContext(FormCtx);
+  return<RightPaneShell modItems={modItems} textures={textures} isBlock={false} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView} itemForm={form} itemF={F}/>;
 }
 
 function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlocks=[],showCons,consoleH,activePanel,setActivePanel,setHighlightFaceKey}){
@@ -807,6 +1304,7 @@ export default function App(){
   const[backOk,setBackOk]=useState(null);
   const[showCons,setShowCons]=useState(false);const[consH,setConsH]=useState(200);
   const[activePanel,setActivePanel]=useState(null);
+  const[rightView,setRightView]=useState({mode:"methodList",editingMethod:null});
   const[highlightFaceKey,setHighlightFaceKey]=useState("textureId");
   const{rs,running,run}=useRun();
   const isElectron=typeof window!=="undefined"&&window.ycsNative?.isElectron;
@@ -874,11 +1372,39 @@ export default function App(){
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={texEntries} emptyLabel="No textures yet." onDelete={delTex} onOpen={e=>setTexEd({mode:"edit",target:e})}/></div>;
     }
     if(tab==="items"){
-      if(itemEd){const init=itemEd.target||null;return<ItemProv initial={init} formOverride={itemEd.liveForm||null} onFormChange={f=>setItemEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={()=>{setItemEd(null);savedEdState.current.items=null;}} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel}/></div></div></ItemProv>;}
+      if(itemEd){const init=itemEd.target||null;
+      const cancelItem=async()=>{
+        // For new items only: roll back anything written during this session
+        if(!init){
+          const lf=itemEd.liveForm;
+          if(lf?.id){
+            const CN=lf.customConstName?lf.constName:(lf.id||"").toUpperCase();
+            await api("/items/delete",{id:lf.id,constName:CN});
+          }
+          if(lf?.customItemClass){
+            await api("/items/custom-class/delete",{className:lf.customItemClass});
+          }
+        }
+        setItemEd(null);savedEdState.current.items=null;
+        setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});
+      };
+      return<ItemProv initial={init} formOverride={itemEd.liveForm||null} onFormChange={f=>setItemEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={cancelItem} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/></div></div></ItemProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={itemEntries} emptyLabel="No items yet." onDelete={delItem} onOpen={e=>setItemEd({target:e})}/></div>;
     }
     if(tab==="blocks"){
-      if(blockEd){const init=blockEd.target||null;return<BlockProv initial={init} formOverride={blockEd.liveForm||null} onFormChange={f=>setBlockEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={()=>{setBlockEd(null);savedEdState.current.blocks=null;}} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
+      if(blockEd){const init=blockEd.target||null;
+      const cancelBlock=async()=>{
+        if(!init){
+          const lf=blockEd.liveForm;
+          if(lf?.id){
+            const CN=lf.customConstName?lf.constName:(lf.id||"").toUpperCase();
+            await api("/blocks/delete",{id:lf.id,constName:CN});
+          }
+        }
+        setBlockEd(null);savedEdState.current.blocks=null;
+        setActivePanel(null);
+      };
+      return<BlockProv initial={init} formOverride={blockEd.liveForm||null} onFormChange={f=>setBlockEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={cancelBlock} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={blockEntries} emptyLabel="No blocks yet." onDelete={delBlock} onOpen={e=>setBlockEd({target:e})}/></div>;
     }
     return null;
