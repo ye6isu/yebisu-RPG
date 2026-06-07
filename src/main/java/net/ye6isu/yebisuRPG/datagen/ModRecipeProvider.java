@@ -23,7 +23,7 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
     @Override
     protected void buildRecipes(RecipeOutput recipeOutput) {
 
-        List<ItemLike> YE6ISU_SMELTABLES = List.of(ModItems.RAW_YE6ISU);
+        //List<ItemLike> YE6ISU_SMELTABLES = List.of(ModItems.RAW_YE6ISU);
 
         //Shapeless recipe
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.YE6ISU_BLOCK.get())
@@ -74,10 +74,10 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
                 .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
 
         //Furnace recipe
-        smelting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 200, "ye6isu");
+        //smelting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 200, "ye6isu");
 
         //Blasting recipe
-        blasting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 100, "ye6isu");
+        //blasting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 100, "ye6isu");
 
         //YCS_Mod_Recipe_Provider_START
 

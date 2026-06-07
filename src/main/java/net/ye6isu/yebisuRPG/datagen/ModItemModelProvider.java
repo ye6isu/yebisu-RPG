@@ -71,9 +71,6 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         //Normal Items
         basicItem(ModItems.PLANK.get());
-        basicItem(ModItems.SUKUNA_FINGER.get());
-        basicItem(ModItems.MOTHER_FLAME.get());
-        handheldItem(ModItems.RAW_YE6ISU);
 
         //Tool Items
         handheldItem(ModItems.YE6ISU_SWORD);
@@ -98,7 +95,59 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         //YCS_Mod_Item_Model_START
 
-        handheldItem(ModItems.YAYAYAYA);
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
+        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
 
         //YCS_Mod_Item_Model_END
     }
