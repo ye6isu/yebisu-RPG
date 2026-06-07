@@ -132,56 +132,58 @@ function idToClassName(id){return id.split("_").map(w=>w?w[0].toUpperCase()+w.sl
 function gItemCode(item,textures){
   const texId=(item.textureId||"").startsWith("__direct__")?null:item.textureId;const tex=textures.find(t=>t.id===texId);
   const id=item.id||"my_item",CN=item.customConstName?item.constName:id.toUpperCase(),dn=item.displayName||id;
-  const tt=()=>{if(!item.hasTooltip)return null;const n=item.tooltipNormal?`"tooltip.${MODID}.${id}.normal"`:"null";const h=item.hasHiddenTooltip&&item.tooltipHidden?`"tooltip.${MODID}.${id}.hidden"`:"null";const s=item.hasHiddenTooltip?(item.useDefaultShiftHint?`"tooltip.${MODID}.shift_to_see"`:(item.tooltipShiftHint?`"tooltip.${MODID}.${id}.shift_hint"`:"null")):"null";return{n,h,s};};
-  const addTooltip=(baseInst)=>{
-    const t=tt();
-    if(!t||(t.n==="null"&&t.h==="null"))return baseInst;
-    let stmts=[];
-    if(t.n!=="null")stmts.push(`                    tooltipComponents.add(Component.translatable(${t.n}));`);
-    if(t.h!=="null"){stmts.push(`                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);stmts.push(`                        tooltipComponents.add(Component.translatable(${t.h}));`);stmts.push(`                    } else {`);stmts.push(`                        tooltipComponents.add(Component.translatable(${t.s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);stmts.push(`                    }`);}
-    return`${baseInst} {\n                @Override\n                public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {\n${stmts.join('\n')}\n                    super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);\n                }\n            }`;
-  };
-  const stackOpt=(item.maxStackSize&&parseInt(item.maxStackSize)!==64)?`.stacksTo(${parseInt(item.maxStackSize)})`:"";
-  let reg="",fpReg;
-  // Compose class name and properties from flags
   const cls2=item.customItemClass||null;
   const isTool=!!item.isTool;
   const isFood=!!item.isFood;
   const isFuel=!!item.isFuel;
+  const hasDur=!!item.hasDurability&&!isTool; // tools handle durability via tier
 
-  if(isTool){
-    // Tool: uses SwordItem / PickaxeItem etc. with attributes; food/fuel can stack on top via .food() / FuelItem wrapping is not standard for tools, so we just add food props inline
-    const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,tc=`${item.toolType||"Sword"}Item`;
-    let props=`new Item.Properties()\n                .attributes(${tc}.createAttributes(${tier}, ${dmg}f, ${spd}f))${stackOpt}`;
-    if(isFood){
-      const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
-      let fx="";if(item.foodEffects?.length){fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");}
-      fpReg=`public static final FoodProperties ${CN}_FOOD = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
-      props+=`\n                .food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN}_FOOD)`;
-    }
-    const instCls=cls2||tc;
-    const baseNew=cls2?`new ${cls2}(${props})`:`new ${tc}(${tier}, ${props})`;
-    reg=`public static final DeferredItem<${cls2?`Item`:tc}> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(baseNew)});`;
-  } else {
-    // Plain Item base — compose properties
-    let props=`new Item.Properties()${stackOpt}`;
-    if(isFood){
-      const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
-      let fx="";if(item.foodEffects?.length){fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");}
-      fpReg=`public static final FoodProperties ${CN} = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
-      props+=`.food(net.ye6isu.yebisuRPG.item.ModFoodProperties.${CN})`;
-    }
-    if(isFuel){
-      // FuelItem wraps the base item — takes Properties + burnTime
-      const bt=item.burnTime||1600;
-      const instCls=cls2||"FuelItem";
-      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${instCls}(${props}, ${bt})`)});`;
-    } else if(cls2){
-      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new ${cls2}(${props})`)});`;
-    } else {
-      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltip(`new Item(${props})`)});`;
-    }
+  // ── Properties string ──────────────────────────────────────────────────────
+  let props="new Item.Properties()";
+  if(hasDur) props+=`.durability(${parseInt(item.durability)||100})`;
+  else if(!isTool&&item.maxStackSize&&parseInt(item.maxStackSize)!==64) props+=`.stacksTo(${parseInt(item.maxStackSize)})`;
+
+  // ── Inline food/fuel/tooltip only when NO custom class ────────────────────
+  let fpReg=null;
+  const addTooltipInline=(baseInst)=>{
+    if(cls2||!item.hasTooltip)return baseInst;
+    const n=item.tooltipNormal?`"tooltip.${MODID}.${id}.normal"`:"null";
+    const h=item.hasHiddenTooltip&&item.tooltipHidden?`"tooltip.${MODID}.${id}.hidden"`:"null";
+    const s=item.hasHiddenTooltip?(item.useDefaultShiftHint?`"tooltip.${MODID}.shift_to_see"`:(item.tooltipShiftHint?`"tooltip.${MODID}.${id}.shift_hint"`:"null")):"null";
+    if(n==="null"&&h==="null")return baseInst;
+    let stmts=[];
+    if(n!=="null")stmts.push(`                    tooltipComponents.add(Component.translatable(${n}));`);
+    if(h!=="null"){stmts.push(`                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);stmts.push(`                        tooltipComponents.add(Component.translatable(${h}));`);stmts.push(`                    } else {`);stmts.push(`                        tooltipComponents.add(Component.translatable(${s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);stmts.push(`                    }`);}
+    return`${baseInst} {\n                @Override\n                public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {\n${stmts.join('\n')}\n                    super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);\n                }\n            }`;
+  };
+
+  // Inline food: only when no custom class
+  if(isFood&&!cls2){
+    const al=item.foodAlwaysEdible?".alwaysEdible()":"",n=item.foodNutrition||2,s=parseFloat(item.foodSaturation)||0.3;
+    let fx="";if(item.foodEffects?.length){fx=item.foodEffects.map(e=>`.effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`).join("");}
+    fpReg=`public static final FoodProperties ${CN}_FOOD = new FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}${fx}.build();`;
+    props+=`.food(${CN}_FOOD)`;
   }
+
+  let reg="";
+  if(isTool){
+    const tier=TIER_MAP[item.tier]||"Tiers.IRON",dmg=parseFloat(item.damage)||3,spd=parseFloat(item.speed)||-2.4,tc=`${item.toolType||"Sword"}Item`;
+    const toolProps=`new Item.Properties()\n                .attributes(${tc}.createAttributes(${tier}, ${dmg}f, ${spd}f))`;
+    if(cls2){
+      reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new ${cls2}(${toolProps})`)});`;
+    } else {
+      reg=`public static final DeferredItem<${tc}> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new ${tc}(${tier}, ${toolProps})`)});`;
+    }
+  } else if(cls2){
+    // Custom class — all food/fuel/tooltip handled inside the .java file
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new ${cls2}(${props}));`;
+  } else if(isFuel&&!cls2){
+    // Inline fuel: new Item with getBurnTime via anonymous override
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new Item(${props}) {\n            @Override\n            public int getBurnTime(ItemStack itemStack, @org.jetbrains.annotations.Nullable net.minecraft.world.item.crafting.RecipeType<?> recipeType) {\n                return ${item.burnTime||1600};\n            }\n        }`)});`;
+  } else {
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new Item(${props})`)});`;
+  }
+
   const isHandheld=item.holdingMode==="handheld";
   const modelLine=isHandheld?`handheldItem(ModItems.${CN});`:(tex?.isAnimated?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");`:`basicItem(ModItems.${CN}.get());`);
   return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN,fpReg};
@@ -244,56 +246,201 @@ function gBlockEntries(block,textures=[]){
 }
 
 // ─── Visual Scripting: Method Definitions ─────────────────────────────────────
+// Base imports always needed in every custom class
+const YCS_BASE_IMPORTS=[
+  "net.minecraft.world.item.Item",
+  "net.minecraft.world.item.ItemStack",
+  "net.minecraft.world.level.Level",
+  "net.minecraft.world.entity.player.Player",
+];
+
 const ITEM_METHODS=[
   {key:"useOn",label:"Block Interaction",sig:"useOn(UseOnContext context)",
    params:[{name:"context",type:"UseOnContext"}],
    returnType:"InteractionResult",
-   imports:["net.minecraft.world.item.context.UseOnContext","net.minecraft.world.InteractionResult","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   imports:[
+     "net.minecraft.world.item.context.UseOnContext",
+     "net.minecraft.world.InteractionResult",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.level.Level",
+     "net.minecraft.world.entity.player.Player",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
    stub:`    @Override\n    public InteractionResult useOn(UseOnContext context) {\n        //YCS:useOn:body\n        return super.useOn(context);\n    }`},
   {key:"use",label:"Air Interaction",sig:"use(Level level, Player player, InteractionHand usedHand)",
    params:[{name:"level",type:"Level"},{name:"player",type:"Player"},{name:"usedHand",type:"InteractionHand"}],
    returnType:"InteractionResultHolder<ItemStack>",
-   imports:["net.minecraft.world.InteractionResultHolder","net.minecraft.world.InteractionHand","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   imports:[
+     "net.minecraft.world.InteractionResultHolder",
+     "net.minecraft.world.InteractionHand",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.level.Level",
+     "net.minecraft.world.entity.player.Player",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
    stub:`    @Override\n    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {\n        //YCS:use:body\n        return super.use(level, player, usedHand);\n    }`},
-  {key:"continuousUse",label:"Continuous Use",sig:"onUseTick(...) + releaseUsing(...)",
-   params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"entity",type:"LivingEntity"},{name:"remainingUseDuration",type:"int"}],
+  {key:"continuousUse",label:"Continuous Use",sig:"onUseTick(Level, LivingEntity, ItemStack, int) + releaseUsing(ItemStack, Level, LivingEntity, int)",
+   params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"},{name:"remainingUseDuration",type:"int"}],
    returnType:"void",
-   imports:["net.minecraft.world.entity.LivingEntity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
-   stub:`    @Override\n    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingUseDuration) {\n        //YCS:continuousUse:body\n    }\n\n    @Override\n    public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeCharged) {\n    }`},
+   imports:[
+     "net.minecraft.world.entity.LivingEntity",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.level.Level",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
+   stub:`    @Override\n    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration) {\n        //YCS:continuousUse:body\n    }\n\n    @Override\n    public void releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged) {\n        //YCS:releaseUsing:body\n    }`},
   {key:"finishUsingItem",label:"Finished Using",sig:"finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity)",
    params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"}],
    returnType:"ItemStack",
-   imports:["net.minecraft.world.entity.LivingEntity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   imports:[
+     "net.minecraft.world.entity.LivingEntity",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.level.Level",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
    stub:`    @Override\n    public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity) {\n        //YCS:finishUsingItem:body\n        return super.finishUsingItem(stack, level, livingEntity);\n    }`},
   {key:"inventoryTick",label:"Inventory Tick",sig:"inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected)",
    params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"entity",type:"Entity"},{name:"slotId",type:"int"},{name:"isSelected",type:"boolean"}],
    returnType:"void",
-   imports:["net.minecraft.world.entity.Entity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   imports:[
+     "net.minecraft.world.entity.Entity",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.level.Level",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
    stub:`    @Override\n    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {\n        //YCS:inventoryTick:body\n    }`},
   {key:"hurtEnemy",label:"Combat / Hurt Entity",sig:"hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker)",
    params:[{name:"stack",type:"ItemStack"},{name:"target",type:"LivingEntity"},{name:"attacker",type:"LivingEntity"}],
    returnType:"boolean",
-   imports:["net.minecraft.world.entity.LivingEntity","net.minecraft.world.effect.MobEffectInstance","net.minecraft.world.effect.MobEffects"],
+   imports:[
+     "net.minecraft.world.entity.LivingEntity",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
    stub:`    @Override\n    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {\n        //YCS:hurtEnemy:body\n        return super.hurtEnemy(stack, target, attacker);\n    }`},
+  {key:"interactLivingEntity",label:"Entity Interaction",sig:"interactLivingEntity(ItemStack stack, Player player, LivingEntity interactionTarget, InteractionHand usedHand)",
+   params:[{name:"stack",type:"ItemStack"},{name:"player",type:"Player"},{name:"interactionTarget",type:"LivingEntity"},{name:"usedHand",type:"InteractionHand"}],
+   returnType:"InteractionResult",
+   imports:[
+     "net.minecraft.world.InteractionResult",
+     "net.minecraft.world.InteractionHand",
+     "net.minecraft.world.entity.LivingEntity",
+     "net.minecraft.world.entity.player.Player",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
+   stub:`    @Override\n    public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity interactionTarget, InteractionHand usedHand) {\n        //YCS:interactLivingEntity:body\n        return super.interactLivingEntity(stack, player, interactionTarget, usedHand);\n    }`},
 ];
+
+// ─── YCS feature stubs injected/removed as sentinels ─────────────────────────
+// These are non-method features (food, fuel, tooltip) managed identically to methods
+const YCS_FEATURES={
+  food:{
+    key:"food",
+    imports:["net.minecraft.world.food.FoodProperties","net.minecraft.world.entity.LivingEntity","net.minecraft.world.item.ItemStack"],
+    buildStub:(form)=>{
+      const n=form.foodNutrition||2,s=parseFloat(form.foodSaturation)||0.3;
+      const al=form.foodAlwaysEdible?".alwaysEdible()":"";
+      let fx="";
+      if(form.foodEffects?.length){
+        fx=form.foodEffects.map(e=>
+          `\n            .effect(new net.minecraft.world.effect.MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`
+        ).join("");
+      }
+      return `    //YCS:food:start\n    @Override\n    public net.minecraft.world.food.FoodProperties getFoodProperties(ItemStack stack, LivingEntity entity) {\n        return new FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }\n    //YCS:food:end`;
+    },
+    // Simpler: we build the stub inline in ycsSyncFeature
+  },
+  fuel:{
+    key:"fuel",
+    imports:["net.minecraft.world.item.ItemStack","org.jetbrains.annotations.Nullable","net.minecraft.world.item.crafting.RecipeType"],
+    buildStub:(form)=>{
+      const bt=form.burnTime||1600;
+      return `    //YCS:fuel:start\n    @Override\n    public int getBurnTime(ItemStack itemStack, @Nullable RecipeType<?> recipeType) {\n        return ${bt};\n    }\n    //YCS:fuel:end`;
+    },
+  },
+  tooltip:{
+    key:"tooltip",
+    imports:[
+      "net.minecraft.network.chat.Component",
+      "net.minecraft.world.item.ItemStack",
+      "net.minecraft.world.item.TooltipFlag",
+      "net.minecraft.world.item.Item",
+      "java.util.List",
+    ],
+    buildStub:(form,id)=>{
+      const MODID_="yebisurpg";
+      const n=form.tooltipNormal?`"tooltip.${MODID_}.${id}.normal"`:"null";
+      const h=form.hasHiddenTooltip&&form.tooltipHidden?`"tooltip.${MODID_}.${id}.hidden"`:"null";
+      const s=form.hasHiddenTooltip
+        ?(form.useDefaultShiftHint?`"tooltip.${MODID_}.shift_to_see"`:(form.tooltipShiftHint?`"tooltip.${MODID_}.${id}.shift_hint"`:"null"))
+        :"null";
+      let lines=[];
+      if(n!=="null") lines.push(`        tooltipComponents.add(Component.translatable(${n}));`);
+      if(h!=="null"){
+        lines.push(`        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);
+        lines.push(`            tooltipComponents.add(Component.translatable(${h}));`);
+        lines.push(`        } else {`);
+        lines.push(`            tooltipComponents.add(Component.translatable(${s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);
+        lines.push(`        }`);
+      }
+      lines.push(`        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);`);
+      return `    //YCS:tooltip:start\n    @Override\n    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {\n${lines.join('\n')}\n    }\n    //YCS:tooltip:end`;
+    },
+  },
+};
 
 // Block palette: categories of draggable action blocks
 const BLOCK_PALETTE=[
-  {category:"Effects",color:"#1a2e3a",blocks:[
-    {opcode:"effect.apply",label:"Apply Effect",color:"#1a3a2e",inputs:{entity:null},fields:{effect:"MobEffects.REGENERATION",duration:200,level:1},hint:"Apply a status effect to an entity"},
-    {opcode:"effect.remove",label:"Remove Effect",color:"#2e1a1a",inputs:{entity:null},fields:{effect:"MobEffects.POISON"},hint:"Remove a status effect"},
+  {category:"Universal Flow & Logic",color:"#1a1e2a",blocks:[
+    {opcode:"if.do",label:"If / Do",color:"#1a2a3a",inputs:{body:null},fields:{condition:"true"},hint:"Execute if true"},
+    {opcode:"if.do.else",label:"If / Do / Else",color:"#1a2a3a",inputs:{body:null,elseBody:null},fields:{condition:"true"},hint:"Execute if true, else other"},
+    {opcode:"repeat",label:"Repeat [Number] times",color:"#2a2a1a",inputs:{body:null},fields:{times:"5"},hint:"Loop a certain number of times"},
+    {opcode:"return.value",label:"Return [Value]",color:"#2a1a1a",inputs:{},fields:{value:"InteractionResult.SUCCESS"},hint:"Return from method"},
+    {opcode:"math.number",label:"Number",color:"#2a2e3a",inputs:{},fields:{value:"0"},hint:"A numeric value"},
+    {opcode:"math.op",label:"Math Operation",color:"#1e1e28",inputs:{},fields:{a:"1",op:"+",b:"1"},hint:"Math operation: +, -, *, /, %"},
+    {opcode:"math.random",label:"Random Integer",color:"#1e281e",inputs:{},fields:{min:"1",max:"10"},hint:"Random number between min and max"},
+    {opcode:"logic.bool",label:"Boolean",color:"#2a2a2e",inputs:{},fields:{value:"true"},hint:"True or False"},
+    {opcode:"logic.compare",label:"Compare",color:"#1e201e",inputs:{},fields:{a:"1",op:"==",b:"1"},hint:"Compare two values: ==, !=, <, <=, >, >="},
+    {opcode:"logic.gate",label:"Logic Gate",color:"#1e1e20",inputs:{},fields:{a:"true",op:"&&",b:"false"},hint:"AND or OR"},
   ]},
-  {category:"Damage",color:"#3a1a1a",blocks:[
-    {opcode:"entity.damage",label:"Deal Damage",color:"#3a1a1a",inputs:{target:null},fields:{amount:"2.0",damageType:"generic"},hint:"Damage an entity"},
-    {opcode:"stack.damage",label:"Damage Item",color:"#2a1a2e",inputs:{},fields:{amount:1},hint:"Damage the item stack"},
+  {category:"Context Data Blocks",color:"#203040",blocks:[
+    {opcode:"ctx.level",label:"Get World/Level",color:"#152535",inputs:{},fields:{},hint:"Get Level",methods:["useOn","use","continuousUse","finishUsingItem","inventoryTick"]},
+    {opcode:"ctx.player",label:"Get Player",color:"#152535",inputs:{},fields:{},hint:"Get Player",methods:["useOn","use","interactLivingEntity"]},
+    {opcode:"ctx.user",label:"Get User Entity",color:"#152535",inputs:{},fields:{},hint:"Get User Entity",methods:["continuousUse","finishUsingItem","inventoryTick"]},
+    {opcode:"ctx.target",label:"Get Target Entity",color:"#152535",inputs:{},fields:{},hint:"Get Target Entity",methods:["hurtEnemy","interactLivingEntity"]},
+    {opcode:"ctx.attacker",label:"Get Attacker",color:"#152535",inputs:{},fields:{},hint:"Get Attacker",methods:["hurtEnemy"]},
+    {opcode:"ctx.pos",label:"Get Target X/Y/Z",color:"#152535",inputs:{},fields:{coord:"X"},hint:"Get X/Y/Z from context",methods:["useOn"]},
+    {opcode:"ctx.face",label:"Get Target Face",color:"#152535",inputs:{},fields:{},hint:"Get Clicked Face",methods:["useOn"]},
+    {opcode:"ctx.item",label:"Get Current Item",color:"#152535",inputs:{},fields:{},hint:"Get ItemStack"},
+    {opcode:"ctx.slot",label:"Get Active Slot ID",color:"#152535",inputs:{},fields:{},hint:"Get Slot ID",methods:["inventoryTick"]},
+    {opcode:"ctx.selected",label:"Is Item Selected?",color:"#152535",inputs:{},fields:{},hint:"Is Selected?",methods:["inventoryTick"]},
+    {opcode:"ctx.duration",label:"Get Use Duration",color:"#152535",inputs:{},fields:{},hint:"Use duration",methods:["continuousUse"]},
   ]},
-  {category:"Particles / Sound",color:"#1a1a3a",blocks:[
-    {opcode:"level.particle",label:"Spawn Particle",color:"#1a1a3a",inputs:{},fields:{particle:"ParticleTypes.FLAME",x:"entity.getX()",y:"entity.getY()",z:"entity.getZ()",count:5},hint:"Spawn particles at position"},
-    {opcode:"level.sound",label:"Play Sound",color:"#1a2a1a",inputs:{},fields:{sound:"SoundEvents.ITEM_FIRECHARGE_USE",volume:"1.0f",pitch:"1.0f"},hint:"Play a sound at entity position"},
+  {category:"World Actions",color:"#0a1e2e",blocks:[
+    {opcode:"level.setblock",label:"Set Block at [X,Y,Z]",color:"#0a1e2e",inputs:{},fields:{x:"x",y:"y",z:"z",block:"Blocks.STONE"},hint:"Set a block at position"},
+    {opcode:"level.getblock",label:"Get Block at [X,Y,Z]",color:"#0a1a2a",inputs:{},fields:{x:"x",y:"y",z:"z"},hint:"Returns BlockType at position"},
+    {opcode:"level.particle",label:"Spawn Particle",color:"#1a1a3a",inputs:{},fields:{particle:"ParticleTypes.FLAME",x:"x",y:"y",z:"z"},hint:"Spawn particles at position"},
+    {opcode:"level.sound",label:"Play Sound",color:"#1a2a1a",inputs:{},fields:{sound:"SoundEvents.ITEM_FIRECHARGE_USE",x:"x",y:"y",z:"z"},hint:"Play a sound at position"},
+    {opcode:"level.lightning",label:"Strike Lightning",color:"#2a200a",inputs:{},fields:{x:"x",y:"y",z:"z"},hint:"Strike lightning at position"},
   ]},
-  {category:"Logic",color:"#2a2a1a",blocks:[
-    {opcode:"if.serverside",label:"Server Side Only",color:"#2a2218",inputs:{body:null},fields:{},hint:"Wrap code in !level.isClientSide"},
-    {opcode:"if.condition",label:"If / Condition",color:"#252520",inputs:{body:null},fields:{condition:"isSelected"},hint:"Simple boolean guard"},
+  {category:"Entity & Movement",color:"#2e2a0a",blocks:[
+    {opcode:"entity.damage",label:"Deal Damage",color:"#3a1a1a",inputs:{},fields:{target:"entity",amount:"2.0"},hint:"Damage an entity"},
+    {opcode:"effect.apply",label:"Apply Potion Effect",color:"#1a3a2e",inputs:{},fields:{effect:"MobEffects.REGENERATION",target:"entity",duration:"200",level:"1"},hint:"Apply a status effect to an entity"},
+    {opcode:"entity.velocity",label:"Set Velocity",color:"#2e2a0a",inputs:{},fields:{target:"entity",x:"0.0",y:"0.5",z:"0.0"},hint:"Set entity velocity (knockback/launch)"},
+    {opcode:"entity.health",label:"Get Health",color:"#2a1a0e",inputs:{},fields:{target:"entity"},hint:"Get health of an entity (use in condition)"},
+  ]},
+  {category:"Item Actions",color:"#1e2a1a",blocks:[
+    {opcode:"stack.damage",label:"Damage Item",color:"#2a1a2e",inputs:{},fields:{amount:"1"},hint:"Damage the item stack"},
+    {opcode:"stack.shrink",label:"Shrink Stack",color:"#1e2a1a",inputs:{},fields:{amount:"1"},hint:"Consume/shrink the item stack"},
+    {opcode:"return.result",label:"Return Interaction Result",color:"#2a1a2e",inputs:{},fields:{result:"InteractionResult.SUCCESS"},hint:"Return an InteractionResult (SUCCESS, PASS, FAIL)"},
   ]},
 ];
 
@@ -317,11 +464,17 @@ function ycsGetEnabledMethods(code) {
   return ITEM_METHODS.filter(m => code.includes(`//YCS:${m.key}:start`)).map(m => m.key);
 }
 
-function ycsSyncImports(code, enabledKeys) {
-  const needed = new Set();
-  for (const key of enabledKeys) {
+function ycsSyncImports(code, enabledMethodKeys) {
+  const needed = new Set(YCS_BASE_IMPORTS);
+  for (const key of enabledMethodKeys) {
     const def = ITEM_METHODS.find(m => m.key === key);
     if (def) def.imports.forEach(i => needed.add(i));
+  }
+  // Also add imports for any YCS features present in the file
+  for (const feat of Object.values(YCS_FEATURES)) {
+    if (code.includes(`//YCS:${feat.key}:start`)) {
+      feat.imports.forEach(i => needed.add(i));
+    }
   }
 
   // 1. Remove the entire YCS import block if it exists
@@ -348,6 +501,74 @@ function ycsSyncImports(code, enabledKeys) {
     `\n//YCS_Import_END`;
 
   return result.replace(/(^package [^;]+;)/m, `$1\n\n${importBlock}`);
+}
+
+// ─── YCS Feature (food/fuel/tooltip) inject/remove ───────────────────────────
+function ycsInjectFeature(code, featureKey, form, itemId) {
+  if (code.includes(`//YCS:${featureKey}:start`)) {
+    // Already present — update the stub content between start/end
+    return ycsUpdateFeature(code, featureKey, form, itemId);
+  }
+  const stub = buildFeatureStub(featureKey, form, itemId);
+  if (!stub) return code;
+  const sentinel = `\n    //YCS:${featureKey}:start\n${stub}\n    //YCS:${featureKey}:end\n`;
+  return code.replace(/\n\}\s*$/, sentinel + '\n}');
+}
+
+function ycsRemoveFeature(code, featureKey) {
+  return code.replace(
+    new RegExp(`\\n    \\/\\/YCS:${featureKey}:start[\\s\\S]*?\\/\\/YCS:${featureKey}:end\\n`, 'g'),
+    '\n'
+  ).replace(/\n{3,}/g, '\n\n');
+}
+
+function ycsUpdateFeature(code, featureKey, form, itemId) {
+  const stub = buildFeatureStub(featureKey, form, itemId);
+  if (!stub) return code;
+  return code.replace(
+    new RegExp(`(\\/\\/YCS:${featureKey}:start)[\\s\\S]*?(\\/\\/YCS:${featureKey}:end)`),
+    `//YCS:${featureKey}:start\n${stub}\n    //YCS:${featureKey}:end`
+  );
+}
+
+function buildFeatureStub(featureKey, form, itemId) {
+  const MODID_ = "yebisurpg";
+  if (featureKey === 'food') {
+    const n = form.foodNutrition || 2;
+    const s = parseFloat(form.foodSaturation) || 0.3;
+    const al = form.foodAlwaysEdible ? "\n            .alwaysEdible()" : "";
+    let fx = "";
+    if (form.foodEffects?.length) {
+      fx = form.foodEffects.map(e =>
+        `\n            .effect(new net.minecraft.world.effect.MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level) - 1)}), ${parseFloat(e.probability) || 1.0}f)`
+      ).join("");
+    }
+    return `    @Override\n    public net.minecraft.world.food.FoodProperties getFoodProperties(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {\n        return new FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }`;
+  }
+  if (featureKey === 'fuel') {
+    const bt = form.burnTime || 1600;
+    return `    @Override\n    public int getBurnTime(ItemStack itemStack, @Nullable RecipeType<?> recipeType) {\n        return ${bt};\n    }`;
+  }
+  if (featureKey === 'tooltip') {
+    if (!form.hasTooltip) return null;
+    const n = form.tooltipNormal ? `"tooltip.${MODID_}.${itemId}.normal"` : "null";
+    const h = form.hasHiddenTooltip && form.tooltipHidden ? `"tooltip.${MODID_}.${itemId}.hidden"` : "null";
+    const s = form.hasHiddenTooltip
+      ? (form.useDefaultShiftHint ? `"tooltip.${MODID_}.shift_to_see"` : (form.tooltipShiftHint ? `"tooltip.${MODID_}.${itemId}.shift_hint"` : "null"))
+      : "null";
+    let lines = [];
+    if (n !== "null") lines.push(`        tooltipComponents.add(Component.translatable(${n}));`);
+    if (h !== "null") {
+      lines.push(`        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);
+      lines.push(`            tooltipComponents.add(Component.translatable(${h}));`);
+      lines.push(`        } else {`);
+      lines.push(`            tooltipComponents.add(Component.translatable(${s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);
+      lines.push(`        }`);
+    }
+    lines.push(`        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);`);
+    return `    @Override\n    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {\n${lines.join('\n')}\n    }`;
+  }
+  return null;
 }
 
 function ycsToggleMethod(code, methodKey, enable) {
@@ -377,64 +598,108 @@ function resolveSlot(node, slot) {
 function compileBlock(node) {
   if (!node) return [];
   const lines = [];
-  const slot = (s) => resolveSlot(node, s); // returns varName string or null
+  const slot = (s) => resolveSlot(node, s);
   switch (node.opcode) {
-    case 'effect.apply': {
-      const ent = slot('entity') || 'entity';
-      const eff = node.fields?.effect || 'MobEffects.REGENERATION';
-      const dur = node.fields?.duration ?? 200;
-      const amp = Math.max(0, (node.fields?.level ?? 1) - 1);
-      lines.push(`${ent}.addEffect(new MobEffectInstance(${eff}, ${dur}, ${amp}));`);
-      break;
-    }
-    case 'effect.remove': {
-      const ent = slot('entity') || 'entity';
-      const eff = node.fields?.effect || 'MobEffects.POISON';
-      lines.push(`${ent}.removeEffect(${eff});`);
-      break;
-    }
-    case 'entity.damage': {
-      const tgt = slot('target') || 'target';
-      const amt = node.fields?.amount ?? '1.0';
-      lines.push(`if (${tgt} instanceof LivingEntity _le) { _le.hurt(_le.damageSources().generic(), ${amt}f); }`);
-      break;
-    }
-    case 'stack.damage':
-      lines.push(`stack.hurtAndBreak(${node.fields?.amount ?? 1}, attacker instanceof LivingEntity le ? le : null, stack.getEquipmentSlot());`);
-      break;
-    case 'level.particle': {
-      const p = node.fields?.particle || 'ParticleTypes.FLAME';
-      const x = node.fields?.x || 'entity.getX()';
-      const y = node.fields?.y || 'entity.getY()';
-      const z = node.fields?.z || 'entity.getZ()';
-      const cnt = node.fields?.count ?? 5;
-      lines.push(`if (level instanceof net.minecraft.server.level.ServerLevel sl) { sl.sendParticles(${p}, ${x}, ${y}, ${z}, ${cnt}, 0.2, 0.2, 0.2, 0.0); }`);
-      break;
-    }
-    case 'level.sound': {
-      const snd = node.fields?.sound || 'SoundEvents.ITEM_FIRECHARGE_USE';
-      const vol = node.fields?.volume || '1.0f';
-      const pit = node.fields?.pitch || '1.0f';
-      lines.push(`level.playSound(null, entity.blockPosition(), ${snd}, net.minecraft.sounds.SoundSource.PLAYERS, ${vol}, ${pit});`);
-      break;
-    }
-    case 'if.serverside': {
-      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
-      lines.push('if (!level.isClientSide) {');
-      body.forEach(l => lines.push('    ' + l));
-      lines.push('}');
-      break;
-    }
-    case 'if.condition': {
-      const cond = node.fields?.condition || 'isSelected';
+    case 'if.do': {
+      const cond = node.fields?.condition || 'true';
       const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
       lines.push(`if (${cond}) {`);
       body.forEach(l => lines.push('    ' + l));
       lines.push('}');
       break;
     }
+    case 'if.do.else': {
+      const cond = node.fields?.condition || 'true';
+      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
+      const elseBody = node.inputs?.elseBody ? compileBlock(node.inputs.elseBody) : [];
+      lines.push(`if (${cond}) {`);
+      body.forEach(l => lines.push('    ' + l));
+      lines.push('} else {');
+      elseBody.forEach(l => lines.push('    ' + l));
+      lines.push('}');
+      break;
+    }
+    case 'repeat': {
+      const t = node.fields?.times || '5';
+      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
+      lines.push(`for (int _i = 0; _i < ${t}; _i++) {`);
+      body.forEach(l => lines.push('    ' + l));
+      lines.push('}');
+      break;
+    }
+    case 'return.value':
+      lines.push(`return ${node.fields?.value || 'InteractionResult.SUCCESS'};`);
+      break;
+    case 'return.result':
+      lines.push(`return ${node.fields?.result || 'InteractionResult.SUCCESS'};`);
+      break;
+    case 'effect.apply': {
+      const ent = node.fields?.target || 'entity';
+      const eff = node.fields?.effect || 'MobEffects.REGENERATION';
+      const dur = node.fields?.duration ?? 200;
+      const amp = Math.max(0, (node.fields?.level ?? 1) - 1);
+      lines.push(`${ent}.addEffect(new net.minecraft.world.effect.MobEffectInstance(${eff}, ${dur}, ${amp}));`);
+      break;
+    }
+    case 'entity.damage': {
+      const tgt = node.fields?.target || 'target';
+      const amt = node.fields?.amount ?? '1.0';
+      lines.push(`if (${tgt} instanceof net.minecraft.world.entity.LivingEntity _le) { _le.hurt(_le.damageSources().generic(), ${amt}f); }`);
+      break;
+    }
+    case 'stack.damage':
+      lines.push(`stack.hurtAndBreak(Math.round(${node.fields?.amount ?? 1}), level instanceof net.minecraft.server.level.ServerLevel ? (net.minecraft.server.level.ServerLevel)level : null, null, null);`);
+      break;
+    case 'stack.shrink':
+      lines.push(`stack.shrink((int)(${node.fields?.amount ?? 1}));`);
+      break;
+    case 'entity.velocity': {
+      const ent = node.fields?.target || 'entity';
+      const x = node.fields?.x ?? '0.0';
+      const y = node.fields?.y ?? '0.5';
+      const z = node.fields?.z ?? '0.0';
+      lines.push(`${ent}.setDeltaMovement(${x}, ${y}, ${z});`);
+      lines.push(`${ent}.hurtMarked = true;`);
+      break;
+    }
+    case 'entity.health':
+      lines.push(`/* Get Health: ${node.fields?.target||'entity'}.getHealth() */`);
+      break;
+    case 'level.setblock': {
+      const bk = node.fields?.block || 'net.minecraft.world.level.block.Blocks.STONE';
+      const x = node.fields?.x || '0';
+      const y = node.fields?.y || '0';
+      const z = node.fields?.z || '0';
+      lines.push(`if (!level.isClientSide) { level.setBlock(new net.minecraft.core.BlockPos((int)(${x}), (int)(${y}), (int)(${z})), ${bk}.defaultBlockState(), 3); }`);
+      break;
+    }
+    case 'level.getblock':
+      lines.push(`/* Get Block at ${node.fields?.x}, ${node.fields?.y}, ${node.fields?.z} */`);
+      break;
+    case 'level.particle': {
+      const p = node.fields?.particle || 'net.minecraft.core.particles.ParticleTypes.FLAME';
+      const x = node.fields?.x || '0';
+      const y = node.fields?.y || '0';
+      const z = node.fields?.z || '0';
+      lines.push(`if (level instanceof net.minecraft.server.level.ServerLevel sl) { sl.sendParticles(${p}, ${x}, ${y}, ${z}, 5, 0.2, 0.2, 0.2, 0.0); }`);
+      break;
+    }
+    case 'level.sound': {
+      const snd = node.fields?.sound || 'net.minecraft.sounds.SoundEvents.ITEM_FIRECHARGE_USE';
+      const x = node.fields?.x || '0';
+      const y = node.fields?.y || '0';
+      const z = node.fields?.z || '0';
+      lines.push(`level.playSound(null, new net.minecraft.core.BlockPos((int)(${x}),(int)(${y}),(int)(${z})), ${snd}, net.minecraft.sounds.SoundSource.PLAYERS, 1.0f, 1.0f);`);
+      break;
+    }
+    case 'level.lightning': {
+      const x = node.fields?.x || '0';
+      const y = node.fields?.y || '0';
+      const z = node.fields?.z || '0';
+      lines.push(`if (!level.isClientSide) { net.minecraft.world.entity.LightningBolt bolt = net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level); if (bolt != null) { bolt.moveTo(${x}, ${y}, ${z}); level.addFreshEntity(bolt); } }`);
+      break;
+    }
     case 'var.context':
-      // var.context blocks dropped directly on the canvas as statements are no-ops
       break;
     default:
       lines.push(`// unknown block: ${node.opcode}`);
@@ -454,7 +719,7 @@ function compileMethodBlocks(nodes) {
   return nodes.flatMap(n => compileBlock(n));
 }
 
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
@@ -700,233 +965,211 @@ function CustomClassPanel(){
 
 // ─── Visual Scripting UI ──────────────────────────────────────────────────────
 
-function BlockChip({block,onDragStart,style={}}){
-  const isCtx=block.type==="variable"||block.isContext;
-  return<div
-    draggable
-    onDragStart={e=>{e.dataTransfer.setData("block",JSON.stringify({...block,id:crypto.randomUUID()}));if(onDragStart)onDragStart(e);}}
-    title={isCtx?`Drop into a slot (entity:, target:, etc.)\n${block.hint||""}`:block.hint||block.label}
-    style={{display:"flex",alignItems:"center",gap:5,padding:"5px 9px",borderRadius:4,
-      background:block.color||C.card,
-      border:`1px solid ${isCtx?"#1a3a5a":"#252530"}`,
-      cursor:"grab",fontSize:11,fontFamily:"monospace",
-      color:isCtx?"#7ab0d4":C.text,
-      userSelect:"none",whiteSpace:"nowrap",
-      boxShadow:isCtx?"inset 0 0 0 1px #0d1e2e":undefined,
-      ...style}}>
-    {isCtx
-      ?<span style={{fontSize:9,color:"#4a7a9a",fontWeight:700,marginRight:1}}>$</span>
-      :<span style={{fontSize:9,color:"#3a4a3a",marginRight:1}}>▶</span>}
-    {block.label}
-    {isCtx&&<span style={{fontSize:8,color:"#2a5a7a",marginLeft:2,opacity:.7}}>→slot</span>}
-  </div>;
-}
-
-function DroppableSlot({value,label,onDrop,onClear}){
-  const[over,setOver]=useState(false);
-  const[varHover,setVarHover]=useState(false);
-
-  const handleCanvasDragOver=e=>{
-    e.preventDefault();
-    // Peek at what's being dragged to show correct hint
-    try{
-      const raw=e.dataTransfer.types.includes("block");
-      setOver(true);
-    }catch{}
-  };
-
-  const handleCanvasDrop=e=>{
-    e.preventDefault();setOver(false);setVarHover(false);
-    try{
-      const b=JSON.parse(e.dataTransfer.getData("block"));
-      // Reject var.context at canvas level — must go into a slot
-      if(b.opcode==="var.context")return;
-      addBlock(b);
-    }catch{}
-  };
-  return<div
-    onDragOver={e=>{e.preventDefault();e.stopPropagation();setOver(true);}}
-    onDragLeave={e=>{e.stopPropagation();setOver(false);}}
-    onDrop={e=>{
-      e.preventDefault();e.stopPropagation();setOver(false);
-      try{
-        const b=JSON.parse(e.dataTransfer.getData("block"));
-        // Only accept var.context blocks in slots
-        if(b.opcode==="var.context")onDrop(b);
-      }catch{}
-    }}
-    style={{display:"inline-flex",alignItems:"center",gap:4,minWidth:64,padding:"3px 8px",borderRadius:3,
-      background:over?"#1a2438":value?"#0d1c2a":"#0c0c0e",
-      border:`1px dashed ${over?"#5a9fd4":value?"#1a3a50":"#252528"}`,
-      fontSize:11,cursor:"default",verticalAlign:"middle",transition:"all .1s"}}>
-    {value
-      ?<><span style={{color:"#7ab0d4",fontFamily:"monospace",fontWeight:500}}>{value.fields?.varName||value.label}</span>
-         <span onClick={onClear} style={{color:"#cc5a5a",cursor:"pointer",marginLeft:3,fontSize:10,lineHeight:1}}>✕</span></>
-      :<span style={{color:"#3a4a5a",fontSize:10,fontStyle:"italic"}}>{label||"drop $var"}</span>}
-  </div>;
-}
-
-function BlockCard({node,onChange,onDelete,depth=0}){
-  const def=BLOCK_PALETTE.flatMap(c=>c.blocks).find(b=>b.opcode===node.opcode)||{inputs:{},fields:{}};
-  const updField=(k,v)=>onChange({...node,fields:{...node.fields,[k]:v}});
-  const updInput=(k,v)=>onChange({...node,inputs:{...node.inputs,[k]:v}});
-  const isContainer=node.opcode==="if.serverside"||node.opcode==="if.condition";
-  const indent=depth*10;
-
-  return<div style={{marginLeft:indent,marginBottom:4,borderRadius:5,border:`1px solid ${node.color||"#252530"}`,background:node.color||C.card,overflow:"visible"}}>
-    {/* Header row */}
-    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderBottom:isContainer?`1px solid #252530`:"none"}}>
-      <span style={{fontSize:11,fontWeight:500,color:C.text,flex:1,fontFamily:"monospace"}}>{node.label}</span>
-      <span onClick={onDelete} style={{color:"#cc5a5a",cursor:"pointer",fontSize:11,padding:"0 3px"}}>✕</span>
-    </div>
-    {/* Fields row */}
-    <div style={{padding:"5px 8px",display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",fontSize:11}}>
-      {/* Render each input slot */}
-      {Object.keys(def.inputs||{}).map(slotKey=><span key={slotKey} style={{display:"inline-flex",alignItems:"center",gap:4}}>
-        <span style={{color:C.dim,fontSize:10}}>{slotKey}:</span>
-        <DroppableSlot
-          label={slotKey}
-          value={node.inputs?.[slotKey]||null}
-          onDrop={b=>updInput(slotKey,b)}
-          onClear={()=>updInput(slotKey,null)}
-        />
-      </span>)}
-      {/* Render each primitive field */}
-      {Object.entries(node.fields||{}).map(([fk,fv])=><span key={fk} style={{display:"inline-flex",alignItems:"center",gap:3}}>
-        <span style={{color:C.dim,fontSize:10}}>{fk}:</span>
-        <input value={fv} onChange={e=>updField(fk,e.target.value)}
-          style={{background:"#0c0e12",border:`1px solid #252530`,borderRadius:3,padding:"2px 5px",
-            fontSize:11,color:C.text,fontFamily:"monospace",width:Math.max(60,String(fv).length*7+16)}}/>
-      </span>)}
-    </div>
-    {/* Container body drop zone */}
-    {isContainer&&<div style={{padding:"4px 8px 6px",marginLeft:8}}>
-      <span style={{fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:.6}}>body</span>
-      {node.inputs?.body
-        ?<BlockCard node={node.inputs.body} depth={depth+1}
-            onChange={b=>updInput("body",b)} onDelete={()=>updInput("body",null)}/>
-        :<div onDragOver={e=>e.preventDefault()}
-            onDrop={e=>{e.preventDefault();try{const b=JSON.parse(e.dataTransfer.getData("block"));updInput("body",b);}catch{}}}
-            style={{marginTop:3,padding:"6px",borderRadius:3,border:"1px dashed #252530",
-              background:"#0c0c0e",color:C.faint,fontSize:10,textAlign:"center"}}>drop block here</div>}
-    </div>}
-  </div>;
-}
-
 function VisualEditorPanel({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
-  const[saving,setSaving]=useState(false);
-  const[saveStatus,setSaveStatus]=useState(null);
-  const ctxBlocks=def.params.map(p=>({id:`ctx_${p.name}`,type:"variable",isContext:true,
-    opcode:"var.context",label:p.name,color:"#0e1820",
-    hint:`${p.type} ${p.name}`,inputs:{},fields:{varName:p.name,varType:p.type},next:null}));
   const nodes=(form.methodBlocks||{})[methodKey]||[];
-  const setNodes=nv=>F("methodBlocks",{...(form.methodBlocks||{}),[methodKey]:nv});
-  const[over,setOver]=useState(false);
-  const[varHover,setVarHover]=useState(false);
+  const setNodes=nds=>{const mb={...(form.methodBlocks||{}),[methodKey]:nds};F("methodBlocks",mb);};
 
-  const handleCanvasDragOver=e=>{
+  // Canvas pan state
+  const canvasRef=useRef();
+  const [pan,setPan]=useState({x:60,y:60});
+  const [draggingBlock,setDraggingBlock]=useState(null); // {id, offsetX, offsetY}
+  const [isPanning,setIsPanning]=useState(false);
+  const panStart=useRef(null);
+
+  // Each node has {id, x, y, opcode, fields, inputs}
+  const [canvasNodes,setCanvasNodes]=useState(()=>{
+    // Migrate flat nodes array → positioned nodes
+    const existing=nodes.filter(n=>n.x!=null&&n.y!=null);
+    if(existing.length===nodes.length&&nodes.length>0)return nodes;
+    // Layout old linear nodes in a column
+    return nodes.map((n,i)=>({...n,x:40+i*20,y:40+i*90}));
+  });
+
+  const [saving,setSaving]=useState(false);
+  const [saveStatus,setSaveStatus]=useState(null);
+
+  // Sync canvasNodes → methodBlocks whenever they change
+  useEffect(()=>{
+    const mb={...(form.methodBlocks||{}),[methodKey]:canvasNodes};
+    F("methodBlocks",mb);
+  },[canvasNodes]);
+
+  const addNodeAt=(blockDef,x,y)=>{
+    const id=`${blockDef.opcode}_${Date.now()}`;
+    setCanvasNodes(ns=>[...ns,{id,...blockDef,x,y,fields:{...blockDef.fields},inputs:{...blockDef.inputs}}]);
+  };
+
+  const updateNode=(id,patch)=>{
+    setCanvasNodes(ns=>ns.map(n=>n.id===id?{...n,...patch,fields:{...n.fields,...(patch.fields||{})}}:n));
+  };
+
+  const removeNode=id=>setCanvasNodes(ns=>ns.filter(n=>n.id!==id));
+
+  // Canvas mouse handlers
+  const onCanvasMouseDown=e=>{
+    if(e.target!==canvasRef.current&&!e.target.classList.contains('canvas-bg'))return;
+    setIsPanning(true);
+    panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};
+  };
+  const onCanvasMouseMove=e=>{
+    if(isPanning&&panStart.current){
+      setPan({x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)});
+    }
+    if(draggingBlock){
+      const rect=canvasRef.current.getBoundingClientRect();
+      const nx=e.clientX-rect.left-pan.x-draggingBlock.offX;
+      const ny=e.clientY-rect.top-pan.y-draggingBlock.offY;
+      updateNode(draggingBlock.id,{x:nx,y:ny});
+    }
+  };
+  const onCanvasMouseUp=()=>{setIsPanning(false);setDraggingBlock(null);panStart.current=null;};
+
+  // Drop from palette
+  const onCanvasDrop=e=>{
     e.preventDefault();
-    // Peek at what's being dragged to show correct hint
-    try{
-      const raw=e.dataTransfer.types.includes("block");
-      setOver(true);
-    }catch{}
+    const data=e.dataTransfer.getData("block");
+    if(!data)return;
+    const blockDef=JSON.parse(data);
+    const rect=canvasRef.current.getBoundingClientRect();
+    const x=e.clientX-rect.left-pan.x;
+    const y=e.clientY-rect.top-pan.y;
+    addNodeAt(blockDef,x,y);
   };
-
-  const handleCanvasDrop=e=>{
-    e.preventDefault();setOver(false);setVarHover(false);
-    try{
-      const b=JSON.parse(e.dataTransfer.getData("block"));
-      // Reject var.context at canvas level — must go into a slot
-      if(b.opcode==="var.context")return;
-      addBlock(b);
-    }catch{}
-  };
-
-  const addBlock=b=>{
-    setNodes([...nodes,{...b,id:crypto.randomUUID(),next:null,inputs:Object.fromEntries(Object.keys(b.inputs||{}).map(k=>[k,null])),fields:{...(b.fields||{})}}]);
-  };
-  const updateNode=(idx,nb)=>setNodes(nodes.map((n,i)=>i===idx?nb:n));
-  const deleteNode=idx=>setNodes(nodes.filter((_,i)=>i!==idx));
 
   const save=async()=>{
     setSaving(true);setSaveStatus(null);
     const j=await api("/items/custom-class/read",{className});
     if(!j.ok){setSaving(false);setSaveStatus({ok:false,msg:j.reason});return;}
-    // Restore the body marker first (replace any previously compiled body between start/end)
-    // then inject the freshly compiled body so changes to block fields are always reflected
     const bodyMarker=`//YCS:${methodKey}:body`;
     const startTag=`//YCS:${methodKey}:start`;
-    const endTag=`//YCS:${methodKey}:end`;
     let code=j.code;
-    // If the body marker is already gone (was compiled before), reset the method stub fresh
     if(!code.includes(bodyMarker)&&code.includes(startTag)){
-      const def=ITEM_METHODS.find(m=>m.key===methodKey);
-      if(def){
-        // Re-inject a fresh stub (which contains the body marker) over the old compiled one
-        code=ycsRemoveMethod(code,methodKey);
-        code=ycsInjectMethod(code,methodKey);
-        const enabledKeys=ycsGetEnabledMethods(code);
-        code=ycsSyncImports(code,enabledKeys);
-      }
+      const def2=ITEM_METHODS.find(m=>m.key===methodKey);
+      if(def2){code=ycsRemoveMethod(code,methodKey);code=ycsInjectMethod(code,methodKey);const ek=ycsGetEnabledMethods(code);code=ycsSyncImports(code,ek);}
     }
-    const bodyLines=compileMethodBlocks(nodes);
+    const bodyLines=compileMethodBlocks(canvasNodes);
     const updated=ycsInjectCompiledBody(code,methodKey,bodyLines);
     const j2=await api("/items/custom-class/write",{className,code:updated});
-    setSaving(false);
-    setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
+    setSaving(false);setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
     if(j2.ok)setTimeout(()=>{setSaveStatus(null);onBack();},700);
   };
 
-  return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+  const params=def?.params||[];
+  // Derive context var pills from method params
+  const contextVars=params.map(p=>({varName:p.name,type:p.type}));
+
+  return<div style={{display:"flex",flexDirection:"column",height:"100%",background:C.bg}}>
     {/* Header */}
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-      padding:"7px 12px",borderBottom:`1px solid ${C.inpB}`,flexShrink:0,background:"#101218"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-        <Btn sm v="g" onClick={onBack}>← Back</Btn>
-        <span style={{color:C.accent,fontSize:12,fontWeight:500,flexShrink:0}}>{def.label}</span>
-        <span style={{color:C.dim,fontSize:10,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{def.sig}</span>
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-        {saveStatus&&<span style={{fontSize:10,color:saveStatus.ok?"#5acc5a":"#cc5a5a"}}>{saveStatus.msg}</span>}
-        <Btn sm v="p" onClick={save} dis={saving}>{saving?"saving…":"Save"}</Btn>
-      </div>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:`1px solid ${C.inpB}`,background:C.panel,flexShrink:0}}>
+      <Btn sm v="g" onClick={onBack}>← Back</Btn>
+      <span style={{color:C.accent,fontWeight:500,fontFamily:"monospace",fontSize:13}}>{def?.label}</span>
+      <span style={{color:C.faint,fontSize:11,fontFamily:"monospace"}}>{def?.sig}</span>
+      <div style={{flex:1}}/>
+      {saveStatus&&<span style={{fontSize:11,color:saveStatus.ok?"#5acc5a":"#cc5a5a"}}>{saveStatus.msg}</span>}
+      <Btn sm v="p" onClick={save} dis={saving}>{saving?"…":"Save"}</Btn>
     </div>
 
-    <div style={{flex:1,display:"flex",overflow:"hidden"}}>
-      {/* Left: palette */}
-      <div style={{width:148,borderRight:`1px solid ${C.inpB}`,overflowY:"auto",background:"#0d0f12",flexShrink:0}}>
-        {/* Context variables */}
-        <div style={{padding:"8px 8px 4px",fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:.8}}>Parameters</div>
-        <div style={{padding:"0 6px 8px",display:"flex",flexDirection:"column",gap:3}}>
-          {ctxBlocks.map(b=><BlockChip key={b.id} block={b}/>)}
-        </div>
-        {/* Action block categories */}
-        {BLOCK_PALETTE.map(cat=><div key={cat.category}>
-          <div style={{padding:"6px 8px 3px",fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:.8,background:cat.color+"22",borderTop:`1px solid ${C.inpB}`}}>{cat.category}</div>
-          <div style={{padding:"3px 6px 6px",display:"flex",flexDirection:"column",gap:3}}>
-            {cat.blocks.map(b=><BlockChip key={b.opcode} block={b}/>)}
+    <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+      {/* Left palette */}
+      <div style={{width:210,borderRight:`1px solid ${C.inpB}`,overflowY:"auto",flexShrink:0,background:"#111113",display:"flex",flexDirection:"column",gap:0}}>
+        {/* Context vars */}
+        <div style={{padding:"8px 10px 4px",borderBottom:`1px solid ${C.inpB}`}}>
+          <Lbl>Parameters</Lbl>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+            {contextVars.map(v=><div key={v.varName} draggable
+              onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify({opcode:"var.context",fields:{varName:v.varName,type:v.type},inputs:{}}))}
+              style={{padding:"3px 8px",background:"#152030",border:"1px solid #1a3040",borderRadius:3,fontSize:11,fontFamily:"monospace",cursor:"grab",color:"#7ab8d4"}}>
+              $ {v.varName} <span style={{color:C.faint,fontSize:9}}>—slot</span>
+            </div>)}
           </div>
-        </div>)}
+        </div>
+        {/* Block categories */}
+        {BLOCK_PALETTE.map(cat=>{
+          const blocks=cat.blocks.filter(b=>!b.methods||b.methods.includes(methodKey));
+          if(!blocks.length) return null;
+          return <div key={cat.category}>
+          <div style={{padding:"5px 10px",background:"#141416",borderBottom:`1px solid ${C.inpB}`}}>
+            <Lbl>{cat.category}</Lbl>
+          </div>
+          {blocks.map(b=><div key={b.opcode} draggable
+            onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))}
+            style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",cursor:"grab",borderBottom:`1px solid #181818`,background:b.color||"transparent",userSelect:"none"}}
+            title={b.hint}>
+            <span style={{color:C.accent,fontSize:10}}>▶</span>
+            <span style={{fontSize:12,color:C.text,fontFamily:"monospace"}}>{b.label}</span>
+          </div>)}
+        </div>})}
       </div>
 
-      {/* Right: canvas */}
+      {/* Free-floating canvas */}
       <div
-        onDragOver={handleCanvasDragOver}
-        onDragLeave={()=>{setOver(false);setVarHover(false);}}
-        onDrop={handleCanvasDrop}
-        style={{flex:1,overflowY:"auto",padding:12,background:over?"#0f1218":"#0d0e10",
-          display:"flex",flexDirection:"column",gap:4,transition:"background .1s"}}>
-        {nodes.length===0&&<div style={{margin:"auto",textAlign:"center",color:C.faint,fontSize:12,userSelect:"none",pointerEvents:"none"}}>
-          <div style={{fontSize:28,marginBottom:8,color:"#1e2030"}}>⟨/⟩</div>
-          <div>drag action blocks here</div>
-          <div style={{fontSize:10,color:"#2a3a4a",marginTop:6}}>drop <span style={{color:"#3a5a7a"}}>$params</span> into block slots → not onto canvas</div>
+        ref={canvasRef}
+        className="canvas-bg"
+        style={{flex:1,position:"relative",overflow:"hidden",background:"#0d0d0f",cursor:isPanning?"grabbing":"default",
+          backgroundImage:"radial-gradient(circle,#1a1a1e 1px,transparent 1px)",backgroundSize:"24px 24px"}}
+        onMouseDown={onCanvasMouseDown}
+        onMouseMove={onCanvasMouseMove}
+        onMouseUp={onCanvasMouseUp}
+        onMouseLeave={onCanvasMouseUp}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={onCanvasDrop}
+      >
+        {/* Empty state */}
+        {canvasNodes.length===0&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none",textAlign:"center",color:C.faint}}>
+          <div style={{fontSize:28,marginBottom:8,opacity:.3}}>{"</>"}</div>
+          <div style={{fontSize:12,marginBottom:4}}>drag action blocks here</div>
+          <div style={{fontSize:10,color:"#2a4050"}}>drop <span style={{color:"#3a6080",fontFamily:"monospace"}}>$params</span> into block slots — not onto canvas</div>
         </div>}
-        {nodes.map((n,i)=><BlockCard key={n.id} node={n} depth={0}
-          onChange={nb=>updateNode(i,nb)} onDelete={()=>deleteNode(i)}/>)}
+
+        {/* Pan container */}
+        <div style={{position:"absolute",left:0,top:0,transform:`translate(${pan.x}px,${pan.y}px)`}}>
+          {canvasNodes.map(node=><CanvasBlock
+            key={node.id}
+            node={node}
+            onDragStart={(offX,offY)=>setDraggingBlock({id:node.id,offX,offY})}
+            onFieldChange={(field,val)=>updateNode(node.id,{fields:{...node.fields,[field]:val}})}
+            onRemove={()=>removeNode(node.id)}
+          />)}
+        </div>
       </div>
     </div>
+  </div>;
+}
+
+function CanvasBlock({node,onDragStart,onFieldChange,onRemove}){
+  const def=BLOCK_PALETTE.flatMap(c=>c.blocks).find(b=>b.opcode===node.opcode)||{label:node.opcode,color:"#222"};
+  const isVar=node.opcode==="var.context";
+  const fields=node.fields||{};
+
+  return<div
+    style={{position:"absolute",left:node.x,top:node.y,minWidth:isVar?80:200,background:node.color||def.color||"#1e1e22",
+      border:`1px solid ${isVar?"#1a3040":"#2a2a30"}`,borderRadius:5,boxShadow:"0 3px 12px rgba(0,0,0,.5)",
+      userSelect:"none",zIndex:1}}
+    onMouseDown={e=>{
+      e.stopPropagation();
+      const rect=e.currentTarget.getBoundingClientRect();
+      onDragStart(e.clientX-rect.left,e.clientY-rect.top);
+    }}
+  >
+    {/* Block header */}
+    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderBottom:`1px solid rgba(255,255,255,.05)`,cursor:"grab"}}>
+      <span style={{color:isVar?"#7ab8d4":C.accent,fontSize:10}}>▶</span>
+      <span style={{fontFamily:"monospace",fontSize:11,color:C.text,fontWeight:500}}>{isVar?`$ ${fields.varName}`:(def.label||node.opcode)}</span>
+      <div style={{flex:1}}/>
+      <span onClick={e=>{e.stopPropagation();onRemove();}} style={{color:"#663333",fontSize:11,cursor:"pointer",padding:"0 2px"}}>✕</span>
+    </div>
+    {/* Fields */}
+    {!isVar&&<div style={{padding:"6px 8px",display:"flex",flexDirection:"column",gap:4}}>
+      {Object.entries(fields).map(([k,v])=><div key={k} style={{display:"flex",alignItems:"center",gap:5}}>
+        <span style={{fontSize:9,color:C.dim,fontFamily:"monospace",minWidth:54,flexShrink:0}}>{k}</span>
+        <input
+          value={v??""} onChange={e=>{e.stopPropagation();onFieldChange(k,e.target.value);}}
+          onMouseDown={e=>e.stopPropagation()}
+          style={{flex:1,background:"#111116",border:`1px solid ${C.inpB}`,borderRadius:3,padding:"2px 5px",color:C.text,fontSize:11,fontFamily:"monospace",outline:"none",minWidth:0}}
+        />
+      </div>)}
+    </div>}
   </div>;
 }
 
@@ -1057,6 +1300,20 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       else{const jr=await api("/recipes/delete",{constName:initial.constName||initial.id?.toUpperCase()});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:false});}
     }
+    if(form.customItemClass) {
+      const clsName = form.customItemClass;
+      const cc = await api("/items/custom-class/read",{className:clsName});
+      if(cc.ok) {
+        let nCode = cc.code;
+        nCode = form.isFood ? ycsInjectFeature(nCode, "food", form, form.id) : ycsRemoveFeature(nCode, "food");
+        nCode = form.isFuel ? ycsInjectFeature(nCode, "fuel", form, form.id) : ycsRemoveFeature(nCode, "fuel");
+        nCode = form.hasTooltip ? ycsInjectFeature(nCode, "tooltip", form, form.id) : ycsRemoveFeature(nCode, "tooltip");
+        if (nCode !== cc.code) {
+          const cw = await api("/items/custom-class/write",{className:clsName,code:nCode});
+          msgs.push({ok:cw.ok,label:"class",msg:cw.ok?"ok":cw.reason});
+        }
+      }
+    }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
     await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()},initial?.id);
@@ -1098,10 +1355,32 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
             <Chk label="Fuel" checked={!!form.isFuel} onChange={v=>F("isFuel",v)}/>
           </div>
         </div>
-        {form.isTool&&<Sect title="Tool Properties"><Sel label="Type" value={form.toolType||"Sword"} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/><Sel label="Tier" value={form.tier||"Iron"} onChange={v=>F("tier",v)} options={TIERS}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div></Sect>}
-        {form.isFuel&&<Inp label="Burn Time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>}
+        {form.isTool&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:"2px solid #1a3040"}}>
+          <Sel label="Tool Type" value={form.toolType||"Sword"} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/>
+          <Sel label="Tier" value={form.tier||"Iron"} onChange={v=>F("tier",v)} options={TIERS}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div>
+        </div>}
+        {form.isFuel&&<div style={{marginTop:8,paddingLeft:10,borderLeft:"2px solid #3a2a10"}}>
+          <Inp label="Burn Time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>
+        </div>}
+        {form.isFood&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:"2px solid #1a3020"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div>
+          <Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><Lbl>Status Effects</Lbl><Btn sm v="g" onClick={addEff}>+ add</Btn></div>
+            {effs.map((e,i)=><div key={i} style={{background:C.inp,padding:10,borderRadius:C.r,display:"flex",flexDirection:"column",gap:8,position:"relative",border:`1px solid ${C.inpB}`}}>
+              <Btn sm v="dan" onClick={()=>rmEff(i)} style={{position:"absolute",top:6,right:6,padding:"2px 5px"}}>✕</Btn>
+              <EffectSel label="Effect" value={e.effect} onChange={v=>updEff(i,"effect",v)}/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                <Inp label="Duration (ticks)" value={e.duration} type="number" onChange={v=>updEff(i,"duration",v)}/>
+                <Inp label="Level (1=I, 2=II)" value={e.level} type="number" onChange={v=>updEff(i,"level",v)}/>
+                <Inp label="Probability (0.0-1.0)" value={e.probability} type="number" onChange={v=>updEff(i,"probability",v)}/>
+              </div>
+            </div>)}
+          </div>
+        </div>}
 
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:activePanel==="customclass"?"#0e1820":"#141416",border:`1px solid ${activePanel==="customclass"?"#1a3040":C.inpB}`,borderRadius:4}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:activePanel==="customclass"?"#0e1820":"#141416",border:`1px solid ${activePanel==="customclass"?"#1a3040":C.inpB}`,borderRadius:4,marginTop:12}}>
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
             <Lbl>Override Methods</Lbl>
             {form.customItemClass&&<span style={{fontSize:10,color:"#2a5a7a",fontFamily:"monospace"}}>{form.customItemClass}.java</span>}
@@ -1118,23 +1397,11 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       </div>
     </div>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
-    <Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>
-    {form.isFood && <Sect title="Food Properties">
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div>
-      <Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/>
-      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><Lbl>Status Effects</Lbl><Btn sm v="g" onClick={addEff}>+ add</Btn></div>
-        {effs.map((e,i)=><div key={i} style={{background:C.inp,padding:10,borderRadius:C.r,display:"flex",flexDirection:"column",gap:8,position:"relative",border:`1px solid ${C.inpB}`}}>
-          <Btn sm v="dan" onClick={()=>rmEff(i)} style={{position:"absolute",top:6,right:6,padding:"2px 5px"}}>✕</Btn>
-          <EffectSel label="Effect" value={e.effect} onChange={v=>updEff(i,"effect",v)}/>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
-            <Inp label="Duration (ticks)" value={e.duration} type="number" onChange={v=>updEff(i,"duration",v)}/>
-            <Inp label="Level (1=I, 2=II)" value={e.level} type="number" onChange={v=>updEff(i,"level",v)}/>
-            <Inp label="Probability (0.0-1.0)" value={e.probability} type="number" onChange={v=>updEff(i,"probability",v)}/>
-          </div>
-        </div>)}
-      </div>
-    </Sect>}
+    {!form.isTool&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
+    {!form.isTool&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <Chk label="Has Durability" checked={!!form.hasDurability} onChange={v=>F("hasDurability",v)}/>
+      {form.hasDurability&&<Inp label="Durability" value={form.durability||"100"} onChange={v=>F("durability",v)} type="number"/>}
+    </div>}
     
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
@@ -1366,7 +1633,7 @@ export default function App(){
   const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allItems,textures]);
   const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allBlocks,textures]);
   const delTex=id=>setTextures(arr=>arr.filter(x=>x.id!==id));
-  const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});if(item.itemType==="Custom"&&item.customItemClass)await api("/items/custom-class/delete",{className:item.customItemClass});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
+  const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});if(item.customItemClass)await api("/items/custom-class/delete",{className:item.customItemClass});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const delBlock=async id=>{const b=allBlocks.find(x=>x.id===id);if(!b)return;await api("/blocks/delete",{id,constName:b.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"block"});setBlocks(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const saveItem=(item,oldId)=>{setItems(arr=>{const searchId=oldId||item.id;const i=arr.findIndex(x=>x.id===searchId);return i>=0?arr.map((x,j)=>j===i?item:x):[...arr,item];});reloadMod();setItemEd(null);savedEdState.current.items=null;};
   const saveBlock=(block,oldId)=>{setBlocks(arr=>{const searchId=oldId||block.id;const i=arr.findIndex(x=>x.id===searchId);return i>=0?arr.map((x,j)=>j===i?block:x):[...arr,block];});reloadMod();setBlockEd(null);savedEdState.current.blocks=null;};

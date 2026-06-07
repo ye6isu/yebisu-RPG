@@ -1,14 +1,11 @@
 {
-  "item.yebisurpg.mother_flame": "Mother Flame",
+  "item.yebisurpg.norbit_the_orbit": "Norbit the orbit",
   "item.yebisurpg.plank": "Plank",
   "item.yebisurpg.plank_boots": "Plank Boots",
   "item.yebisurpg.plank_chestplate": "Plank Chestplate",
   "item.yebisurpg.plank_helmet": "Plank Helmet",
   "item.yebisurpg.plank_leggings": "Plank Leggings",
-  "item.yebisurpg.raw_ye6isu": "Raw ye6isu",
-  "item.yebisurpg.sukuna_finger": "Sukuna's Finger",
   "item.yebisurpg.walkman": "Walkman",
-  "item.yebisurpg.yayayaya": "Yayayaya",
   "item.yebisurpg.ye6isu": "ye6isu",
   "item.yebisurpg.ye6isu_axe": "ye6isu Axe",
   "item.yebisurpg.ye6isu_hoe": "ye6isu Hoe",
@@ -30,8 +27,10 @@
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
   "block.yebisurpg.ye6isu_ore": "ye6isu Ore",
 
+  "tooltip.yebisurpg.norbit_the_orbit.hidden": "Cause it is an orbit",
+  "tooltip.yebisurpg.norbit_the_orbit.normal": "This is Norbit",
+  "tooltip.yebisurpg.norbit_the_orbit.shift_hint": "Why?",
   "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info",
-  "tooltip.yebisurpg.sukuna_finger.tooltip": "Finger of the the King of Curses",
   "tooltip.yebisurpg.ye6isu": "NO",
   "tooltip.yebisurpg.ye6isu.shift_down": "YES",
 

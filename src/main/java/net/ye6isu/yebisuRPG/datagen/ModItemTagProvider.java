@@ -23,8 +23,7 @@ public class ModItemTagProvider extends ItemTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider provider) {
-        tag(ModTags.Items.CURSED_ITEMS)
-                .add(ModItems.SUKUNA_FINGER.get());
+
 
         tag(ItemTags.SWORDS)
                 .add(ModItems.YE6ISU_SWORD.get());
@@ -37,8 +36,7 @@ public class ModItemTagProvider extends ItemTagsProvider {
 
         tag(ItemTags.AXES)
                 .add(ModItems.YE6ISU_AXE.get())
-                .add(ModItems.YE6ISU_SWORD.get())
-                .add(ModItems.RAW_YE6ISU.get());
+                .add(ModItems.YE6ISU_SWORD.get());
 
         tag(ItemTags.HOES)
                 .add(ModItems.YE6ISU_HOE.get());
@@ -49,8 +47,6 @@ public class ModItemTagProvider extends ItemTagsProvider {
                 .add(ModItems.PLANK_LEGGINGS.get())
                 .add(ModItems.PLANK_BOOTS.get());
 
-        tag(TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("yebisurpg", "test_items")))
-                .add(ModItems.RAW_YE6ISU.get());
         //YCS_Mod_Item_Tags_START
 
         //YCS_Mod_Item_Tags_END

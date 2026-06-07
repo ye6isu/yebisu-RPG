@@ -1,7 +1,6 @@
 package net.ye6isu.yebisuRPG.item;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -17,29 +16,9 @@ public class ModItems {
     //Normal Items
     public static final DeferredItem<Item> PLANK = ITEMS.register("plank",   () -> new Item(new Item.Properties()));
 
-    //Custom Items
-
-    public static final DeferredItem<AxeItem> RAW_YE6ISU = ITEMS.register("raw_ye6isu",
-                () -> new AxeItem(Tiers.IRON, new Item.Properties()
-                        .attributes(AxeItem.createAttributes(Tiers.IRON, 3f, -2.4f))));
-
     public static final DeferredItem<Item> YE6ISU  = ITEMS.register("ye6isu",  () -> new Ye6isuItem(new Item.Properties()));
 
     public static final DeferredItem<Item> WALKMAN = ITEMS.register("walkman", () -> new WalkmanItem(new Item.Properties()));
-
-    //Foods with Tooltip
-    public static final DeferredItem<Item> SUKUNA_FINGER = ITEMS.register("sukuna_finger",
-            () -> new Item(new Item.Properties().food(ModFoodProperties.SUKUNA_FINGER)) {
-                @Override
-                public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
-                    tooltipComponents.add(Component.translatable("tooltip.yebisurpg.sukuna_finger.tooltip"));
-                    super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-                }
-            });
-
-    //Fuels
-    public static final DeferredItem<Item> MOTHER_FLAME = ITEMS.register("mother_flame",
-            () -> new FuelItem(new Item.Properties(), 40000));
 
     //Tools
     public static final DeferredItem<SwordItem> YE6ISU_SWORD = ITEMS.register("ye6isu_sword",
@@ -81,9 +60,8 @@ public class ModItems {
 
     //YCS_Mod_Items_START
 
-    public static final DeferredItem<Item> YAYAYAYA = ITEMS.register("yayayaya",
-                () -> new YayayayaItem(new Item.Properties()
-                        .attributes(SwordItem.createAttributes(Tiers.IRON, 3f, -2.4f))));
+    public static final DeferredItem<Item> NORBIT_THE_ORBIT = ITEMS.register("norbit_the_orbit",
+                () -> new NorbitTheOrbitItem(new Item.Properties().stacksTo(1)));
 
     //YCS_Mod_Items_END
 
