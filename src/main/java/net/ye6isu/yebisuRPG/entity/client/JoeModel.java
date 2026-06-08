@@ -56,7 +56,7 @@ public class JoeModel<T extends JoeEntity> extends HierarchicalModel<T> {
         this.root().getAllParts().forEach(ModelPart::resetPose);
         this.applyHeadRotation(netHeadYaw, headPitch);
 
-        this.animateWalk(JoeAnimations.ANIM_JOE_IDLE, limbSwing, limbSwingAmount, 2f, 2.5f);
+        this.animateWalk(JoeAnimations.ANIM_JOE_WALK, limbSwing, limbSwingAmount, 2f, 2.5f);
         this.animate(entity.idleAnimationState, JoeAnimations.ANIM_JOE_IDLE, ageInTicks, 1f);
 
     }

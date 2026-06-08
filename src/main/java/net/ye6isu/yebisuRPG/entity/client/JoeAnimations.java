@@ -26,7 +26,7 @@ public class JoeAnimations {
             ))
             .build();
 
-    public static final AnimationDefinition walk = AnimationDefinition.Builder.withLength(1.5F).looping()
+    public static final AnimationDefinition ANIM_JOE_WALK = AnimationDefinition.Builder.withLength(1.5F).looping()
             .addAnimation("head", new AnimationChannel(AnimationChannel.Targets.ROTATION,
                     new Keyframe(0.0F, KeyframeAnimations.degreeVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                     new Keyframe(0.4583F, KeyframeAnimations.degreeVec(0.0F, 0.0F, 10.0F), AnimationChannel.Interpolations.CATMULLROM),

@@ -2,9 +2,12 @@ package net.ye6isu.yebisuRPG.item;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.*;
+import net.minecraft.world.food.FoodProperties;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.ye6isu.yebisuRPG.entity.ModEntities;
 import net.ye6isu.yebisuRPG.item.custom.*;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
@@ -58,10 +61,15 @@ public class ModItems {
             () -> new ArmorItem(ModArmorMaterials.PLANK_ARMOR_MATERIAL, ArmorItem.Type.BOOTS,
                     new Item.Properties().durability(ArmorItem.Type.BOOTS.getDurability(19))));
 
+
+    public static final DeferredItem<Item> JOE_SPAWN_EGG = ITEMS.register("joe_spawn_egg",
+            () -> new DeferredSpawnEggItem(ModEntities.JOE, 0x31afaf, 0xffac00,
+                    new Item.Properties()));
+
     //YCS_Mod_Items_START
 
     public static final DeferredItem<Item> NORBIT_THE_ORBIT = ITEMS.register("norbit_the_orbit",
-                () -> new NorbitTheOrbitItem(new Item.Properties().stacksTo(1)));
+                () -> new NorbitTheOrbitItem(new Item.Properties()));
 
     //YCS_Mod_Items_END
 

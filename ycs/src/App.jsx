@@ -175,8 +175,20 @@ function gItemCode(item,textures){
       reg=`public static final DeferredItem<${tc}> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new ${tc}(${tier}, ${toolProps})`)});`;
     }
   } else if(cls2){
-    // Custom class — all food/fuel/tooltip handled inside the .java file
-    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new ${cls2}(${props}));`;
+    // Custom class — food/fuel/tooltip are handled inside the .java file via YCS sentinels.
+    // For food: we must still pass a base .food() on Properties so the game registers this
+    // as an edible item (sets the FOOD data component). The getFoodProperties override in
+    // the class then replaces the actual values at runtime.
+    let clsProps = props;
+    if(isFood) {
+      // Minimal placeholder food so the FOOD component is set and eating can begin.
+      // The class's getFoodProperties override supplies the real values.
+      const al = item.foodAlwaysEdible ? ".alwaysEdible()" : "";
+      const n = item.foodNutrition || 2;
+      const s = parseFloat(item.foodSaturation) || 0.3;
+      clsProps += `.food(new net.minecraft.world.food.FoodProperties.Builder().nutrition(${n}).saturationModifier(${s}f)${al}.build())`;
+    }
+    reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> new ${cls2}(${clsProps}));`;
   } else if(isFuel&&!cls2){
     // Inline fuel: new Item with getBurnTime via anonymous override
     reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new Item(${props}) {\n            @Override\n            public int getBurnTime(ItemStack itemStack, @org.jetbrains.annotations.Nullable net.minecraft.world.item.crafting.RecipeType<?> recipeType) {\n                return ${item.burnTime||1600};\n            }\n        }`)});`;
@@ -506,20 +518,25 @@ function ycsSyncImports(code, enabledMethodKeys) {
 // ─── YCS Feature (food/fuel/tooltip) inject/remove ───────────────────────────
 function ycsInjectFeature(code, featureKey, form, itemId) {
   if (code.includes(`//YCS:${featureKey}:start`)) {
-    // Already present — update the stub content between start/end
     return ycsUpdateFeature(code, featureKey, form, itemId);
   }
   const stub = buildFeatureStub(featureKey, form, itemId);
   if (!stub) return code;
   const sentinel = `\n    //YCS:${featureKey}:start\n${stub}\n    //YCS:${featureKey}:end\n`;
-  return code.replace(/\n\}\s*$/, sentinel + '\n}');
+  let result = code.replace(/\n\}\s*$/, sentinel + '\n}');
+  // Always re-sync imports after injecting a feature so its imports are included
+  const enabledKeys = ycsGetEnabledMethods(result);
+  return ycsSyncImports(result, enabledKeys);
 }
 
 function ycsRemoveFeature(code, featureKey) {
-  return code.replace(
+  let result = code.replace(
     new RegExp(`\\n    \\/\\/YCS:${featureKey}:start[\\s\\S]*?\\/\\/YCS:${featureKey}:end\\n`, 'g'),
     '\n'
   ).replace(/\n{3,}/g, '\n\n');
+  // Re-sync imports after removal so orphaned feature imports are cleaned up
+  const enabledKeys = ycsGetEnabledMethods(result);
+  return ycsSyncImports(result, enabledKeys);
 }
 
 function ycsUpdateFeature(code, featureKey, form, itemId) {
@@ -543,7 +560,9 @@ function buildFeatureStub(featureKey, form, itemId) {
         `\n            .effect(new net.minecraft.world.effect.MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level) - 1)}), ${parseFloat(e.probability) || 1.0}f)`
       ).join("");
     }
-    return `    @Override\n    public net.minecraft.world.food.FoodProperties getFoodProperties(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {\n        return new FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }`;
+    // NOTE: Item.Properties must also have .food() set for the game to start the eating process.
+    // gItemCode() handles this by mirroring these values onto Properties when cls2 is set + isFood.
+    return `    @Override\n    public net.minecraft.world.food.FoodProperties getFoodProperties(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {\n        return new net.minecraft.world.food.FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }`;
   }
   if (featureKey === 'fuel') {
     const bt = form.burnTime || 1600;
@@ -1287,12 +1306,12 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       await wtItem();
       const j2=await api("/items/register",{line:code.reg,constName:CN,fpReg:code.fpReg});msgs.push({ok:j2.ok,label:"ModItems",msg:j2.ok?"ok":j2.reason});
       const j3=await api("/lang/set",{key:code.langKey,value:code.langVal});msgs.push({ok:j3.ok,label:"lang",msg:j3.ok?"ok":j3.reason});
-      const j4=await api("/items/model",{line:code.modelLine});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
+      const j4=await api("/items/model",{line:code.modelLine,constName:code.CN,id:form.id});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}
       if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
     }else{
-      const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine,fpReg:code.fpReg});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
+      const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine,fpReg:code.fpReg,isAnimated:code.tex?.isAnimated||false});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
       await wtItem();
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
@@ -1351,8 +1370,8 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
           <Lbl>Properties</Lbl>
           <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
             <Chk label="Tool" checked={!!form.isTool} onChange={v=>{F("isTool",v);if(v&&form.holdingMode==="none")F("holdingMode","handheld");}}/>
-            <Chk label="Food" checked={!!form.isFood} onChange={v=>F("isFood",v)}/>
-            <Chk label="Fuel" checked={!!form.isFuel} onChange={v=>F("isFuel",v)}/>
+            {!form.isTool&&<Chk label="Food" checked={!!form.isFood} onChange={v=>F("isFood",v)}/>}
+            {!form.isTool&&<Chk label="Fuel" checked={!!form.isFuel} onChange={v=>F("isFuel",v)}/>}
           </div>
         </div>
         {form.isTool&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:"2px solid #1a3040"}}>
