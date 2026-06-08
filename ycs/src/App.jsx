@@ -409,50 +409,63 @@ const YCS_FEATURES={
   },
 };
 
-// Block palette: categories of draggable action blocks
-const BLOCK_PALETTE=[
-  {category:"Universal Flow & Logic",color:"#1a1e2a",blocks:[
-    {opcode:"if.do",label:"If / Do",color:"#1a2a3a",inputs:{body:null},fields:{condition:"true"},hint:"Execute if true"},
-    {opcode:"if.do.else",label:"If / Do / Else",color:"#1a2a3a",inputs:{body:null,elseBody:null},fields:{condition:"true"},hint:"Execute if true, else other"},
-    {opcode:"repeat",label:"Repeat [Number] times",color:"#2a2a1a",inputs:{body:null},fields:{times:"5"},hint:"Loop a certain number of times"},
-    {opcode:"return.value",label:"Return [Value]",color:"#2a1a1a",inputs:{},fields:{value:"InteractionResult.SUCCESS"},hint:"Return from method"},
-    {opcode:"math.number",label:"Number",color:"#2a2e3a",inputs:{},fields:{value:"0"},hint:"A numeric value"},
-    {opcode:"math.op",label:"Math Operation",color:"#1e1e28",inputs:{},fields:{a:"1",op:"+",b:"1"},hint:"Math operation: +, -, *, /, %"},
-    {opcode:"math.random",label:"Random Integer",color:"#1e281e",inputs:{},fields:{min:"1",max:"10"},hint:"Random number between min and max"},
-    {opcode:"logic.bool",label:"Boolean",color:"#2a2a2e",inputs:{},fields:{value:"true"},hint:"True or False"},
-    {opcode:"logic.compare",label:"Compare",color:"#1e201e",inputs:{},fields:{a:"1",op:"==",b:"1"},hint:"Compare two values: ==, !=, <, <=, >, >="},
-    {opcode:"logic.gate",label:"Logic Gate",color:"#1e1e20",inputs:{},fields:{a:"true",op:"&&",b:"false"},hint:"AND or OR"},
+// --- Block editor type system & palette ---
+const LINK_ENTITY = "entity";
+const LINK_NUMBER = "number";
+
+function resolveEntityVar(opcode, methodKey) {
+  if (opcode === "entity.event") {
+    if (methodKey === "useOn" || methodKey === "use" || methodKey === "interactLivingEntity") return "player";
+    if (methodKey === "continuousUse" || methodKey === "finishUsingItem") return "livingEntity";
+    if (methodKey === "inventoryTick") return "entity";
+    if (methodKey === "hurtEnemy") return "attacker";
+    return "player";
+  }
+  if (opcode === "entity.target") {
+    if (methodKey === "hurtEnemy") return "target";
+    if (methodKey === "interactLivingEntity") return "interactionTarget";
+    return "target";
+  }
+  return "entity";
+}
+function resolveSlotValue(slotNodeId, nodes, methodKey) {
+  if (!slotNodeId) return null;
+  const node = nodes.find(n => n.id === slotNodeId);
+  if (!node) return null;
+  if (node.opcode === "entity.event" || node.opcode === "entity.target") return resolveEntityVar(node.opcode, methodKey);
+  if (node.opcode === "number.literal") return node.fields?.value ?? "0";
+  return null;
+}
+function getChain(startNextId, nodes) {
+  const chain = [], seen = new Set();
+  let cur = startNextId;
+  while (cur) { if (seen.has(cur)) break; seen.add(cur); const n = nodes.find(x => x.id === cur); if (!n) break; chain.push(n); cur = n.nextId || null; }
+  return chain;
+}
+function compileChain(startNextId, nodes, methodKey) {
+  return getChain(startNextId, nodes).flatMap(n => compileActionNode(n, nodes, methodKey));
+}
+function compileActionNode(node, nodes, methodKey) {
+  if (node.opcode === "effect.apply") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    const eff = node.fields?.effect || "MobEffects.REGENERATION";
+    const dur = resolveSlotValue(node.slots?.duration, nodes, methodKey) ?? (node.fields?.duration ?? "200");
+    const lvl = resolveSlotValue(node.slots?.level, nodes, methodKey) ?? (node.fields?.level ?? "1");
+    return ["if (" + ent + " instanceof net.minecraft.world.entity.LivingEntity _et) { _et.addEffect(new net.minecraft.world.effect.MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1))); }"];
+  }
+  return ["// unknown: " + node.opcode];
+}
+const PALETTE_BLOCKS = [
+  { category:"Entity", blocks:[
+    { opcode:"entity.event",  label:"Event Entity",  linkType:LINK_ENTITY, hint:"Entity that triggered this method" },
+    { opcode:"entity.target", label:"Target Entity", linkType:LINK_ENTITY, hint:"Target entity (hurtEnemy/interactLivingEntity)" },
   ]},
-  {category:"Context Data Blocks",color:"#203040",blocks:[
-    {opcode:"ctx.level",label:"Get World/Level",color:"#152535",inputs:{},fields:{},hint:"Get Level",methods:["useOn","use","continuousUse","finishUsingItem","inventoryTick"]},
-    {opcode:"ctx.player",label:"Get Player",color:"#152535",inputs:{},fields:{},hint:"Get Player",methods:["useOn","use","interactLivingEntity"]},
-    {opcode:"ctx.user",label:"Get User Entity",color:"#152535",inputs:{},fields:{},hint:"Get User Entity",methods:["continuousUse","finishUsingItem","inventoryTick"]},
-    {opcode:"ctx.target",label:"Get Target Entity",color:"#152535",inputs:{},fields:{},hint:"Get Target Entity",methods:["hurtEnemy","interactLivingEntity"]},
-    {opcode:"ctx.attacker",label:"Get Attacker",color:"#152535",inputs:{},fields:{},hint:"Get Attacker",methods:["hurtEnemy"]},
-    {opcode:"ctx.pos",label:"Get Target X/Y/Z",color:"#152535",inputs:{},fields:{coord:"X"},hint:"Get X/Y/Z from context",methods:["useOn"]},
-    {opcode:"ctx.face",label:"Get Target Face",color:"#152535",inputs:{},fields:{},hint:"Get Clicked Face",methods:["useOn"]},
-    {opcode:"ctx.item",label:"Get Current Item",color:"#152535",inputs:{},fields:{},hint:"Get ItemStack"},
-    {opcode:"ctx.slot",label:"Get Active Slot ID",color:"#152535",inputs:{},fields:{},hint:"Get Slot ID",methods:["inventoryTick"]},
-    {opcode:"ctx.selected",label:"Is Item Selected?",color:"#152535",inputs:{},fields:{},hint:"Is Selected?",methods:["inventoryTick"]},
-    {opcode:"ctx.duration",label:"Get Use Duration",color:"#152535",inputs:{},fields:{},hint:"Use duration",methods:["continuousUse"]},
+  { category:"Numbers", blocks:[
+    { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
   ]},
-  {category:"World Actions",color:"#0a1e2e",blocks:[
-    {opcode:"level.setblock",label:"Set Block at [X,Y,Z]",color:"#0a1e2e",inputs:{},fields:{x:"x",y:"y",z:"z",block:"Blocks.STONE"},hint:"Set a block at position"},
-    {opcode:"level.getblock",label:"Get Block at [X,Y,Z]",color:"#0a1a2a",inputs:{},fields:{x:"x",y:"y",z:"z"},hint:"Returns BlockType at position"},
-    {opcode:"level.particle",label:"Spawn Particle",color:"#1a1a3a",inputs:{},fields:{particle:"ParticleTypes.FLAME",x:"x",y:"y",z:"z"},hint:"Spawn particles at position"},
-    {opcode:"level.sound",label:"Play Sound",color:"#1a2a1a",inputs:{},fields:{sound:"SoundEvents.ITEM_FIRECHARGE_USE",x:"x",y:"y",z:"z"},hint:"Play a sound at position"},
-    {opcode:"level.lightning",label:"Strike Lightning",color:"#2a200a",inputs:{},fields:{x:"x",y:"y",z:"z"},hint:"Strike lightning at position"},
-  ]},
-  {category:"Entity & Movement",color:"#2e2a0a",blocks:[
-    {opcode:"entity.damage",label:"Deal Damage",color:"#3a1a1a",inputs:{},fields:{target:"entity",amount:"2.0"},hint:"Damage an entity"},
-    {opcode:"effect.apply",label:"Apply Potion Effect",color:"#1a3a2e",inputs:{},fields:{effect:"MobEffects.REGENERATION",target:"entity",duration:"200",level:"1"},hint:"Apply a status effect to an entity"},
-    {opcode:"entity.velocity",label:"Set Velocity",color:"#2e2a0a",inputs:{},fields:{target:"entity",x:"0.0",y:"0.5",z:"0.0"},hint:"Set entity velocity (knockback/launch)"},
-    {opcode:"entity.health",label:"Get Health",color:"#2a1a0e",inputs:{},fields:{target:"entity"},hint:"Get health of an entity (use in condition)"},
-  ]},
-  {category:"Item Actions",color:"#1e2a1a",blocks:[
-    {opcode:"stack.damage",label:"Damage Item",color:"#2a1a2e",inputs:{},fields:{amount:"1"},hint:"Damage the item stack"},
-    {opcode:"stack.shrink",label:"Shrink Stack",color:"#1e2a1a",inputs:{},fields:{amount:"1"},hint:"Consume/shrink the item stack"},
-    {opcode:"return.result",label:"Return Interaction Result",color:"#2a1a2e",inputs:{},fields:{result:"InteractionResult.SUCCESS"},hint:"Return an InteractionResult (SUCCESS, PASS, FAIL)"},
+  { category:"Effects", blocks:[
+    { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
+      slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"duration",accepts:LINK_NUMBER},{key:"level",accepts:LINK_NUMBER}] },
   ]},
 ];
 
@@ -606,138 +619,6 @@ function ycsInjectCompiledBody(code, methodKey, bodyLines) {
 }
 
 // ─── Block AST compiler: BlockNode[] → Java string[] ─────────────────────────
-function resolveSlot(node, slot) {
-  // A slot can hold a var.context block (inline expr) or an action block (statement)
-  const child = node.inputs?.[slot];
-  if (!child) return null;
-  if (child.opcode === 'var.context') return child.fields?.varName || null;
-  return null; // non-inline blocks in slots are not supported as expressions
-}
-
-function compileBlock(node) {
-  if (!node) return [];
-  const lines = [];
-  const slot = (s) => resolveSlot(node, s);
-  switch (node.opcode) {
-    case 'if.do': {
-      const cond = node.fields?.condition || 'true';
-      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
-      lines.push(`if (${cond}) {`);
-      body.forEach(l => lines.push('    ' + l));
-      lines.push('}');
-      break;
-    }
-    case 'if.do.else': {
-      const cond = node.fields?.condition || 'true';
-      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
-      const elseBody = node.inputs?.elseBody ? compileBlock(node.inputs.elseBody) : [];
-      lines.push(`if (${cond}) {`);
-      body.forEach(l => lines.push('    ' + l));
-      lines.push('} else {');
-      elseBody.forEach(l => lines.push('    ' + l));
-      lines.push('}');
-      break;
-    }
-    case 'repeat': {
-      const t = node.fields?.times || '5';
-      const body = node.inputs?.body ? compileBlock(node.inputs.body) : [];
-      lines.push(`for (int _i = 0; _i < ${t}; _i++) {`);
-      body.forEach(l => lines.push('    ' + l));
-      lines.push('}');
-      break;
-    }
-    case 'return.value':
-      lines.push(`return ${node.fields?.value || 'InteractionResult.SUCCESS'};`);
-      break;
-    case 'return.result':
-      lines.push(`return ${node.fields?.result || 'InteractionResult.SUCCESS'};`);
-      break;
-    case 'effect.apply': {
-      const ent = node.fields?.target || 'entity';
-      const eff = node.fields?.effect || 'MobEffects.REGENERATION';
-      const dur = node.fields?.duration ?? 200;
-      const amp = Math.max(0, (node.fields?.level ?? 1) - 1);
-      lines.push(`${ent}.addEffect(new net.minecraft.world.effect.MobEffectInstance(${eff}, ${dur}, ${amp}));`);
-      break;
-    }
-    case 'entity.damage': {
-      const tgt = node.fields?.target || 'target';
-      const amt = node.fields?.amount ?? '1.0';
-      lines.push(`if (${tgt} instanceof net.minecraft.world.entity.LivingEntity _le) { _le.hurt(_le.damageSources().generic(), ${amt}f); }`);
-      break;
-    }
-    case 'stack.damage':
-      lines.push(`stack.hurtAndBreak(Math.round(${node.fields?.amount ?? 1}), level instanceof net.minecraft.server.level.ServerLevel ? (net.minecraft.server.level.ServerLevel)level : null, null, null);`);
-      break;
-    case 'stack.shrink':
-      lines.push(`stack.shrink((int)(${node.fields?.amount ?? 1}));`);
-      break;
-    case 'entity.velocity': {
-      const ent = node.fields?.target || 'entity';
-      const x = node.fields?.x ?? '0.0';
-      const y = node.fields?.y ?? '0.5';
-      const z = node.fields?.z ?? '0.0';
-      lines.push(`${ent}.setDeltaMovement(${x}, ${y}, ${z});`);
-      lines.push(`${ent}.hurtMarked = true;`);
-      break;
-    }
-    case 'entity.health':
-      lines.push(`/* Get Health: ${node.fields?.target||'entity'}.getHealth() */`);
-      break;
-    case 'level.setblock': {
-      const bk = node.fields?.block || 'net.minecraft.world.level.block.Blocks.STONE';
-      const x = node.fields?.x || '0';
-      const y = node.fields?.y || '0';
-      const z = node.fields?.z || '0';
-      lines.push(`if (!level.isClientSide) { level.setBlock(new net.minecraft.core.BlockPos((int)(${x}), (int)(${y}), (int)(${z})), ${bk}.defaultBlockState(), 3); }`);
-      break;
-    }
-    case 'level.getblock':
-      lines.push(`/* Get Block at ${node.fields?.x}, ${node.fields?.y}, ${node.fields?.z} */`);
-      break;
-    case 'level.particle': {
-      const p = node.fields?.particle || 'net.minecraft.core.particles.ParticleTypes.FLAME';
-      const x = node.fields?.x || '0';
-      const y = node.fields?.y || '0';
-      const z = node.fields?.z || '0';
-      lines.push(`if (level instanceof net.minecraft.server.level.ServerLevel sl) { sl.sendParticles(${p}, ${x}, ${y}, ${z}, 5, 0.2, 0.2, 0.2, 0.0); }`);
-      break;
-    }
-    case 'level.sound': {
-      const snd = node.fields?.sound || 'net.minecraft.sounds.SoundEvents.ITEM_FIRECHARGE_USE';
-      const x = node.fields?.x || '0';
-      const y = node.fields?.y || '0';
-      const z = node.fields?.z || '0';
-      lines.push(`level.playSound(null, new net.minecraft.core.BlockPos((int)(${x}),(int)(${y}),(int)(${z})), ${snd}, net.minecraft.sounds.SoundSource.PLAYERS, 1.0f, 1.0f);`);
-      break;
-    }
-    case 'level.lightning': {
-      const x = node.fields?.x || '0';
-      const y = node.fields?.y || '0';
-      const z = node.fields?.z || '0';
-      lines.push(`if (!level.isClientSide) { net.minecraft.world.entity.LightningBolt bolt = net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level); if (bolt != null) { bolt.moveTo(${x}, ${y}, ${z}); level.addFreshEntity(bolt); } }`);
-      break;
-    }
-    case 'var.context':
-      break;
-    default:
-      lines.push(`// unknown block: ${node.opcode}`);
-  }
-  if (node.next) compileBlock(node.next).forEach(l => lines.push(l));
-  return lines;
-}
-
-function compileInlineExpr(node) {
-  if (!node) return null;
-  if (node.opcode === 'var.context') return node.fields?.varName || null;
-  return null;
-}
-
-function compileMethodBlocks(nodes) {
-  if (!nodes?.length) return [];
-  return nodes.flatMap(n => compileBlock(n));
-}
-
 const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
@@ -986,209 +867,293 @@ function CustomClassPanel(){
 
 function VisualEditorPanel({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
-  const nodes=(form.methodBlocks||{})[methodKey]||[];
-  const setNodes=nds=>{const mb={...(form.methodBlocks||{}),[methodKey]:nds};F("methodBlocks",mb);};
-
-  // Canvas pan state
+  const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
+  const[nodes,setNodes]=useState(init);
+  const[saving,setSaving]=useState(false);
+  const[saveStatus,setSaveStatus]=useState(null);
+  const[pan,setPan]=useState({x:0,y:0});
   const canvasRef=useRef();
-  const [pan,setPan]=useState({x:60,y:60});
-  const [draggingBlock,setDraggingBlock]=useState(null); // {id, offsetX, offsetY}
-  const [isPanning,setIsPanning]=useState(false);
-  const panStart=useRef(null);
-
-  // Each node has {id, x, y, opcode, fields, inputs}
-  const [canvasNodes,setCanvasNodes]=useState(()=>{
-    // Migrate flat nodes array → positioned nodes
-    const existing=nodes.filter(n=>n.x!=null&&n.y!=null);
-    if(existing.length===nodes.length&&nodes.length>0)return nodes;
-    // Layout old linear nodes in a column
-    return nodes.map((n,i)=>({...n,x:40+i*20,y:40+i*90}));
-  });
-
-  const [saving,setSaving]=useState(false);
-  const [saveStatus,setSaveStatus]=useState(null);
-
-  // Sync canvasNodes → methodBlocks whenever they change
-  useEffect(()=>{
-    const mb={...(form.methodBlocks||{}),[methodKey]:canvasNodes};
-    F("methodBlocks",mb);
-  },[canvasNodes]);
-
-  const addNodeAt=(blockDef,x,y)=>{
-    const id=`${blockDef.opcode}_${Date.now()}`;
-    setCanvasNodes(ns=>[...ns,{id,...blockDef,x,y,fields:{...blockDef.fields},inputs:{...blockDef.inputs}}]);
+  const ip=useRef(false),ps=useRef(null),dn=useRef(null);
+  useEffect(()=>{F("methodBlocks",{...(form.methodBlocks||{}),[methodKey]:nodes});},[nodes]);
+  const upd=fn=>setNodes(fn);
+  const add=(bd,x,y)=>{
+    const id=bd.opcode+"_"+Date.now();
+    upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:{},slots:{}}]);
+  };
+  const del=id=>{
+    if(id==="start")return;
+    upd(ns=>{
+      const td=new Set([id]);
+      const node=ns.find(n=>n.id===id);
+      if(node?.isAction){let c=node.nextId;while(c){td.add(c);c=ns.find(n=>n.id===c)?.nextId||null;}}
+      return ns.filter(n=>!td.has(n.id)).map(n=>({...n,nextId:td.has(n.nextId)?null:n.nextId,slots:Object.fromEntries(Object.entries(n.slots||{}).map(([k,v])=>[k,td.has(v)?null:v]))}));
+    });
   };
 
-  const updateNode=(id,patch)=>{
-    setCanvasNodes(ns=>ns.map(n=>n.id===id?{...n,...patch,fields:{...n.fields,...(patch.fields||{})}}:n));
+  const getDescendants = (nId, curNs) => {
+    const res = [];
+    const cur = curNs.find(x=>x.id===nId);
+    if(!cur) return res;
+    if(cur.nextId){ res.push(cur.nextId); res.push(...getDescendants(cur.nextId, curNs)); }
+    if(cur.slots){ Object.values(cur.slots).forEach(vid=>{ if(vid){ res.push(vid); res.push(...getDescendants(vid, curNs)); } }); }
+    return res;
   };
 
-  const removeNode=id=>setCanvasNodes(ns=>ns.filter(n=>n.id!==id));
-
-  // Canvas mouse handlers
-  const onCanvasMouseDown=e=>{
-    if(e.target!==canvasRef.current&&!e.target.classList.contains('canvas-bg'))return;
-    setIsPanning(true);
-    panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};
+  const handleDragStart = (id, ox, oy, cx, cy) => {
+    const r=canvasRef.current?.getBoundingClientRect();
+    const stX = cx - (r?.left||0) - pan.x - ox;
+    const stY = cy - (r?.top||0) - pan.y - oy;
+    dn.current = {id, ox, oy};
+    upd(ns => {
+      let nextNs = [...ns];
+      nextNs = nextNs.map(n=> n.id===id ? {...n, x:stX, y:stY} : n);
+      nextNs = nextNs.map(n=> n.nextId===id ? {...n, nextId:null} : n);
+      nextNs = nextNs.map(n=>{
+        if(!n.slots) return n;
+        const newSlots = {...n.slots};
+        let changed = false;
+        for(const k in newSlots){ if(newSlots[k]===id){ newSlots[k]=null; changed=true; } }
+        return changed ? {...n, slots:newSlots} : n;
+      });
+      const desc = new Set([id, ...getDescendants(id, nextNs)]);
+      const topNodes = nextNs.filter(n=>desc.has(n.id));
+      const baseNodes = nextNs.filter(n=>!desc.has(n.id));
+      return [...baseNodes, ...topNodes];
+    });
   };
-  const onCanvasMouseMove=e=>{
-    if(isPanning&&panStart.current){
-      setPan({x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)});
+
+  const onMD=e=>{if(e.target===canvasRef.current||e.target.classList.contains("canvas-bg")){ip.current=true;ps.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};}};
+  const onMM=e=>{
+    if(ip.current&&ps.current)setPan({x:ps.current.px+(e.clientX-ps.current.mx),y:ps.current.py+(e.clientY-ps.current.my)});
+    if(dn.current){
+      const{id,ox,oy}=dn.current;const r=canvasRef.current?.getBoundingClientRect();if(!r)return;
+      const nx=e.clientX-r.left-pan.x-ox,ny=e.clientY-r.top-pan.y-oy;
+      upd(ns=>{
+        const node=ns.find(n=>n.id===id);if(!node)return ns;const dx=nx-node.x,dy=ny-node.y;
+        const ch=new Set([id, ...getDescendants(id, ns)]);
+        return ns.map(n=>ch.has(n.id)?{...n,x:n.x+dx,y:n.y+dy}:n);
+      });
     }
-    if(draggingBlock){
-      const rect=canvasRef.current.getBoundingClientRect();
-      const nx=e.clientX-rect.left-pan.x-draggingBlock.offX;
-      const ny=e.clientY-rect.top-pan.y-draggingBlock.offY;
-      updateNode(draggingBlock.id,{x:nx,y:ny});
+  };
+  const onMU=()=>{
+    ip.current=false;
+    if(dn.current){
+      const id=dn.current.id;
+      dn.current=null;
+      upd(ns=>{
+        let nextNs=[...ns];
+        const dragged=nextNs.find(n=>n.id===id);
+        if(!dragged)return nextNs;
+
+        if(dragged.isAction||dragged.opcode==="start"){
+          if(dragged.id!=="start"){
+             const dt={x:dragged.x+115,y:dragged.y};
+             let ct=null,md=60;
+             for(const n of nextNs){
+               if(n.id===dragged.id)continue;
+               if(n.isAction||n.opcode==="start"){
+                 const ch=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
+                 if(ch.has(n.id))continue;
+                 const nb={x:n.x+115,y:n.y+(n.id==="start"?40:95)};
+                 const dist=Math.hypot(dt.x-nb.x,dt.y-nb.y);
+                 if(dist<md){md=dist;ct=n.id;}
+               }
+             }
+             if(ct){
+               const parent=nextNs.find(x=>x.id===ct);
+               const dx=parent.x-dragged.x,dy=(parent.y+(parent.id==="start"?45:100))-dragged.y;
+               const sub=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
+               const oldChild=parent.nextId;
+               nextNs=nextNs.map(x=>x.id===parent.id?{...x,nextId:dragged.id}:x.id===dragged.id&&oldChild?{...x,nextId:oldChild}:x);
+               nextNs=nextNs.map(x=>sub.has(x.id)?{...x,x:x.x+dx,y:x.y+dy}:x);
+             }
+          }
+        }else if(dragged.linkType){
+           const dt={x:dragged.x+45,y:dragged.y+15};
+           let cst=null,csk=null,md=120;
+           for(const n of nextNs){
+             if(!n.slotDefs)continue;
+             for(const def of n.slotDefs){
+               if(def.accepts===dragged.linkType){
+                 const sk=def.key;
+                 const sx=n.opcode==="effect.apply"?(sk==="entity"?60:sk==="duration"?40:120):115;
+                 const sy=n.opcode==="effect.apply"?(sk==="entity"?40:65):50;
+                 const st={x:n.x+sx,y:n.y+sy};
+                 const dist=Math.hypot(dt.x-st.x,dt.y-st.y);
+                 if(dist<md&&!n.slots[sk]){md=dist;cst=n.id;csk=sk;}
+               }
+             }
+           }
+           if(cst){
+              const parent=nextNs.find(x=>x.id===cst);
+              const sx=parent.opcode==="effect.apply"?(csk==="entity"?60:csk==="duration"?40:120):115;
+              const sy=parent.opcode==="effect.apply"?(csk==="entity"?40:65):50;
+              const vx=parent.x+sx,vy=parent.y+sy;
+              const dx=vx-dragged.x,dy=vy-dragged.y;
+              const sub=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
+              nextNs=nextNs.map(x=>x.id===parent.id?{...x,slots:{...x.slots,[csk]:dragged.id}}:x);
+              nextNs=nextNs.map(x=>sub.has(x.id)?{...x,x:x.x+dx,y:x.y+dy}:x);
+           }
+        }
+        return nextNs;
+      });
     }
-  };
-  const onCanvasMouseUp=()=>{setIsPanning(false);setDraggingBlock(null);panStart.current=null;};
-
-  // Drop from palette
-  const onCanvasDrop=e=>{
-    e.preventDefault();
-    const data=e.dataTransfer.getData("block");
-    if(!data)return;
-    const blockDef=JSON.parse(data);
-    const rect=canvasRef.current.getBoundingClientRect();
-    const x=e.clientX-rect.left-pan.x;
-    const y=e.clientY-rect.top-pan.y;
-    addNodeAt(blockDef,x,y);
+    ps.current=null;
   };
 
+  const onDrop=e=>{
+    e.preventDefault();const data=e.dataTransfer.getData("block");if(!data)return;
+    const bd=JSON.parse(data);const r=canvasRef.current.getBoundingClientRect();
+    add(bd,e.clientX-r.left-pan.x-100,e.clientY-r.top-pan.y-20);
+  };
   const save=async()=>{
     setSaving(true);setSaveStatus(null);
     const j=await api("/items/custom-class/read",{className});
     if(!j.ok){setSaving(false);setSaveStatus({ok:false,msg:j.reason});return;}
-    const bodyMarker=`//YCS:${methodKey}:body`;
-    const startTag=`//YCS:${methodKey}:start`;
-    let code=j.code;
-    if(!code.includes(bodyMarker)&&code.includes(startTag)){
-      const def2=ITEM_METHODS.find(m=>m.key===methodKey);
-      if(def2){code=ycsRemoveMethod(code,methodKey);code=ycsInjectMethod(code,methodKey);const ek=ycsGetEnabledMethods(code);code=ycsSyncImports(code,ek);}
-    }
-    const bodyLines=compileMethodBlocks(canvasNodes);
-    const updated=ycsInjectCompiledBody(code,methodKey,bodyLines);
-    const j2=await api("/items/custom-class/write",{className,code:updated});
+    let c2=j.code;
+    const bm="//YCS:"+methodKey+":body",st="//YCS:"+methodKey+":start";
+    if(!c2.includes(bm)&&c2.includes(st)){const d2=ITEM_METHODS.find(m=>m.key===methodKey);if(d2){c2=ycsRemoveMethod(c2,methodKey);c2=ycsInjectMethod(c2,methodKey);c2=ycsSyncImports(c2,ycsGetEnabledMethods(c2));}}
+    const sn=nodes.find(n=>n.id==="start");
+    const bl=sn?.nextId?compileChain(sn.nextId,nodes,methodKey):[];
+    const j2=await api("/items/custom-class/write",{className,code:ycsInjectCompiledBody(c2,methodKey,bl)});
     setSaving(false);setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
     if(j2.ok)setTimeout(()=>{setSaveStatus(null);onBack();},700);
   };
-
-  const params=def?.params||[];
-  // Derive context var pills from method params
-  const contextVars=params.map(p=>({varName:p.name,type:p.type}));
-
-  return<div style={{display:"flex",flexDirection:"column",height:"100%",background:C.bg}}>
-    {/* Header */}
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:`1px solid ${C.inpB}`,background:C.panel,flexShrink:0}}>
-      <Btn sm v="g" onClick={onBack}>← Back</Btn>
+  const sn=nodes.find(n=>n.id==="start");
+  const ch=new Set(["start"]);if(sn){let c=sn.nextId;while(c){ch.add(c);c=nodes.find(n=>n.id===c)?.nextId||null;}}
+  return <div style={{display:"flex",flexDirection:"column",height:"100%",background:C.bg}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:"1px solid "+C.inpB,background:C.panel,flexShrink:0}}>
+      <Btn sm v="g" onClick={onBack}>Back</Btn>
       <span style={{color:C.accent,fontWeight:500,fontFamily:"monospace",fontSize:13}}>{def?.label}</span>
       <span style={{color:C.faint,fontSize:11,fontFamily:"monospace"}}>{def?.sig}</span>
       <div style={{flex:1}}/>
       {saveStatus&&<span style={{fontSize:11,color:saveStatus.ok?"#5acc5a":"#cc5a5a"}}>{saveStatus.msg}</span>}
-      <Btn sm v="p" onClick={save} dis={saving}>{saving?"…":"Save"}</Btn>
+      <Btn sm v="p" onClick={save} dis={saving}>{saving?"...":"Save"}</Btn>
     </div>
-
     <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-      {/* Left palette */}
-      <div style={{width:210,borderRight:`1px solid ${C.inpB}`,overflowY:"auto",flexShrink:0,background:"#111113",display:"flex",flexDirection:"column",gap:0}}>
-        {/* Context vars */}
-        <div style={{padding:"8px 10px 4px",borderBottom:`1px solid ${C.inpB}`}}>
-          <Lbl>Parameters</Lbl>
-          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-            {contextVars.map(v=><div key={v.varName} draggable
-              onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify({opcode:"var.context",fields:{varName:v.varName,type:v.type},inputs:{}}))}
-              style={{padding:"3px 8px",background:"#152030",border:"1px solid #1a3040",borderRadius:3,fontSize:11,fontFamily:"monospace",cursor:"grab",color:"#7ab8d4"}}>
-              $ {v.varName} <span style={{color:C.faint,fontSize:9}}>—slot</span>
-            </div>)}
-          </div>
-        </div>
-        {/* Block categories */}
-        {BLOCK_PALETTE.map(cat=>{
-          const blocks=cat.blocks.filter(b=>!b.methods||b.methods.includes(methodKey));
-          if(!blocks.length) return null;
-          return <div key={cat.category}>
-          <div style={{padding:"5px 10px",background:"#141416",borderBottom:`1px solid ${C.inpB}`}}>
-            <Lbl>{cat.category}</Lbl>
-          </div>
-          {blocks.map(b=><div key={b.opcode} draggable
-            onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",cursor:"grab",borderBottom:`1px solid #181818`,background:b.color||"transparent",userSelect:"none"}}
-            title={b.hint}>
-            <span style={{color:C.accent,fontSize:10}}>▶</span>
+      <div style={{width:190,borderRight:"1px solid "+C.inpB,overflowY:"auto",flexShrink:0,background:"#111113",userSelect:"none",zIndex:10}}>
+        {PALETTE_BLOCKS.map(cat=><div key={cat.category}>
+          <div style={{padding:"6px 10px 4px",background:"#141416",borderBottom:"1px solid "+C.inpB}}><Lbl>{cat.category}</Lbl></div>
+          {cat.blocks.map(b=><div key={b.opcode} draggable onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))} title={b.hint}
+            style={{display:"flex",alignItems:"center",gap:7,padding:"8px 10px",cursor:"grab",borderBottom:"1px solid #181818",userSelect:"none",
+              background:b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.isAction?"#1a2a20":"transparent"}}>
+            <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:b.linkType===LINK_ENTITY?"#638999":b.linkType===LINK_NUMBER?"#6a8fa8":"#5a9a6a"}}/>
             <span style={{fontSize:12,color:C.text,fontFamily:"monospace"}}>{b.label}</span>
           </div>)}
-        </div>})}
+        </div>)}
       </div>
-
-      {/* Free-floating canvas */}
-      <div
-        ref={canvasRef}
-        className="canvas-bg"
-        style={{flex:1,position:"relative",overflow:"hidden",background:"#0d0d0f",cursor:isPanning?"grabbing":"default",
-          backgroundImage:"radial-gradient(circle,#1a1a1e 1px,transparent 1px)",backgroundSize:"24px 24px"}}
-        onMouseDown={onCanvasMouseDown}
-        onMouseMove={onCanvasMouseMove}
-        onMouseUp={onCanvasMouseUp}
-        onMouseLeave={onCanvasMouseUp}
-        onDragOver={e=>e.preventDefault()}
-        onDrop={onCanvasDrop}
-      >
-        {/* Empty state */}
-        {canvasNodes.length===0&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none",textAlign:"center",color:C.faint}}>
+      <div ref={canvasRef} className="canvas-bg"
+        style={{flex:1,position:"relative",overflow:"hidden",background:"#0d0d0f",backgroundImage:"radial-gradient(circle,#1a1a1e 1px,transparent 1px)",backgroundSize:"24px 24px"}}
+        onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onDragOver={e=>e.preventDefault()} onDrop={onDrop}>
+        {nodes.length===1&&!nodes[0].nextId&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none",textAlign:"center",color:C.faint}}>
           <div style={{fontSize:28,marginBottom:8,opacity:.3}}>{"</>"}</div>
-          <div style={{fontSize:12,marginBottom:4}}>drag action blocks here</div>
-          <div style={{fontSize:10,color:"#2a4050"}}>drop <span style={{color:"#3a6080",fontFamily:"monospace"}}>$params</span> into block slots — not onto canvas</div>
+          <div style={{fontSize:12,marginBottom:4}}>drag blocks here</div>
+          <div style={{fontSize:10,color:"#2a4050"}}>connect to Start to run</div>
         </div>}
-
-        {/* Pan container */}
-        <div style={{position:"absolute",left:0,top:0,transform:`translate(${pan.x}px,${pan.y}px)`}}>
-          {canvasNodes.map(node=><CanvasBlock
-            key={node.id}
-            node={node}
-            onDragStart={(offX,offY)=>setDraggingBlock({id:node.id,offX,offY})}
-            onFieldChange={(field,val)=>updateNode(node.id,{fields:{...node.fields,[field]:val}})}
-            onRemove={()=>removeNode(node.id)}
-          />)}
+        <svg style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",pointerEvents:"none",transform:`translate(${pan.x}px,${pan.y}px)`,zIndex:0}}>
+          {nodes.map(node=>{
+            const lines = [];
+            if(node.nextId){
+              const child = nodes.find(n=>n.id===node.nextId);
+              if(child){
+                const h = node.id==="start"?40:95;
+                const x1 = node.x + 115, y1 = node.y + h;
+                const x2 = child.x + 115, y2 = child.y;
+                lines.push(<path key={node.id+"_chain"} d={`M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`} stroke={C.accent} strokeWidth="3" fill="none" opacity="0.6"/>);
+              }
+            }
+            return lines;
+          })}
+        </svg>
+        <div style={{position:"absolute",left:0,top:0,transform:"translate("+pan.x+"px,"+pan.y+"px)"}}>
+          {nodes.map(node=>{
+             let isSlotted = false;
+             for(const p of nodes){if(p.slots){for(const sk in p.slots){if(p.slots[sk]===node.id)isSlotted=true;}}}
+             if(isSlotted) return null;
+             return <CanvasNode key={node.id} node={node} nodes={nodes} methodKey={methodKey} inChain={ch.has(node.id)}
+               onDragStart={handleDragStart}
+               onDelete={(nid)=>del(nid)}
+               onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?{...n,fields:{...n.fields,[f]:v}}:n))}
+               onDisconnectChain={(nid)=>upd(ns=>ns.map(n=>n.id===nid?{...n,nextId:null}:n))}
+             />;
+          })}
         </div>
       </div>
     </div>
   </div>;
 }
 
-function CanvasBlock({node,onDragStart,onFieldChange,onRemove}){
-  const def=BLOCK_PALETTE.flatMap(c=>c.blocks).find(b=>b.opcode===node.opcode)||{label:node.opcode,color:"#222"};
-  const isVar=node.opcode==="var.context";
-  const fields=node.fields||{};
+function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldChange,onDisconnectChain,inline}){
+  const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
+  const cc=node.linkType===LINK_ENTITY?"#638999":node.linkType===LINK_NUMBER?"#6a8fa8":"#5a9a6a";
 
-  return<div
-    style={{position:"absolute",left:node.x,top:node.y,minWidth:isVar?80:200,background:node.color||def.color||"#1e1e22",
-      border:`1px solid ${isVar?"#1a3040":"#2a2a30"}`,borderRadius:5,boxShadow:"0 3px 12px rgba(0,0,0,.5)",
-      userSelect:"none",zIndex:1}}
-    onMouseDown={e=>{
-      e.stopPropagation();
-      const rect=e.currentTarget.getBoundingClientRect();
-      onDragStart(e.clientX-rect.left,e.clientY-rect.top);
-    }}
-  >
-    {/* Block header */}
-    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderBottom:`1px solid rgba(255,255,255,.05)`,cursor:"grab"}}>
-      <span style={{color:isVar?"#7ab8d4":C.accent,fontSize:10}}>▶</span>
-      <span style={{fontFamily:"monospace",fontSize:11,color:C.text,fontWeight:500}}>{isVar?`$ ${fields.varName}`:(def.label||node.opcode)}</span>
-      <div style={{flex:1}}/>
-      <span onClick={e=>{e.stopPropagation();onRemove();}} style={{color:"#663333",fontSize:11,cursor:"pointer",padding:"0 2px"}}>✕</span>
+  if(inline){
+     return <div onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}
+       style={{display:"flex",alignItems:"center",background:cc,borderRadius:10,padding:"0 6px",height:20,cursor:"grab",boxShadow:"0 1px 3px rgba(0,0,0,.3)",gap:4}}>
+        <span style={{fontSize:10,fontFamily:"monospace",color:"#fff",fontWeight:600}}>
+          {node.opcode==="entity.event"?"Event Ent"
+         :node.opcode==="entity.target"?"Target Ent"
+         :node.opcode==="number.literal"?"Num"
+         :node.opcode}
+        </span>
+        {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+          style={{width:30,background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,.2)",borderRadius:3,padding:"1px 4px",color:"#fff",fontSize:11,fontFamily:"monospace",outline:"none"}}/>}
+     </div>;
+  }
+
+  return <div
+    style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?90:230,
+      background:isSt?"#0e1e30":(!inChain&&isAct)?"#1a1a1a":isAct?"#1a2a20":node.linkType===LINK_ENTITY?"#162028":"#16202a",
+      border:"1.5px solid "+(isSt?C.accent:(!inChain&&isAct)?"#2a2a2a":inChain?"#2a4a30":"#222830"),
+      borderRadius:isVal?10:6,boxShadow:"0 3px 14px rgba(0,0,0,.55)",userSelect:"none",zIndex:1,opacity:(!inChain&&isAct&&!isSt)?0.6:1}}
+    onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
+    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderBottom:"1px solid rgba(255,255,255,.05)",cursor:"grab",background:isSt?"#0a1828":"transparent"}}>
+      {isVal&&<div style={{width:8,height:8,borderRadius:"50%",background:cc,flexShrink:0}}/>}
+      <span style={{fontFamily:"monospace",fontSize:11,color:isSt?C.accent:C.text,fontWeight:500,flex:1}}>
+        {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
+         :node.opcode==="entity.event"?"Event Entity -> "+resolveEntityVar("entity.event",methodKey)
+         :node.opcode==="entity.target"?"Target Entity -> "+resolveEntityVar("entity.target",methodKey)
+         :node.opcode==="number.literal"?"Number"
+         :node.opcode==="effect.apply"?"Add Effect"
+         :node.opcode}
+      </span>
+      {!inChain&&isAct&&!isSt&&<span style={{fontSize:9,color:"#666"}} title="Not connected to Start">!</span>}
+      {!isSt&&<span onClick={e=>{e.stopPropagation();onDelete(node.id);}} onMouseDown={e=>e.stopPropagation()} style={{color:"#553333",fontSize:11,cursor:"pointer",padding:"0 3px"}}>x</span>}
     </div>
-    {/* Fields */}
-    {!isVar&&<div style={{padding:"6px 8px",display:"flex",flexDirection:"column",gap:4}}>
-      {Object.entries(fields).map(([k,v])=><div key={k} style={{display:"flex",alignItems:"center",gap:5}}>
-        <span style={{fontSize:9,color:C.dim,fontFamily:"monospace",minWidth:54,flexShrink:0}}>{k}</span>
-        <input
-          value={v??""} onChange={e=>{e.stopPropagation();onFieldChange(k,e.target.value);}}
-          onMouseDown={e=>e.stopPropagation()}
-          style={{flex:1,background:"#111116",border:`1px solid ${C.inpB}`,borderRadius:3,padding:"2px 5px",color:C.text,fontSize:11,fontFamily:"monospace",outline:"none",minWidth:0}}
-        />
-      </div>)}
+    <div style={{padding:"6px 8px",display:"flex",flexDirection:"column",gap:5}}>
+      {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+        style={{width:70,background:"#0e161e",border:"1px solid #2a3a4a",borderRadius:3,padding:"3px 6px",color:C.text,fontSize:12,fontFamily:"monospace",outline:"none"}}/>}
+      {node.opcode==="effect.apply"&&<div style={{display:"flex",flexDirection:"column",gap:5}}>
+        <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+          <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>to</span>
+          <SlotConn sk="entity" sc="#638999" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+          <input value={node.fields?.effect??"MobEffects.REGENERATION"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"effect",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="effect"
+            style={{flex:1,minWidth:100,background:"#0e161e",border:"1px solid #2a3a4a",borderRadius:3,padding:"3px 6px",color:C.text,fontSize:11,fontFamily:"monospace",outline:"none"}}/>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:5}}>
+          <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>dur</span>
+          <SlotConn sk="duration" sc="#6a8fa8" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+          <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>lvl</span>
+          <SlotConn sk="level" sc="#6a8fa8" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+        </div>
+      </div>}
+    </div>
+    {isAct&&<div style={{display:"flex",justifyContent:"center",paddingBottom:5}}>
+      <div onMouseDown={e=>{e.stopPropagation();if(node.nextId)onDisconnectChain(node.id);}}
+        title={node.nextId?"click to disconnect":""}
+        style={{width:12,height:12,borderRadius:"50%",cursor:node.nextId?"pointer":"default",background:node.nextId?C.accent:"#2a2a30",border:"2px solid "+(node.nextId?C.accent:"#3a3a44"),boxShadow:node.nextId?"0 0 6px "+C.accent+"44":""}}/>
     </div>}
+  </div>;
+}
+
+function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange}){
+  const cn=connId?nodes.find(n=>n.id===connId):null;
+  if(cn) return <CanvasNode node={cn} nodes={nodes} methodKey={mk} onDragStart={onDragStart} onFieldChange={onFieldChange} inline/>;
+  return <div title="drop value here"
+    style={{display:"flex",alignItems:"center",justifyContent:"center",
+      background:"rgba(0,0,0,0.3)",border:"1px solid "+sc+"88",
+      borderRadius:10,minWidth:30,height:18,boxShadow:"inset 0 1px 3px rgba(0,0,0,.4)"}}>
   </div>;
 }
 

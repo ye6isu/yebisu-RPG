@@ -11,8 +11,8 @@
     "preview": "vite preview",
     "electron": "electron .",
     "electron:dev": "concurrently -k \"npm:dev\" \"wait-on tcp:5173 && electron .\"",
-    "app": "concurrently -k \"node server.js\" \"npm:dev\" \"wait-on tcp:5173 && electron .\"",
-    "cleanup": "node cleanup.mjs"
+    "cleanup": "node cleanup.mjs",
+    "app": "concurrently -k \"node server.js\" \"npm:dev\" \"wait-on tcp:5173 && electron .\""
   },
   "dependencies": {
     "cors": "^2.8.6",
