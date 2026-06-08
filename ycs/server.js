@@ -385,24 +385,37 @@ app.post('/api/items/update', (req, res) => {
       let msrc = rf(modelFile)
       const CN = newConstName || (newId||'').toUpperCase()
       const oldCN = oldConstName || (oldId||'').toUpperCase()
-      const mlines = msrc.split('\n')
-      let replaced = false
-      const newMlines = mlines.map(l => {
-        if ((l.includes(`ModItems.${oldCN}`) || l.includes(`ModItems.${CN}`)) &&
-            (l.trim().startsWith('basicItem') || l.trim().startsWith('handheldItem'))) {
-          replaced = true
-          return '        ' + newModelLine.trim()
-        }
-        return l
-      })
-      if (replaced) {
-        wf(modelFile, newMlines.join('\n'))
+
+      // Step 1: Remove ALL existing YCS-managed lines for this item inside the YCS model block
+      // This covers basicItem, handheldItem, existingFileHelper.trackGenerated, getBuilder — everything
+      const ycsStart = msrc.indexOf('//YCS_Mod_Item_Model_START')
+      const ycsEnd   = msrc.indexOf('//YCS_Mod_Item_Model_END')
+      if (ycsStart !== -1 && ycsEnd !== -1) {
+        const before  = msrc.slice(0, ycsStart + '//YCS_Mod_Item_Model_START'.length)
+        const section = msrc.slice(ycsStart + '//YCS_Mod_Item_Model_START'.length, ycsEnd)
+        const after   = msrc.slice(ycsEnd)
+        // Remove any line that references ModItems.CN or ModItems.oldCN
+        const cleanedSection = section.split('\n').filter(l => {
+          if (l.includes(`ModItems.${CN}`) || l.includes(`ModItems.${oldCN}`)) return false
+          // Also remove getBuilder lines that reference the item id
+          if (l.includes(`"item/${newId}"`) || l.includes(`"item/${oldId}"`)) return false
+          if (l.includes(`"${newId}"`     ) || l.includes(`"${oldId}"`     )) {
+            // Only remove if it's a model/texture line (contains getBuilder or trackGenerated)
+            if (l.includes('getBuilder') || l.includes('trackGenerated')) return false
+          }
+          return true
+        }).join('\n')
+        msrc = before + cleanedSection + after
+      }
+      msrc = msrc.replace(/\n{3,}/g, '\n\n')
+
+      // Step 2: Insert the new model line
+      const modelMarker = '\n        //YCS_Mod_Item_Model_END'
+      if (msrc.includes(modelMarker)) {
+        const indentedModel = newModelLine.split('\n').map(l => '        ' + l.trim()).join('\n')
+        wf(modelFile, msrc.replace(modelMarker, '\n' + indentedModel + '\n        //YCS_Mod_Item_Model_END'))
       } else {
-        const modelMarker = '\n        //YCS_Mod_Item_Model_END'
-        if (msrc.includes(modelMarker)) {
-          const indentedModel = '        ' + newModelLine.trim()
-          wf(modelFile, msrc.replace(modelMarker, '\n' + indentedModel + '\n        //YCS_Mod_Item_Model_END'))
-        }
+        wf(modelFile, msrc)
       }
     }
     if (oldId && oldId !== newId) {
@@ -412,6 +425,18 @@ app.post('/api/items/update', (req, res) => {
       try {
         const tPath = path.join(MOD_ROOT,'assets',MODID,'textures','item',`${oldId}.png`)
         if (fs.existsSync(tPath)) { fs.unlinkSync(tPath); triggerIdeaReload(tPath); }
+        const mPath = tPath + '.mcmeta'
+        if (fs.existsSync(mPath)) { fs.unlinkSync(mPath); triggerIdeaReload(mPath); }
+      } catch {}
+    } else {
+      // Same id — check if animated→static or static→animated: clean up stale mcmeta or irrelevant files
+      try {
+        const texBase = path.join(MOD_ROOT,'assets',MODID,'textures','item',`${newId}.png`)
+        const mcmeta  = texBase + '.mcmeta'
+        const isNowAnimated = (req.body.isAnimated === true || req.body.isAnimated === 'true')
+        if (!isNowAnimated && fs.existsSync(mcmeta)) {
+          fs.unlinkSync(mcmeta); triggerIdeaReload(mcmeta)
+        }
       } catch {}
     }
     const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
@@ -484,11 +509,26 @@ app.post('/api/items/delete', (req, res) => {
 
 app.post('/api/items/model', (req, res) => {
   try {
-    const { line } = req.body
+    const { line, constName, id } = req.body
     const file = jp(JAVA_ROOT,'datagen','ModItemModelProvider.java')
     let src = rf(file)
-    const firstLine = line.split('\n')[0].trim()
-    if (src.includes(firstLine)) return res.json({ ok:false, reason:'already exists' })
+
+    // Remove any existing YCS-managed lines for this item inside the YCS block before inserting
+    const ycsStart = src.indexOf('//YCS_Mod_Item_Model_START')
+    const ycsEnd   = src.indexOf('//YCS_Mod_Item_Model_END')
+    if (ycsStart !== -1 && ycsEnd !== -1 && (constName || id)) {
+      const before  = src.slice(0, ycsStart + '//YCS_Mod_Item_Model_START'.length)
+      const section = src.slice(ycsStart + '//YCS_Mod_Item_Model_START'.length, ycsEnd)
+      const after   = src.slice(ycsEnd)
+      const cleaned = section.split('\n').filter(l => {
+        if (constName && l.includes(`ModItems.${constName}`)) return false
+        if (id && (l.includes(`"item/${id}"`) || (l.includes(`"${id}"`) && (l.includes('getBuilder') || l.includes('trackGenerated'))))) return false
+        return true
+      }).join('\n')
+      src = before + cleaned + after
+      src = src.replace(/\n{3,}/g, '\n\n')
+    }
+
     const marker = '\n        //YCS_Mod_Item_Model_END'
     if (!src.includes(marker)) return res.json({ ok:false, reason:'YCS_Mod_Item_Model_END marker not found' })
     const indented = line.split('\n').map(l => '        ' + l.trim()).join('\n')

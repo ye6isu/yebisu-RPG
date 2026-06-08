@@ -46,6 +46,8 @@ public class yebisuRPG {
 
         YCSTabRegistry.register(modEventBus);
 
+        net.ye6isu.yebisuRPG.entity.ModEntities.register(modEventBus);
+
         //modEventBus.addListener(this::addCreative); To be decided if needed
 
         // Client-only setup (keybinds, client-side registrations, etc.)

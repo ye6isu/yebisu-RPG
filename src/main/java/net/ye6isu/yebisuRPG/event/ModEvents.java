@@ -9,7 +9,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.ye6isu.yebisuRPG.entity.ModEntities;
+import net.ye6isu.yebisuRPG.entity.custom.JoeEntity;
 import net.ye6isu.yebisuRPG.item.ModItems;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
@@ -24,4 +27,10 @@ public class ModEvents {
             }
         }
     }
+
+    @SubscribeEvent
+    public static void registerAttributes(EntityAttributeCreationEvent event) {
+        event.put(ModEntities.JOE.get(), JoeEntity.createAttributes().build());
+    }
+
 }

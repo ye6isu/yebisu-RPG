@@ -10,7 +10,7 @@ import net.ye6isu.yebisuRPG.yebisuRPG;
 
 public class JoeRenderer extends MobRenderer<JoeEntity, JoeModel<JoeEntity>> {
 
-    public JoeRenderer(EntityRendererProvider.Context context, JoeModel<JoeEntity> model, float shadowRadius) {
+    public JoeRenderer(EntityRendererProvider.Context context) {
         super(context, new JoeModel<>(context.bakeLayer(JoeModel.LAYER_LOCATION)), 0.25f);
     }
 
