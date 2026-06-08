@@ -1,4 +1,28 @@
-import { useState, useRef, useCallback, useEffect, useMemo, createContext, useContext } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo, createContext, useContext } from "react";
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{padding: 20, color: 'red', background: '#222', zIndex: 9999, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
+        <h1>Fatal Error in Visual Editor</h1>
+        <pre>{this.state.error?.toString()}</pre>
+        <pre>{this.state.error?.stack}</pre>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
+
 
 const MODID="yebisurpg", BASE="http://localhost:3001/api";
 const FONT_URL=`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;400;500;700;800&display=swap');`;
@@ -412,6 +436,7 @@ const YCS_FEATURES={
 // --- Block editor type system & palette ---
 const LINK_ENTITY = "entity";
 const LINK_NUMBER = "number";
+const LINK_LOGIC = "logic";
 
 function resolveEntityVar(opcode, methodKey) {
   if (opcode === "entity.event") {
@@ -434,6 +459,17 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (!node) return null;
   if (node.opcode === "entity.event" || node.opcode === "entity.target") return resolveEntityVar(node.opcode, methodKey);
   if (node.opcode === "number.literal") return node.fields?.value ?? "0";
+  if (node.opcode === "logic.true") return "true";
+  if (node.opcode === "logic.false") return "false";
+  if (node.opcode.startsWith("entity.look_")) {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    if (node.opcode === "entity.look_x") return `(${ent}.getLookAngle().x)`;
+    if (node.opcode === "entity.look_y") return `(${ent}.getLookAngle().y)`;
+    if (node.opcode === "entity.look_z") return `(${ent}.getLookAngle().z)`;
+    if (node.opcode === "entity.look_client_x") return `(${ent}.getViewVector(1.0F).x)`;
+    if (node.opcode === "entity.look_client_y") return `(${ent}.getViewVector(1.0F).y)`;
+    if (node.opcode === "entity.look_client_z") return `(${ent}.getViewVector(1.0F).z)`;
+  }
   return null;
 }
 function getChain(startNextId, nodes) {
@@ -446,6 +482,26 @@ function compileChain(startNextId, nodes, methodKey) {
   return getChain(startNextId, nodes).flatMap(n => compileActionNode(n, nodes, methodKey));
 }
 function compileActionNode(node, nodes, methodKey) {
+  if (node.opcode === "control.if") {
+    const fields = node.fields || {elseIfCount:0, hasElse:false};
+    let code = "";
+    const cond = resolveSlotValue(node.slots?.condition, nodes, methodKey) || "false";
+    code += `if (${cond}) {\n`;
+    if (node.slots?.do0) code += compileChain(node.slots.do0, nodes, methodKey).map(l=>"  "+l).join("\n") + "\n";
+    code += "}";
+    for (let i = 1; i <= fields.elseIfCount; i++) {
+        const cnd = resolveSlotValue(node.slots?.["condition" + i], nodes, methodKey) || "false";
+        code += ` else if (${cnd}) {\n`;
+        if (node.slots?.["do" + i]) code += compileChain(node.slots["do" + i], nodes, methodKey).map(l=>"  "+l).join("\n") + "\n";
+        code += "}";
+    }
+    if (fields.hasElse) {
+        code += ` else {\n`;
+        if (node.slots?.doElse) code += compileChain(node.slots.doElse, nodes, methodKey).map(l=>"  "+l).join("\n") + "\n";
+        code += "}";
+    }
+    return code.split("\n");
+  }
   if (node.opcode === "effect.apply") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     const eff = node.fields?.effect || "MobEffects.REGENERATION";
@@ -462,6 +518,19 @@ const PALETTE_BLOCKS = [
   ]},
   { category:"Numbers", blocks:[
     { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
+    { opcode:"entity.look_x", label:"Look Dir X", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_y", label:"Look Dir Y", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_z", label:"Look Dir Z", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_client_x", label:"Look Dir (Client) X", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_client_y", label:"Look Dir (Client) Y", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_client_z", label:"Look Dir (Client) Z", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+  ]},
+  { category:"Logic", blocks:[
+    { opcode:"logic.true", label:"True", linkType:LINK_LOGIC, hint:"True value" },
+    { opcode:"logic.false", label:"False", linkType:LINK_LOGIC, hint:"False value" },
+  ]},
+  { category:"Control", blocks:[
+    { opcode:"control.if", label:"If", isAction:true, hint:"If statement", slotDefs:[{key:"condition",accepts:LINK_LOGIC}] },
   ]},
   { category:"Effects", blocks:[
     { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
@@ -866,29 +935,131 @@ function CustomClassPanel(){
 // ─── Visual Scripting UI ──────────────────────────────────────────────────────
 
 function VisualEditorPanel({methodKey,form,F,onBack,className}){
+  return <ErrorBoundary><VisualEditorPanelInner methodKey={methodKey} form={form} F={F} onBack={onBack} className={className}/></ErrorBoundary>;
+}
+function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
   const[nodes,setNodes]=useState(init);
   const[saving,setSaving]=useState(false);
   const[saveStatus,setSaveStatus]=useState(null);
   const[pan,setPan]=useState({x:0,y:0});
+  const [zoom,setZoom]=useState(1);
   const canvasRef=useRef();
   const ip=useRef(false),ps=useRef(null),dn=useRef(null);
   useEffect(()=>{F("methodBlocks",{...(form.methodBlocks||{}),[methodKey]:nodes});},[nodes]);
-  const upd=fn=>setNodes(fn);
+  const recalcLayout = (nodes) => {
+    let nextNs = nodes.map(n => ({...n}));
+    const roots = nextNs.filter(n => n.id === "start" || (!nextNs.some(p => p.nextId === n.id || (p.slots && Object.values(p.slots).includes(n.id)))));
+    function getH(id) {
+      if (!id) return 0;
+      let cur = id; let h = 0; let loops=0;
+      while(cur) {
+        if(loops++ > 500) break;
+        const n = nextNs.find(x=>x.id===cur);
+        if(!n) break;
+        if (n.opcode === "control.if") {
+          const f = n.fields || {elseIfCount:0, hasElse:false};
+          let d0h = Math.max(20, getH(n.slots?.do0));
+          let ih = 40 + d0h;
+          n.gapHeights = { do0: d0h };
+          for (let i=1; i<=f.elseIfCount; i++) {
+             let dH = Math.max(20, getH(n.slots?.['do'+i]));
+             ih += 30 + dH;
+             n.gapHeights['do'+i] = dH;
+          }
+          if (f.hasElse) {
+             let dH = Math.max(20, getH(n.slots?.doElse));
+             ih += 30 + dH;
+             n.gapHeights.doElse = dH;
+          }
+          h += ih + 25;
+          n.height = ih + 25;
+        } else {
+          h += n.opcode==="effect.apply"?115:95;
+        }
+        cur = n.nextId;
+      }
+      return h;
+    }
+    // also compute gapHeights for the layout
+    function layoutChain(startId, sx, sy, depth) {
+      let cur = startId;
+      let cy = sy;
+      while(cur) {
+        const n = nextNs.find(x=>x.id===cur);
+        if(!n) break;
+        n.x = sx; n.y = cy; n.depth = depth;
+        if (n.opcode === "control.if") {
+          const f = n.fields || {elseIfCount:0, hasElse:false};
+          let innerY = cy + 40;
+          if (n.slots?.do0) layoutChain(n.slots.do0, sx + 20, innerY, depth + 1);
+          innerY += Math.max(20, getH(n.slots?.do0));
+          for (let i=1; i<=f.elseIfCount; i++) {
+            innerY += 30;
+            if (n.slots?.['do'+i]) layoutChain(n.slots['do'+i], sx + 20, innerY, depth + 1);
+            innerY += Math.max(20, getH(n.slots?.['do'+i]));
+          }
+          if (f.hasElse) {
+            innerY += 30;
+            if (n.slots?.doElse) layoutChain(n.slots.doElse, sx + 20, innerY, depth + 1);
+            innerY += Math.max(20, getH(n.slots?.doElse));
+          }
+          innerY += 25; cy = innerY;
+        } else {
+          cy += n.opcode === "effect.apply" ? 115 : 95;
+        }
+        cur = n.nextId;
+      }
+    }
+    for (const r of roots) if (r.id === "start" || r.isAction) {
+        getH(r.id); // Compute height and gapHeights for the root node!
+        layoutChain(r.id, r.x, r.y, 1);
+    }
+    return nextNs;
+  };
+  const upd=fn=>setNodes(prev => recalcLayout(fn(prev)));
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
     upd(ns=>{
-      const td=new Set([id]);
-      const node=ns.find(n=>n.id===id);
-      if(node?.isAction){let c=node.nextId;while(c){td.add(c);c=ns.find(n=>n.id===c)?.nextId||null;}}
-      return ns.filter(n=>!td.has(n.id)).map(n=>({...n,nextId:td.has(n.nextId)?null:n.nextId,slots:Object.fromEntries(Object.entries(n.slots||{}).map(([k,v])=>[k,td.has(v)?null:v]))}));
+      const ch=new Set([id, ...getDescendants(id, ns)]);
+      return ns.filter(n=>!ch.has(n.id)).map(n=>{
+          const nextSlots = {...n.slots};
+          for(const k in nextSlots) { if(ch.has(nextSlots[k])) nextSlots[k] = null; }
+          return {...n,nextId:ch.has(n.nextId)?null:n.nextId, slots: nextSlots};
+      });
     });
+  };
+
+  const duplicateNode = (id) => {
+      if(id==="start")return;
+      upd(ns => {
+         const toCopy = new Set([id, ...getDescendants(id, ns)]);
+         const oldNodes = ns.filter(n => toCopy.has(n.id));
+         const idMap = {};
+         oldNodes.forEach(n => {
+             idMap[n.id] = n.opcode + "_" + Math.random().toString(36).substr(2,9);
+         });
+         const newNodes = oldNodes.map(n => {
+            const copy = {...n, id: idMap[n.id], x: n.x + (n.id===id ? 20 : 0), y: n.y + (n.id===id ? 20 : 0)};
+            if (copy.nextId && idMap[copy.nextId]) copy.nextId = idMap[copy.nextId];
+            else copy.nextId = null;
+            if (copy.slots) {
+                copy.slots = {...copy.slots};
+                for(const k in copy.slots) {
+                    if (copy.slots[k] && idMap[copy.slots[k]]) copy.slots[k] = idMap[copy.slots[k]];
+                    else copy.slots[k] = null;
+                }
+            }
+            return copy;
+         });
+         return [...ns, ...newNodes];
+      });
   };
 
   const getDescendants = (nId, curNs) => {
@@ -902,8 +1073,8 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
 
   const handleDragStart = (id, ox, oy, cx, cy) => {
     const r=canvasRef.current?.getBoundingClientRect();
-    const stX = cx - (r?.left||0) - pan.x - ox;
-    const stY = cy - (r?.top||0) - pan.y - oy;
+    const stX = (cx - (r?.left||0))/zoom - pan.x - ox/zoom;
+    const stY = (cy - (r?.top||0))/zoom - pan.y - oy/zoom;
     dn.current = {id, ox, oy};
     upd(ns => {
       let nextNs = [...ns];
@@ -925,10 +1096,10 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
 
   const onMD=e=>{if(e.target===canvasRef.current||e.target.classList.contains("canvas-bg")){ip.current=true;ps.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};}};
   const onMM=e=>{
-    if(ip.current&&ps.current)setPan({x:ps.current.px+(e.clientX-ps.current.mx),y:ps.current.py+(e.clientY-ps.current.my)});
+    if(ip.current&&ps.current)setPan({x:ps.current.px+(e.clientX-ps.current.mx)/zoom,y:ps.current.py+(e.clientY-ps.current.my)/zoom});
     if(dn.current){
       const{id,ox,oy}=dn.current;const r=canvasRef.current?.getBoundingClientRect();if(!r)return;
-      const nx=e.clientX-r.left-pan.x-ox,ny=e.clientY-r.top-pan.y-oy;
+      const nx=(e.clientX-r.left)/zoom-pan.x-ox/zoom,ny=(e.clientY-r.top)/zoom-pan.y-oy/zoom;
       upd(ns=>{
         const node=ns.find(n=>n.id===id);if(!node)return ns;const dx=nx-node.x,dy=ny-node.y;
         const ch=new Set([id, ...getDescendants(id, ns)]);
@@ -949,24 +1120,64 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
         if(dragged.isAction||dragged.opcode==="start"){
           if(dragged.id!=="start"){
              const dt={x:dragged.x+115,y:dragged.y};
-             let ct=null,md=60;
+             let ct=null,csk="nextId",md=60;
              for(const n of nextNs){
                if(n.id===dragged.id)continue;
                if(n.isAction||n.opcode==="start"){
                  const ch=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
                  if(ch.has(n.id))continue;
-                 const nb={x:n.x+115,y:n.y+(n.id==="start"?40:95)};
+                 const bottomY = n.height || (n.id==="start"?40:95);
+                 const nb={x:n.x+115,y:n.y+bottomY};
                  const dist=Math.hypot(dt.x-nb.x,dt.y-nb.y);
-                 if(dist<md){md=dist;ct=n.id;}
+                 if(dist<md){md=dist;ct=n.id;csk="nextId";}
+
+                 const isIf = n.opcode === "control.if";
+                 if (isIf) {
+                     function getH(id) {
+                         if (!id) return 0;
+                         let cur = id; let h = 0; let loops=0;
+                         while(cur) {
+                           if(loops++ > 500) break;
+                           const c = nextNs.find(x=>x.id===cur);
+                           if(!c) break;
+                           if (c.opcode === "control.if") {
+                             const f = c.fields || {elseIfCount:0, hasElse:false};
+                             let ih = 40 + Math.max(20, getH(c.slots?.do0));
+                             for (let i=1; i<=f.elseIfCount; i++) ih += 30 + Math.max(20, getH(c.slots?.['do'+i]));
+                             if (f.hasElse) ih += 30 + Math.max(20, getH(c.slots?.doElse));
+                             h += ih + 25;
+                           } else h += c.opcode==="effect.apply"?115:95;
+                           cur = c.nextId;
+                         }
+                         return h;
+                     }
+                     let curY = 40;
+                     const f = n.fields || {elseIfCount:0, hasElse:false};
+                     for (let i=0; i<=f.elseIfCount + (f.hasElse?1:0); i++) {
+                         let sk = i===0 ? "do0" : i<=f.elseIfCount ? "do"+i : "doElse";
+                         let snb = {x: n.x + 130, y: n.y + curY};
+                         let d = Math.hypot(dt.x - snb.x, dt.y - snb.y);
+                         if (d < md && !n.slots?.[sk]) { md = d; ct = n.id; csk = sk; }
+                         curY += Math.max(20, getH(n.slots?.[sk]));
+                         if (i < f.elseIfCount + (f.hasElse?1:0)) curY += 30;
+                     }
+                     let bottomSnb = {x: n.x + 115, y: n.y + curY + 25};
+                     // Only snap to inner slots for IF, bottom snapping works via regular nextId logic above
+                     let db = Math.hypot(dt.x - bottomSnb.x, dt.y - bottomSnb.y);
+                     if (db < md && !n.nextId) { md = db; ct = n.id; csk = "nextId"; }
+                 }
                }
              }
              if(ct){
                const parent=nextNs.find(x=>x.id===ct);
-               const dx=parent.x-dragged.x,dy=(parent.y+(parent.id==="start"?45:100))-dragged.y;
                const sub=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
-               const oldChild=parent.nextId;
-               nextNs=nextNs.map(x=>x.id===parent.id?{...x,nextId:dragged.id}:x.id===dragged.id&&oldChild?{...x,nextId:oldChild}:x);
-               nextNs=nextNs.map(x=>sub.has(x.id)?{...x,x:x.x+dx,y:x.y+dy}:x);
+               if (csk === "nextId") {
+                 const oldChild=parent.nextId;
+                 nextNs=nextNs.map(x=>x.id===parent.id?{...x,nextId:dragged.id}:x.id===dragged.id&&oldChild?{...x,nextId:oldChild}:x);
+               } else {
+                 const oldChild=parent.slots?.[csk];
+                 nextNs=nextNs.map(x=>x.id===parent.id?{...x,slots:{...(x.slots||{}), [csk]:dragged.id}}:x.id===dragged.id&&oldChild?{...x,nextId:oldChild}:x);
+               }
              }
           }
         }else if(dragged.linkType){
@@ -1005,7 +1216,7 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
   const onDrop=e=>{
     e.preventDefault();const data=e.dataTransfer.getData("block");if(!data)return;
     const bd=JSON.parse(data);const r=canvasRef.current.getBoundingClientRect();
-    add(bd,e.clientX-r.left-pan.x-100,e.clientY-r.top-pan.y-20);
+    add(bd,(e.clientX-r.left)/zoom-pan.x-100,(e.clientY-r.top)/zoom-pan.y-20);
   };
   const save=async()=>{
     setSaving(true);setSaveStatus(null);
@@ -1044,49 +1255,80 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
         </div>)}
       </div>
       <div ref={canvasRef} className="canvas-bg"
-        style={{flex:1,position:"relative",overflow:"hidden",background:"#0d0d0f",backgroundImage:"radial-gradient(circle,#1a1a1e 1px,transparent 1px)",backgroundSize:"24px 24px"}}
-        onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onDragOver={e=>e.preventDefault()} onDrop={onDrop}>
+        style={{flex:1,position:"relative",overflow:"hidden",background:"#0d0d0f"}}
+        onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}
+        onDragOver={e=>e.preventDefault()} onDrop={onDrop}
+        onWheel={e=>{
+            if(!e.ctrlKey){
+                const delta = e.deltaY < 0 ? 0.1 : -0.1;
+                const r = canvasRef.current.getBoundingClientRect();
+                const sx = e.clientX - r.left;
+                const sy = e.clientY - r.top;
+                const nz = Math.min(Math.max(0.4, zoom + delta), 2);
+                if (nz !== zoom) {
+                    setZoom(nz);
+                    setPan(p => ({
+                        x: p.x + sx * (1/nz - 1/zoom),
+                        y: p.y + sy * (1/nz - 1/zoom)
+                    }));
+                }
+            }
+        }}>
+        <div style={{position:"absolute",left:0,top:0,right:0,bottom:0,pointerEvents:"none",
+            backgroundImage:"radial-gradient(circle,#1a1a1e 1px,transparent 1px)",
+            backgroundSize:`${24*zoom}px ${24*zoom}px`,
+            backgroundPosition:`${pan.x*zoom}px ${pan.y*zoom}px`}} className="canvas-bg"/>
+        <div className="canvas-bg" style={{transform:`scale(${zoom})`, transformOrigin:"0 0", width:"100%", height:"100%"}}>
         {nodes.length===1&&!nodes[0].nextId&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none",textAlign:"center",color:C.faint}}>
           <div style={{fontSize:28,marginBottom:8,opacity:.3}}>{"</>"}</div>
           <div style={{fontSize:12,marginBottom:4}}>drag blocks here</div>
           <div style={{fontSize:10,color:"#2a4050"}}>connect to Start to run</div>
         </div>}
-        <svg style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",pointerEvents:"none",transform:`translate(${pan.x}px,${pan.y}px)`,zIndex:0}}>
+        <svg style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:0,overflow:"visible"}}>
           {nodes.map(node=>{
             const lines = [];
             if(node.nextId){
               const child = nodes.find(n=>n.id===node.nextId);
               if(child){
-                const h = node.id==="start"?40:95;
-                const x1 = node.x + 115, y1 = node.y + h;
-                const x2 = child.x + 115, y2 = child.y;
+                const isIf=node.opcode==="control.if";
+                const h = node.height || (node.id==="start"?40:isIf?35:95);
+                const x1 = pan.x + node.x + 115, y1 = pan.y + node.y + h;
+                const x2 = pan.x + child.x + 115, y2 = pan.y + child.y;
                 lines.push(<path key={node.id+"_chain"} d={`M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`} stroke={C.accent} strokeWidth="3" fill="none" opacity="0.6"/>);
               }
             }
             return lines;
           })}
         </svg>
-        <div style={{position:"absolute",left:0,top:0,transform:"translate("+pan.x+"px,"+pan.y+"px)"}}>
+        <div style={{position:"absolute",left:pan.x,top:pan.y}}>
           {nodes.map(node=>{
-             let isSlotted = false;
-             for(const p of nodes){if(p.slots){for(const sk in p.slots){if(p.slots[sk]===node.id)isSlotted=true;}}}
-             if(isSlotted) return null;
+             let isSlottedVal = false;
+             if (node.linkType) {
+                 for(const p of nodes){if(p.slots){for(const sk in p.slots){if(p.slots[sk]===node.id)isSlottedVal=true;}}}
+             }
+             if (isSlottedVal) return null;
              return <CanvasNode key={node.id} node={node} nodes={nodes} methodKey={methodKey} inChain={ch.has(node.id)}
                onDragStart={handleDragStart}
                onDelete={(nid)=>del(nid)}
+               onCopy={typeof duplicateNode!=="undefined"?duplicateNode:null}
                onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?{...n,fields:{...n.fields,[f]:v}}:n))}
                onDisconnectChain={(nid)=>upd(ns=>ns.map(n=>n.id===nid?{...n,nextId:null}:n))}
              />;
           })}
+        </div>
         </div>
       </div>
     </div>
   </div>;
 }
 
-function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldChange,onDisconnectChain,inline}){
+function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldChange,onDisconnectChain,onCopy,inline}){
+  const [showSettings, setShowSettings] = useState(false);
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
-  const cc=node.linkType===LINK_ENTITY?"#638999":node.linkType===LINK_NUMBER?"#6a8fa8":"#5a9a6a";
+  const isIf=node.opcode==="control.if";
+  const cc=node.linkType===LINK_ENTITY?"#638999":node.linkType===LINK_NUMBER?"#6a8fa8":node.linkType===LINK_LOGIC?"#a8a86a":"#5a9a6a";
+  const bg=isSt?"#0e1e30":(!inChain&&isAct)?"#1a1a1a":isAct?"#1a2a20":node.linkType===LINK_ENTITY?"#162028":"#16202a";
+  const br=isSt?C.accent:(!inChain&&isAct)?"#2a2a2a":inChain?"#2a4a30":"#222830";
 
   if(inline){
      return <div onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}
@@ -1102,28 +1344,37 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
      </div>;
   }
 
-  return <div
-    style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?90:230,
-      background:isSt?"#0e1e30":(!inChain&&isAct)?"#1a1a1a":isAct?"#1a2a20":node.linkType===LINK_ENTITY?"#162028":"#16202a",
-      border:"1.5px solid "+(isSt?C.accent:(!inChain&&isAct)?"#2a2a2a":inChain?"#2a4a30":"#222830"),
-      borderRadius:isVal?10:6,boxShadow:"0 3px 14px rgba(0,0,0,.55)",userSelect:"none",zIndex:1,opacity:(!inChain&&isAct&&!isSt)?0.6:1}}
-    onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
-    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderBottom:"1px solid rgba(255,255,255,.05)",cursor:"grab",background:isSt?"#0a1828":"transparent"}}>
+  const commonHeader = (
+    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",cursor:"grab",background:isSt?"#0a1828":"transparent",flex:1}}>
       {isVal&&<div style={{width:8,height:8,borderRadius:"50%",background:cc,flexShrink:0}}/>}
-      <span style={{fontFamily:"monospace",fontSize:11,color:isSt?C.accent:C.text,fontWeight:500,flex:1}}>
+      <span style={{fontFamily:"monospace",fontSize:11,color:isSt?C.accent:C.text,fontWeight:500,flex:isIf?0:1,whiteSpace:"nowrap"}}>
         {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
          :node.opcode==="entity.event"?"Event Entity -> "+resolveEntityVar("entity.event",methodKey)
          :node.opcode==="entity.target"?"Target Entity -> "+resolveEntityVar("entity.target",methodKey)
          :node.opcode==="number.literal"?"Number"
          :node.opcode==="effect.apply"?"Add Effect"
+         :node.opcode==="control.if"?"If"
          :node.opcode}
       </span>
+      {isIf&&<div style={{marginLeft:8,flex:1}}>
+        <SlotConn sk="condition" sc="#a8a86a" connId={node.slots?.condition} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+      </div>}
       {!inChain&&isAct&&!isSt&&<span style={{fontSize:9,color:"#666"}} title="Not connected to Start">!</span>}
-      {!isSt&&<span onClick={e=>{e.stopPropagation();onDelete(node.id);}} onMouseDown={e=>e.stopPropagation()} style={{color:"#553333",fontSize:11,cursor:"pointer",padding:"0 3px"}}>x</span>}
+      {!isSt&&<span onClick={e=>{e.stopPropagation();if(onCopy)onCopy(node.id);}} onMouseDown={e=>e.stopPropagation()} style={{color:"#449944",fontSize:11,cursor:"pointer",padding:"0 4px",marginLeft:"auto"}} title="Copy Branch">c</span>}
+      {!isSt&&<span onClick={e=>{e.stopPropagation();onDelete(node.id);}} onMouseDown={e=>e.stopPropagation()} style={{color:"#aa4444",fontSize:11,cursor:"pointer",padding:"0 4px"}} title="Delete">x</span>}
     </div>
+  );
+
+  const blockBody = (
     <div style={{padding:"6px 8px",display:"flex",flexDirection:"column",gap:5}}>
       {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:70,background:"#0e161e",border:"1px solid #2a3a4a",borderRadius:3,padding:"3px 6px",color:C.text,fontSize:12,fontFamily:"monospace",outline:"none"}}/>}
+      
+      {node.opcode.startsWith("entity.look_")&&<div style={{display:"flex",alignItems:"center",gap:5}}>
+         <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>entity</span>
+         <SlotConn sk="entity" sc="#638999" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+      </div>}
+
       {node.opcode==="effect.apply"&&<div style={{display:"flex",flexDirection:"column",gap:5}}>
         <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
           <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>to</span>
@@ -1139,14 +1390,94 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         </div>
       </div>}
     </div>
-    {isAct&&<div style={{display:"flex",justifyContent:"center",paddingBottom:5}}>
-      <div onMouseDown={e=>{e.stopPropagation();if(node.nextId)onDisconnectChain(node.id);}}
-        title={node.nextId?"click to disconnect":""}
-        style={{width:12,height:12,borderRadius:"50%",cursor:node.nextId?"pointer":"default",background:node.nextId?C.accent:"#2a2a30",border:"2px solid "+(node.nextId?C.accent:"#3a3a44"),boxShadow:node.nextId?"0 0 6px "+C.accent+"44":""}}/>
-    </div>}
-  </div>;
-}
+  );
 
+  if (isIf) {
+      return (
+        <div style={{position:"absolute",left:node.x,top:node.y,minWidth:230,zIndex:node.depth||1,opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 3px 10px rgba(0,0,0,.5))"}}
+             onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
+            
+            {/* Settings Modal */}
+            <div style={{position:"absolute",right:0,top:-25,zIndex:10}}>
+               <Btn sm v="g" onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙ Settings</Btn>
+               {showSettings&&<div style={{position:"absolute",right:0,top:25,background:"#222",border:"1px solid #444",padding:10,borderRadius:5,zIndex:100,display:"flex",flexDirection:"column",gap:5}}>
+                  <div style={{fontSize:11,color:"#ccc",marginBottom:5,whiteSpace:"nowrap"}}>If Branches</div>
+                  <Btn sm v="g" onClick={()=>{
+                     const f = node.fields || {elseIfCount:0, hasElse:false};
+                     onFieldChange(node.id, "elseIfCount", f.elseIfCount+1);
+                  }}>+ Else If</Btn>
+                  <Btn sm v="g" onClick={()=>{
+                     const f = node.fields || {elseIfCount:0, hasElse:false};
+                     if(f.elseIfCount>0) onFieldChange(node.id, "elseIfCount", f.elseIfCount-1);
+                  }}>- Else If</Btn>
+                  <Btn sm v="g" onClick={()=>{
+                     const f = node.fields || {elseIfCount:0, hasElse:false};
+                     onFieldChange(node.id, "hasElse", !f.hasElse);
+                  }}>{(node.fields?.hasElse) ? "- Else" : "+ Else"}</Btn>
+               </div>}
+            </div>
+
+            {/* Header */}
+            <div style={{width:230,height:40,background:bg,border:"1.5px solid "+br,borderRadius:"6px 6px 6px 0",borderBottom:"none",display:"flex"}}>
+                {commonHeader}
+            </div>
+
+            {/* do0 Spine & Gap */}
+            <div style={{display:"flex"}}>
+                <div style={{width:20,height:node.gapHeights?.do0||20,background:bg,borderLeft:"1.5px solid "+br}}/>
+                <div style={{flex:1,position:"relative"}}>
+                     {!node.slots?.do0 && <div style={{position:"absolute",left:10,top:4,width:12,height:12,borderRadius:"50%",border:"2px dashed #4a4a54"}}/>}
+                </div>
+            </div>
+
+            {/* Else If branches */}
+            {Array.from({length: node.fields?.elseIfCount || 0}).map((_, i) => (
+              <div style={{display:"contents"}} key={i}>
+                  <div style={{width:230,height:30,background:bg,border:"1.5px solid "+br,borderRight:"none",borderLeft:"1.5px solid "+br,borderRadius:"0 6px 6px 0",display:"flex",alignItems:"center",paddingLeft:8}}>
+                      <span style={{fontFamily:"monospace",fontSize:11,color:C.text,fontWeight:500,marginRight:8}}>Else If</span>
+                      <SlotConn sk={"condition"+(i+1)} sc="#a8a86a" connId={node.slots?.["condition"+(i+1)]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+                  </div>
+                  <div style={{display:"flex"}}>
+                      <div style={{width:20,height:node.gapHeights?.["do"+(i+1)]||20,background:bg,borderLeft:"1.5px solid "+br}}/>
+                      <div style={{flex:1,position:"relative"}}>
+                           {!node.slots?.["do"+(i+1)] && <div style={{position:"absolute",left:10,top:4,width:12,height:12,borderRadius:"50%",border:"2px dashed #4a4a54"}}/>}
+                      </div>
+                  </div>
+              </div>
+            ))}
+
+            {/* Else branch */}
+            {node.fields?.hasElse && (
+              <div style={{display:"contents"}}>
+                  <div style={{width:230,height:30,background:bg,border:"1.5px solid "+br,borderRight:"none",borderLeft:"1.5px solid "+br,borderRadius:"0 6px 6px 0",display:"flex",alignItems:"center",paddingLeft:8}}>
+                      <span style={{fontFamily:"monospace",fontSize:11,color:C.text,fontWeight:500}}>Else</span>
+                  </div>
+                  <div style={{display:"flex"}}>
+                      <div style={{width:20,height:node.gapHeights?.doElse||20,background:bg,borderLeft:"1.5px solid "+br}}/>
+                      <div style={{flex:1,position:"relative"}}>
+                           {!node.slots?.doElse && <div style={{position:"absolute",left:10,top:4,width:12,height:12,borderRadius:"50%",border:"2px dashed #4a4a54"}}/>}
+                      </div>
+                  </div>
+              </div>
+            )}
+
+            {/* Bottom Cap */}
+            <div style={{width:230,height:25,background:bg,border:"1.5px solid "+br,borderRadius:"0 6px 6px 6px",borderTop:"none"}}/>
+        </div>
+      );
+  }
+
+  // Standard Action or Value Block
+  return (
+    <div
+      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?90:230,height:node.height||"auto",
+        background:bg, border:"1.5px solid "+br, borderRadius:isVal?10:6,boxShadow:"0 3px 14px rgba(0,0,0,.55)",userSelect:"none",zIndex:node.depth||1,opacity:(!inChain&&isAct&&!isSt)?0.6:1}}
+      onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
+      {commonHeader}
+      {blockBody}
+    </div>
+  );
+}
 function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange}){
   const cn=connId?nodes.find(n=>n.id===connId):null;
   if(cn) return <CanvasNode node={cn} nodes={nodes} methodKey={mk} onDragStart={onDragStart} onFieldChange={onFieldChange} inline/>;
