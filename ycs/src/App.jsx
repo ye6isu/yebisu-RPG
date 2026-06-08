@@ -518,12 +518,12 @@ const PALETTE_BLOCKS = [
   ]},
   { category:"Numbers", blocks:[
     { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
-    { opcode:"entity.look_x", label:"Look Dir X", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_y", label:"Look Dir Y", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_z", label:"Look Dir Z", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_client_x", label:"Look Dir (Client) X", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_client_y", label:"Look Dir (Client) Y", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_client_z", label:"Look Dir (Client) Z", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_x", label:"Look Dir X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_y", label:"Look Dir Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_z", label:"Look Dir Z of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_client_x", label:"Look Dir X (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_client_y", label:"Look Dir Y (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.look_client_z", label:"Look Dir Z (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
   ]},
   { category:"Logic", blocks:[
     { opcode:"logic.true", label:"True", linkType:LINK_LOGIC, hint:"True value" },
@@ -941,6 +941,26 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
   const[nodes,setNodes]=useState(init);
+  const[selected,setSelected]=useState(null);
+  const selRef=useRef(null);
+  useEffect(()=>{selRef.current=selected;},[selected]);
+  useEffect(()=>{
+    const handleKeyDown = (e) => {
+       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+       if ((e.key === 'Delete' || e.key === 'Backspace') && selected && selected !== "start") {
+           del(selected);
+           setSelected(null);
+       }
+       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selected && selected !== "start") {
+           window.__clipboardNodeId = selected;
+       }
+       if ((e.ctrlKey || e.metaKey) && e.key === 'v' && window.__clipboardNodeId) {
+           if (typeof duplicateNode !== "undefined") duplicateNode(window.__clipboardNodeId);
+       }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selected, nodes]);
   const[saving,setSaving]=useState(false);
   const[saveStatus,setSaveStatus]=useState(null);
   const[pan,setPan]=useState({x:0,y:0});
@@ -959,30 +979,29 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
         const n = nextNs.find(x=>x.id===cur);
         if(!n) break;
         if (n.opcode === "control.if") {
-          const f = n.fields || {elseIfCount:0, hasElse:false};
-          let d0h = Math.max(20, getH(n.slots?.do0));
-          let ih = 40 + d0h;
-          n.gapHeights = { do0: d0h };
-          for (let i=1; i<=f.elseIfCount; i++) {
-             let dH = Math.max(20, getH(n.slots?.['do'+i]));
-             ih += 30 + dH;
-             n.gapHeights['do'+i] = dH;
-          }
-          if (f.hasElse) {
-             let dH = Math.max(20, getH(n.slots?.doElse));
-             ih += 30 + dH;
-             n.gapHeights.doElse = dH;
-          }
-          h += ih + 25;
-          n.height = ih + 25;
+           const f = n.fields || {elseIfCount:0, hasElse:false};
+           let d0h = Math.max(0, getH(n.slots?.do0));
+           let ih = 50 + d0h;
+           n.gapHeights = { do0: d0h };
+           for (let i=1; i<=f.elseIfCount; i++) {
+              let dH = Math.max(0, getH(n.slots?.["do"+i]));
+              ih += 50 + dH;
+              n.gapHeights['do'+i] = dH;
+           }
+           if (f.hasElse) {
+              let dH = Math.max(0, getH(n.slots?.doElse));
+              ih += 50 + dH;
+              n.gapHeights.doElse = dH;
+           }
+           h += ih;
+           n.height = ih;
         } else {
-          h += n.opcode==="effect.apply"?115:95;
+           h += 50;
         }
         cur = n.nextId;
       }
       return h;
     }
-    // also compute gapHeights for the layout
     function layoutChain(startId, sx, sy, depth) {
       let cur = startId;
       let cy = sy;
@@ -991,29 +1010,29 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
         if(!n) break;
         n.x = sx; n.y = cy; n.depth = depth;
         if (n.opcode === "control.if") {
-          const f = n.fields || {elseIfCount:0, hasElse:false};
-          let innerY = cy + 40;
-          if (n.slots?.do0) layoutChain(n.slots.do0, sx + 20, innerY, depth + 1);
-          innerY += Math.max(20, getH(n.slots?.do0));
-          for (let i=1; i<=f.elseIfCount; i++) {
-            innerY += 30;
-            if (n.slots?.['do'+i]) layoutChain(n.slots['do'+i], sx + 20, innerY, depth + 1);
-            innerY += Math.max(20, getH(n.slots?.['do'+i]));
-          }
-          if (f.hasElse) {
-            innerY += 30;
-            if (n.slots?.doElse) layoutChain(n.slots.doElse, sx + 20, innerY, depth + 1);
-            innerY += Math.max(20, getH(n.slots?.doElse));
-          }
-          innerY += 25; cy = innerY;
+           const f = n.fields || {elseIfCount:0, hasElse:false};
+           let innerY = cy + 50;
+           if (n.slots?.do0) layoutChain(n.slots.do0, sx + 30, innerY, depth + 1);
+           innerY += Math.max(0, getH(n.slots?.do0));
+           for (let i=1; i<=f.elseIfCount; i++) {
+             innerY += 50;
+             if (n.slots?.['do'+i]) layoutChain(n.slots['do'+i], sx + 30, innerY, depth + 1);
+             innerY += Math.max(0, getH(n.slots?.["do"+i]));
+           }
+           if (f.hasElse) {
+             innerY += 50;
+             if (n.slots?.doElse) layoutChain(n.slots.doElse, sx + 30, innerY, depth + 1);
+             innerY += Math.max(0, getH(n.slots?.doElse));
+           }
+           cy = innerY;
         } else {
-          cy += n.opcode === "effect.apply" ? 115 : 95;
+           cy += 50;
         }
         cur = n.nextId;
       }
     }
     for (const r of roots) if (r.id === "start" || r.isAction) {
-        getH(r.id); // Compute height and gapHeights for the root node!
+        getH(r.id);
         layoutChain(r.id, r.x, r.y, 1);
     }
     return nextNs;
@@ -1094,7 +1113,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
     });
   };
 
-  const onMD=e=>{if(e.target===canvasRef.current||e.target.classList.contains("canvas-bg")){ip.current=true;ps.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};}};
+  const onMD=e=>{if(e.target===canvasRef.current||e.target.classList.contains("canvas-bg")){ip.current=true;ps.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y}; setSelected(null); }};
   const onMM=e=>{
     if(ip.current&&ps.current)setPan({x:ps.current.px+(e.clientX-ps.current.mx)/zoom,y:ps.current.py+(e.clientY-ps.current.my)/zoom});
     if(dn.current){
@@ -1107,7 +1126,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
       });
     }
   };
-  const onMU=()=>{
+  const onMU=e=>{
     ip.current=false;
     if(dn.current){
       const id=dn.current.id;
@@ -1117,60 +1136,42 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
         const dragged=nextNs.find(n=>n.id===id);
         if(!dragged)return nextNs;
 
+        const r=canvasRef.current?.getBoundingClientRect();
+        if(!r) return nextNs;
+
+        const mx = (e.clientX - r.left)/zoom - pan.x;
+        const my = (e.clientY - r.top)/zoom - pan.y;
+
         if(dragged.isAction||dragged.opcode==="start"){
           if(dragged.id!=="start"){
-             const dt={x:dragged.x+115,y:dragged.y};
-             let ct=null,csk="nextId",md=60;
+             let cst=null,csk=null,md=60;
              for(const n of nextNs){
-               if(n.id===dragged.id)continue;
-               if(n.isAction||n.opcode==="start"){
-                 const ch=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
-                 if(ch.has(n.id))continue;
-                 const bottomY = n.height || (n.id==="start"?40:95);
-                 const nb={x:n.x+115,y:n.y+bottomY};
-                 const dist=Math.hypot(dt.x-nb.x,dt.y-nb.y);
-                 if(dist<md){md=dist;ct=n.id;csk="nextId";}
-
-                 const isIf = n.opcode === "control.if";
-                 if (isIf) {
-                     function getH(id) {
-                         if (!id) return 0;
-                         let cur = id; let h = 0; let loops=0;
-                         while(cur) {
-                           if(loops++ > 500) break;
-                           const c = nextNs.find(x=>x.id===cur);
-                           if(!c) break;
-                           if (c.opcode === "control.if") {
-                             const f = c.fields || {elseIfCount:0, hasElse:false};
-                             let ih = 40 + Math.max(20, getH(c.slots?.do0));
-                             for (let i=1; i<=f.elseIfCount; i++) ih += 30 + Math.max(20, getH(c.slots?.['do'+i]));
-                             if (f.hasElse) ih += 30 + Math.max(20, getH(c.slots?.doElse));
-                             h += ih + 25;
-                           } else h += c.opcode==="effect.apply"?115:95;
-                           cur = c.nextId;
-                         }
-                         return h;
+                 if(n.id===dragged.id || getDescendants(dragged.id, nextNs).includes(n.id)) continue;
+                 if(n.isAction||n.id==="start"){
+                     let h = 50;
+                     if (n.opcode==="control.if") h = n.height || 50;
+                     if(n.opcode!=="control.if"){
+                       let snb={x:n.x+20,y:n.y+h}; 
+                       let d=Math.hypot(mx-snb.x,my-snb.y);
+                       if(d<md&&!n.nextId){md=d;cst=n.id;csk="nextId";}
+                     } else {
+                       let curY = 50;
+                       const f = n.fields || {elseIfCount:0, hasElse:false};
+                       for (let i=0; i<=f.elseIfCount + (f.hasElse?1:0); i++) {
+                           let sk = i===0 ? "do0" : i<=f.elseIfCount ? "do"+i : "doElse";
+                           let snb = {x: n.x + 45, y: n.y + curY};
+                           let d = Math.hypot(mx - snb.x, my - snb.y);
+                           if (d < md && !n.slots?.[sk]) { md = d; cst = n.id; csk = sk; }
+                           curY += (n.gapHeights?.[sk] || 0) + 50;
+                       }
+                       let bottomSnb = {x: n.x + 20, y: n.y + n.height};
+                       let db = Math.hypot(mx - bottomSnb.x, my - bottomSnb.y);
+                       if (db < md && !n.nextId) { md = db; cst = n.id; csk = "nextId"; }
                      }
-                     let curY = 40;
-                     const f = n.fields || {elseIfCount:0, hasElse:false};
-                     for (let i=0; i<=f.elseIfCount + (f.hasElse?1:0); i++) {
-                         let sk = i===0 ? "do0" : i<=f.elseIfCount ? "do"+i : "doElse";
-                         let snb = {x: n.x + 130, y: n.y + curY};
-                         let d = Math.hypot(dt.x - snb.x, dt.y - snb.y);
-                         if (d < md && !n.slots?.[sk]) { md = d; ct = n.id; csk = sk; }
-                         curY += Math.max(20, getH(n.slots?.[sk]));
-                         if (i < f.elseIfCount + (f.hasElse?1:0)) curY += 30;
-                     }
-                     let bottomSnb = {x: n.x + 115, y: n.y + curY + 25};
-                     // Only snap to inner slots for IF, bottom snapping works via regular nextId logic above
-                     let db = Math.hypot(dt.x - bottomSnb.x, dt.y - bottomSnb.y);
-                     if (db < md && !n.nextId) { md = db; ct = n.id; csk = "nextId"; }
                  }
-               }
              }
-             if(ct){
-               const parent=nextNs.find(x=>x.id===ct);
-               const sub=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
+             if(cst){
+               const parent=nextNs.find(x=>x.id===cst);
                if (csk === "nextId") {
                  const oldChild=parent.nextId;
                  nextNs=nextNs.map(x=>x.id===parent.id?{...x,nextId:dragged.id}:x.id===dragged.id&&oldChild?{...x,nextId:oldChild}:x);
@@ -1181,30 +1182,26 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
              }
           }
         }else if(dragged.linkType){
-           const dt={x:dragged.x+45,y:dragged.y+15};
-           let cst=null,csk=null,md=120;
-           for(const n of nextNs){
-             if(!n.slotDefs)continue;
-             for(const def of n.slotDefs){
-               if(def.accepts===dragged.linkType){
-                 const sk=def.key;
-                 const sx=n.opcode==="effect.apply"?(sk==="entity"?60:sk==="duration"?40:120):115;
-                 const sy=n.opcode==="effect.apply"?(sk==="entity"?40:65):50;
-                 const st={x:n.x+sx,y:n.y+sy};
-                 const dist=Math.hypot(dt.x-st.x,dt.y-st.y);
-                 if(dist<md&&!n.slots[sk]){md=dist;cst=n.id;csk=sk;}
+           let best = null;
+           let md = 50;
+           const smx = e.clientX, smy = e.clientY;
+           
+           document.querySelectorAll('.slot-conn').forEach(el => {
+              const rect = el.getBoundingClientRect();
+              const sx = rect.left + rect.width/2;
+              const sy = rect.top + rect.height/2;
+              const d = Math.hypot(smx - sx, smy - sy);
+              if (d < md) { md = d; best = { nodeId: el.dataset.nodeid, sk: el.dataset.sk }; }
+           });
+           
+           if (best) {
+               const { nodeId, sk } = best;
+               const parent = nextNs.find(x => x.id === nodeId);
+               const isLogicSlot = parent.opcode === "control.if" && sk.startsWith("condition");
+               const def = parent?.slotDefs?.find(d => d.key === sk);
+               if ((def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
+                   nextNs = nextNs.map(x => x.id === parent.id ? {...x, slots: {...(x.slots||{}), [sk]: dragged.id}} : x);
                }
-             }
-           }
-           if(cst){
-              const parent=nextNs.find(x=>x.id===cst);
-              const sx=parent.opcode==="effect.apply"?(csk==="entity"?60:csk==="duration"?40:120):115;
-              const sy=parent.opcode==="effect.apply"?(csk==="entity"?40:65):50;
-              const vx=parent.x+sx,vy=parent.y+sy;
-              const dx=vx-dragged.x,dy=vy-dragged.y;
-              const sub=new Set([dragged.id, ...getDescendants(dragged.id, nextNs)]);
-              nextNs=nextNs.map(x=>x.id===parent.id?{...x,slots:{...x.slots,[csk]:dragged.id}}:x);
-              nextNs=nextNs.map(x=>sub.has(x.id)?{...x,x:x.x+dx,y:x.y+dy}:x);
            }
         }
         return nextNs;
@@ -1212,7 +1209,6 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
     }
     ps.current=null;
   };
-
   const onDrop=e=>{
     e.preventDefault();const data=e.dataTransfer.getData("block");if(!data)return;
     const bd=JSON.parse(data);const r=canvasRef.current.getBoundingClientRect();
@@ -1232,7 +1228,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
     if(j2.ok)setTimeout(()=>{setSaveStatus(null);onBack();},700);
   };
   const sn=nodes.find(n=>n.id==="start");
-  const ch=new Set(["start"]);if(sn){let c=sn.nextId;while(c){ch.add(c);c=nodes.find(n=>n.id===c)?.nextId||null;}}
+  const ch=new Set(sn ? ["start", ...getDescendants("start", nodes)] : []);
   return <div style={{display:"flex",flexDirection:"column",height:"100%",background:C.bg}}>
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:"1px solid "+C.inpB,background:C.panel,flexShrink:0}}>
       <Btn sm v="g" onClick={onBack}>Back</Btn>
@@ -1284,31 +1280,16 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
           <div style={{fontSize:12,marginBottom:4}}>drag blocks here</div>
           <div style={{fontSize:10,color:"#2a4050"}}>connect to Start to run</div>
         </div>}
-        <svg style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:0,overflow:"visible"}}>
-          {nodes.map(node=>{
-            const lines = [];
-            if(node.nextId){
-              const child = nodes.find(n=>n.id===node.nextId);
-              if(child){
-                const isIf=node.opcode==="control.if";
-                const h = node.height || (node.id==="start"?40:isIf?35:95);
-                const x1 = pan.x + node.x + 115, y1 = pan.y + node.y + h;
-                const x2 = pan.x + child.x + 115, y2 = pan.y + child.y;
-                lines.push(<path key={node.id+"_chain"} d={`M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`} stroke={C.accent} strokeWidth="3" fill="none" opacity="0.6"/>);
-              }
-            }
-            return lines;
-          })}
-        </svg>
+        
         <div style={{position:"absolute",left:pan.x,top:pan.y}}>
+          
           {nodes.map(node=>{
              let isSlottedVal = false;
              if (node.linkType) {
                  for(const p of nodes){if(p.slots){for(const sk in p.slots){if(p.slots[sk]===node.id)isSlottedVal=true;}}}
              }
              if (isSlottedVal) return null;
-             return <CanvasNode key={node.id} node={node} nodes={nodes} methodKey={methodKey} inChain={ch.has(node.id)}
-               onDragStart={handleDragStart}
+             return <CanvasNode key={node.id} node={node} nodes={nodes} methodKey={methodKey} inChain={ch.has(node.id)} selected={selected} onSelect={(id)=>setSelected(id)} onDragStart={handleDragStart}
                onDelete={(nid)=>del(nid)}
                onCopy={typeof duplicateNode!=="undefined"?duplicateNode:null}
                onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?{...n,fields:{...n.fields,[f]:v}}:n))}
@@ -1322,173 +1303,138 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   </div>;
 }
 
-function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldChange,onDisconnectChain,onCopy,inline}){
+function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldChange,onCopy,inline,selected,onSelect}){
+  
+
   const [showSettings, setShowSettings] = useState(false);
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
   const isIf=node.opcode==="control.if";
-  const cc=node.linkType===LINK_ENTITY?"#638999":node.linkType===LINK_NUMBER?"#6a8fa8":node.linkType===LINK_LOGIC?"#a8a86a":"#5a9a6a";
-  const bg=isSt?"#0e1e30":(!inChain&&isAct)?"#1a1a1a":isAct?"#1a2a20":node.linkType===LINK_ENTITY?"#162028":"#16202a";
-  const br=isSt?C.accent:(!inChain&&isAct)?"#2a2a2a":inChain?"#2a4a30":"#222830";
+  
+  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":"#5a9a6a";
+  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":isIf?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":"#5a9a6a";
+
+  const lblStr = node.opcode==="entity.event"?"Event Entity"
+       :node.opcode==="entity.target"?"Target Entity"
+       :node.opcode==="number.literal"?null
+       :node.opcode==="entity.look_x"?"Get Look Direction X of"
+       :node.opcode==="entity.look_y"?"Get Look Direction Y of"
+       :node.opcode==="entity.look_z"?"Get Look Direction Z of"
+       :node.opcode==="entity.look_client_x"?"Get Look Direction X (Client) of"
+       :node.opcode==="entity.look_client_y"?"Get Look Direction Y (Client) of"
+       :node.opcode==="entity.look_client_z"?"Get Look Direction Z (Client) of"
+       :node.opcode==="logic.true"?"True"
+       :node.opcode==="logic.false"?"False"
+       :node.opcode;
+
+  const valContent = (
+    <>
+      {lblStr && <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>
+        {lblStr}
+      </span>}
+      {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+        style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
+      
+      {node.slotDefs?.map(def => (
+          <SlotConn key={def.key} sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      ))}
+    </>
+  );
 
   if(inline){
-     return <div onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}
-       style={{display:"flex",alignItems:"center",background:cc,borderRadius:10,padding:"0 6px",height:20,cursor:"grab",boxShadow:"0 1px 3px rgba(0,0,0,.3)",gap:4}}>
-        <span style={{fontSize:10,fontFamily:"monospace",color:"#fff",fontWeight:600}}>
-          {node.opcode==="entity.event"?"Event Ent"
-         :node.opcode==="entity.target"?"Target Ent"
-         :node.opcode==="number.literal"?"Num"
-         :node.opcode}
-        </span>
-        {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-          style={{width:30,background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,.2)",borderRadius:3,padding:"1px 4px",color:"#fff",fontSize:11,fontFamily:"monospace",outline:"none"}}/>}
+     return <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}
+       style={{display:"flex",alignItems:"center",background:bg,borderRadius:0,padding:"0 10px",height:30,minWidth:50,cursor:"grab",boxShadow:"0 2px 6px rgba(0,0,0,.3)",gap:10, border:selected===node.id?"2px solid #fff":"2px solid transparent", boxSizing:"border-box"}}>
+        {valContent}
      </div>;
   }
 
   const commonHeader = (
-    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",cursor:"grab",background:isSt?"#0a1828":"transparent",flex:1}}>
-      {isVal&&<div style={{width:8,height:8,borderRadius:"50%",background:cc,flexShrink:0}}/>}
-      <span style={{fontFamily:"monospace",fontSize:11,color:isSt?C.accent:C.text,fontWeight:500,flex:isIf?0:1,whiteSpace:"nowrap"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 10px",cursor:"grab",background:isSt?"#0f172a":"transparent",flex:1,height:"100%",boxSizing:"border-box"}}>
+      <span style={{fontFamily:"sans-serif",fontSize:16,lineHeight:"20px",color:isSt?"#38bdf8":"#fff",fontWeight:700,whiteSpace:"nowrap"}}>
         {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
-         :node.opcode==="entity.event"?"Event Entity -> "+resolveEntityVar("entity.event",methodKey)
-         :node.opcode==="entity.target"?"Target Entity -> "+resolveEntityVar("entity.target",methodKey)
-         :node.opcode==="number.literal"?"Number"
-         :node.opcode==="effect.apply"?"Add Effect"
+         :node.opcode==="effect.apply"?"Add Effect to"
          :node.opcode==="control.if"?"If"
          :node.opcode}
       </span>
-      {isIf&&<div style={{marginLeft:8,flex:1}}>
-        <SlotConn sk="condition" sc="#a8a86a" connId={node.slots?.condition} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
-      </div>}
-      {!inChain&&isAct&&!isSt&&<span style={{fontSize:9,color:"#666"}} title="Not connected to Start">!</span>}
-      {!isSt&&<span onClick={e=>{e.stopPropagation();if(onCopy)onCopy(node.id);}} onMouseDown={e=>e.stopPropagation()} style={{color:"#449944",fontSize:11,cursor:"pointer",padding:"0 4px",marginLeft:"auto"}} title="Copy Branch">c</span>}
-      {!isSt&&<span onClick={e=>{e.stopPropagation();onDelete(node.id);}} onMouseDown={e=>e.stopPropagation()} style={{color:"#aa4444",fontSize:11,cursor:"pointer",padding:"0 4px"}} title="Delete">x</span>}
-    </div>
-  );
-
-  const blockBody = (
-    <div style={{padding:"6px 8px",display:"flex",flexDirection:"column",gap:5}}>
-      {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-        style={{width:70,background:"#0e161e",border:"1px solid #2a3a4a",borderRadius:3,padding:"3px 6px",color:C.text,fontSize:12,fontFamily:"monospace",outline:"none"}}/>}
-      
-      {node.opcode.startsWith("entity.look_")&&<div style={{display:"flex",alignItems:"center",gap:5}}>
-         <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>entity</span>
-         <SlotConn sk="entity" sc="#638999" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
-      </div>}
-
-      {node.opcode==="effect.apply"&&<div style={{display:"flex",flexDirection:"column",gap:5}}>
-        <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
-          <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>to</span>
-          <SlotConn sk="entity" sc="#638999" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
-          <input value={node.fields?.effect??"MobEffects.REGENERATION"} onChange={e=>{e.stopPropagation();onFieldChange(node.id,"effect",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="effect"
-            style={{flex:1,minWidth:100,background:"#0e161e",border:"1px solid #2a3a4a",borderRadius:3,padding:"3px 6px",color:C.text,fontSize:11,fontFamily:"monospace",outline:"none"}}/>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:5}}>
-          <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>dur</span>
-          <SlotConn sk="duration" sc="#6a8fa8" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
-          <span style={{fontSize:10,color:C.dim,fontFamily:"monospace"}}>lvl</span>
-          <SlotConn sk="level" sc="#6a8fa8" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
-        </div>
-      </div>}
+      {isIf&&<>
+        <span style={{cursor:"pointer",opacity:0.6,fontSize:14}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+        <SlotConn sk="condition" sc="rgba(0,0,0,0.3)" connId={node.slots?.condition} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="effect.apply"&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <input value={node.fields?.effect??"MobEffects.REGENERATION"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"effect",e.target.value);}} onMouseDown={e=>{e.stopPropagation();if(onSelect)onSelect(node.id);}} placeholder="effect"
+            style={{height:30,width:200,background:"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"0 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",boxSizing:"border-box"}}/>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Duration</span>
+          <SlotConn sk="duration" sc="rgba(0,0,0,0.3)" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Level</span>
+          <SlotConn sk="level" sc="rgba(0,0,0,0.3)" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}
     </div>
   );
 
   if (isIf) {
       return (
-        <div style={{position:"absolute",left:node.x,top:node.y,minWidth:230,zIndex:node.depth||1,opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 3px 10px rgba(0,0,0,.5))"}}
-             onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
+        <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+            {showSettings&&<div style={{position:"absolute",left:0,top:-45,background:"#222",border:"2px solid #444",padding:"6px 10px",borderRadius:10,zIndex:100,display:"flex",gap:8,pointerEvents:"auto"}}>
+               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={(e)=>{e.stopPropagation();setShowSettings(false)}}>X</div>
+               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id, "elseIfCount", (node.fields?.elseIfCount||0)+1)}>+ Else If</div>
+               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id, "elseIfCount", Math.max(0, (node.fields?.elseIfCount||0)-1))}>- Else If</div>
+               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id, "hasElse", !node.fields?.hasElse)}>{node.fields?.hasElse?"- Else":"+ Else"}</div>
+            </div>}
             
-            {/* Settings Modal */}
-            <div style={{position:"absolute",right:0,top:-25,zIndex:10}}>
-               <Btn sm v="g" onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙ Settings</Btn>
-               {showSettings&&<div style={{position:"absolute",right:0,top:25,background:"#222",border:"1px solid #444",padding:10,borderRadius:5,zIndex:100,display:"flex",flexDirection:"column",gap:5}}>
-                  <div style={{fontSize:11,color:"#ccc",marginBottom:5,whiteSpace:"nowrap"}}>If Branches</div>
-                  <Btn sm v="g" onClick={()=>{
-                     const f = node.fields || {elseIfCount:0, hasElse:false};
-                     onFieldChange(node.id, "elseIfCount", f.elseIfCount+1);
-                  }}>+ Else If</Btn>
-                  <Btn sm v="g" onClick={()=>{
-                     const f = node.fields || {elseIfCount:0, hasElse:false};
-                     if(f.elseIfCount>0) onFieldChange(node.id, "elseIfCount", f.elseIfCount-1);
-                  }}>- Else If</Btn>
-                  <Btn sm v="g" onClick={()=>{
-                     const f = node.fields || {elseIfCount:0, hasElse:false};
-                     onFieldChange(node.id, "hasElse", !f.hasElse);
-                  }}>{(node.fields?.hasElse) ? "- Else" : "+ Else"}</Btn>
-               </div>}
-            </div>
+            <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
+            <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
 
-            {/* Header */}
-            <div style={{width:230,height:40,background:bg,border:"1.5px solid "+br,borderRadius:"6px 6px 6px 0",borderBottom:"none",display:"flex"}}>
-                {commonHeader}
-            </div>
-
-            {/* do0 Spine & Gap */}
-            <div style={{display:"flex"}}>
-                <div style={{width:20,height:node.gapHeights?.do0||20,background:bg,borderLeft:"1.5px solid "+br}}/>
-                <div style={{flex:1,position:"relative"}}>
-                     {!node.slots?.do0 && <div style={{position:"absolute",left:10,top:4,width:12,height:12,borderRadius:"50%",border:"2px dashed #4a4a54"}}/>}
-                </div>
-            </div>
-
-            {/* Else If branches */}
             {Array.from({length: node.fields?.elseIfCount || 0}).map((_, i) => (
               <div style={{display:"contents"}} key={i}>
-                  <div style={{width:230,height:30,background:bg,border:"1.5px solid "+br,borderRight:"none",borderLeft:"1.5px solid "+br,borderRadius:"0 6px 6px 0",display:"flex",alignItems:"center",paddingLeft:8}}>
-                      <span style={{fontFamily:"monospace",fontSize:11,color:C.text,fontWeight:500,marginRight:8}}>Else If</span>
-                      <SlotConn sk={"condition"+(i+1)} sc="#a8a86a" connId={node.slots?.["condition"+(i+1)]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange}/>
+                  <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
+                      <span style={{fontFamily:"sans-serif",fontSize:16,color:"#fff",fontWeight:700,marginRight:15,whiteSpace:"nowrap"}}>Else If</span>
+                      <SlotConn sk={"condition"+(i+1)} sc="rgba(0,0,0,0.3)" connId={node.slots?.["condition"+(i+1)]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
                   </div>
-                  <div style={{display:"flex"}}>
-                      <div style={{width:20,height:node.gapHeights?.["do"+(i+1)]||20,background:bg,borderLeft:"1.5px solid "+br}}/>
-                      <div style={{flex:1,position:"relative"}}>
-                           {!node.slots?.["do"+(i+1)] && <div style={{position:"absolute",left:10,top:4,width:12,height:12,borderRadius:"50%",border:"2px dashed #4a4a54"}}/>}
-                      </div>
-                  </div>
+                  <div style={{height:node.gapHeights?.["do"+(i+1)]||0,background:"transparent"}}/>
               </div>
             ))}
 
-            {/* Else branch */}
             {node.fields?.hasElse && (
               <div style={{display:"contents"}}>
-                  <div style={{width:230,height:30,background:bg,border:"1.5px solid "+br,borderRight:"none",borderLeft:"1.5px solid "+br,borderRadius:"0 6px 6px 0",display:"flex",alignItems:"center",paddingLeft:8}}>
-                      <span style={{fontFamily:"monospace",fontSize:11,color:C.text,fontWeight:500}}>Else</span>
+                  <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
+                      <span style={{fontFamily:"sans-serif",fontSize:16,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>Else</span>
                   </div>
-                  <div style={{display:"flex"}}>
-                      <div style={{width:20,height:node.gapHeights?.doElse||20,background:bg,borderLeft:"1.5px solid "+br}}/>
-                      <div style={{flex:1,position:"relative"}}>
-                           {!node.slots?.doElse && <div style={{position:"absolute",left:10,top:4,width:12,height:12,borderRadius:"50%",border:"2px dashed #4a4a54"}}/>}
-                      </div>
-                  </div>
+                  <div style={{height:node.gapHeights?.doElse||0,background:"transparent"}}/>
               </div>
             )}
-
-            {/* Bottom Cap */}
-            <div style={{width:230,height:25,background:bg,border:"1.5px solid "+br,borderRadius:"0 6px 6px 6px",borderTop:"none"}}/>
         </div>
       );
   }
 
-  // Standard Action or Value Block
   return (
-    <div
-      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?90:230,height:node.height||"auto",
-        background:bg, border:"1.5px solid "+br, borderRadius:isVal?10:6,boxShadow:"0 3px 14px rgba(0,0,0,.55)",userSelect:"none",zIndex:node.depth||1,opacity:(!inChain&&isAct&&!isSt)?0.6:1}}
-      onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
-      {commonHeader}
-      {blockBody}
+    <div id={"node-"+node.id} onContextMenu={e=>{e.preventDefault(); e.stopPropagation(); if(window.__showYcsCtx) window.__showYcsCtx(node.id, e.clientX, e.clientY);}}
+      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?50:300,minHeight:50,height:node.height||(isVal?"auto":50),
+        display:isVal?"flex":"block", alignItems:isVal?"center":"stretch", padding:isVal?"8px 10px":"0", gap:isVal?10:0, boxSizing:"border-box", border:selected===node.id?"2px solid #fff":"2px solid transparent",
+        zIndex:isVal?100:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,
+        background:bg, borderRadius:10}}
+      onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
+      {isVal && <div style={{position:"absolute",left:-10,top:"50%",transform:"translateY(-50%)",width:10,height:20,borderRadius:"10px 0 0 10px",background:bg}}/>}
+
+      
+      {isVal ? valContent : commonHeader}
     </div>
   );
 }
-function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange}){
-  const cn=connId?nodes.find(n=>n.id===connId):null;
-  if(cn) return <CanvasNode node={cn} nodes={nodes} methodKey={mk} onDragStart={onDragStart} onFieldChange={onFieldChange} inline/>;
-  return <div title="drop value here"
-    style={{display:"flex",alignItems:"center",justifyContent:"center",
-      background:"rgba(0,0,0,0.3)",border:"1px solid "+sc+"88",
-      borderRadius:10,minWidth:30,height:18,boxShadow:"inset 0 1px 3px rgba(0,0,0,.4)"}}>
-  </div>;
-}
 
-function MethodListPanel({form,F,onEnterEditor,className}){
+function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSelect,selectedNodeId}){
+  const cn=connId?nodes?.find(n=>n.id===connId):null;
+  if(cn) return <CanvasNode node={cn} nodes={nodes} methodKey={mk} onDragStart={onDragStart} onFieldChange={onFieldChange} onSelect={onSelect} selected={selectedNodeId} inline/>;
+  return <div title="drop value here" className="slot-conn" data-nodeid={nodeId} data-sk={sk}
+    onMouseEnter={() => { window.__hoveredSlot = { nodeId, sk }; }}
+    onMouseLeave={() => { if (window.__hoveredSlot?.sk === sk) window.__hoveredSlot = null; }}
+    style={{display:"flex",alignItems:"center",justifyContent:"center",
+      background:sc, position:"relative",
+      borderRadius:0,minWidth:50,height:30,marginLeft:10
+    }}>
+      <div style={{position:"absolute",left:-8,top:"50%",transform:"translateY(-50%)",width:8,height:16,borderRadius:"8px 0 0 8px",background:sc}}/>
+  </div>;
+}function MethodListPanel({form,F,onEnterEditor,className}){
   const[busyKey,setBusyKey]=useState(null);
   const enabled=form.enabledMethods||[];
 

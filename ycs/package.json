@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "electron": "electron .",
     "electron:dev": "concurrently -k \"npm:dev\" \"wait-on tcp:5173 && electron .\"",
+    "truncate": "node truncate.mjs",
     "cleanup": "node cleanup.mjs",
     "app": "concurrently -k \"node server.js\" \"npm:dev\" \"wait-on tcp:5173 && electron .\""
   },
