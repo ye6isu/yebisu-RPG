@@ -54,8 +54,8 @@ public final class ModKeybinds {
     // Use new KeyMapping(...) directly for full control.
     // ---------------------------------------------------------------------------------
 
-    /** Primary ability / skill activation. Default: R
-    public static final KeyMapping USE_ABILITY = bind("use_ability", GLFW.GLFW_KEY_R);*/
+    /** Opens the first-person hand debug screen. Default: H */
+    public static final KeyMapping OPEN_HAND_DEBUG = bind("open_hand_debug", GLFW.GLFW_KEY_H);
 
     // Add more binds here:
     // public static final KeyMapping OPEN_SKILL_TREE = bind("open_skill_tree", GLFW.GLFW_KEY_K);
@@ -71,8 +71,7 @@ public final class ModKeybinds {
      */
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
-        //event.register(USE_ABILITY);
-        // Register new binds here in the same order as the declarations above.
+        event.register(OPEN_HAND_DEBUG);
     }
 
     // ---------------------------------------------------------------------------------

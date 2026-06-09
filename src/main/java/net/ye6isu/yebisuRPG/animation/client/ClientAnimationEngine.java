@@ -3,6 +3,7 @@ package net.ye6isu.yebisuRPG.animation.client;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 
@@ -143,6 +144,24 @@ public final class ClientAnimationEngine {
      * if a packet arrives on the Netty thread mid-tick.</p>
      */
     public void tick() {
+        // Auto-stop playheads that have run past their animation length.
+        // Collect first, then stop — avoids mutating the EnumMap while iterating it.
+        record ExpiredSlot(int entityId, AnimationCategory category) {}
+        List<ExpiredSlot> expired = new ArrayList<>();
+        for (Map.Entry<Integer, EnumMap<AnimationCategory, AnimationPlayhead>> outer : playheads.entrySet()) {
+            for (Map.Entry<AnimationCategory, AnimationPlayhead> inner : outer.getValue().entrySet()) {
+                AnimationPlayhead ph = inner.getValue();
+                if (!ph.isPlaying()) continue;
+                HandAnimationLoader.AnimData anim = HandAnimationLoader.INSTANCE.get(ph.animId());
+                if (anim != null && ph.getCurrentTimeSecs() >= anim.length()) {
+                    expired.add(new ExpiredSlot(outer.getKey(), inner.getKey()));
+                }
+            }
+        }
+        for (ExpiredSlot slot : expired) {
+            stopWithSnapshot(slot.entityId(), slot.category(), AnimationBlender.PoseSnapshot.empty());
+        }
+
         // Snapshot the key sets to avoid concurrent modification.
         List<Integer> entityIds = new ArrayList<>(blenders.keySet());
 
@@ -159,12 +178,11 @@ public final class ClientAnimationEngine {
                 blender.tick();
 
                 if (blender.isFinished()) {
+                    AnimationCategory cat = entry.getKey(); // read key before it.remove() invalidates the entry
                     it.remove();
-                    // Also evict the now-DONE playhead from the playhead map.
-                    EnumMap<AnimationCategory, AnimationPlayhead> pSlots =
-                            playheads.get(entityId);
+                    EnumMap<AnimationCategory, AnimationPlayhead> pSlots = playheads.get(entityId);
                     if (pSlots != null) {
-                        pSlots.remove(entry.getKey());
+                        pSlots.remove(cat);
                         if (pSlots.isEmpty()) playheads.remove(entityId);
                     }
                 }
