@@ -7,6 +7,21 @@ import net.minecraft.client.animation.KeyframeAnimations;
 
 public class JoeAnimations {
 
+    // Driven by AnimationAPI.triggerAnimation() via ClientAnimationEngine.
+    // Bone names must match the keys in the Blockbench / JSON animation file.
+    public static final AnimationDefinition ANIM_JOE_CUSTOM = AnimationDefinition.Builder.withLength(1.0F)
+            .addAnimation("rightLeg", new AnimationChannel(AnimationChannel.Targets.ROTATION,
+                    new Keyframe(0.0F,  KeyframeAnimations.degreeVec(  0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
+                    new Keyframe(0.25F, KeyframeAnimations.degreeVec(-90.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
+                    new Keyframe(1.0F,  KeyframeAnimations.degreeVec(  0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
+            ))
+            .addAnimation("leftLeg", new AnimationChannel(AnimationChannel.Targets.ROTATION,
+                    new Keyframe(0.0F,    KeyframeAnimations.degreeVec(   0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
+                    new Keyframe(0.9583F, KeyframeAnimations.degreeVec(-150.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
+                    new Keyframe(1.0F,    KeyframeAnimations.degreeVec(   0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
+            ))
+            .build();
+
     public static final AnimationDefinition ANIM_JOE_IDLE = AnimationDefinition.Builder.withLength(2.0F).looping()
 
             .addAnimation("head", new AnimationChannel(AnimationChannel.Targets.POSITION,

@@ -25,4 +25,22 @@ public final class ClientHandlerProxy {
             call.run();
         }
     }
+
+    public static void onAnimTrigger(net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload payload,
+                                     IPayloadContext ctx) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            Runnable call = () ->
+                net.ye6isu.yebisuRPG.animation.client.AnimClientHandler.onTrigger(payload, ctx);
+            call.run();
+        }
+    }
+
+    public static void onAnimStop(net.ye6isu.yebisuRPG.network.animation.AnimStopPayload payload,
+                                  IPayloadContext ctx) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            Runnable call = () ->
+                net.ye6isu.yebisuRPG.animation.client.AnimClientHandler.onStop(payload, ctx);
+            call.run();
+        }
+    }
 }

@@ -28,6 +28,18 @@ public final class NetworkRegistry {
             net.ye6isu.yebisuRPG.data.network.VarSyncPayload.STREAM_CODEC,
             net.ye6isu.yebisuRPG.network.ClientHandlerProxy::onVarSync
         );
+
+        registrar.playToClient(
+            net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload.TYPE,
+            net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload.STREAM_CODEC,
+            net.ye6isu.yebisuRPG.network.ClientHandlerProxy::onAnimTrigger
+        );
+
+        registrar.playToClient(
+            net.ye6isu.yebisuRPG.network.animation.AnimStopPayload.TYPE,
+            net.ye6isu.yebisuRPG.network.animation.AnimStopPayload.STREAM_CODEC,
+            net.ye6isu.yebisuRPG.network.ClientHandlerProxy::onAnimStop
+        );
     }
 
     public static String getNetworkVersion() { return NETWORK_VERSION; }

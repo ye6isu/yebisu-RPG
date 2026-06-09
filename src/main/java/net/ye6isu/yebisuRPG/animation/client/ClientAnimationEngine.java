@@ -1,0 +1,232 @@
+package net.ye6isu.yebisuRPG.animation.client;
+
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
+import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
+
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * CLIENT-ONLY singleton that owns every active {@link AnimationPlayhead} and
+ * {@link AnimationBlender} on the local client.
+ *
+ * <h2>Lifecycle</h2>
+ * <ol>
+ *   <li>{@link #trigger(AnimTriggerPayload)} — called by {@link AnimClientHandler} when a
+ *       trigger packet arrives. Creates or replaces the playhead for that slot and fast-forwards
+ *       it if the packet carries a non-zero progress delta.</li>
+ *   <li>{@link #stop(AnimStopPayload)} — called by {@link AnimClientHandler} when a stop packet
+ *       arrives. Transitions the playhead to {@code BLENDING_OUT} and hands it to a
+ *       {@link AnimationBlender} with a blank {@link AnimationBlender.PoseSnapshot}.
+ *       Renderers that want to supply actual bone angles call
+ *       {@link #stopWithSnapshot(int, AnimationCategory, AnimationBlender.PoseSnapshot)}
+ *       directly before this method processes the packet.</li>
+ *   <li>{@link #tick()} — called once per client game tick by {@link
+ *       net.ye6isu.yebisuRPG.texture.TextureTickHandler}. Advances every active blender
+ *       and removes finished entries.</li>
+ *   <li>{@link #clearAll()} — called on client disconnect to wipe all state.</li>
+ * </ol>
+ *
+ * <h2>Renderer contract</h2>
+ * <p>Renderers do not call {@code trigger} or {@code stop}. They call
+ * {@link #getPlayhead(int, AnimationCategory)} to obtain the active cursor,
+ * then use {@link AnimationPlayhead#getCurrentTimeSecs()} to drive their
+ * {@code AnimationDefinition} selector. They call
+ * {@link #getBlender(int, AnimationCategory)} to obtain any active blender
+ * and lerp bones accordingly via {@link AnimationBlender#lerpToRest}.</p>
+ *
+ * <h2>Thread safety</h2>
+ * <p>The outer map is a {@link ConcurrentHashMap} because packet handlers run on
+ * the Netty I/O thread, while {@link #tick()} and renderer queries run on the main
+ * client thread. The inner {@link EnumMap} is only ever mutated under the protection
+ * of {@code computeIfAbsent} or explicit replacement at the outer key level, which
+ * is safe because ConcurrentHashMap's per-bucket locking covers the entire
+ * compute lambda atomically.</p>
+ */
+@OnlyIn(Dist.CLIENT)
+public final class ClientAnimationEngine {
+
+    public static final ClientAnimationEngine INSTANCE = new ClientAnimationEngine();
+
+    // entityId → (category → playhead)
+    private final ConcurrentHashMap<Integer, EnumMap<AnimationCategory, AnimationPlayhead>> playheads =
+            new ConcurrentHashMap<>();
+
+    // entityId → (category → blender) — only populated while a blend-out is running
+    private final ConcurrentHashMap<Integer, EnumMap<AnimationCategory, AnimationBlender>> blenders =
+            new ConcurrentHashMap<>();
+
+    private ClientAnimationEngine() {}
+
+    // -------------------------------------------------------------------------
+    // Packet-driven entry points (called from AnimClientHandler on Netty thread)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Creates or replaces the active playhead for the given entity/category slot.
+     * If the payload carries {@code progressTicks > 0} the playhead is immediately
+     * fast-forwarded to align with the server's current animation position.
+     *
+     * <p>Replacing an existing playhead (mid-animation retrigger) implicitly cancels
+     * any in-progress blend for that slot by removing the old blender entry.</p>
+     */
+    public void trigger(AnimTriggerPayload payload) {
+        AnimationPlayhead ph = new AnimationPlayhead(
+                payload.entityId(), payload.category(), payload.animId());
+        ph.fastForward(payload.progressTicks());
+
+        playheads
+            .computeIfAbsent(payload.entityId(), id -> new EnumMap<>(AnimationCategory.class))
+            .put(payload.category(), ph);
+
+        // Cancel any stale blend-out for this slot — the new trigger supersedes it.
+        EnumMap<AnimationCategory, AnimationBlender> bSlots = blenders.get(payload.entityId());
+        if (bSlots != null) bSlots.remove(payload.category());
+    }
+
+    /**
+     * Transitions the active playhead to {@code BLENDING_OUT} and registers a blender
+     * with an empty pose snapshot. The blender will complete in {@link AnimationBlender#BLEND_TICKS}
+     * ticks and mark the playhead as {@code DONE} so {@link #tick()} can clean it up.
+     *
+     * <p>If no playhead exists for the slot (e.g. the animation already finished
+     * naturally before the stop signal arrived) this method is a silent no-op.</p>
+     */
+    public void stop(AnimStopPayload payload) {
+        stopWithSnapshot(payload.entityId(), payload.category(), AnimationBlender.PoseSnapshot.empty());
+    }
+
+    /**
+     * Variant of {@link #stop(AnimStopPayload)} that accepts a real bone snapshot
+     * captured by the renderer at the moment of interruption, enabling a smooth
+     * per-bone linear blend-out rather than an immediate snap to rest.
+     *
+     * <p>Renderers that participate in blend-out (e.g. {@code MixinPlayerRenderer}
+     * and {@code MixinItemInHandRenderer}) should call this before forwarding the
+     * stop packet to {@link #stop(AnimStopPayload)} if they want bone-accurate
+     * interpolation.</p>
+     */
+    public void stopWithSnapshot(int entityId, AnimationCategory category,
+                                 AnimationBlender.PoseSnapshot snapshot) {
+        EnumMap<AnimationCategory, AnimationPlayhead> pSlots = playheads.get(entityId);
+        if (pSlots == null) return;
+
+        AnimationPlayhead ph = pSlots.get(category);
+        if (ph == null || !ph.isPlaying()) return;
+
+        ph.beginBlendOut();
+
+        AnimationBlender blender = new AnimationBlender();
+        blender.beginBlend(ph, snapshot);
+
+        blenders
+            .computeIfAbsent(entityId, id -> new EnumMap<>(AnimationCategory.class))
+            .put(category, blender);
+    }
+
+    // -------------------------------------------------------------------------
+    // Tick (called once per client game tick from TextureTickHandler)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Advances every active blender by one tick and removes all finished entries
+     * from both the blender and playhead maps.
+     *
+     * <p>Iterates a snapshot list of entity IDs to avoid ConcurrentModificationException
+     * if a packet arrives on the Netty thread mid-tick.</p>
+     */
+    public void tick() {
+        // Snapshot the key sets to avoid concurrent modification.
+        List<Integer> entityIds = new ArrayList<>(blenders.keySet());
+
+        for (int entityId : entityIds) {
+            EnumMap<AnimationCategory, AnimationBlender> bSlots = blenders.get(entityId);
+            if (bSlots == null) continue;
+
+            Iterator<Map.Entry<AnimationCategory, AnimationBlender>> it =
+                    bSlots.entrySet().iterator();
+
+            while (it.hasNext()) {
+                Map.Entry<AnimationCategory, AnimationBlender> entry = it.next();
+                AnimationBlender blender = entry.getValue();
+                blender.tick();
+
+                if (blender.isFinished()) {
+                    it.remove();
+                    // Also evict the now-DONE playhead from the playhead map.
+                    EnumMap<AnimationCategory, AnimationPlayhead> pSlots =
+                            playheads.get(entityId);
+                    if (pSlots != null) {
+                        pSlots.remove(entry.getKey());
+                        if (pSlots.isEmpty()) playheads.remove(entityId);
+                    }
+                }
+            }
+
+            if (bSlots.isEmpty()) blenders.remove(entityId);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Renderer queries (called on main client thread each render frame)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the active {@link AnimationPlayhead} for the given entity/category slot,
+     * or {@code null} if no animation is running or the slot is in DONE state.
+     *
+     * <p>Renderers check for null before querying the playhead — a null return means
+     * vanilla behaviour should proceed unchanged for that slot.</p>
+     */
+    public AnimationPlayhead getPlayhead(int entityId, AnimationCategory category) {
+        EnumMap<AnimationCategory, AnimationPlayhead> slots = playheads.get(entityId);
+        if (slots == null) return null;
+        AnimationPlayhead ph = slots.get(category);
+        // Expose PLAYING and BLENDING_OUT playheads — renderers need the time value
+        // during the blend window too. DONE playheads are already removed by tick().
+        return (ph != null && !ph.isDone()) ? ph : null;
+    }
+
+    /**
+     * Returns the active {@link AnimationBlender} for the given entity/category slot,
+     * or {@code null} if no blend-out is currently running.
+     *
+     * <p>Renderers use this to lerp bone channels toward rest. A null return means
+     * no blend is in progress — render the live playhead pose directly.</p>
+     */
+    public AnimationBlender getBlender(int entityId, AnimationCategory category) {
+        EnumMap<AnimationCategory, AnimationBlender> slots = blenders.get(entityId);
+        if (slots == null) return null;
+        AnimationBlender b = slots.get(category);
+        return (b != null && b.isActive()) ? b : null;
+    }
+
+    /**
+     * Returns {@code true} if the given slot has an active playhead in PLAYING state.
+     * Convenience check for event hooks that only need a boolean without querying time.
+     */
+    public boolean isPlaying(int entityId, AnimationCategory category) {
+        AnimationPlayhead ph = getPlayhead(entityId, category);
+        return ph != null && ph.isPlaying();
+    }
+
+    // -------------------------------------------------------------------------
+    // Teardown
+    // -------------------------------------------------------------------------
+
+    /**
+     * Wipes all playheads and blenders. Called on client disconnect so stale state
+     * from a previous session never bleeds into a new connection.
+     */
+    public void clearAll() {
+        playheads.clear();
+        blenders.clear();
+    }
+}

@@ -4,6 +4,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.AnimationState;
 import net.minecraft.world.entity.EntityType;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
@@ -17,7 +21,8 @@ import org.jetbrains.annotations.Nullable;
 
 public class JoeEntity extends Animal {
 
-    public final AnimationState idleAnimationState = new AnimationState();
+    public final AnimationState idleAnimationState  = new AnimationState();
+    public final AnimationState customAnimationState = new AnimationState();
     private int idleAnimationTimeout = 0;
 
     public JoeEntity(EntityType<? extends Animal> entityType, Level level) {
@@ -56,6 +61,16 @@ public class JoeEntity extends Animal {
         return ModEntities.JOE.get().create(level);
     }
 
+    @OnlyIn(Dist.CLIENT)
+    private void updateCustomAnimationState() {
+        boolean active = ClientAnimationEngine.INSTANCE.isPlaying(this.getId(), AnimationCategory.ENTITY);
+        if (active) {
+            this.customAnimationState.startIfStopped(this.tickCount);
+        } else {
+            this.customAnimationState.stop();
+        }
+    }
+
     private void setupAnimationStates() {
         if(this.idleAnimationTimeout <= 0) {
             this.idleAnimationTimeout = 40;
@@ -71,6 +86,7 @@ public class JoeEntity extends Animal {
 
         if(this.level().isClientSide()) {
             this.setupAnimationStates();
+            this.updateCustomAnimationState();
         }
     }
 }
