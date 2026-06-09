@@ -316,7 +316,7 @@ const ITEM_METHODS=[
      "net.minecraft.world.effect.MobEffectInstance",
      "net.minecraft.world.effect.MobEffects",
    ],
-   stub:`    @Override\n    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {\n        //YCS:use:body\n        return super.use(level, player, usedHand);\n    }`},
+   stub:`    @Override\n    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {\n        player.startUsingItem(usedHand);\n        //YCS:use:body\n        return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));\n    }`},
   {key:"continuousUse",label:"Continuous Use",sig:"onUseTick(Level, LivingEntity, ItemStack, int) + releaseUsing(ItemStack, Level, LivingEntity, int)",
    params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"},{name:"remainingUseDuration",type:"int"}],
    returnType:"void",
@@ -327,7 +327,18 @@ const ITEM_METHODS=[
      "net.minecraft.world.effect.MobEffectInstance",
      "net.minecraft.world.effect.MobEffects",
    ],
-   stub:`    @Override\n    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration) {\n        //YCS:continuousUse:body\n    }\n\n    @Override\n    public void releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged) {\n        //YCS:releaseUsing:body\n    }`},
+   stub:`    @Override\n    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration) {\n        //YCS:continuousUse:body\n    }`},
+  {key:"releaseUsing",label:"Release Using",sig:"releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged)", hidden:true,
+   params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"},{name:"timeCharged",type:"int"}],
+   returnType:"void",
+   imports:[
+     "net.minecraft.world.entity.LivingEntity",
+     "net.minecraft.world.item.ItemStack",
+     "net.minecraft.world.level.Level",
+     "net.minecraft.world.effect.MobEffectInstance",
+     "net.minecraft.world.effect.MobEffects",
+   ],
+   stub:`    @Override\n    public void releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged) {\n        //YCS:releaseUsing:body\n    }`},
   {key:"finishUsingItem",label:"Finished Using",sig:"finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity)",
    params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"}],
    returnType:"ItemStack",
@@ -378,6 +389,14 @@ const ITEM_METHODS=[
 // ─── YCS feature stubs injected/removed as sentinels ─────────────────────────
 // These are non-method features (food, fuel, tooltip) managed identically to methods
 const YCS_FEATURES={
+  useDuration:{
+    key:"useDuration",
+    imports:["net.minecraft.world.item.ItemStack", "net.minecraft.world.entity.LivingEntity"],
+  },
+  useAnimation:{
+    key:"useAnimation",
+    imports:["net.minecraft.world.item.ItemStack", "net.minecraft.world.item.UseAnim"],
+  },
   food:{
     key:"food",
     imports:["net.minecraft.world.food.FoodProperties","net.minecraft.world.entity.LivingEntity","net.minecraft.world.item.ItemStack"],
@@ -440,11 +459,7 @@ const LINK_LOGIC = "logic";
 
 function resolveEntityVar(opcode, methodKey) {
   if (opcode === "entity.event") {
-    if (methodKey === "useOn" || methodKey === "use" || methodKey === "interactLivingEntity") return "player";
-    if (methodKey === "continuousUse" || methodKey === "finishUsingItem") return "livingEntity";
-    if (methodKey === "inventoryTick") return "entity";
-    if (methodKey === "hurtEnemy") return "attacker";
-    return "player";
+    return "eventEntity";
   }
   if (opcode === "entity.target") {
     if (methodKey === "hurtEnemy") return "target";
@@ -632,6 +647,14 @@ function ycsUpdateFeature(code, featureKey, form, itemId) {
 
 function buildFeatureStub(featureKey, form, itemId) {
   const MODID_ = "yebisurpg";
+  if (featureKey === 'useDuration') {
+    const dur = form.useDuration || "72000";
+    return `    @Override\n    public int getUseDuration(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {\n        return ${dur};\n    }`;
+  }
+  if (featureKey === 'useAnimation') {
+    const anim = form.useAnimation || "NONE";
+    return `    @Override\n    public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {\n        return net.minecraft.world.item.UseAnim.${anim};\n    }`;
+  }
   if (featureKey === 'food') {
     const n = form.foodNutrition || 2;
     const s = parseFloat(form.foodSaturation) || 0.3;
@@ -674,6 +697,9 @@ function buildFeatureStub(featureKey, form, itemId) {
 
 function ycsToggleMethod(code, methodKey, enable) {
   let result = enable ? ycsInjectMethod(code, methodKey) : ycsRemoveMethod(code, methodKey);
+  if (methodKey === "continuousUse") {
+    result = enable ? ycsInjectMethod(result, "releaseUsing") : ycsRemoveMethod(result, "releaseUsing");
+  }
   const enabledKeys = ycsGetEnabledMethods(result);
   return ycsSyncImports(result, enabledKeys);
 }
@@ -681,14 +707,24 @@ function ycsToggleMethod(code, methodKey, enable) {
 function ycsInjectCompiledBody(code, methodKey, bodyLines) {
   const bodyMarker = `//YCS:${methodKey}:body`;
   if (!code.includes(bodyMarker)) return code;
-  const compiled = bodyLines.length
-    ? bodyLines.map(l => '        ' + l).join('\n')
+  
+  let finalBodyLines = [...bodyLines];
+  if (finalBodyLines.some(l => /\beventEntity\b/.test(l))) {
+    if (methodKey === "useOn") finalBodyLines.unshift("Player eventEntity = context.getPlayer();");
+    else if (methodKey === "use" || methodKey === "interactLivingEntity") finalBodyLines.unshift("Player eventEntity = player;");
+    else if (methodKey === "continuousUse" || methodKey === "finishUsingItem" || methodKey === "releaseUsing") finalBodyLines.unshift("LivingEntity eventEntity = livingEntity;");
+    else if (methodKey === "inventoryTick") finalBodyLines.unshift("Entity eventEntity = entity;");
+    else if (methodKey === "hurtEnemy") finalBodyLines.unshift("LivingEntity eventEntity = attacker;");
+  }
+
+  const compiled = finalBodyLines.length
+    ? finalBodyLines.map(l => '        ' + l).join('\n')
     : '        // (empty)';
   return code.replace(bodyMarker, compiled);
 }
 
 // ─── Block AST compiler: BlockNode[] → Java string[] ─────────────────────────
-const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
+const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
 const BLOCK_DEF={...ITEM_DEF,orientationType:"simple",dropType:"Self",dropItem:"",dropXp:"1-3",textureTopId:"",textureBottomId:"",textureSideId:"",textureFrontId:"",textureBackId:"",textureLeftId:"",textureRightId:"",textureDoorTopId:"",textureDoorBottomId:"",textureDoorItemId:"",textureTrapdoorId:"",strength:"2.0",soundType:"WOOD",createSlab:false,createStairs:false,createFence:false,createFenceGate:false,createWall:false,createPressurePlate:false,createButton:false,createDoor:false,createTrapdoor:false,showVariants:false};
 const TEX_DEF={label:"",dataUrl:null,shapeUrl:null,emissiveUrl:null,isAnimated:false,frames:4,ticksPerFrame:4};
 
@@ -1455,32 +1491,50 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
 
   return<div style={{padding:"14px 12px",display:"flex",flexDirection:"column",gap:7}}>
     <div style={{fontSize:10,color:C.dim,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Override Methods</div>
-    {ITEM_METHODS.map(m=>{
+    {ITEM_METHODS.filter(m=>!m.hidden).map(m=>{
       const isOn=enabled.includes(m.key);
       const busy=busyKey===m.key;
       const hasBlocks=((form.methodBlocks||{})[m.key]||[]).length>0;
+      const isCont=m.key==="continuousUse";
+      const useOn=enabled.includes("use");
+      const disabled=isCont&&!useOn;
+      const visuallyOn=isOn&&!disabled;
       return<div key={m.key} style={{
         display:"flex",alignItems:"center",justifyContent:"space-between",
         padding:"9px 11px",borderRadius:5,
-        background:isOn?"#0f1820":C.card,
-        border:`1px solid ${isOn?"#1a3040":C.inpB}`,
-        opacity:busy?0.6:1,transition:"all .15s"}}>
+        background:visuallyOn?"#1a2438":C.card,
+        border:`1px solid ${visuallyOn?"#2a3f5a":C.inpB}`,
+        opacity:busy||disabled?0.6:1,transition:"all .15s",filter:disabled?"grayscale(1)":""}}>
         <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
-          <div onClick={()=>!busy&&toggle(m.key,!isOn)} style={{
-            width:14,height:14,border:`1px solid ${isOn?C.accent:C.inpB}`,borderRadius:3,
-            background:isOn?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",
-            cursor:busy?"wait":"pointer",flexShrink:0}}>
-            {isOn&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+          <div onClick={()=>!busy&&!disabled&&toggle(m.key,!isOn)} style={{
+            width:14,height:14,border:`1px solid ${visuallyOn?C.accent:C.inpB}`,borderRadius:3,
+            background:visuallyOn?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",
+            cursor:busy||disabled?"not-allowed":"pointer",flexShrink:0}}>
+            {visuallyOn&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
           </div>
           <div style={{minWidth:0}}>
-            <div style={{fontSize:12,color:isOn?C.text:"#787872",fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+            <div style={{fontSize:12,color:visuallyOn?C.text:"#787872",fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
               {m.label}
               {hasBlocks&&<span style={{fontSize:9,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
+              {disabled&&<span style={{fontSize:9,color:"#e8a868",background:"#3a2010",padding:"1px 5px",borderRadius:3}}>requires Air Interaction</span>}
             </div>
             <div style={{fontSize:10,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>
           </div>
         </div>
-        {isOn&&<Btn sm v="p" onClick={()=>onEnterEditor(m.key)} style={{marginLeft:8,flexShrink:0}}>Edit</Btn>}
+        {visuallyOn&&m.key!=="continuousUse"&&<Btn sm v="p" onClick={()=>onEnterEditor(m.key)} style={{marginLeft:8,flexShrink:0}}>Edit</Btn>}
+        {visuallyOn&&m.key==="continuousUse"&&<div style={{display:"flex",gap:4,marginLeft:8,flexShrink:0,alignItems:"center"}}>
+          <div style={{fontSize:10,color:C.faint,marginRight:4}}>Anim:</div>
+          <Sel value={form.useAnimation||"NONE"} onChange={v=>{F("useAnimation",v);if(v!=="NONE"){F("hasUseAnimation",true);}else{F("hasUseAnimation",false);}}} options={[{value:"NONE",label:"None"},{value:"EAT",label:"Eat"},{value:"DRINK",label:"Drink"},{value:"BLOCK",label:"Block"},{value:"BOW",label:"Bow"},{value:"SPEAR",label:"Spear"},{value:"CROSSBOW",label:"Crossbow"},{value:"SPYGLASS",label:"Spyglass"},{value:"TOOT_HORN",label:"Horn"},{value:"BRUSH",label:"Brush"}]} style={{height:24,fontSize:11,marginRight:4,padding:"0 6px"}}/>
+          <label style={{fontSize:10,color:C.faint,display:"flex",alignItems:"center",gap:4,cursor:"pointer",marginRight:4}}>
+            <input type="checkbox" checked={form.tags?.includes("yebisurpg:no_use_slowdown")||false} onChange={e=>{
+              const v = e.target.checked;
+              const next = v ? [...(form.tags||[]), "yebisurpg:no_use_slowdown"] : (form.tags||[]).filter(t=>t!=="yebisurpg:no_use_slowdown");
+              F("tags", next);
+            }} style={{margin:0,cursor:"pointer"}}/> No Slowdown
+          </label>
+          <Btn sm v="p" onClick={()=>onEnterEditor("continuousUse")}>onUseTick</Btn>
+          <Btn sm v="p" onClick={()=>onEnterEditor("releaseUsing")}>releaseUsing</Btn>
+        </div>}
       </div>;
     })}
   </div>;
@@ -1569,6 +1623,8 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
         nCode = form.isFood ? ycsInjectFeature(nCode, "food", form, form.id) : ycsRemoveFeature(nCode, "food");
         nCode = form.isFuel ? ycsInjectFeature(nCode, "fuel", form, form.id) : ycsRemoveFeature(nCode, "fuel");
         nCode = form.hasTooltip ? ycsInjectFeature(nCode, "tooltip", form, form.id) : ycsRemoveFeature(nCode, "tooltip");
+        nCode = form.hasUseDuration ? ycsInjectFeature(nCode, "useDuration", form, form.id) : ycsRemoveFeature(nCode, "useDuration");
+        nCode = form.hasUseAnimation ? ycsInjectFeature(nCode, "useAnimation", form, form.id) : ycsRemoveFeature(nCode, "useAnimation");
         if (nCode !== cc.code) {
           const cw = await api("/items/custom-class/write",{className:clsName,code:nCode});
           msgs.push({ok:cw.ok,label:"class",msg:cw.ok?"ok":cw.reason});
@@ -1641,24 +1697,28 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
           </div>
         </div>}
 
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:activePanel==="customclass"?"#0e1820":"#141416",border:`1px solid ${activePanel==="customclass"?"#1a3040":C.inpB}`,borderRadius:4,marginTop:12}}>
-          <div style={{display:"flex",flexDirection:"column",gap:2}}>
-            <Lbl>Override Methods</Lbl>
-            {form.customItemClass&&<span style={{fontSize:10,color:"#2a5a7a",fontFamily:"monospace"}}>{form.customItemClass}.java</span>}
-          </div>
-          <Btn sm v={activePanel==="customclass"?"p":"g"} onClick={async()=>{
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:12}}>
+      <Lbl>Override Methods</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:form.customItemClass?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{form.customItemClass ? `${form.customItemClass}.java` : "none added"}</span>
+        <Btn sm v={activePanel==="customclass"?"p":"g"} onClick={async()=>{
             if(activePanel==="customclass"){setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});return;}
             const cls2=form.customItemClass||(form.id?idToClassName(form.id):null);
             if(!cls2)return;
             if(!form.customItemClass){F("customItemClass",cls2);await api("/items/custom-class",{className:cls2});}
             setRightView({mode:"methodList",editingMethod:null});
             setActivePanel("customclass");
-          }} dis={!form.id}>edit methods</Btn>
-        </div>
+          }} dis={!form.id} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>
       </div>
     </div>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
     {!form.isTool&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <Chk label="Set Use Duration" checked={!!form.hasUseDuration} onChange={v=>F("hasUseDuration",v)}/>
+      {form.hasUseDuration&&<Inp label="Duration (ticks)" value={form.useDuration||"72000"} onChange={v=>F("useDuration",v)} type="number"/>}
+    </div>
     {!form.isTool&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
       <Chk label="Has Durability" checked={!!form.hasDurability} onChange={v=>F("hasDurability",v)}/>
       {form.hasDurability&&<Inp label="Durability" value={form.durability||"100"} onChange={v=>F("durability",v)} type="number"/>}
