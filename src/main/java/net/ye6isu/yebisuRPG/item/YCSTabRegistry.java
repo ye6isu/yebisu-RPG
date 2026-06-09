@@ -23,7 +23,7 @@ public final class YCSTabRegistry {
         "food_and_drinks",      ResourceLocation.fromNamespaceAndPath("minecraft", "food_and_drinks"),
         "ingredients",          ResourceLocation.fromNamespaceAndPath("minecraft", "ingredients"),
         "building_blocks",      ResourceLocation.fromNamespaceAndPath("minecraft", "building_blocks"),
-        "redstone_blocks",      ResourceLocation.fromNamespaceAndPath("minecraft", "redstone_blocks"),
+        "redstone_blocks",      ResourceLocation.fromNamespaceAndPath("minecraft", "redstone"),
         "natural_blocks",       ResourceLocation.fromNamespaceAndPath("minecraft", "natural_blocks")
     );
 

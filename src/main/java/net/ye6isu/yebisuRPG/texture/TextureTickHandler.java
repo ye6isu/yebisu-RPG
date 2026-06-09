@@ -17,11 +17,13 @@ public final class TextureTickHandler {
     public static void onClientTick(ClientTickEvent.Post event) {
         TextureManager.INSTANCE.clientTick();
         ItemTextureState.INSTANCE.tickAll();
+        net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE.tick();
     }
 
     @SubscribeEvent
     public static void onClientDisconnect(ClientPlayerNetworkEvent.LoggingOut event) {
         TextureManager.INSTANCE.clearAll();
         VarSyncClientCache.clearAll();
+        net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE.clearAll();
     }
 }

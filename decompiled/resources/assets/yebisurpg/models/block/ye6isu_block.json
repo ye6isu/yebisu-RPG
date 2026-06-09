@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "yebisurpg:block/ye6isu_block"
-  }
-}

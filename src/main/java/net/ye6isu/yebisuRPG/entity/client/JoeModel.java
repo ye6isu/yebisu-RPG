@@ -9,6 +9,11 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
+import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.ye6isu.yebisuRPG.entity.custom.JoeEntity;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
@@ -59,6 +64,15 @@ public class JoeModel<T extends JoeEntity> extends HierarchicalModel<T> {
         this.animateWalk(JoeAnimations.ANIM_JOE_WALK, limbSwing, limbSwingAmount, 2f, 2.5f);
         this.animate(entity.idleAnimationState, JoeAnimations.ANIM_JOE_IDLE, ageInTicks, 1f);
 
+        // Query the animation engine for any custom AnimationAPI-triggered animation.
+        // getCurrentTimeSecs() is sub-tick accurate so it stays smooth at any frame rate.
+        AnimationPlayhead playhead =
+                ClientAnimationEngine.INSTANCE.getPlayhead(entity.getId(), AnimationCategory.ENTITY);
+        if (playhead != null) {
+            // animate() expects ageInTicks; convert ms-accurate seconds to ticks.
+            float animTicks = playhead.getCurrentTimeSecs() * 20f;
+            this.animate(entity.customAnimationState, JoeAnimations.ANIM_JOE_CUSTOM, animTicks, 1f);
+        }
     }
 
     private void applyHeadRotation(float headYaw, float headPitch) {

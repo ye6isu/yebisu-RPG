@@ -17,7 +17,8 @@ public class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(yebisuRPG.MODID);
 
     //Normal Items
-    public static final DeferredItem<Item> PLANK = ITEMS.register("plank",   () -> new Item(new Item.Properties()));
+    public static final DeferredItem<Item> PLANK = ITEMS.register("plank",
+                () -> new PlankItem(new Item.Properties()));
 
     public static final DeferredItem<Item> YE6ISU  = ITEMS.register("ye6isu",  () -> new Ye6isuItem(new Item.Properties()));
 

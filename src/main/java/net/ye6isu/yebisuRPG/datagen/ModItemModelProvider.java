@@ -100,6 +100,8 @@ public class ModItemModelProvider extends ItemModelProvider {
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
         getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
 
+        basicItem(ModItems.PLANK.get());
+
         //YCS_Mod_Item_Model_END
     }
 
