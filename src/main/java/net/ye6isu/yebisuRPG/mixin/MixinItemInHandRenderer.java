@@ -2,11 +2,18 @@ package net.ye6isu.yebisuRPG.mixin;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexSorting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
@@ -14,10 +21,8 @@ import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
 import net.ye6isu.yebisuRPG.client.debug.HandDebugState;
-import net.ye6isu.yebisuRPG.client.renderer.firstperson.FirstPersonHandModel;
-import net.ye6isu.yebisuRPG.client.renderer.firstperson.FirstPersonHandRenderer;
-import com.mojang.blaze3d.vertex.VertexSorting;
-import net.minecraft.client.Minecraft;
+import net.ye6isu.yebisuRPG.client.renderer.CompositeSkinManager;
+import net.ye6isu.yebisuRPG.client.renderer.FullbrightRenderType;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -47,8 +52,15 @@ public abstract class MixinItemInHandRenderer {
         HandAnimationLoader.AnimData anim = animId != null ? HandAnimationLoader.INSTANCE.get(animId) : null;
         if (anim == null && !HandDebugState.debugMode) return;
 
-        FirstPersonHandModel model = FirstPersonHandRenderer.getOrBakeModel();
-        if (model == null) return;
+        Minecraft mc = Minecraft.getInstance();
+
+        // Advance the animated/emissive texture for this player.
+        CompositeSkinManager.INSTANCE.update(player);
+
+        // Get the actual PlayerModel — handles slim/wide arm type automatically.
+        var entityRenderer = mc.getEntityRenderDispatcher().getRenderer(player);
+        if (!(entityRenderer instanceof PlayerRenderer playerRenderer)) return;
+        PlayerModel<AbstractClientPlayer> playerModel = playerRenderer.getModel();
 
         float timeSecs = playhead != null ? playhead.getCurrentTimeSecs() : 0f;
 
@@ -63,58 +75,89 @@ public abstract class MixinItemInHandRenderer {
             leftRX  = l != null ? l.evalX(timeSecs) : 0f; leftRY  = l != null ? l.evalY(timeSecs) : 0f; leftRZ  = l != null ? l.evalZ(timeSecs) : 0f;
         }
 
-        model.rightArm.xRot = (float) Math.toRadians(rightRX);
-        model.rightArm.yRot = (float) Math.toRadians(rightRY);
-        model.rightArm.zRot = (float) Math.toRadians(rightRZ);
-        model.leftArm.xRot  = (float) Math.toRadians(leftRX);
-        model.leftArm.yRot  = (float) Math.toRadians(leftRY);
-        model.leftArm.zRot  = (float) Math.toRadians(leftRZ);
-
-        // Push a custom projection with near=0.01 so close geometry isn't clipped.
-        // Hand FOV is 87°; aspect from window size.
-        var window = Minecraft.getInstance().getWindow();
+        // Push projection with near=0.01 to avoid clipping close geometry.
+        var window = mc.getWindow();
         float aspect = (float) window.getWidth() / (float) window.getHeight();
-        Matrix4f handProj = new Matrix4f().perspective(
-            (float) Math.toRadians(87.0), aspect, 0.01f, 100f);
+        Matrix4f handProj = new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.01f, 100f);
         RenderSystem.setProjectionMatrix(handProj, VertexSorting.DISTANCE_TO_ORIGIN);
 
-        // Replace the world-space modelview with identity so geometry
-        // is in camera space, not world space.
+        // Identity modelview — strips world rotation, puts us in camera space.
         var mvStack = RenderSystem.getModelViewStack();
         mvStack.pushMatrix();
         mvStack.identity();
         RenderSystem.applyModelViewMatrix();
 
-        // Build pose in camera space.
-        // +X = right, +Y = down (Java model convention), -Z = forward into screen.
+        ResourceLocation skinTex     = player.getSkin().texture();
+        ResourceLocation emissiveTex = CompositeSkinManager.INSTANCE.getEmissiveLocation(player.getUUID());
+
+        RenderSystem.disableCull();
+
+        // Render each arm separately so we can apply the correct X-mirror per arm.
+        // PlayerModel geometry: rightArm is mirrored (box at negative X), leftArm is normal.
+        // We un-mirror rightArm by rendering it inside a scale(-1,1,1) scope.
+        renderArm(playerModel.rightArm, playerModel.rightSleeve, rightRX, rightRY, rightRZ,
+                  skinTex, emissiveTex, bufferSource, packedLight);
+        renderArm(playerModel.leftArm,  playerModel.leftSleeve,  leftRX,  leftRY,  leftRZ,
+                  skinTex, emissiveTex, bufferSource, packedLight);
+
+        RenderSystem.enableCull();
+
+        mvStack.popMatrix();
+        RenderSystem.applyModelViewMatrix();
+        RenderSystem.setProjectionMatrix(
+            new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.05f, 100f),
+            VertexSorting.DISTANCE_TO_ORIGIN);
+
+        ci.cancel();
+    }
+
+    private static void renderArm(
+            ModelPart arm, ModelPart sleeve,
+            float rx, float ry, float rz,
+            ResourceLocation skinTex, ResourceLocation emissiveTex,
+            MultiBufferSource.BufferSource bufferSource, int packedLight) {
+
+        // Save original rotations — PlayerModel is shared/reused.
+        float origX = arm.xRot, origY = arm.yRot, origZ = arm.zRot;
+        float origSX = sleeve.xRot, origSY = sleeve.yRot, origSZ = sleeve.zRot;
+
+        arm.xRot    = (float) Math.toRadians(rx);
+        arm.yRot    = (float) Math.toRadians(ry);
+        arm.zRot    = (float) Math.toRadians(rz);
+        sleeve.xRot = (float) Math.toRadians(rx);
+        sleeve.yRot = (float) Math.toRadians(ry);
+        sleeve.zRot = (float) Math.toRadians(rz);
+
         PoseStack pose = new PoseStack();
 
         float dtx = HandDebugState.BASE_TX + (HandDebugState.debugMode ? HandDebugState.tx : 0f);
         float dty = HandDebugState.BASE_TY + (HandDebugState.debugMode ? HandDebugState.ty : 0f);
         float dtz = HandDebugState.BASE_TZ + (HandDebugState.debugMode ? HandDebugState.tz : 0f);
         pose.translate(dtx, dty, dtz);
-
-        // Scale: Bedrock pixel → block (1/16). Flip Y: Bedrock Y-up, Java model Y-down.
         pose.scale(1f / 16f, -1f / 16f, 1f / 16f);
-
-        // Offset so Camera bone pivot [0,27,4] sits at the pose origin.
-        // In Java pixel space (after Y-flip): [0, -27, 4] → negate to bring to origin.
         pose.translate(0f, 27f, -4f);
 
-        RenderSystem.disableCull();
-        var vc = bufferSource.getBuffer(RenderType.entitySolid(player.getSkin().texture()));
-        model.renderToBuffer(pose, vc, packedLight, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
-        bufferSource.endBatch(RenderType.entitySolid(player.getSkin().texture()));
-        RenderSystem.enableCull();
+        // Both arm geometries in PlayerModel are stored mirrored — flip X for both.
+        pose.scale(-1f, 1f, 1f);
 
-        mvStack.popMatrix();
-        RenderSystem.applyModelViewMatrix();
+        // Layer 1: base skin.
+        arm.render(pose, bufferSource.getBuffer(RenderType.entitySolid(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
+        bufferSource.endBatch(RenderType.entitySolid(skinTex));
 
-        // Restore a standard hand projection (vanilla will re-set it anyway after we cancel, but be clean).
-        RenderSystem.setProjectionMatrix(
-            new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.05f, 100f),
-            VertexSorting.DISTANCE_TO_ORIGIN);
+        // Layer 2: jacket/sleeve overlay.
+        sleeve.render(pose, bufferSource.getBuffer(RenderType.entityTranslucent(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
+        bufferSource.endBatch(RenderType.entityTranslucent(skinTex));
 
-        ci.cancel();
+        // Layer 3: emissive/animated texture.
+        if (emissiveTex != null && FullbrightRenderType.shader != null) {
+            var vcEmissive = bufferSource.getBuffer(FullbrightRenderType.get(emissiveTex));
+            arm.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
+            sleeve.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
+            bufferSource.endBatch(FullbrightRenderType.get(emissiveTex));
+        }
+
+        // Restore original rotations.
+        arm.xRot = origX; arm.yRot = origY; arm.zRot = origZ;
+        sleeve.xRot = origSX; sleeve.yRot = origSY; sleeve.zRot = origSZ;
     }
 }
