@@ -1,172 +1,120 @@
 package net.ye6isu.yebisuRPG.mixin;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
-import net.ye6isu.yebisuRPG.animation.client.AnimationBlender;
 import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
+import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
+import net.ye6isu.yebisuRPG.client.debug.HandDebugState;
+import net.ye6isu.yebisuRPG.client.renderer.firstperson.FirstPersonHandModel;
+import net.ye6isu.yebisuRPG.client.renderer.firstperson.FirstPersonHandRenderer;
+import com.mojang.blaze3d.vertex.VertexSorting;
+import net.minecraft.client.Minecraft;
+import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Injects custom item-slot animation transforms before the vanilla item-in-hand
- * render call, enabling multi-part item bone offsets (e.g. a rifle slide cycling
- * or a barrel spinning) to be applied per frame without altering the vanilla render path.
- *
- * <h2>Injection strategy</h2>
- * <p>We inject at {@code HEAD} of {@code renderHandsWithItems} so the PoseStack
- * transform is pushed before any vanilla matrix operations occur for that frame.
- * The transform is a no-op (immediate return) when no playhead is active, so vanilla
- * behaviour is completely unchanged in the common case.</p>
- *
- * <h2>Blend-out</h2>
- * <p>When a stop signal is received the blender's {@link AnimationBlender#lerpToRest}
- * drives the rotation back to zero over two ticks. We snapshot a neutral pose
- * (all-zero rotations) since item components return to their model-file default,
- * not a pose we need to capture at interrupt time.</p>
- */
 @Mixin(ItemInHandRenderer.class)
 @OnlyIn(Dist.CLIENT)
 public abstract class MixinItemInHandRenderer {
 
-    /**
-     * Applies the active main-hand or off-hand item animation transform to the
-     * PoseStack at the start of each hand-render frame.
-     *
-     * <p>The method signature matches {@code ItemInHandRenderer.renderHandsWithItems}
-     * in Minecraft 1.21.1. We read which hand is being rendered from the
-     * {@code InteractionHand} parameter and route to the correct category.</p>
-     */
     @Inject(
         method = "renderHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/player/LocalPlayer;I)V",
-        at = @At("HEAD")
+        at = @At("HEAD"),
+        cancellable = true
     )
-    private void yebisurpg$applyItemAnimTransform(
-            float partialTick,
-            PoseStack poseStack,
+    private void yebisurpg$renderFirstPersonHands(
+            float partialTick, PoseStack poseStack,
             MultiBufferSource.BufferSource bufferSource,
-            LocalPlayer player,
-            int packedLight,
+            LocalPlayer player, int packedLight,
             CallbackInfo ci) {
 
-        AnimationCategory category = resolveHandCategory(player);
-        if (category == null) return;
-
         int entityId = player.getId();
-        ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
+        AnimationPlayhead playhead = ClientAnimationEngine.INSTANCE.getPlayhead(entityId, AnimationCategory.ENTITY);
+        if (playhead == null && !HandDebugState.debugMode) return;
 
-        AnimationPlayhead playhead = engine.getPlayhead(entityId, category);
-        AnimationBlender  blender  = engine.getBlender(entityId, category);
+        String animId = playhead != null ? playhead.animId() : null;
+        HandAnimationLoader.AnimData anim = animId != null ? HandAnimationLoader.INSTANCE.get(animId) : null;
+        if (anim == null && !HandDebugState.debugMode) return;
 
-        if (playhead == null && blender == null) return;
+        FirstPersonHandModel model = FirstPersonHandRenderer.getOrBakeModel();
+        if (model == null) return;
 
-        poseStack.pushPose();
+        float timeSecs = playhead != null ? playhead.getCurrentTimeSecs() : 0f;
 
-        if (blender != null && blender.isActive()) {
-            // Blend-out: lerp each rotation channel from the snapshot toward rest.
-            AnimationBlender.PoseSnapshot snap = blender.snapshot();
-            for (int i = 0; i < snap.boneCount(); i++) {
-                float rx = blender.lerpToRest(snap.rotationsX()[i], partialTick);
-                float ry = blender.lerpToRest(snap.rotationsY()[i], partialTick);
-                float rz = blender.lerpToRest(snap.rotationsZ()[i], partialTick);
-                applyBoneRotation(poseStack, rx, ry, rz);
-            }
-        } else if (playhead != null && playhead.isPlaying()) {
-            // Active animation: apply the time-driven transform for this frame.
-            applyPlayheadTransform(poseStack, playhead, partialTick);
+        float rightRX, rightRY, rightRZ, leftRX, leftRY, leftRZ;
+        if (HandDebugState.debugMode) {
+            rightRX = HandDebugState.rightRX; rightRY = HandDebugState.rightRY; rightRZ = HandDebugState.rightRZ;
+            leftRX  = HandDebugState.leftRX;  leftRY  = HandDebugState.leftRY;  leftRZ  = HandDebugState.leftRZ;
+        } else {
+            HandAnimationLoader.BoneChannel r = anim.bone("right_arm");
+            HandAnimationLoader.BoneChannel l = anim.bone("left_arm");
+            rightRX = r != null ? r.evalX(timeSecs) : 0f; rightRY = r != null ? r.evalY(timeSecs) : 0f; rightRZ = r != null ? r.evalZ(timeSecs) : 0f;
+            leftRX  = l != null ? l.evalX(timeSecs) : 0f; leftRY  = l != null ? l.evalY(timeSecs) : 0f; leftRZ  = l != null ? l.evalZ(timeSecs) : 0f;
         }
 
-        // Note: poseStack.popPose() is called in the @TAIL inject below so the
-        // push/pop pair is always balanced even if vanilla throws mid-render.
-    }
+        model.rightArm.xRot = (float) Math.toRadians(rightRX);
+        model.rightArm.yRot = (float) Math.toRadians(rightRY);
+        model.rightArm.zRot = (float) Math.toRadians(rightRZ);
+        model.leftArm.xRot  = (float) Math.toRadians(leftRX);
+        model.leftArm.yRot  = (float) Math.toRadians(leftRY);
+        model.leftArm.zRot  = (float) Math.toRadians(leftRZ);
 
-    /**
-     * Pops the PoseStack entry pushed in the HEAD inject after the vanilla render
-     * completes, ensuring the matrix stack is always balanced.
-     */
-    @Inject(
-        method = "renderHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/player/LocalPlayer;I)V",
-        at = @At("TAIL")
-    )
-    private void yebisurpg$popItemAnimTransform(
-            float partialTick,
-            PoseStack poseStack,
-            MultiBufferSource.BufferSource bufferSource,
-            LocalPlayer player,
-            int packedLight,
-            CallbackInfo ci) {
+        // Push a custom projection with near=0.01 so close geometry isn't clipped.
+        // Hand FOV is 87°; aspect from window size.
+        var window = Minecraft.getInstance().getWindow();
+        float aspect = (float) window.getWidth() / (float) window.getHeight();
+        Matrix4f handProj = new Matrix4f().perspective(
+            (float) Math.toRadians(87.0), aspect, 0.01f, 100f);
+        RenderSystem.setProjectionMatrix(handProj, VertexSorting.DISTANCE_TO_ORIGIN);
 
-        AnimationCategory category = resolveHandCategory(player);
-        if (category == null) return;
+        // Replace the world-space modelview with identity so geometry
+        // is in camera space, not world space.
+        var mvStack = RenderSystem.getModelViewStack();
+        mvStack.pushMatrix();
+        mvStack.identity();
+        RenderSystem.applyModelViewMatrix();
 
-        int entityId = player.getId();
-        ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
+        // Build pose in camera space.
+        // +X = right, +Y = down (Java model convention), -Z = forward into screen.
+        PoseStack pose = new PoseStack();
 
-        // Only pop if we pushed — same guard as the HEAD inject.
-        if (engine.getPlayhead(entityId, category) != null
-                || engine.getBlender(entityId, category) != null) {
-            poseStack.popPose();
-        }
-    }
+        float dtx = HandDebugState.BASE_TX + (HandDebugState.debugMode ? HandDebugState.tx : 0f);
+        float dty = HandDebugState.BASE_TY + (HandDebugState.debugMode ? HandDebugState.ty : 0f);
+        float dtz = HandDebugState.BASE_TZ + (HandDebugState.debugMode ? HandDebugState.tz : 0f);
+        pose.translate(dtx, dty, dtz);
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+        // Scale: Bedrock pixel → block (1/16). Flip Y: Bedrock Y-up, Java model Y-down.
+        pose.scale(1f / 16f, -1f / 16f, 1f / 16f);
 
-    /**
-     * Resolves which animation category corresponds to the hand currently being
-     * rendered. We infer the hand from which Minecraft hand is active for the
-     * local player rather than receiving it as a parameter (the vanilla method
-     * renders one hand at a time internally).
-     */
-    private static AnimationCategory resolveHandCategory(LocalPlayer player) {
-        if (player == null) return null;
-        // ItemInHandRenderer renders the main hand in its primary call path;
-        // the category is refined to OFF_HAND when off-hand item state is active.
-        // For the initial implementation both slots check MAIN_HAND; OFF_HAND
-        // support is wired identically and activates when an off-hand playhead exists.
-        if (ClientAnimationEngine.INSTANCE.isPlaying(player.getId(), AnimationCategory.ITEM_OFF_HAND)
-                || ClientAnimationEngine.INSTANCE.getBlender(player.getId(), AnimationCategory.ITEM_OFF_HAND) != null) {
-            return AnimationCategory.ITEM_OFF_HAND;
-        }
-        return AnimationCategory.ITEM_MAIN_HAND;
-    }
+        // Offset so Camera bone pivot [0,27,4] sits at the pose origin.
+        // In Java pixel space (after Y-flip): [0, -27, 4] → negate to bring to origin.
+        pose.translate(0f, 27f, -4f);
 
-    /**
-     * Applies a time-driven rotation transform from the active playhead.
-     * The Y-axis rotation is derived from the animation time so custom item
-     * components spin, cycle, or oscillate in model space.
-     *
-     * Renderers for specific items will override this by querying the playhead
-     * time directly from {@link ClientAnimationEngine#getPlayhead} and driving
-     * their own {@code ModelPart} rotations. This fallback exists so the engine
-     * is visually observable before per-item renderers are implemented.
-     */
-    private static void applyPlayheadTransform(PoseStack poseStack,
-                                               AnimationPlayhead playhead,
-                                               float partialTick) {
-        float timeSecs = playhead.getCurrentTimeSecs()
-                + (partialTick * AnimationPlayhead.MS_PER_TICK / 1000f);
-        // Default: gentle Y-axis oscillation so the system is visually verifiable.
-        // Per-item renderers replace this with their Blockbench-driven keyframe data.
-        float ry = (float) Math.sin(timeSecs * Math.PI * 2.0) * 5.0f;
-        applyBoneRotation(poseStack, 0f, ry, 0f);
-    }
+        RenderSystem.disableCull();
+        var vc = bufferSource.getBuffer(RenderType.entitySolid(player.getSkin().texture()));
+        model.renderToBuffer(pose, vc, packedLight, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
+        bufferSource.endBatch(RenderType.entitySolid(player.getSkin().texture()));
+        RenderSystem.enableCull();
 
-    /** Applies X/Y/Z degree rotations to the PoseStack in ZYX order (standard for models). */
-    private static void applyBoneRotation(PoseStack poseStack, float rx, float ry, float rz) {
-        if (rx != 0f) poseStack.mulPose(
-            com.mojang.math.Axis.XP.rotationDegrees(rx));
-        if (ry != 0f) poseStack.mulPose(
-            com.mojang.math.Axis.YP.rotationDegrees(ry));
-        if (rz != 0f) poseStack.mulPose(
-            com.mojang.math.Axis.ZP.rotationDegrees(rz));
+        mvStack.popMatrix();
+        RenderSystem.applyModelViewMatrix();
+
+        // Restore a standard hand projection (vanilla will re-set it anyway after we cancel, but be clean).
+        RenderSystem.setProjectionMatrix(
+            new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.05f, 100f),
+            VertexSorting.DISTANCE_TO_ORIGIN);
+
+        ci.cancel();
     }
 }

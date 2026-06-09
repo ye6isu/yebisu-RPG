@@ -4,6 +4,7 @@
   "package": "net.ye6isu.yebisuRPG.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "MixinGameRenderer",
     "MixinItemInHandRenderer",
     "MixinPlayerModel",
     "MixinPlayerRenderer"

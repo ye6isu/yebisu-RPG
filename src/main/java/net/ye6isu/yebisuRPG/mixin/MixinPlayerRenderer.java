@@ -42,6 +42,7 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
             bs.endBatch(FullbrightRenderType.get(emissiveLoc));
     }
 
+
     @Inject(method = "renderLeftHand", at = @At("TAIL"))
     private void yebisurpg$emissiveLeftHand(
             PoseStack poseStack, MultiBufferSource buffer,
@@ -56,6 +57,7 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         if (buffer instanceof MultiBufferSource.BufferSource bs)
             bs.endBatch(FullbrightRenderType.get(emissiveLoc));
     }
+
 
     // -------------------------------------------------------------------------
     // Custom armor slot animation queries
