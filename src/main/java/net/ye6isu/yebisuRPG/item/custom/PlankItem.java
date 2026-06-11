@@ -21,7 +21,7 @@ public class PlankItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-        net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(player, net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY, "test_anim");
+        net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(player, net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY, "tester");
         //YCS:use:body
         return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

@@ -1,22 +1,33 @@
 {
 	"format_version": "1.8.0",
 	"animations": {
-		"test_anim": {
+		"tester": {
 			"loop": "once",
-			"animation_length": 0.458333,
+			"animation_length": 1,
 			"bones": {
 				"right_arm": {
 					"rotation": {
-						"vector": [-90, 0, 0]
-					}
-				},
-				"left_arm": {
-					"rotation": {
 						"0": {
-							"vector": [0, 0, 0]
-						},
-						"0.458333": {
 							"vector": [-90, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.25": {
+							"vector": [
+								0,
+								10,
+								0
+							]
+						},
+						"0.25": {
+							"vector": [
+								0,
+								10,
+								0
+							]
 						}
 					}
 				}
