@@ -66,6 +66,38 @@ public class HandDebugScreen extends Screen {
         rows.add(addRow(col2, ry+step,   sliderW, "R RY", R_MIN, R_MAX, HandDebugState.rightRY, v -> HandDebugState.rightRY = v, () -> HandDebugState.rightRY));
         rows.add(addRow(col2, ry+step*2, sliderW, "R RZ", R_MIN, R_MAX, HandDebugState.rightRZ, v -> HandDebugState.rightRZ = v, () -> HandDebugState.rightRZ));
 
+        // ── Item translation rows ────────────────────────────────────────────
+        int iy = ry + step * 4;
+
+        rows.add(addRow(col1, iy,        sliderW, "L ITX", T_MIN, T_MAX, HandDebugState.leftITX,  v -> HandDebugState.leftITX  = v, () -> HandDebugState.leftITX));
+        rows.add(addRow(col1, iy+step,   sliderW, "L ITY", T_MIN, T_MAX, HandDebugState.leftITY,  v -> HandDebugState.leftITY  = v, () -> HandDebugState.leftITY));
+        rows.add(addRow(col1, iy+step*2, sliderW, "L ITZ", T_MIN, T_MAX, HandDebugState.leftITZ,  v -> HandDebugState.leftITZ  = v, () -> HandDebugState.leftITZ));
+
+        rows.add(addRow(col2, iy,        sliderW, "R ITX", T_MIN, T_MAX, HandDebugState.rightITX, v -> HandDebugState.rightITX = v, () -> HandDebugState.rightITX));
+        rows.add(addRow(col2, iy+step,   sliderW, "R ITY", T_MIN, T_MAX, HandDebugState.rightITY, v -> HandDebugState.rightITY = v, () -> HandDebugState.rightITY));
+        rows.add(addRow(col2, iy+step*2, sliderW, "R ITZ", T_MIN, T_MAX, HandDebugState.rightITZ, v -> HandDebugState.rightITZ = v, () -> HandDebugState.rightITZ));
+
+        // ── Item rotation rows ───────────────────────────────────────────────
+        int irY = iy + step * 4;
+
+        rows.add(addRow(col1, irY,        sliderW, "L IRX", R_MIN, R_MAX, HandDebugState.leftIRX,  v -> HandDebugState.leftIRX  = v, () -> HandDebugState.leftIRX));
+        rows.add(addRow(col1, irY+step,   sliderW, "L IRY", R_MIN, R_MAX, HandDebugState.leftIRY,  v -> HandDebugState.leftIRY  = v, () -> HandDebugState.leftIRY));
+        rows.add(addRow(col1, irY+step*2, sliderW, "L IRZ", R_MIN, R_MAX, HandDebugState.leftIRZ,  v -> HandDebugState.leftIRZ  = v, () -> HandDebugState.leftIRZ));
+
+        rows.add(addRow(col2, irY,        sliderW, "R IRX", R_MIN, R_MAX, HandDebugState.rightIRX, v -> HandDebugState.rightIRX = v, () -> HandDebugState.rightIRX));
+        rows.add(addRow(col2, irY+step,   sliderW, "R IRY", R_MIN, R_MAX, HandDebugState.rightIRY, v -> HandDebugState.rightIRY = v, () -> HandDebugState.rightIRY));
+        rows.add(addRow(col2, irY+step*2, sliderW, "R IRZ", R_MIN, R_MAX, HandDebugState.rightIRZ, v -> HandDebugState.rightIRZ = v, () -> HandDebugState.rightIRZ));
+
+        // ── Debug square (right hand) ────────────────────────────────────────
+        int sqY = 30;
+        int col3 = width * 3 / 4 - colW / 2;
+        rows.add(addRow(col3, sqY,        sliderW, "SQ TX", T_MIN, T_MAX, HandDebugState.squareTX, v -> HandDebugState.squareTX = v, () -> HandDebugState.squareTX));
+        rows.add(addRow(col3, sqY+step,   sliderW, "SQ TY", T_MIN, T_MAX, HandDebugState.squareTY, v -> HandDebugState.squareTY = v, () -> HandDebugState.squareTY));
+        rows.add(addRow(col3, sqY+step*2, sliderW, "SQ TZ", T_MIN, T_MAX, HandDebugState.squareTZ, v -> HandDebugState.squareTZ = v, () -> HandDebugState.squareTZ));
+        rows.add(addRow(col3, sqY+step*4, sliderW, "SQ RX", R_MIN, R_MAX, HandDebugState.squareRX, v -> HandDebugState.squareRX = v, () -> HandDebugState.squareRX));
+        rows.add(addRow(col3, sqY+step*5, sliderW, "SQ RY", R_MIN, R_MAX, HandDebugState.squareRY, v -> HandDebugState.squareRY = v, () -> HandDebugState.squareRY));
+        rows.add(addRow(col3, sqY+step*6, sliderW, "SQ RZ", R_MIN, R_MAX, HandDebugState.squareRZ, v -> HandDebugState.squareRZ = v, () -> HandDebugState.squareRZ));
+
         addRenderableWidget(Button.builder(Component.literal("Reset"), btn -> resetAll())
             .bounds(width / 2 - 40, height - 30, 80, 20).build());
     }
@@ -104,10 +136,17 @@ public class HandDebugScreen extends Screen {
         super.render(g, mx, my, pt);
 
         int c1 = 10, c2 = width / 2 + 10;
-        g.drawString(font, "LEFT ARM",  c1, 16,          0xFF00AAFF);
-        g.drawString(font, "RIGHT ARM", c2, 16,          0xFFFFAA00);
-        g.drawString(font, "ROTATION",  c1, 16 + 22 * 3, 0xFFAAAAAA);
-        g.drawString(font, "ROTATION",  c2, 16 + 22 * 3, 0xFFAAAAAA);
+        g.drawString(font, "LEFT ARM",    c1, 16,           0xFF00AAFF);
+        g.drawString(font, "RIGHT ARM",   c2, 16,           0xFFFFAA00);
+        g.drawString(font, "ARM ROT",     c1, 16 + 22 * 3,  0xFFAAAAAA);
+        g.drawString(font, "ARM ROT",     c2, 16 + 22 * 3,  0xFFAAAAAA);
+        int c3 = width * 3 / 4 - (width / 2 - 20) / 2;
+        g.drawString(font, "SQ OFFSET",   c3, 16,           0xFFFF44FF);
+        g.drawString(font, "SQ ROTATION", c3, 16 + 22 * 3,  0xFFAAAAAA);
+        g.drawString(font, "LEFT ITEM",   c1, 16 + 22 * 7,  0xFF00FF88);
+        g.drawString(font, "RIGHT ITEM",  c2, 16 + 22 * 7,  0xFFFFCC44);
+        g.drawString(font, "ITEM ROT",    c1, 16 + 22 * 11, 0xFFAAAAAA);
+        g.drawString(font, "ITEM ROT",    c2, 16 + 22 * 11, 0xFFAAAAAA);
 
         // ── Live readout ─────────────────────────────────────────────────
         int by = height - 64;
@@ -155,6 +194,12 @@ public class HandDebugScreen extends Screen {
         HandDebugState.leftTX  = HandDebugState.leftTY  = HandDebugState.leftTZ  = 0f;
         HandDebugState.rightRX = HandDebugState.rightRY = HandDebugState.rightRZ = 0f;
         HandDebugState.leftRX  = HandDebugState.leftRY  = HandDebugState.leftRZ  = 0f;
+        HandDebugState.squareTX = HandDebugState.squareTY = HandDebugState.squareTZ = 0f;
+        HandDebugState.squareRX = HandDebugState.squareRY = HandDebugState.squareRZ = 0f;
+        HandDebugState.rightITX = HandDebugState.rightITY = HandDebugState.rightITZ = 0f;
+        HandDebugState.leftITX  = HandDebugState.leftITY  = HandDebugState.leftITZ  = 0f;
+        HandDebugState.rightIRX = HandDebugState.rightIRY = HandDebugState.rightIRZ = 0f;
+        HandDebugState.leftIRX  = HandDebugState.leftIRY  = HandDebugState.leftIRZ  = 0f;
         clearWidgets();
         init();
     }
