@@ -38,5 +38,28 @@ public final class HandDebugState {
     public static float leftRY = 0f;
     public static float leftRZ = 0f;
 
+    // Debug square attached to the right hand.
+    public static float squareTX = 0f;
+    public static float squareTY = 0f;
+    public static float squareTZ = 0f;
+    public static float squareRX = 0f;
+    public static float squareRY = 0f;
+    public static float squareRZ = 0f;
+
+    // Item bone debug deltas (added on top of the geometry pivot position).
+    public static float rightITX = 0f;
+    public static float rightITY = 0f;
+    public static float rightITZ = 0f;
+    public static float rightIRX = 0f;
+    public static float rightIRY = 0f;
+    public static float rightIRZ = 0f;
+
+    public static float leftITX = 0f;
+    public static float leftITY = 0f;
+    public static float leftITZ = 0f;
+    public static float leftIRX = 0f;
+    public static float leftIRY = 0f;
+    public static float leftIRZ = 0f;
+
     private HandDebugState() {}
 }
