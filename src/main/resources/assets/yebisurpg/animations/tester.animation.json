@@ -1,0 +1,21 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"tester": {
+			"loop": "once",
+			"animation_length": 10,
+			"bones": {
+				"right_arm": {
+					"position": {
+						"0": {
+							"vector": [0, 19.87, 0]
+						},
+						"10": {
+							"vector": [0, 19.87, 0]
+						}
+					}
+				}
+			}
+		}
+	}
+}

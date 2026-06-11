@@ -27,9 +27,8 @@ public final class HandAnimationLoader {
 
     public static final HandAnimationLoader INSTANCE = new HandAnimationLoader();
 
-    /** Keyframe row: [timeSecs, xDeg, yDeg, zDeg] */
+    /** Keyframe row: [timeSecs, x, y, z] — used for both rotation (degrees) and position (Blockbench units). */
     public record BoneChannel(float[][] keys) {
-        /** Evaluate the X rotation at time t (linear interpolation). */
         public float evalX(float t) { return eval(0, t); }
         public float evalY(float t) { return eval(1, t); }
         public float evalZ(float t) { return eval(2, t); }
@@ -48,13 +47,16 @@ public final class HandAnimationLoader {
         }
     }
 
-    public record AnimData(float length, Map<String, BoneChannel> bones) {
-        public BoneChannel bone(String name) {
-            return bones.getOrDefault(name, EMPTY_CHANNEL);
+    public record BonePose(BoneChannel rotation, BoneChannel position) {}
+
+    public record AnimData(float length, Map<String, BonePose> bones) {
+        public BonePose bone(String name) {
+            return bones.getOrDefault(name, EMPTY_POSE);
         }
     }
 
     private static final BoneChannel EMPTY_CHANNEL = new BoneChannel(new float[0][]);
+    private static final BonePose    EMPTY_POSE    = new BonePose(EMPTY_CHANNEL, EMPTY_CHANNEL);
 
     // Cache: animName -> AnimData
     private final Map<String, AnimData> cache = new HashMap<>();
@@ -92,14 +94,14 @@ public final class HandAnimationLoader {
                     JsonObject animObj = animEntry.getValue().getAsJsonObject();
                     float length = animObj.has("animation_length")
                         ? animObj.get("animation_length").getAsFloat() : 1f;
-                    Map<String, BoneChannel> bones = new HashMap<>();
+                    Map<String, BonePose> bones = new HashMap<>();
                     if (animObj.has("bones")) {
                         for (Map.Entry<String, JsonElement> boneEntry : animObj.getAsJsonObject("bones").entrySet()) {
                             String boneName = boneEntry.getKey();
                             JsonObject boneObj = boneEntry.getValue().getAsJsonObject();
-                            if (boneObj.has("rotation")) {
-                                bones.put(boneName, parseRotation(boneObj.getAsJsonObject("rotation")));
-                            }
+                            BoneChannel rot = boneObj.has("rotation") ? parseChannel(boneObj.getAsJsonObject("rotation")) : EMPTY_CHANNEL;
+                            BoneChannel pos = boneObj.has("position") ? parseChannel(boneObj.getAsJsonObject("position")) : EMPTY_CHANNEL;
+                            bones.put(boneName, new BonePose(rot, pos));
                         }
                     }
                     cache.put(animName, new AnimData(length, bones));
@@ -111,9 +113,22 @@ public final class HandAnimationLoader {
         }
     }
 
-    private static BoneChannel parseRotation(JsonObject rotObj) {
-        // Sort keys numerically (they are time values like "0", "0.5", "1")
-        List<Map.Entry<String, JsonElement>> entries = new ArrayList<>(rotObj.entrySet());
+    private static BoneChannel parseChannel(JsonObject obj) {
+        // Constant form: { "vector": [x, y, z] } — no keyframe timestamps.
+        if (obj.has("vector")) {
+            JsonArray vec = obj.getAsJsonArray("vector");
+            float x = vec.get(0).getAsFloat();
+            float y = vec.get(1).getAsFloat();
+            float z = vec.get(2).getAsFloat();
+            return new BoneChannel(new float[][]{ { 0f, x, y, z } });
+        }
+
+        // Keyframe form: { "0": { "vector": [x,y,z] }, "0.5": [...], ... }
+        List<Map.Entry<String, JsonElement>> entries = new ArrayList<>(obj.entrySet());
+        entries.removeIf(e -> {
+            try { Double.parseDouble(e.getKey()); return false; }
+            catch (NumberFormatException ex) { return true; }
+        });
         entries.sort(Comparator.comparingDouble(e -> Double.parseDouble(e.getKey())));
 
         float[][] keys = new float[entries.size()][4];
@@ -123,14 +138,10 @@ public final class HandAnimationLoader {
             float x, y, z;
             if (val.isJsonObject() && val.getAsJsonObject().has("vector")) {
                 JsonArray vec = val.getAsJsonObject().getAsJsonArray("vector");
-                x = vec.get(0).getAsFloat();
-                y = vec.get(1).getAsFloat();
-                z = vec.get(2).getAsFloat();
+                x = vec.get(0).getAsFloat(); y = vec.get(1).getAsFloat(); z = vec.get(2).getAsFloat();
             } else if (val.isJsonArray()) {
                 JsonArray vec = val.getAsJsonArray();
-                x = vec.get(0).getAsFloat();
-                y = vec.get(1).getAsFloat();
-                z = vec.get(2).getAsFloat();
+                x = vec.get(0).getAsFloat(); y = vec.get(1).getAsFloat(); z = vec.get(2).getAsFloat();
             } else {
                 x = y = z = 0f;
             }
