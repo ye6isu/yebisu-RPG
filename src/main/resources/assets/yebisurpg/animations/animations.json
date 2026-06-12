@@ -3,36 +3,15 @@
 	"animations": {
 		"tester": {
 			"loop": "once",
-			"animation_length": 2,
+			"animation_length": 1,
 			"bones": {
-				"left_arm": {
+				"root": {
 					"position": {
-						"0": {
-							"vector": [-5, 0, -5]
-						},
-						"2": {
-							"vector": [-5, 0, -5]
-						}
-					},
-					"rotation": {
-						"0": {
-							"vector": [0, 90, 90]
-						},
-						"2": {
-							"vector": [0, 90, 90]
-						}
-					}
-				},
-				"left_item_socket": {
-					"rotation": {
 						"0": {
 							"vector": [0, 0, 0]
 						},
-						"2": {
-							"vector": [43.0782, -0.4277, -46.6008]
-						},
-						"0.5": {
-							"vector": [43.0782, -0.4277, -46.6008]
+						"0.375": {
+							"vector": [0, 19.87, 0]
 						}
 					}
 				}
