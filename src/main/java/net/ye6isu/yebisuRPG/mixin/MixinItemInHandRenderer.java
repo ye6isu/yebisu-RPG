@@ -150,14 +150,30 @@ public abstract class MixinItemInHandRenderer {
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
 
+        // Read item-socket bones from the animation (right_item_socket / left_item_socket).
+        float rightIPX = 0f, rightIPY = 0f, rightIPZ = 0f;
+        float rightIRX = 0f, rightIRY = 0f, rightIRZ = 0f;
+        float leftIPX  = 0f, leftIPY  = 0f, leftIPZ  = 0f;
+        float leftIRX  = 0f, leftIRY  = 0f, leftIRZ  = 0f;
+        if (anim != null) {
+            HandAnimationLoader.BonePose ri = anim.bone("right_item_socket");
+            HandAnimationLoader.BonePose li = anim.bone("left_item_socket");
+            rightIPX = ri.position().evalX(timeSecs); rightIPY = ri.position().evalY(timeSecs); rightIPZ = ri.position().evalZ(timeSecs);
+            rightIRX = ri.rotation().evalX(timeSecs); rightIRY = ri.rotation().evalY(timeSecs); rightIRZ = ri.rotation().evalZ(timeSecs);
+            leftIPX  = li.position().evalX(timeSecs); leftIPY  = li.position().evalY(timeSecs); leftIPZ  = li.position().evalZ(timeSecs);
+            leftIRX  = li.rotation().evalX(timeSecs); leftIRY  = li.rotation().evalY(timeSecs); leftIRZ  = li.rotation().evalZ(timeSecs);
+        }
+
         // Render held items using vanilla renderRightHand / renderLeftHand on our calibrated pose.
         // Set arm rotations first so the vanilla method sees our animation pose, then pass our
         // pose stack — vanilla internally calls arm.translateAndRotate + ItemInHandLayer.
         renderHandWithItem(
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
+                rightIPX, rightIPY, rightIPZ, rightIRX, rightIRY, rightIRZ,
                 player, bufferSource, packedLight, true);
         renderHandWithItem(
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
+                leftIPX, leftIPY, leftIPZ, leftIRX, leftIRY, leftIRZ,
                 player, bufferSource, packedLight, false);
 
         RenderSystem.enableCull();
@@ -235,10 +251,21 @@ public abstract class MixinItemInHandRenderer {
      * bottom of the arm (hand tip) using the same offset vanilla uses relative
      * to the arm pivot in third-person.
      */
+    /**
+     * Ratio that converts Blockbench position units (item-socket bone) to game-space units.
+     * The arm uses BB_TO_GAME = 0.0821f / 19.87f ≈ 0.00413. Item-socket values are in the
+     * same BB units, but the item lives in arm-local space after the 1/16 scale in buildArmPose,
+     * so the effective scale is 1/16. Adjust ITEM_SOCKET_RATIO to calibrate how far one BB unit
+     * moves the item in the rendered scene.
+     */
+    private static final float ITEM_SOCKET_RATIO = 1f / 16f;
+
     private static void renderHandWithItem(
             float rx, float ry, float rz,
             float tx, float ty, float tz,
             float px, float py, float pz,
+            float socketPX, float socketPY, float socketPZ,
+            float socketRX, float socketRY, float socketRZ,
             AbstractClientPlayer player,
             MultiBufferSource.BufferSource bufferSource, int packedLight,
             boolean isRightHand) {
@@ -276,21 +303,25 @@ public abstract class MixinItemInHandRenderer {
         // scale(-1,1,1) mirrors X, so the left hand needs a negated X to land correctly.
         pose.translate((leftHand ? -1f : 1f) / 16f, 0.125f, -0.625f);
 
-        // 5. Item position — translates the pivot point in arm-local space.
-        //    Item rotation then happens around this displaced pivot.
+        // 5. Item socket — animation position + rotation for right_item_socket / left_item_socket.
+        //    Position units from Blockbench are scaled by ITEM_SOCKET_RATIO.
+        //    Debug mode overrides with HandDebugState sliders on top.
+        float finalSocketPX = socketPX, finalSocketPY = socketPY, finalSocketPZ = socketPZ;
+        float finalSocketRX = socketRX, finalSocketRY = socketRY, finalSocketRZ = socketRZ;
         if (HandDebugState.debugMode) {
             if (isRightHand) {
-                pose.translate(HandDebugState.rightITX, HandDebugState.rightITY, HandDebugState.rightITZ);
-                pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(HandDebugState.rightIRX));
-                pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(HandDebugState.rightIRY));
-                pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(HandDebugState.rightIRZ));
+                finalSocketPX += HandDebugState.rightITX; finalSocketPY += HandDebugState.rightITY; finalSocketPZ += HandDebugState.rightITZ;
+                finalSocketRX += HandDebugState.rightIRX; finalSocketRY += HandDebugState.rightIRY; finalSocketRZ += HandDebugState.rightIRZ;
             } else {
-                pose.translate(HandDebugState.leftITX, HandDebugState.leftITY, HandDebugState.leftITZ);
-                pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(HandDebugState.leftIRX));
-                pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(HandDebugState.leftIRY));
-                pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(HandDebugState.leftIRZ));
+                finalSocketPX += HandDebugState.leftITX; finalSocketPY += HandDebugState.leftITY; finalSocketPZ += HandDebugState.leftITZ;
+                finalSocketRX += HandDebugState.leftIRX; finalSocketRY += HandDebugState.leftIRY; finalSocketRZ += HandDebugState.leftIRZ;
             }
         }
+        if (finalSocketPX != 0f || finalSocketPY != 0f || finalSocketPZ != 0f)
+            pose.translate(-finalSocketPX * ITEM_SOCKET_RATIO, -finalSocketPZ * ITEM_SOCKET_RATIO, finalSocketPY * ITEM_SOCKET_RATIO);
+        if (finalSocketRX != 0f) pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-finalSocketRX));
+        if (finalSocketRZ != 0f) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(finalSocketRZ));
+        if (finalSocketRY != 0f) pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-finalSocketRY));
 
         // For the left hand, mirror X around the item's pivot so asymmetric items
         // (shield, sword, bow, crossbow, trident) face the correct direction.
