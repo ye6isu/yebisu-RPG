@@ -35,6 +35,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @OnlyIn(Dist.CLIENT)
 public abstract class MixinItemInHandRenderer {
 
+    // Smoothed look-lag offsets — yaw and pitch lag that decays toward zero each frame.
+    private static float yebisu$lagYaw   = 0f;
+    private static float yebisu$lagPitch = 0f;
+    private static float yebisu$prevYaw   = Float.NaN;
+    private static float yebisu$prevPitch = Float.NaN;
+
     @Inject(
         method = "renderHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/player/LocalPlayer;I)V",
         at = @At("HEAD"),
@@ -85,9 +91,40 @@ public abstract class MixinItemInHandRenderer {
             new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.01f, 100f),
             VertexSorting.DISTANCE_TO_ORIGIN);
 
+        // Bob: dampen translation, keep rotation at full strength.
+        var bobMat = poseStack.last().pose();
+        float bobTX = bobMat.m30();
+        float bobTY = bobMat.m31();
+        float bobTZ = bobMat.m32();
+        var dampedBob = new Matrix4f(bobMat);
+        dampedBob.m30(bobTX * 0.05f);
+        dampedBob.m31(bobTY * 0.05f);
+        dampedBob.m32(bobTZ * 0.05f);
+
+        // Look-around lag: accumulate yaw/pitch delta each frame, decay toward zero.
+        // This makes the arms trail behind camera turns and spring back smoothly.
+        float currentYaw   = player.getViewYRot(partialTick);
+        float currentPitch = player.getViewXRot(partialTick);
+        if (Float.isNaN(yebisu$prevYaw)) {
+            yebisu$prevYaw   = currentYaw;
+            yebisu$prevPitch = currentPitch;
+        }
+        float rawYawDelta   = currentYaw   - yebisu$prevYaw;
+        float rawPitchDelta = currentPitch - yebisu$prevPitch;
+        // Wrap yaw delta to [-180, 180] to avoid teleport jumps.
+        while (rawYawDelta >  180f) rawYawDelta -= 360f;
+        while (rawYawDelta < -180f) rawYawDelta += 360f;
+        // Accumulate into lag (scale controls strength) then decay (0.08 = fast spring).
+        yebisu$lagYaw   = (yebisu$lagYaw   - rawYawDelta   * -0.15f) * 0.925f;
+        yebisu$lagPitch = (yebisu$lagPitch - rawPitchDelta * -0.15f) * 0.925f;
+        yebisu$prevYaw   = currentYaw;
+        yebisu$prevPitch = currentPitch;
+
         var mvStack = RenderSystem.getModelViewStack();
         mvStack.pushMatrix();
-        mvStack.identity();
+        mvStack.mul(dampedBob);
+        mvStack.rotate(com.mojang.math.Axis.YP.rotationDegrees(yebisu$lagYaw));
+        mvStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(yebisu$lagPitch));
         RenderSystem.applyModelViewMatrix();
 
         ResourceLocation skinTex     = player.getSkin().texture();
