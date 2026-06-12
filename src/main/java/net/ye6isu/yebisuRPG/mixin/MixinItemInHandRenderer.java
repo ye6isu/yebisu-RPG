@@ -255,12 +255,17 @@ public abstract class MixinItemInHandRenderer {
             }
         }
 
-        ItemDisplayContext ctx = isRightHand
-                ? ItemDisplayContext.THIRD_PERSON_RIGHT_HAND
-                : ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
+        // For the left hand, mirror X around the item's pivot so asymmetric items
+        // (shield, sword, bow, crossbow, trident) face the correct direction.
+        // scale(-1,1,1) flips winding order, so cull is disabled for the render.
+        if (leftHand) pose.scale(-1f, 1f, 1f);
+
+        ItemDisplayContext ctx = ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
+        if (leftHand) RenderSystem.disableCull();
         Minecraft.getInstance().getItemRenderer().renderStatic(
                 heldItem, ctx, packedLight, OverlayTexture.NO_OVERLAY,
                 pose, bufferSource, Minecraft.getInstance().level, 0);
         bufferSource.endBatch();
+        if (leftHand) RenderSystem.enableCull();
     }
 }
