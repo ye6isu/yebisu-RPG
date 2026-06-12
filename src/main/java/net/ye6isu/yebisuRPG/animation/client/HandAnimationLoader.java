@@ -268,6 +268,7 @@ public final class HandAnimationLoader {
 
     private static final BoneChannel EMPTY_CHANNEL = new BoneChannel(new Keyframe[0]);
     private static final BonePose    EMPTY_POSE    = new BonePose(EMPTY_CHANNEL, EMPTY_CHANNEL);
+    public  static final BonePose    EMPTY_POSE_PUBLIC = EMPTY_POSE;
 
     // ── Cache / loading ───────────────────────────────────────────────────────
 

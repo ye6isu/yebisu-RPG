@@ -70,6 +70,8 @@ public abstract class MixinItemInHandRenderer {
 
         float timeSecs = playhead != null ? playhead.getCurrentTimeSecs() : 0f;
 
+        float rootRX = 0f, rootRY = 0f, rootRZ = 0f;
+        float rootPX = 0f, rootPY = 0f, rootPZ = 0f;
         float rightRX, rightRY, rightRZ, leftRX, leftRY, leftRZ;
         float rightPX = 0f, rightPY = 0f, rightPZ = 0f;
         float leftPX  = 0f, leftPY  = 0f, leftPZ  = 0f;
@@ -77,8 +79,11 @@ public abstract class MixinItemInHandRenderer {
             rightRX = HandDebugState.rightRX; rightRY = HandDebugState.rightRY; rightRZ = HandDebugState.rightRZ;
             leftRX  = HandDebugState.leftRX;  leftRY  = HandDebugState.leftRY;  leftRZ  = HandDebugState.leftRZ;
         } else {
-            HandAnimationLoader.BonePose r = anim.bone("right_arm");
-            HandAnimationLoader.BonePose l = anim.bone("left_arm");
+            HandAnimationLoader.BonePose root = anim != null ? anim.bone("root") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            HandAnimationLoader.BonePose r    = anim != null ? anim.bone("right_arm") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            HandAnimationLoader.BonePose l    = anim != null ? anim.bone("left_arm")  : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            rootRX = root.rotation().evalX(timeSecs); rootRY = root.rotation().evalY(timeSecs); rootRZ = root.rotation().evalZ(timeSecs);
+            rootPX = root.position().evalX(timeSecs); rootPY = root.position().evalY(timeSecs); rootPZ = root.position().evalZ(timeSecs);
             rightRX = r.rotation().evalX(timeSecs); rightRY = r.rotation().evalY(timeSecs); rightRZ = r.rotation().evalZ(timeSecs);
             leftRX  = l.rotation().evalX(timeSecs); leftRY  = l.rotation().evalY(timeSecs); leftRZ  = l.rotation().evalZ(timeSecs);
             rightPX = r.position().evalX(timeSecs); rightPY = r.position().evalY(timeSecs); rightPZ = r.position().evalZ(timeSecs);
@@ -120,11 +125,28 @@ public abstract class MixinItemInHandRenderer {
         yebisu$prevYaw   = currentYaw;
         yebisu$prevPitch = currentPitch;
 
+        // Root pivot from Blockbench geometry [0,21,-8], camera pivot [0,27,4].
+        // Conversion: x=0-0, y=-(21-27)=6, z=-8-4=-12, all divided by 16.
+        final float ROOT_PIVOT_X =   0f / 16f;
+        final float ROOT_PIVOT_Y =   -0.43f / 16f;
+        final float ROOT_PIVOT_Z = -0.4f / 16f;
+        // Same scale used for arm position (BB_TO_GAME).
+        final float ROOT_POS_RATIO = 0.0821f / 19.87f;
+
         var mvStack = RenderSystem.getModelViewStack();
         mvStack.pushMatrix();
         mvStack.mul(dampedBob);
         mvStack.rotate(com.mojang.math.Axis.YP.rotationDegrees(yebisu$lagYaw));
         mvStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(yebisu$lagPitch));
+        // Root bone: translate to pivot, rotate, translate back, then apply position offset.
+        if (rootRX != 0f || rootRY != 0f || rootRZ != 0f || rootPX != 0f || rootPY != 0f || rootPZ != 0f) {
+            mvStack.translate( ROOT_PIVOT_X,  ROOT_PIVOT_Y,  ROOT_PIVOT_Z);
+            if (rootRZ != 0f) mvStack.rotate(com.mojang.math.Axis.ZP.rotationDegrees(rootRZ));
+            if (rootRY != 0f) mvStack.rotate(com.mojang.math.Axis.YP.rotationDegrees(-rootRY));
+            if (rootRX != 0f) mvStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(-rootRX));
+            mvStack.translate(-ROOT_PIVOT_X, -ROOT_PIVOT_Y, -ROOT_PIVOT_Z);
+            mvStack.translate(-rootPX * ROOT_POS_RATIO, rootPY * ROOT_POS_RATIO, rootPZ * ROOT_POS_RATIO);
+        }
         RenderSystem.applyModelViewMatrix();
 
         ResourceLocation skinTex     = player.getSkin().texture();
