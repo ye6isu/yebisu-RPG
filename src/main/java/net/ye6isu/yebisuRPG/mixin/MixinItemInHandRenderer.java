@@ -342,7 +342,7 @@ public abstract class MixinItemInHandRenderer {
         if (finalSocketPX != 0f || finalSocketPY != 0f || finalSocketPZ != 0f)
             pose.translate(-finalSocketPX * ITEM_SOCKET_RATIO, -finalSocketPZ * ITEM_SOCKET_RATIO, finalSocketPY * ITEM_SOCKET_RATIO);
         if (finalSocketRX != 0f) pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-finalSocketRX));
-        if (finalSocketRZ != 0f) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(finalSocketRZ));
+        if (finalSocketRZ != 0f) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-finalSocketRZ));
         if (finalSocketRY != 0f) pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-finalSocketRY));
 
         // For the left hand, mirror X around the item's pivot so asymmetric items
