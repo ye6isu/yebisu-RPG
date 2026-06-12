@@ -3,7 +3,7 @@
 	"animations": {
 		"tester": {
 			"loop": "once",
-			"animation_length": 1,
+			"animation_length": 10,
 			"bones": {
 				"right_arm": {
 					"rotation": {
