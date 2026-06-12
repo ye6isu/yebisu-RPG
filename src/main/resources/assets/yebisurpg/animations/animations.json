@@ -10,8 +10,80 @@
 						"0": {
 							"vector": [0, 0, 0]
 						},
-						"0.375": {
-							"vector": [0, 19.87, 0]
+						"1": {
+							"vector": [0, 0, 0],
+							"easing": "easeOutElastic"
+						},
+						"0.5": {
+							"vector": [0, 12, 0],
+							"easing": "easeOutCirc"
+						}
+					},
+					"rotation": {
+						"0": {
+							"vector": [0, 0, 0]
+						},
+						"1": {
+							"vector": [60, 0, 0],
+							"easing": "easeOutElastic"
+						},
+						"0.5": {
+							"vector": [-60, 0, 0],
+							"easing": "easeOutCirc"
+						}
+					}
+				},
+				"left_arm": {
+					"position": {
+						"0": {
+							"vector": [-3, 0, 0]
+						},
+						"1": {
+							"vector": [-3, 0, 0]
+						}
+					},
+					"rotation": {
+						"0": {
+							"vector": [-90, 45, 0]
+						},
+						"1": {
+							"vector": [-90, 45, 0]
+						}
+					}
+				},
+				"right_arm": {
+					"position": {
+						"0": {
+							"vector": [3, 0, 0]
+						},
+						"1": {
+							"vector": [3, 0, 0]
+						}
+					},
+					"rotation": {
+						"0": {
+							"vector": [-90, -45, 0]
+						},
+						"1": {
+							"vector": [-90, -45, 0]
+						}
+					}
+				},
+				"right_item_socket": {
+					"position": {
+						"0": {
+							"vector": [-1, 1, 0]
+						},
+						"1": {
+							"vector": [-1, 1, 0]
+						}
+					},
+					"rotation": {
+						"0": {
+							"vector": [0, 0, 45]
+						},
+						"1": {
+							"vector": [0, 0, 45]
 						}
 					}
 				}
