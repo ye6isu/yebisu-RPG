@@ -116,12 +116,12 @@ public abstract class MixinItemInHandRenderer {
         // Render held items using vanilla renderRightHand / renderLeftHand on our calibrated pose.
         // Set arm rotations first so the vanilla method sees our animation pose, then pass our
         // pose stack — vanilla internally calls arm.translateAndRotate + ItemInHandLayer.
-        renderHandWithItem(playerModel.rightArm, playerModel.rightSleeve,
+        renderHandWithItem(
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
-                playerRenderer, player, bufferSource, packedLight, true);
-        renderHandWithItem(playerModel.leftArm, playerModel.leftSleeve,
+                player, bufferSource, packedLight, true);
+        renderHandWithItem(
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
-                playerRenderer, player, bufferSource, packedLight, false);
+                player, bufferSource, packedLight, false);
 
         RenderSystem.enableCull();
 
@@ -184,31 +184,63 @@ public abstract class MixinItemInHandRenderer {
     }
 
     /**
-     * Renders the held item using the exact same transform that vanilla ItemInHandLayer uses:
-     * arm.translateAndRotate → rotateX(-90) → rotateY(180) → translate(±1/16, 0.125, -0.625)
-     * → ItemInHandRenderer.renderItem.
-     * This is extracted from the ItemInHandLayer bytecode so it matches third-person exactly.
+     * Renders the held item parented to the custom arm's pivot so the item
+     * moves exactly with the arm's animation rotation and position.
+     *
+     * Instead of using vanilla arm.translateAndRotate (which uses the vanilla
+     * PlayerModel arm pivot), we manually enter the coordinate space of our
+     * FirstPersonHandModel arm pivot:
+     *   right_arm: partOffset = (-5, 5, -4) in model units → (-5/16, 5/16, -4/16) after scale
+     *   left_arm:  partOffset = ( 5, 5, -4) in model units → ( 5/16, 5/16, -4/16) after scale
+     * Y is negated by the -1 Y scale already baked into buildArmPose.
+     *
+     * We translate to the arm pivot, rotate there, then place the item at the
+     * bottom of the arm (hand tip) using the same offset vanilla uses relative
+     * to the arm pivot in third-person.
      */
     private static void renderHandWithItem(
-            ModelPart arm, ModelPart sleeve,
             float rx, float ry, float rz,
             float tx, float ty, float tz,
             float px, float py, float pz,
-            PlayerRenderer playerRenderer, AbstractClientPlayer player,
+            AbstractClientPlayer player,
             MultiBufferSource.BufferSource bufferSource, int packedLight,
             boolean isRightHand) {
 
         ItemStack heldItem = isRightHand ? player.getMainHandItem() : player.getOffhandItem();
         if (heldItem.isEmpty()) return;
 
-        float origX = arm.xRot, origY = arm.yRot, origZ = arm.zRot;
-        arm.xRot = (float) Math.toRadians(rx);
-        arm.yRot = (float) Math.toRadians(ry);
-        arm.zRot = (float) Math.toRadians(rz);
+        boolean leftHand = !isRightHand;
 
+        // Build the base arm pose (camera origin, scaled model space).
         PoseStack pose = buildArmPose(rx, ry, rz, tx, ty, tz, px, py, pz);
 
-        // Apply item debug offsets.
+        // 1. Enter arm's shoulder pivot (replicating ModelPart.translateAndRotate).
+        //    Must match the vanilla PlayerModel (HumanoidModel) pivot that renderArmSkin uses:
+        //    rightArm=(-5, 2, 0), leftArm=(5, 2, 0). Divided by 16 as ModelPart does internally.
+        float armPivotX = (isRightHand ? -5f : 5f) / 16f;
+        float armPivotY = 2f / 16f;
+        float armPivotZ = 0f;
+        pose.translate(armPivotX, armPivotY, armPivotZ);
+
+        // 2. Arm rotation at shoulder (ZYX, same order as ModelPart).
+        if (rz != 0f) pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rz));
+        if (ry != 0f) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(ry));
+        if (rx != 0f) pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(rx));
+
+        // 3. Item orientation fix — same for both hands.
+        // The scale(-1,1,1) in buildArmPose already mirrors X for both arms,
+        // so the left arm is already the mirror image of the right. No extra
+        // flip needed — applying the same rotations and offset as the right hand
+        // gives a symmetrical result through the mirror.
+        pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90f));
+        pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f));
+
+        // 4. Default hand-tip offset (wrist position in arm-local space).
+        // scale(-1,1,1) mirrors X, so the left hand needs a negated X to land correctly.
+        pose.translate((leftHand ? -1f : 1f) / 16f, 0.125f, -0.625f);
+
+        // 5. Item position — translates the pivot point in arm-local space.
+        //    Item rotation then happens around this displaced pivot.
         if (HandDebugState.debugMode) {
             if (isRightHand) {
                 pose.translate(HandDebugState.rightITX, HandDebugState.rightITY, HandDebugState.rightITZ);
@@ -223,19 +255,6 @@ public abstract class MixinItemInHandRenderer {
             }
         }
 
-        boolean leftHand = !isRightHand;
-
-        // Replicate ItemInHandLayer.renderArmWithItem exactly (from bytecode):
-        // 1. Enter arm's local space.
-        arm.translateAndRotate(pose);
-        // 2. Vanilla item orientation fix.
-        pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90f));
-        pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f));
-        // 3. For left hand, mirror the item to match how vanilla third-person renders it.
-        if (leftHand) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f));
-        // 4. Hand position offset — right = +1/16, left = -1/16.
-        pose.translate((leftHand ? -1f : 1f) / 16f, 0.125f, -0.625f);
-
         ItemDisplayContext ctx = isRightHand
                 ? ItemDisplayContext.THIRD_PERSON_RIGHT_HAND
                 : ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
@@ -243,7 +262,5 @@ public abstract class MixinItemInHandRenderer {
                 heldItem, ctx, packedLight, OverlayTexture.NO_OVERLAY,
                 pose, bufferSource, Minecraft.getInstance().level, 0);
         bufferSource.endBatch();
-
-        arm.xRot = origX; arm.yRot = origY; arm.zRot = origZ;
     }
 }
