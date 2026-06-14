@@ -3,6 +3,7 @@ package net.ye6isu.yebisuRPG.animation.client;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 
 /**
  * CLIENT-ONLY per-slot playback cursor for one active custom animation.
@@ -56,6 +57,14 @@ public final class AnimationPlayhead {
     private final int entityId;
     private final AnimationCategory category;
     private final String animId;
+    /** Resource path of the JSON file that owns this animation, e.g. {@code "yebisurpg:animations/animations.json"}. */
+    private final String filePath;
+    /**
+     * Loop mode override set by the trigger payload. {@code null} means use whatever
+     * the JSON declares. Takes priority over the JSON's own {@code "loop"} field so the
+     * YCS block (or any API caller) can force loop/hold without editing the asset file.
+     */
+    private final AnimationLoopMode loopModeOverride;
 
     /**
      * Wall-clock origin in milliseconds. Subtracting this from
@@ -70,15 +79,27 @@ public final class AnimationPlayhead {
     // Construction
     // -------------------------------------------------------------------------
 
-    /**
-     * Creates a fresh playhead starting at time zero.
-     * Called when a trigger packet with {@code progressTicks == 0} arrives.
-     */
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId) {
-        this.entityId = entityId;
-        this.category = category;
-        this.animId   = animId;
-        this.startMs  = System.currentTimeMillis();
+        this(entityId, category, animId, null, null);
+    }
+
+    public AnimationPlayhead(int entityId, AnimationCategory category, String animId, String filePath) {
+        this(entityId, category, animId, filePath, null);
+    }
+
+    /**
+     * @param filePath         resource path of the animation JSON, or {@code null} for the default
+     * @param loopModeOverride forces a specific loop behaviour, overriding the JSON's own field;
+     *                         {@code null} means defer to the JSON
+     */
+    public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
+                             String filePath, AnimationLoopMode loopModeOverride) {
+        this.entityId         = entityId;
+        this.category         = category;
+        this.animId           = animId;
+        this.filePath         = filePath;
+        this.loopModeOverride = loopModeOverride;
+        this.startMs          = System.currentTimeMillis();
     }
 
     // -------------------------------------------------------------------------
@@ -128,6 +149,16 @@ public final class AnimationPlayhead {
     // -------------------------------------------------------------------------
 
     /**
+     * Resets the playhead for looping — shifts {@code startMs} forward by exactly
+     * one animation length so elapsed time wraps seamlessly without losing overshoot.
+     *
+     * @param animLengthMs the animation length in milliseconds
+     */
+    public void restart(long animLengthMs) {
+        startMs += animLengthMs;
+    }
+
+    /**
      * Transitions the playhead to {@link State#BLENDING_OUT}.
      * Called by {@link ClientAnimationEngine} when an
      * {@link net.ye6isu.yebisuRPG.network.animation.AnimStopPayload} is received.
@@ -149,9 +180,19 @@ public final class AnimationPlayhead {
     // Accessors
     // -------------------------------------------------------------------------
 
-    public int              entityId()  { return entityId; }
-    public AnimationCategory category() { return category; }
-    public String           animId()    { return animId;   }
+    public int              entityId()         { return entityId; }
+    public AnimationCategory category()        { return category; }
+    public String           animId()           { return animId;   }
+    /** The resource path of the source JSON file, or {@code null} for the default file. */
+    public String           filePath()         { return filePath; }
+    /** The loop mode override, or {@code null} to defer to the JSON. */
+    public AnimationLoopMode loopModeOverride() { return loopModeOverride; }
+    /**
+     * Returns the effective loop mode: the override if set, otherwise the JSON's own value.
+     */
+    public AnimationLoopMode effectiveLoopMode(HandAnimationLoader.AnimData anim) {
+        return loopModeOverride != null ? loopModeOverride : anim.loopMode();
+    }
     public State            state()     { return state;    }
     public boolean          isPlaying() { return state == State.PLAYING; }
     public boolean          isDone()    { return state == State.DONE;    }

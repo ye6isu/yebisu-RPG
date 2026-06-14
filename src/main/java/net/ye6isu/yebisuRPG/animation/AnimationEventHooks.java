@@ -122,7 +122,8 @@ public final class AnimationEventHooks {
         for (AnimationEntry entry : slots.values()) {
             int progressTicks = (int) Math.min(entry.elapsedTicks(now), Integer.MAX_VALUE);
             AnimTriggerPayload catchUp = AnimTriggerPayload.catchUp(
-                    entry.entityId(), entry.category(), entry.animId(), progressTicks);
+                    entry.entityId(), entry.category(), entry.animId(), progressTicks,
+                    entry.filePath(), entry.loopModeOverride());
             NetworkUtils.sendToPlayer(observer, catchUp);
             LOGGER.debug("[AnimHooks] StartTracking catch-up: observer={} entity={} cat={} anim={} progress={}t",
                     observer.getName().getString(), tracked.getId(),
@@ -161,7 +162,8 @@ public final class AnimationEventHooks {
             for (AnimationEntry entry : slots.values()) {
                 int progressTicks = (int) Math.min(entry.elapsedTicks(now), Integer.MAX_VALUE);
                 AnimTriggerPayload catchUp = AnimTriggerPayload.catchUp(
-                        entry.entityId(), entry.category(), entry.animId(), progressTicks);
+                        entry.entityId(), entry.category(), entry.animId(), progressTicks,
+                        entry.filePath(), entry.loopModeOverride());
                 NetworkUtils.sendToPlayer(joining, catchUp);
                 LOGGER.debug("[AnimHooks] Login catch-up: joining={} entity={} cat={} anim={} progress={}t",
                         joining.getName().getString(), entity.getId(),

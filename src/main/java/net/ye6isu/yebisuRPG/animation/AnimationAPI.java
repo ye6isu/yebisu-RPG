@@ -4,6 +4,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
+import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.util.NetworkUtils;
 import org.slf4j.Logger;
@@ -67,6 +68,22 @@ public final class AnimationAPI {
      *                    (e.g. {@code "attack_slash"}, {@code "rifle_fire"})
      */
     public static void triggerAnimation(Entity entity, AnimationCategory category, String animId) {
+        triggerAnimation(entity, category, animId, null, null);
+    }
+
+    public static void triggerAnimation(Entity entity, AnimationCategory category,
+                                        String animId, String filePath) {
+        triggerAnimation(entity, category, animId, filePath, null);
+    }
+
+    /**
+     * @param filePath         source JSON resource path, or {@code null} for the default
+     * @param loopModeOverride forces loop behaviour overriding the JSON's own field;
+     *                         {@code null} defers to the JSON
+     */
+    public static void triggerAnimation(Entity entity, AnimationCategory category,
+                                        String animId, String filePath,
+                                        AnimationLoopMode loopModeOverride) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] triggerAnimation called client-side for entity={} cat={} anim={}; ignoring.",
                     entity.getId(), category, animId);
@@ -74,19 +91,17 @@ public final class AnimationAPI {
         }
 
         long startTick = entity.level().getGameTime();
-        AnimationEntry entry = new AnimationEntry(entity.getId(), category, animId, startTick);
+        AnimationEntry entry = new AnimationEntry(entity.getId(), category, animId, startTick,
+                filePath, loopModeOverride);
 
-        // 1. Write server registry — must happen before the packet is sent so that
-        //    any StartTracking event that fires immediately after sees the entry.
         AnimationRegistry.get().put(entry);
 
-        // 2. Broadcast to all trackers + entity itself (covers player self-view for
-        //    first-person item/armor animations as well as observers for mob animations).
-        AnimTriggerPayload payload = AnimTriggerPayload.fresh(entity.getId(), category, animId);
+        AnimTriggerPayload payload = AnimTriggerPayload.fresh(entity.getId(), category, animId,
+                filePath, loopModeOverride);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
 
-        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} startTick={}",
-                entity.getId(), category, animId, startTick);
+        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} loop={} startTick={}",
+                entity.getId(), category, animId, filePath, loopModeOverride, startTick);
     }
 
     // -------------------------------------------------------------------------
@@ -106,6 +121,14 @@ public final class AnimationAPI {
      * @param entity   the entity whose animation slot is being cleared
      * @param category the slot to clear
      */
+    /**
+     * Stops the first-person animation currently playing on the given entity's ENTITY slot.
+     * Works for all loop types (loop, hold-last, play-once). Silent no-op if nothing is playing.
+     */
+    public static void stopFirstPersonAnimation(Entity entity) {
+        stopAnimation(entity, AnimationCategory.ENTITY);
+    }
+
     public static void stopAnimation(Entity entity, AnimationCategory category) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] stopAnimation called client-side for entity={} cat={}; ignoring.",

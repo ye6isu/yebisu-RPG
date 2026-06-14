@@ -24,7 +24,6 @@ public class ModItemTagProvider extends ItemTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider provider) {
 
-
         tag(ItemTags.SWORDS)
                 .add(ModItems.YE6ISU_SWORD.get());
 
