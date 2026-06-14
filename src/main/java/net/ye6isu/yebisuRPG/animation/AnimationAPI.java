@@ -150,6 +150,37 @@ public final class AnimationAPI {
     }
 
     // -------------------------------------------------------------------------
+    // Hand pose (persistent idle pose shown when no animation is playing)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Sets a persistent first-person hand pose for an entity.
+     * The pose is shown whenever no animation is actively playing on the ENTITY slot.
+     * Specify the animation name and file exactly as you would for triggerAnimation.
+     */
+    public static void setFirstPersonHandPose(Entity entity, String animName, String filePath) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] setFirstPersonHandPose called client-side for entity={}; ignoring.", entity.getId());
+            return;
+        }
+        var payload = net.ye6isu.yebisuRPG.network.animation.HandPosePayload.set(
+                entity.getId(), animName, filePath);
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+    }
+
+    /**
+     * Resets the entity's first-person hand pose back to vanilla default.
+     */
+    public static void resetFirstPersonHandPose(Entity entity) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] resetFirstPersonHandPose called client-side for entity={}; ignoring.", entity.getId());
+            return;
+        }
+        var payload = net.ye6isu.yebisuRPG.network.animation.HandPosePayload.clear(entity.getId());
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+    }
+
+    // -------------------------------------------------------------------------
     // stopAllAnimations
     // -------------------------------------------------------------------------
 

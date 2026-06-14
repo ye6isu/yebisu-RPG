@@ -6,6 +6,7 @@ import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
+import net.ye6isu.yebisuRPG.network.animation.HandPosePayload;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -63,6 +64,9 @@ public final class ClientAnimationEngine {
     // entityId → (category → blender) — only populated while a blend-out is running
     private final ConcurrentHashMap<Integer, EnumMap<AnimationCategory, AnimationBlender>> blenders =
             new ConcurrentHashMap<>();
+
+    // entityId → hand pose (animName + filePath) — shown when no animation is playing
+    private final ConcurrentHashMap<Integer, HandPosePayload> handPoses = new ConcurrentHashMap<>();
 
     private ClientAnimationEngine() {}
 
@@ -248,11 +252,37 @@ public final class ClientAnimationEngine {
     // -------------------------------------------------------------------------
 
     /**
-     * Wipes all playheads and blenders. Called on client disconnect so stale state
+     * Sets or clears the persistent hand pose for an entity.
+     * Called by {@link AnimClientHandler} when a {@link HandPosePayload} arrives.
+     */
+    public void setHandPose(HandPosePayload payload) {
+        if (payload.isClear()) {
+            handPoses.remove(payload.entityId());
+        } else {
+            handPoses.put(payload.entityId(), payload);
+        }
+    }
+
+    /**
+     * Returns the active hand pose anim data for an entity, or {@code null} if none is set.
+     * Used by the renderer when no playhead is active.
+     */
+    public HandAnimationLoader.AnimData getHandPose(int entityId) {
+        HandPosePayload pose = handPoses.get(entityId);
+        if (pose == null) return null;
+        String file = pose.filePath() == null || pose.filePath().isEmpty() ? null : pose.filePath();
+        return file != null
+                ? HandAnimationLoader.INSTANCE.get(pose.animName(), file)
+                : HandAnimationLoader.INSTANCE.get(pose.animName());
+    }
+
+    /**
+     * Wipes all playheads, blenders, and hand poses. Called on client disconnect so stale state
      * from a previous session never bleeds into a new connection.
      */
     public void clearAll() {
         playheads.clear();
         blenders.clear();
+        handPoses.clear();
     }
 }

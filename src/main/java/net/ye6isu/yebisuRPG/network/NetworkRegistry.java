@@ -40,6 +40,12 @@ public final class NetworkRegistry {
             net.ye6isu.yebisuRPG.network.animation.AnimStopPayload.STREAM_CODEC,
             net.ye6isu.yebisuRPG.network.ClientHandlerProxy::onAnimStop
         );
+
+        registrar.playToClient(
+            net.ye6isu.yebisuRPG.network.animation.HandPosePayload.TYPE,
+            net.ye6isu.yebisuRPG.network.animation.HandPosePayload.STREAM_CODEC,
+            net.ye6isu.yebisuRPG.network.ClientHandlerProxy::onHandPose
+        );
     }
 
     public static String getNetworkVersion() { return NETWORK_VERSION; }

@@ -55,14 +55,20 @@ public abstract class MixinItemInHandRenderer {
 
         int entityId = player.getId();
         AnimationPlayhead playhead = ClientAnimationEngine.INSTANCE.getPlayhead(entityId, AnimationCategory.ENTITY);
-        if (playhead == null && !HandDebugState.debugMode) return;
+
+        // Fall back to the persistent hand pose when no animation is playing.
+        HandAnimationLoader.AnimData handPoseAnim = playhead == null
+                ? ClientAnimationEngine.INSTANCE.getHandPose(entityId)
+                : null;
+
+        if (playhead == null && handPoseAnim == null && !HandDebugState.debugMode) return;
 
         String animId = playhead != null ? playhead.animId() : null;
         HandAnimationLoader.AnimData anim = animId != null
                 ? (playhead.filePath() != null
                         ? HandAnimationLoader.INSTANCE.get(animId, playhead.filePath())
                         : HandAnimationLoader.INSTANCE.get(animId))
-                : null;
+                : handPoseAnim;
         if (anim == null && !HandDebugState.debugMode) return;
 
         Minecraft mc = Minecraft.getInstance();
@@ -75,7 +81,8 @@ public abstract class MixinItemInHandRenderer {
 
         float timeSecs;
         if (playhead == null) {
-            timeSecs = 0f;
+            // Hand pose: sample at last frame to show the idle/hold position.
+            timeSecs = anim != null ? anim.length() : 0f;
         } else {
             float raw = playhead.getCurrentTimeSecs();
             if (anim != null && playhead.effectiveLoopMode(anim) == AnimationLoopMode.HOLD_LAST) {
