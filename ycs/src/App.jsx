@@ -562,6 +562,26 @@ function compileActionNode(node, nodes, methodKey) {
       "}",
     ];
   }
+  if (node.opcode === "anim.handpose.set") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
+    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _hp && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.setFirstPersonHandPose(_hp,",
+      "        \"" + animName.replace(/"/g, '\\"') + "\",",
+      "        \"" + filePath.replace(/"/g, '\\"') + "\");",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.handpose.reset") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _hr && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.resetFirstPersonHandPose(_hr);",
+      "}",
+    ];
+  }
   return ["// unknown: " + node.opcode];
 }
 const PALETTE_BLOCKS = [
@@ -603,6 +623,18 @@ const PALETTE_BLOCKS = [
       ] },
     { opcode:"anim.firstperson.stop", label:"Stop First-Person Anim", isAction:true,
       hint:"Stop any playing first-person animation on an entity",
+      slotDefs:[
+        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
+      ] },
+    { opcode:"anim.handpose.set", label:"Set FP Hand Pose", isAction:true,
+      hint:"Set FP hand pose to [text link] for [Entity Link] from [text link]",
+      slotDefs:[
+        {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
+        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
+        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
+      ] },
+    { opcode:"anim.handpose.reset", label:"Reset FP Hand Pose", isAction:true,
+      hint:"Reset FP hand pose for [Entity Link] to vanilla default",
       slotDefs:[
         {key:"entity", accepts:LINK_ENTITY, label:"entity"},
       ] },
@@ -1126,7 +1158,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:"",loopMode:"PLAY_ONCE"}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:"",loopMode:"PLAY_ONCE"}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -1396,10 +1428,12 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isIf=node.opcode==="control.if";
   
   const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#d4a027":"#5a9a6a";
-  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":node.opcode==="anim.firstperson.play"?"#3a5c3a":node.opcode==="anim.firstperson.stop"?"#5c3a3a":isIf?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#d4a027":"#5a9a6a";
+  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":node.opcode==="anim.firstperson.play"?"#3a5c3a":node.opcode==="anim.firstperson.stop"?"#5c3a3a":node.opcode==="anim.handpose.set"?"#2a4a5c":node.opcode==="anim.handpose.reset"?"#3a3a5c":isIf?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#d4a027":"#5a9a6a";
 
   const isAnimPlay = node.opcode === "anim.firstperson.play";
   const isAnimStop = node.opcode === "anim.firstperson.stop";
+  const isHandPoseSet = node.opcode === "anim.handpose.set";
+  const isHandPoseReset = node.opcode === "anim.handpose.reset";
   const lblStr = node.opcode==="entity.event"?"Event Entity"
        :node.opcode==="entity.target"?"Target Entity"
        :node.opcode==="number.literal"?null
@@ -1446,6 +1480,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="control.if"?"If"
          :node.opcode==="anim.firstperson.play"?"Play FP Anim"
          :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
+         :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
+         :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
          :node.opcode}
       </span>
       {isIf&&<>
@@ -1475,6 +1511,16 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           </select>
       </>}
       {isAnimStop&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isHandPoseSet&&<>
+          <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
+          <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isHandPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}

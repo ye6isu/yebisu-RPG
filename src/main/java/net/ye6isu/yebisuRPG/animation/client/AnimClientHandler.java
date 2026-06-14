@@ -5,6 +5,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
+import net.ye6isu.yebisuRPG.network.animation.HandPosePayload;
 
 /**
  * CLIENT-ONLY entry point for incoming animation packets.
@@ -42,5 +43,9 @@ public final class AnimClientHandler {
      */
     public static void onStop(AnimStopPayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.stop(payload));
+    }
+
+    public static void onHandPose(HandPosePayload payload, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.setHandPose(payload));
     }
 }
