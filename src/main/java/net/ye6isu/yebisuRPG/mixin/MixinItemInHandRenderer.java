@@ -368,8 +368,8 @@ public abstract class MixinItemInHandRenderer {
         ItemDisplayContext ctx = ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
         if (leftHand) RenderSystem.disableCull();
         Minecraft.getInstance().getItemRenderer().renderStatic(
-                heldItem, ctx, packedLight, OverlayTexture.NO_OVERLAY,
-                pose, bufferSource, Minecraft.getInstance().level, 0);
+                player, heldItem, ctx, false, pose, bufferSource,
+                Minecraft.getInstance().level, packedLight, OverlayTexture.NO_OVERLAY, 0);
         bufferSource.endBatch();
         if (leftHand) RenderSystem.enableCull();
     }
