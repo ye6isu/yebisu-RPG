@@ -38,7 +38,7 @@ public class NorbitTheOrbitItem extends Item {
           if (player instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {
               net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_ae,
                   net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,
-                  "anim1",
+                  "anim2",
                   "yebisurpg:animations/animations.json",
                   null);
           }

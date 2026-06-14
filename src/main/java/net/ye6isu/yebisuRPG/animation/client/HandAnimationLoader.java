@@ -261,14 +261,17 @@ public final class HandAnimationLoader {
         }
     }
 
-    public record BonePose(BoneChannel rotation, BoneChannel position) {}
+    public record BonePose(BoneChannel rotation, BoneChannel position, BoneChannel scale) {}
 
     public record AnimData(float length, AnimationLoopMode loopMode, Map<String, BonePose> bones) {
         public BonePose bone(String name) { return bones.getOrDefault(name, EMPTY_POSE); }
     }
 
-    private static final BoneChannel EMPTY_CHANNEL = new BoneChannel(new Keyframe[0]);
-    private static final BonePose    EMPTY_POSE    = new BonePose(EMPTY_CHANNEL, EMPTY_CHANNEL);
+    private static final BoneChannel EMPTY_CHANNEL       = new BoneChannel(new Keyframe[0]);
+    // Scale defaults to 1,1,1 — a zero-length channel evaluates to 0, so we use a constant channel.
+    private static final BoneChannel UNIT_SCALE_CHANNEL  = new BoneChannel(new Keyframe[]{
+            new Keyframe(0f, 1f, 1f, 1f, Easing.LINEAR, 0f, null) });
+    private static final BonePose    EMPTY_POSE    = new BonePose(EMPTY_CHANNEL, EMPTY_CHANNEL, UNIT_SCALE_CHANNEL);
     public  static final BonePose    EMPTY_POSE_PUBLIC = EMPTY_POSE;
 
     // ── Cache / loading ───────────────────────────────────────────────────────
@@ -336,7 +339,8 @@ public final class HandAnimationLoader {
                             JsonObject boneObj = boneEntry.getValue().getAsJsonObject();
                             BoneChannel rot = boneObj.has("rotation") ? parseChannel(boneObj.getAsJsonObject("rotation")) : EMPTY_CHANNEL;
                             BoneChannel pos = boneObj.has("position") ? parseChannel(boneObj.getAsJsonObject("position")) : EMPTY_CHANNEL;
-                            bones.put(boneEntry.getKey(), new BonePose(rot, pos));
+                            BoneChannel scl = boneObj.has("scale")    ? parseChannel(boneObj.getAsJsonObject("scale"))    : UNIT_SCALE_CHANNEL;
+                            bones.put(boneEntry.getKey(), new BonePose(rot, pos, scl));
                         }
                     }
                     cache.put(normalizedPath + ":" + animName, new AnimData(length, loopMode, bones));
