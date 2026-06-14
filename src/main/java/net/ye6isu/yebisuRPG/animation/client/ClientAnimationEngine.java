@@ -80,7 +80,8 @@ public final class ClientAnimationEngine {
      */
     public void trigger(AnimTriggerPayload payload) {
         AnimationPlayhead ph = new AnimationPlayhead(
-                payload.entityId(), payload.category(), payload.animId());
+                payload.entityId(), payload.category(), payload.animId(),
+                payload.filePathOrNull(), payload.loopModeOverride());
         ph.fastForward(payload.progressTicks());
 
         playheads
@@ -152,9 +153,16 @@ public final class ClientAnimationEngine {
             for (Map.Entry<AnimationCategory, AnimationPlayhead> inner : outer.getValue().entrySet()) {
                 AnimationPlayhead ph = inner.getValue();
                 if (!ph.isPlaying()) continue;
-                HandAnimationLoader.AnimData anim = HandAnimationLoader.INSTANCE.get(ph.animId());
-                if (anim != null && ph.getCurrentTimeSecs() >= anim.length()) {
-                    expired.add(new ExpiredSlot(outer.getKey(), inner.getKey()));
+                HandAnimationLoader.AnimData anim = ph.filePath() != null
+                        ? HandAnimationLoader.INSTANCE.get(ph.animId(), ph.filePath())
+                        : HandAnimationLoader.INSTANCE.get(ph.animId());
+                if (anim == null) continue;
+                if (ph.getCurrentTimeSecs() >= anim.length()) {
+                    switch (ph.effectiveLoopMode(anim)) {
+                        case LOOP      -> ph.restart((long)(anim.length() * 1000f));
+                        case HOLD_LAST -> {} // renderer clamps to last frame; playhead keeps running but is clamped
+                        default        -> expired.add(new ExpiredSlot(outer.getKey(), inner.getKey()));
+                    }
                 }
             }
         }

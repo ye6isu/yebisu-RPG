@@ -456,10 +456,17 @@ const YCS_FEATURES={
 const LINK_ENTITY = "entity";
 const LINK_NUMBER = "number";
 const LINK_LOGIC = "logic";
+const LINK_TEXT = "text";
 
 function resolveEntityVar(opcode, methodKey) {
   if (opcode === "entity.event") {
-    return "eventEntity";
+    if (methodKey === "useOn") return "context.getPlayer()";
+    if (methodKey === "use") return "player";
+    if (methodKey === "interactLivingEntity") return "player";
+    if (methodKey === "continuousUse" || methodKey === "finishUsingItem" || methodKey === "releaseUsing") return "livingEntity";
+    if (methodKey === "inventoryTick") return "entity";
+    if (methodKey === "hurtEnemy") return "attacker";
+    return "player";
   }
   if (opcode === "entity.target") {
     if (methodKey === "hurtEnemy") return "target";
@@ -474,8 +481,13 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (!node) return null;
   if (node.opcode === "entity.event" || node.opcode === "entity.target") return resolveEntityVar(node.opcode, methodKey);
   if (node.opcode === "number.literal") return node.fields?.value ?? "0";
+  if (node.opcode === "text.literal") return node.fields?.value ?? "";
   if (node.opcode === "logic.true") return "true";
   if (node.opcode === "logic.false") return "false";
+  if (node.opcode === "entity.is_crouching") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    return `(${ent}.isCrouching())`;
+  }
   if (node.opcode.startsWith("entity.look_")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     if (node.opcode === "entity.look_x") return `(${ent}.getLookAngle().x)`;
@@ -524,12 +536,41 @@ function compileActionNode(node, nodes, methodKey) {
     const lvl = resolveSlotValue(node.slots?.level, nodes, methodKey) ?? (node.fields?.level ?? "1");
     return ["if (" + ent + " instanceof net.minecraft.world.entity.LivingEntity _et) { _et.addEffect(new net.minecraft.world.effect.MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1))); }"];
   }
+  if (node.opcode === "anim.firstperson.play") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
+    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
+    const loopMode = node.fields?.loopMode ?? "PLAY_ONCE";
+    const loopArg = loopMode === "PLAY_ONCE"
+      ? "null"
+      : `net.ye6isu.yebisuRPG.animation.AnimationLoopMode.${loopMode}`;
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_ae,",
+      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,",
+      "        \"" + animName.replace(/"/g, '\\"') + "\",",
+      "        \"" + filePath.replace(/"/g, '\\"') + "\",",
+      "        " + loopArg + ");",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.firstperson.stop") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _se && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.stopFirstPersonAnimation(_se);",
+      "}",
+    ];
+  }
   return ["// unknown: " + node.opcode];
 }
 const PALETTE_BLOCKS = [
   { category:"Entity", blocks:[
     { opcode:"entity.event",  label:"Event Entity",  linkType:LINK_ENTITY, hint:"Entity that triggered this method" },
     { opcode:"entity.target", label:"Target Entity", linkType:LINK_ENTITY, hint:"Target entity (hurtEnemy/interactLivingEntity)" },
+  ]},
+  { category:"Text", blocks:[
+    { opcode:"text.literal", label:"Text Link", linkType:LINK_TEXT, hint:"A literal text/string value" },
   ]},
   { category:"Numbers", blocks:[
     { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
@@ -543,6 +584,7 @@ const PALETTE_BLOCKS = [
   { category:"Logic", blocks:[
     { opcode:"logic.true", label:"True", linkType:LINK_LOGIC, hint:"True value" },
     { opcode:"logic.false", label:"False", linkType:LINK_LOGIC, hint:"False value" },
+    { opcode:"entity.is_crouching", label:"Is Crouching?", linkType:LINK_LOGIC, hint:"True if the entity is crouching/sneaking", slotDefs:[{key:"entity", accepts:LINK_ENTITY}] },
   ]},
   { category:"Control", blocks:[
     { opcode:"control.if", label:"If", isAction:true, hint:"If statement", slotDefs:[{key:"condition",accepts:LINK_LOGIC}] },
@@ -550,6 +592,20 @@ const PALETTE_BLOCKS = [
   { category:"Effects", blocks:[
     { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
       slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"duration",accepts:LINK_NUMBER},{key:"level",accepts:LINK_NUMBER}] },
+  ]},
+  { category:"Animations", blocks:[
+    { opcode:"anim.firstperson.play", label:"Play First-Person Anim", isAction:true,
+      hint:"Play firstperson animation [text link] for [Entity Link] from file [text link2]",
+      slotDefs:[
+        {key:"animName", accepts:LINK_TEXT,   label:"anim name"},
+        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
+        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
+      ] },
+    { opcode:"anim.firstperson.stop", label:"Stop First-Person Anim", isAction:true,
+      hint:"Stop any playing first-person animation on an entity",
+      slotDefs:[
+        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
+      ] },
   ]},
 ];
 
@@ -708,14 +764,7 @@ function ycsInjectCompiledBody(code, methodKey, bodyLines) {
   const bodyMarker = `//YCS:${methodKey}:body`;
   if (!code.includes(bodyMarker)) return code;
   
-  let finalBodyLines = [...bodyLines];
-  if (finalBodyLines.some(l => /\beventEntity\b/.test(l))) {
-    if (methodKey === "useOn") finalBodyLines.unshift("Player eventEntity = context.getPlayer();");
-    else if (methodKey === "use" || methodKey === "interactLivingEntity") finalBodyLines.unshift("Player eventEntity = player;");
-    else if (methodKey === "continuousUse" || methodKey === "finishUsingItem" || methodKey === "releaseUsing") finalBodyLines.unshift("LivingEntity eventEntity = livingEntity;");
-    else if (methodKey === "inventoryTick") finalBodyLines.unshift("Entity eventEntity = entity;");
-    else if (methodKey === "hurtEnemy") finalBodyLines.unshift("LivingEntity eventEntity = attacker;");
-  }
+  const finalBodyLines = [...bodyLines];
 
   const compiled = finalBodyLines.length
     ? finalBodyLines.map(l => '        ' + l).join('\n')
@@ -1077,7 +1126,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:"",loopMode:"PLAY_ONCE"}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -1346,18 +1395,22 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
   const isIf=node.opcode==="control.if";
   
-  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":"#5a9a6a";
-  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":isIf?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":"#5a9a6a";
+  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#d4a027":"#5a9a6a";
+  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":node.opcode==="anim.firstperson.play"?"#3a5c3a":node.opcode==="anim.firstperson.stop"?"#5c3a3a":isIf?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#d4a027":"#5a9a6a";
 
+  const isAnimPlay = node.opcode === "anim.firstperson.play";
+  const isAnimStop = node.opcode === "anim.firstperson.stop";
   const lblStr = node.opcode==="entity.event"?"Event Entity"
        :node.opcode==="entity.target"?"Target Entity"
        :node.opcode==="number.literal"?null
+       :node.opcode==="text.literal"?null
        :node.opcode==="entity.look_x"?"Get Look Direction X of"
        :node.opcode==="entity.look_y"?"Get Look Direction Y of"
        :node.opcode==="entity.look_z"?"Get Look Direction Z of"
        :node.opcode==="entity.look_client_x"?"Get Look Direction X (Client) of"
        :node.opcode==="entity.look_client_y"?"Get Look Direction Y (Client) of"
        :node.opcode==="entity.look_client_z"?"Get Look Direction Z (Client) of"
+       :node.opcode==="entity.is_crouching"?"Is Crouching?"
        :node.opcode==="logic.true"?"True"
        :node.opcode==="logic.false"?"False"
        :node.opcode;
@@ -1369,7 +1422,9 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       </span>}
       {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
-      
+      {node.opcode==="text.literal"&&<input value={node.fields?.value??""} placeholder="text…" onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+        style={{width:Math.max(80, ((node.fields?.value||"").length*8)+24),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:14,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
+
       {node.slotDefs?.map(def => (
           <SlotConn key={def.key} sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       ))}
@@ -1389,6 +1444,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
          :node.opcode==="effect.apply"?"Add Effect to"
          :node.opcode==="control.if"?"If"
+         :node.opcode==="anim.firstperson.play"?"Play FP Anim"
+         :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
          :node.opcode}
       </span>
       {isIf&&<>
@@ -1403,6 +1460,22 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="duration" sc="rgba(0,0,0,0.3)" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Level</span>
           <SlotConn sk="level" sc="rgba(0,0,0,0.3)" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimPlay&&<>
+          <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
+          <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <select value={node.fields?.loopMode??"PLAY_ONCE"} onMouseDown={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"loopMode",e.target.value);}}
+            style={{height:26,background:"rgba(0,0,0,0.4)",border:"none",borderRadius:4,padding:"0 6px",color:"#fff",fontSize:12,fontFamily:"sans-serif",cursor:"pointer",outline:"none"}}>
+            <option value="PLAY_ONCE">Play Once</option>
+            <option value="HOLD_LAST">Hold Last Frame</option>
+            <option value="LOOP">Loop</option>
+          </select>
+      </>}
+      {isAnimStop&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}
     </div>

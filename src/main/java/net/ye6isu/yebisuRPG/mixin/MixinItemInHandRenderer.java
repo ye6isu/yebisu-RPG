@@ -19,6 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
@@ -57,7 +58,11 @@ public abstract class MixinItemInHandRenderer {
         if (playhead == null && !HandDebugState.debugMode) return;
 
         String animId = playhead != null ? playhead.animId() : null;
-        HandAnimationLoader.AnimData anim = animId != null ? HandAnimationLoader.INSTANCE.get(animId) : null;
+        HandAnimationLoader.AnimData anim = animId != null
+                ? (playhead.filePath() != null
+                        ? HandAnimationLoader.INSTANCE.get(animId, playhead.filePath())
+                        : HandAnimationLoader.INSTANCE.get(animId))
+                : null;
         if (anim == null && !HandDebugState.debugMode) return;
 
         Minecraft mc = Minecraft.getInstance();
@@ -68,7 +73,17 @@ public abstract class MixinItemInHandRenderer {
         if (!(entityRenderer instanceof PlayerRenderer playerRenderer)) return;
         PlayerModel<AbstractClientPlayer> playerModel = playerRenderer.getModel();
 
-        float timeSecs = playhead != null ? playhead.getCurrentTimeSecs() : 0f;
+        float timeSecs;
+        if (playhead == null) {
+            timeSecs = 0f;
+        } else {
+            float raw = playhead.getCurrentTimeSecs();
+            if (anim != null && playhead.effectiveLoopMode(anim) == AnimationLoopMode.HOLD_LAST) {
+                timeSecs = Math.min(raw, anim.length());
+            } else {
+                timeSecs = raw;
+            }
+        }
 
         float rootRX = 0f, rootRY = 0f, rootRZ = 0f;
         float rootPX = 0f, rootPY = 0f, rootPZ = 0f;
@@ -93,7 +108,7 @@ public abstract class MixinItemInHandRenderer {
         var window = mc.getWindow();
         float aspect = (float) window.getWidth() / (float) window.getHeight();
         RenderSystem.setProjectionMatrix(
-            new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.01f, 100f),
+            new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.001f, 100f),
             VertexSorting.DISTANCE_TO_ORIGIN);
 
         // Bob: dampen translation, keep rotation at full strength.

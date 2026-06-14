@@ -14,12 +14,16 @@ package net.ye6isu.yebisuRPG.animation;
  * @param animId     key matching the Blockbench export filename (e.g. "attack_slash")
  * @param startTick  level.getGameTime() captured at the moment triggerAnimation() was called;
  *                   used to compute the progress delta for late-joiner catch-up
+ * @param filePath         resource path of the source JSON file, or {@code null} for the default
+ * @param loopModeOverride forces a specific loop behaviour; {@code null} defers to the JSON
  */
 public record AnimationEntry(
         int entityId,
         AnimationCategory category,
         String animId,
-        long startTick
+        long startTick,
+        String filePath,
+        AnimationLoopMode loopModeOverride
 ) {
     /**
      * Computes how many ticks have elapsed since this animation started.

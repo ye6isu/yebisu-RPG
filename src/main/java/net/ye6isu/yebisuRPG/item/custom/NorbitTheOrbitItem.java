@@ -9,7 +9,6 @@ import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.UseAnim;
 //YCS_Import_END
 
@@ -18,29 +17,6 @@ public class NorbitTheOrbitItem extends Item {
         super(properties);
     }
 
-    //YCS:useDuration:start
-    @Override
-    public int getUseDuration(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {
-        return 100;
-    }
-    //YCS:useDuration:end
-
-    //YCS:continuousUse:start
-    @Override
-    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration) {
-                // (empty)
-    }
-    //YCS:continuousUse:end
-
-    //YCS:use:start
-    @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
-        player.startUsingItem(usedHand);
-                // (empty)
-        return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));
-    }
-    //YCS:use:end
-
     //YCS:useAnimation:start
     @Override
     public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {
@@ -48,20 +24,25 @@ public class NorbitTheOrbitItem extends Item {
     }
     //YCS:useAnimation:end
 
-    //YCS:releaseUsing:start
+    //YCS:use:start
     @Override
-    public void releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged) {
-                // (empty)
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
+        player.startUsingItem(usedHand);
+                if ((player.isCrouching())) {
+          if (player instanceof net.minecraft.world.entity.Entity _se && !level.isClientSide()) {
+              net.ye6isu.yebisuRPG.animation.AnimationAPI.stopFirstPersonAnimation(_se);
+          }
+        } else {
+          if (player instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {
+              net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_ae,
+                  net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,
+                  "anim3",
+                  "yebisurpg:animations/animations.json",
+                  null);
+          }
+        }
+        return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }
-    //YCS:releaseUsing:end
-
-    //YCS:finishUsingItem:start
-    @Override
-    public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity) {
-                LivingEntity eventEntity = livingEntity;
-        if (eventEntity instanceof net.minecraft.world.entity.LivingEntity _et) { _et.addEffect(new net.minecraft.world.effect.MobEffectInstance(MobEffects.LEVITATION, (int)(10), Math.max(0,(int)(64.1f)-1))); }
-        return super.finishUsingItem(stack, level, livingEntity);
-    }
-    //YCS:finishUsingItem:end
+    //YCS:use:end
 
 }

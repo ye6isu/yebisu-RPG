@@ -6,6 +6,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
 import java.io.InputStream;
@@ -262,7 +263,7 @@ public final class HandAnimationLoader {
 
     public record BonePose(BoneChannel rotation, BoneChannel position) {}
 
-    public record AnimData(float length, Map<String, BonePose> bones) {
+    public record AnimData(float length, AnimationLoopMode loopMode, Map<String, BonePose> bones) {
         public BonePose bone(String name) { return bones.getOrDefault(name, EMPTY_POSE); }
     }
 
@@ -272,28 +273,63 @@ public final class HandAnimationLoader {
 
     // ── Cache / loading ───────────────────────────────────────────────────────
 
+    /**
+     * Cache key: {@code "filePath:animName"} — allows the same animation name to
+     * coexist in multiple JSON files without collision.
+     */
     private final Map<String, AnimData> cache = new HashMap<>();
-    private boolean loaded = false;
+    private final java.util.Set<String> loadedFiles = new java.util.HashSet<>();
 
     private HandAnimationLoader() {}
 
-    public void invalidate() { cache.clear(); loaded = false; }
+    public void invalidate() { cache.clear(); loadedFiles.clear(); }
 
-    public AnimData get(String animName) { if (!loaded) load(); return cache.get(animName); }
+    /**
+     * Looks up an animation by name using the default file
+     * ({@code animations/animations.json}).
+     */
+    public AnimData get(String animName) {
+        return get(animName, yebisuRPG.MODID + ":animations/animations.json");
+    }
 
-    private void load() {
-        loaded = true;
-        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "animations/animations.json");
+    /**
+     * Looks up {@code animName} inside a specific resource-pack JSON file.
+     *
+     * @param animName the key inside the {@code "animations"} object (e.g. {@code "anim1"})
+     * @param filePath resource path relative to the mod assets root, e.g.
+     *                 {@code "yebisurpg:animations/animations.json"} or just
+     *                 {@code "animations/animations.json"} (defaults to the mod namespace)
+     */
+    public AnimData get(String animName, String filePath) {
+        String normalized = normalizeFilePath(filePath);
+        if (!loadedFiles.contains(normalized)) loadFile(normalized);
+        return cache.get(normalized + ":" + animName);
+    }
+
+    private static String normalizeFilePath(String filePath) {
+        if (filePath == null || filePath.isEmpty()) return yebisuRPG.MODID + ":animations/animations.json";
+        if (!filePath.contains(":")) return yebisuRPG.MODID + ":" + filePath;
+        return filePath;
+    }
+
+    private void loadFile(String normalizedPath) {
+        loadedFiles.add(normalizedPath);
+        int colon = normalizedPath.indexOf(':');
+        String namespace = normalizedPath.substring(0, colon);
+        String path      = normalizedPath.substring(colon + 1);
+        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(namespace, path);
         try {
             Optional<Resource> res = Minecraft.getInstance().getResourceManager().getResource(loc);
             if (res.isEmpty()) { yebisuRPG.LOGGER.warn("[HandAnimationLoader] {} not found", loc); return; }
             try (InputStream is = res.get().open()) {
                 JsonObject root  = JsonParser.parseReader(new InputStreamReader(is, StandardCharsets.UTF_8)).getAsJsonObject();
                 JsonObject anims = root.getAsJsonObject("animations");
+                int count = 0;
                 for (Map.Entry<String, JsonElement> animEntry : anims.entrySet()) {
                     String animName  = animEntry.getKey();
                     JsonObject animObj = animEntry.getValue().getAsJsonObject();
                     float length = animObj.has("animation_length") ? animObj.get("animation_length").getAsFloat() : 1f;
+                    AnimationLoopMode loopMode = animObj.has("loop") ? AnimationLoopMode.from(animObj.get("loop").getAsString()) : AnimationLoopMode.PLAY_ONCE;
                     Map<String, BonePose> bones = new HashMap<>();
                     if (animObj.has("bones")) {
                         for (Map.Entry<String, JsonElement> boneEntry : animObj.getAsJsonObject("bones").entrySet()) {
@@ -303,9 +339,10 @@ public final class HandAnimationLoader {
                             bones.put(boneEntry.getKey(), new BonePose(rot, pos));
                         }
                     }
-                    cache.put(animName, new AnimData(length, bones));
+                    cache.put(normalizedPath + ":" + animName, new AnimData(length, loopMode, bones));
+                    count++;
                 }
-                yebisuRPG.LOGGER.info("[HandAnimationLoader] Loaded {} animation(s)", cache.size());
+                yebisuRPG.LOGGER.info("[HandAnimationLoader] Loaded {} animation(s) from {}", count, loc);
             }
         } catch (Exception e) {
             yebisuRPG.LOGGER.error("[HandAnimationLoader] Failed to load {}: {}", loc, e.getMessage());
