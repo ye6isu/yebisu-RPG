@@ -94,9 +94,12 @@ public abstract class MixinItemInHandRenderer {
 
         float rootRX = 0f, rootRY = 0f, rootRZ = 0f;
         float rootPX = 0f, rootPY = 0f, rootPZ = 0f;
+        float rootSX = 1f, rootSY = 1f, rootSZ = 1f;
         float rightRX, rightRY, rightRZ, leftRX, leftRY, leftRZ;
         float rightPX = 0f, rightPY = 0f, rightPZ = 0f;
         float leftPX  = 0f, leftPY  = 0f, leftPZ  = 0f;
+        float rightSX = 1f, rightSY = 1f, rightSZ = 1f;
+        float leftSX  = 1f, leftSY  = 1f, leftSZ  = 1f;
         if (HandDebugState.debugMode) {
             rightRX = HandDebugState.rightRX; rightRY = HandDebugState.rightRY; rightRZ = HandDebugState.rightRZ;
             leftRX  = HandDebugState.leftRX;  leftRY  = HandDebugState.leftRY;  leftRZ  = HandDebugState.leftRZ;
@@ -106,10 +109,13 @@ public abstract class MixinItemInHandRenderer {
             HandAnimationLoader.BonePose l    = anim != null ? anim.bone("left_arm")  : HandAnimationLoader.EMPTY_POSE_PUBLIC;
             rootRX = root.rotation().evalX(timeSecs); rootRY = root.rotation().evalY(timeSecs); rootRZ = root.rotation().evalZ(timeSecs);
             rootPX = root.position().evalX(timeSecs); rootPY = root.position().evalY(timeSecs); rootPZ = root.position().evalZ(timeSecs);
+            rootSX = root.scale().evalX(timeSecs);    rootSY = root.scale().evalY(timeSecs);    rootSZ = root.scale().evalZ(timeSecs);
             rightRX = r.rotation().evalX(timeSecs); rightRY = r.rotation().evalY(timeSecs); rightRZ = r.rotation().evalZ(timeSecs);
             leftRX  = l.rotation().evalX(timeSecs); leftRY  = l.rotation().evalY(timeSecs); leftRZ  = l.rotation().evalZ(timeSecs);
             rightPX = r.position().evalX(timeSecs); rightPY = r.position().evalY(timeSecs); rightPZ = r.position().evalZ(timeSecs);
             leftPX  = l.position().evalX(timeSecs); leftPY  = l.position().evalY(timeSecs); leftPZ  = l.position().evalZ(timeSecs);
+            rightSX = r.scale().evalX(timeSecs);    rightSY = r.scale().evalY(timeSecs);    rightSZ = r.scale().evalZ(timeSecs);
+            leftSX  = l.scale().evalX(timeSecs);    leftSY  = l.scale().evalY(timeSecs);    leftSZ  = l.scale().evalZ(timeSecs);
         }
 
         var window = mc.getWindow();
@@ -160,12 +166,15 @@ public abstract class MixinItemInHandRenderer {
         mvStack.mul(dampedBob);
         mvStack.rotate(com.mojang.math.Axis.YP.rotationDegrees(yebisu$lagYaw));
         mvStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(yebisu$lagPitch));
-        // Root bone: translate to pivot, rotate, translate back, then apply position offset.
-        if (rootRX != 0f || rootRY != 0f || rootRZ != 0f || rootPX != 0f || rootPY != 0f || rootPZ != 0f) {
+        // Root bone: translate to pivot, rotate + scale, translate back, then apply position offset.
+        if (rootRX != 0f || rootRY != 0f || rootRZ != 0f || rootPX != 0f || rootPY != 0f || rootPZ != 0f
+                || rootSX != 1f || rootSY != 1f || rootSZ != 1f) {
             mvStack.translate( ROOT_PIVOT_X,  ROOT_PIVOT_Y,  ROOT_PIVOT_Z);
             if (rootRZ != 0f) mvStack.rotate(com.mojang.math.Axis.ZP.rotationDegrees(rootRZ));
             if (rootRY != 0f) mvStack.rotate(com.mojang.math.Axis.YP.rotationDegrees(-rootRY));
             if (rootRX != 0f) mvStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(-rootRX));
+            // Axis remap JSON→game: Z→X, X→Y, Y→Z
+            if (rootSX != 1f || rootSY != 1f || rootSZ != 1f) mvStack.scale(rootSX, rootSY, rootSZ);
             mvStack.translate(-ROOT_PIVOT_X, -ROOT_PIVOT_Y, -ROOT_PIVOT_Z);
             mvStack.translate(-rootPX * ROOT_POS_RATIO, rootPY * ROOT_POS_RATIO, rootPZ * ROOT_POS_RATIO);
         }
@@ -189,9 +198,11 @@ public abstract class MixinItemInHandRenderer {
         // Render arm skin + sleeve + emissive.
         renderArmSkin(playerModel.rightArm, playerModel.rightSleeve,
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
+                rightSX, rightSY, rightSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
         renderArmSkin(playerModel.leftArm, playerModel.leftSleeve,
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
+                leftSX, leftSY, leftSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
 
         // Read item-socket bones from the animation (right_item_socket / left_item_socket).
@@ -213,10 +224,12 @@ public abstract class MixinItemInHandRenderer {
         // pose stack — vanilla internally calls arm.translateAndRotate + ItemInHandLayer.
         renderHandWithItem(
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
+                rightSX, rightSY, rightSZ,
                 rightIPX, rightIPY, rightIPZ, rightIRX, rightIRY, rightIRZ,
                 player, bufferSource, packedLight, true);
         renderHandWithItem(
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
+                leftSX, leftSY, leftSZ,
                 leftIPX, leftIPY, leftIPZ, leftIRX, leftIRY, leftIRZ,
                 player, bufferSource, packedLight, false);
 
@@ -249,6 +262,7 @@ public abstract class MixinItemInHandRenderer {
             float rx, float ry, float rz,
             float tx, float ty, float tz,
             float px, float py, float pz,
+            float sx, float sy, float sz,
             ResourceLocation skinTex, ResourceLocation emissiveTex,
             MultiBufferSource.BufferSource bufferSource, int packedLight) {
 
@@ -264,16 +278,48 @@ public abstract class MixinItemInHandRenderer {
 
         PoseStack pose = buildArmPose(rx, ry, rz, tx, ty, tz, px, py, pz);
 
-        arm.render(pose, bufferSource.getBuffer(RenderType.entitySolid(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
-        bufferSource.endBatch(RenderType.entitySolid(skinTex));
-        sleeve.render(pose, bufferSource.getBuffer(RenderType.entityTranslucent(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
-        bufferSource.endBatch(RenderType.entityTranslucent(skinTex));
+        if (sx != 1f || sy != 1f || sz != 1f) {
+            // Apply scale in the arm's local bone space (after pivot+rotation) so scale axes
+            // follow the bone and don't shift with rotation.
+            // Replicate translateAndRotate manually, inject scale, then render with zeroed transform.
+            arm.translateAndRotate(pose);
+            // Axis remap JSON→game: Z→X, X→Y, Y→Z
+            pose.scale(sx, sy, sz);
+            // Zero arm + sleeve transforms so their internal translateAndRotate is a no-op.
+            // Both share the same pivot so we only need to call translateAndRotate once above.
+            float savedAX = arm.x, savedAY = arm.y, savedAZ = arm.z;
+            float savedSX2 = sleeve.x, savedSY2 = sleeve.y, savedSZ2 = sleeve.z;
+            arm.x = 0; arm.y = 0; arm.z = 0;
+            arm.xRot = 0; arm.yRot = 0; arm.zRot = 0;
+            sleeve.x = 0; sleeve.y = 0; sleeve.z = 0;
+            sleeve.xRot = 0; sleeve.yRot = 0; sleeve.zRot = 0;
 
-        if (emissiveTex != null && FullbrightRenderType.shader != null) {
-            var vcEmissive = bufferSource.getBuffer(FullbrightRenderType.get(emissiveTex));
-            arm.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
-            sleeve.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
-            bufferSource.endBatch(FullbrightRenderType.get(emissiveTex));
+            arm.render(pose, bufferSource.getBuffer(RenderType.entitySolid(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
+            bufferSource.endBatch(RenderType.entitySolid(skinTex));
+            sleeve.render(pose, bufferSource.getBuffer(RenderType.entityTranslucent(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
+            bufferSource.endBatch(RenderType.entityTranslucent(skinTex));
+
+            if (emissiveTex != null && FullbrightRenderType.shader != null) {
+                var vcEmissive = bufferSource.getBuffer(FullbrightRenderType.get(emissiveTex));
+                arm.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
+                sleeve.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
+                bufferSource.endBatch(FullbrightRenderType.get(emissiveTex));
+            }
+
+            arm.x = savedAX; arm.y = savedAY; arm.z = savedAZ;
+            sleeve.x = savedSX2; sleeve.y = savedSY2; sleeve.z = savedSZ2;
+        } else {
+            arm.render(pose, bufferSource.getBuffer(RenderType.entitySolid(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
+            bufferSource.endBatch(RenderType.entitySolid(skinTex));
+            sleeve.render(pose, bufferSource.getBuffer(RenderType.entityTranslucent(skinTex)), packedLight, OverlayTexture.NO_OVERLAY);
+            bufferSource.endBatch(RenderType.entityTranslucent(skinTex));
+
+            if (emissiveTex != null && FullbrightRenderType.shader != null) {
+                var vcEmissive = bufferSource.getBuffer(FullbrightRenderType.get(emissiveTex));
+                arm.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
+                sleeve.render(pose, vcEmissive, packedLight, OverlayTexture.NO_OVERLAY);
+                bufferSource.endBatch(FullbrightRenderType.get(emissiveTex));
+            }
         }
 
         arm.xRot = origX; arm.yRot = origY; arm.zRot = origZ;
@@ -308,6 +354,7 @@ public abstract class MixinItemInHandRenderer {
             float rx, float ry, float rz,
             float tx, float ty, float tz,
             float px, float py, float pz,
+            float sx, float sy, float sz,
             float socketPX, float socketPY, float socketPZ,
             float socketRX, float socketRY, float socketRZ,
             AbstractClientPlayer player,
@@ -335,6 +382,11 @@ public abstract class MixinItemInHandRenderer {
         if (ry != 0f) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(ry));
         if (rx != 0f) pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(rx));
 
+        // Scale in the arm's local bone space (after rotation) so the item position stays
+        // consistent regardless of arm rotation angle.
+        // Axis remap JSON→game: Z→X, X→Y, Y→Z
+        if (sx != 1f || sy != 1f || sz != 1f) pose.scale(sx, sy, sz);
+
         // 3. Item orientation fix — same for both hands.
         // The scale(-1,1,1) in buildArmPose already mirrors X for both arms,
         // so the left arm is already the mirror image of the right. No extra
@@ -343,7 +395,7 @@ public abstract class MixinItemInHandRenderer {
         pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90f));
         pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f));
 
-        // 4. Default hand-tip offset (wrist position in arm-local space).
+        // 4. Default hand-tip offset — already in scaled space because scale was applied above.
         // scale(-1,1,1) mirrors X, so the left hand needs a negated X to land correctly.
         pose.translate((leftHand ? -1f : 1f) / 16f, 0.125f, -0.625f);
 
