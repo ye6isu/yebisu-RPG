@@ -6,7 +6,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
-import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 import net.ye6isu.yebisuRPG.network.BasePayload;
 
 /**
@@ -19,7 +18,7 @@ import net.ye6isu.yebisuRPG.network.BasePayload;
  *  animId          String   — Blockbench export key, max 64 chars
  *  progressTicks   VarInt   — elapsed ticks since start (0 for fresh triggers)
  *  filePath        String   — resource path of the source JSON (empty = default file), max 256 chars
- *  loopOrdinal     VarInt   — AnimationLoopMode.ordinal(), -1 = defer to JSON
+ *  playbackSpeed   Float    — speed multiplier (1.0 = normal)
  * </pre>
  *
  * @param entityId        entity.getId()
@@ -27,7 +26,7 @@ import net.ye6isu.yebisuRPG.network.BasePayload;
  * @param animId          animation name key (e.g. "anim1")
  * @param progressTicks   ticks already elapsed; 0 for a fresh trigger
  * @param filePath        resource path of the source JSON file, or empty string for the default
- * @param loopOrdinal     LoopMode.ordinal() override, or -1 to defer to the JSON
+ * @param playbackSpeed   speed multiplier (1.0 = normal, 0.5 = half, 2.0 = double)
  */
 public record AnimTriggerPayload(
         int entityId,
@@ -35,7 +34,7 @@ public record AnimTriggerPayload(
         String animId,
         int progressTicks,
         String filePath,
-        int loopOrdinal
+        float playbackSpeed
 ) implements BasePayload {
 
     public static final CustomPacketPayload.Type<AnimTriggerPayload> TYPE =
@@ -44,12 +43,12 @@ public record AnimTriggerPayload(
 
     public static final StreamCodec<ByteBuf, AnimTriggerPayload> STREAM_CODEC =
             StreamCodec.composite(
-                    ByteBufCodecs.VAR_INT,          AnimTriggerPayload::entityId,
-                    ByteBufCodecs.VAR_INT,          AnimTriggerPayload::categoryOrdinal,
-                    ByteBufCodecs.stringUtf8(64),   AnimTriggerPayload::animId,
-                    ByteBufCodecs.VAR_INT,          AnimTriggerPayload::progressTicks,
-                    ByteBufCodecs.stringUtf8(256),  AnimTriggerPayload::filePath,
-                    ByteBufCodecs.VAR_INT,          AnimTriggerPayload::loopOrdinal,
+                    ByteBufCodecs.VAR_INT,         AnimTriggerPayload::entityId,
+                    ByteBufCodecs.VAR_INT,         AnimTriggerPayload::categoryOrdinal,
+                    ByteBufCodecs.stringUtf8(64),  AnimTriggerPayload::animId,
+                    ByteBufCodecs.VAR_INT,         AnimTriggerPayload::progressTicks,
+                    ByteBufCodecs.stringUtf8(256), AnimTriggerPayload::filePath,
+                    ByteBufCodecs.FLOAT,           AnimTriggerPayload::playbackSpeed,
                     AnimTriggerPayload::new);
 
     @Override
@@ -64,51 +63,33 @@ public record AnimTriggerPayload(
         return filePath == null || filePath.isEmpty() ? null : filePath;
     }
 
-    /**
-     * Returns the loop mode override, or {@code null} to defer to the JSON's own field.
-     */
-    public AnimationLoopMode loopModeOverride() {
-        if (loopOrdinal < 0) return null;
-        AnimationLoopMode[] vals = AnimationLoopMode.values();
-        return loopOrdinal < vals.length ? vals[loopOrdinal] : null;
-    }
-
     // ── Factories ────────────────────────────────────────────────────────────
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category, String animId) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0, "", -1);
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0, "", 1f);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
                                            String animId, String filePath) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "", -1);
+                filePath != null ? filePath : "", 1f);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
-                                           String animId, String filePath,
-                                           AnimationLoopMode loopOverride) {
+                                           String animId, String filePath, float playbackSpeed) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "",
-                loopOverride != null ? loopOverride.ordinal() : -1);
+                filePath != null ? filePath : "", playbackSpeed);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
                                              String animId, int progressTicks) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks, "", -1);
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks, "", 1f);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
-                                             String animId, int progressTicks, String filePath) {
+                                             String animId, int progressTicks,
+                                             String filePath, float playbackSpeed) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
-                filePath != null ? filePath : "", -1);
-    }
-
-    public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
-                                             String animId, int progressTicks, String filePath,
-                                             AnimationLoopMode loopOverride) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
-                filePath != null ? filePath : "",
-                loopOverride != null ? loopOverride.ordinal() : -1);
+                filePath != null ? filePath : "", playbackSpeed);
     }
 }

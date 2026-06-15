@@ -4,6 +4,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
+import net.ye6isu.yebisuRPG.network.animation.AnimPausePayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.animation.HandPosePayload;
@@ -85,7 +86,7 @@ public final class ClientAnimationEngine {
     public void trigger(AnimTriggerPayload payload) {
         AnimationPlayhead ph = new AnimationPlayhead(
                 payload.entityId(), payload.category(), payload.animId(),
-                payload.filePathOrNull(), payload.loopModeOverride());
+                payload.filePathOrNull(), payload.playbackSpeed());
         ph.fastForward(payload.progressTicks());
 
         playheads
@@ -138,6 +139,61 @@ public final class ClientAnimationEngine {
     }
 
     // -------------------------------------------------------------------------
+    // Pause / Resume (called from AnimClientHandler on Netty thread)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handles an incoming {@link AnimPausePayload}.
+     *
+     * <p><b>Pause:</b> freezes the playhead at {@code frozenProgressMs}.</p>
+     * <p><b>Resume:</b> unfreezes the playhead. If the animation has already
+     * expired while paused (frozen position is past the animation length) the
+     * slot is immediately stopped rather than playing a sliver of leftover time.</p>
+     */
+    public void pause(AnimPausePayload payload) {
+        EnumMap<AnimationCategory, AnimationPlayhead> slots = playheads.get(payload.entityId());
+        if (slots == null) return;
+        AnimationPlayhead ph = slots.get(payload.category());
+        if (ph == null || !ph.isPlaying()) return;
+
+        if (payload.isResume()) {
+            long frozenMs = ph.resume();
+            // Check whether the animation expired while paused.
+            if (frozenMs >= 0) {
+                HandAnimationLoader.AnimData anim = ph.filePath() != null
+                        ? HandAnimationLoader.INSTANCE.get(ph.animId(), ph.filePath())
+                        : HandAnimationLoader.INSTANCE.get(ph.animId());
+                if (anim != null) {
+                    float frozenSecs = frozenMs / 1000f * ph.playbackSpeed();
+                    switch (ph.effectiveLoopMode(anim)) {
+                        case LOOP -> {
+                            // Wrap so we resume mid-loop rather than at an expired position.
+                            long animMs = (long)(anim.length() * 1000f);
+                            if (animMs > 0) {
+                                long wrapped = frozenMs % animMs;
+                                // Rewind playhead to the wrapped position.
+                                ph.resume(); // already resumed above — re-freeze at wrapped
+                                ph.pause(wrapped);
+                                ph.resume();
+                            }
+                        }
+                        case HOLD_LAST -> {} // renderer clamps; let it keep running
+                        default -> {
+                            if (frozenSecs >= anim.length()) {
+                                // Expired while paused — stop immediately.
+                                stopWithSnapshot(payload.entityId(), payload.category(),
+                                        AnimationBlender.PoseSnapshot.empty());
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            ph.pause(payload.frozenProgressMs());
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Tick (called once per client game tick from TextureTickHandler)
     // -------------------------------------------------------------------------
 
@@ -156,7 +212,7 @@ public final class ClientAnimationEngine {
         for (Map.Entry<Integer, EnumMap<AnimationCategory, AnimationPlayhead>> outer : playheads.entrySet()) {
             for (Map.Entry<AnimationCategory, AnimationPlayhead> inner : outer.getValue().entrySet()) {
                 AnimationPlayhead ph = inner.getValue();
-                if (!ph.isPlaying()) continue;
+                if (!ph.isPlaying() || ph.isPaused()) continue;
                 HandAnimationLoader.AnimData anim = ph.filePath() != null
                         ? HandAnimationLoader.INSTANCE.get(ph.animId(), ph.filePath())
                         : HandAnimationLoader.INSTANCE.get(ph.animId());

@@ -540,13 +540,15 @@ function compileActionNode(node, nodes, methodKey) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
     const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
+    const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f";
+    const speedArg = typeof speed === "string" && !speed.endsWith("f") ? speed + "f" : speed;
     return [
       "if (" + ent + " instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {",
       "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_ae,",
       "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
-      "        null);",
+      "        " + speedArg + ");",
       "}",
     ];
   }
@@ -555,6 +557,24 @@ function compileActionNode(node, nodes, methodKey) {
     return [
       "if (" + ent + " instanceof net.minecraft.world.entity.Entity _se && !level.isClientSide()) {",
       "    net.ye6isu.yebisuRPG.animation.AnimationAPI.stopFirstPersonAnimation(_se);",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.firstperson.pause") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _pe && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.pauseAnimation(_pe,",
+      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY);",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.firstperson.resume") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _re && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.resumeAnimation(_re,",
+      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY);",
       "}",
     ];
   }
@@ -611,14 +631,25 @@ const PALETTE_BLOCKS = [
   ]},
   { category:"Animations", blocks:[
     { opcode:"anim.firstperson.play", label:"Play First-Person Anim", isAction:true,
-      hint:"Play firstperson animation [text link] for [Entity Link] from file [text link2]",
+      hint:"Play FP Anim [Text Link] for [Entity Link] with playback speed [Number Link] from file [Text Link]",
       slotDefs:[
-        {key:"animName", accepts:LINK_TEXT,   label:"anim name"},
-        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
-        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
+        {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
+        {key:"entity",        accepts:LINK_ENTITY, label:"entity"},
+        {key:"playbackSpeed", accepts:LINK_NUMBER, label:"playback speed"},
+        {key:"filePath",      accepts:LINK_TEXT,   label:"from file"},
       ] },
     { opcode:"anim.firstperson.stop", label:"Stop First-Person Anim", isAction:true,
       hint:"Stop any playing first-person animation on an entity",
+      slotDefs:[
+        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
+      ] },
+    { opcode:"anim.firstperson.pause", label:"Pause First-Person Anim", isAction:true,
+      hint:"Freeze the playing first-person animation on an entity at its current position",
+      slotDefs:[
+        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
+      ] },
+    { opcode:"anim.firstperson.resume", label:"Resume First-Person Anim", isAction:true,
+      hint:"Resume a paused first-person animation; if expired while paused, stops it",
       slotDefs:[
         {key:"entity", accepts:LINK_ENTITY, label:"entity"},
       ] },
@@ -1357,8 +1388,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
           <div style={{padding:"6px 10px 4px",background:"#141416",borderBottom:"1px solid "+C.inpB}}><Lbl>{cat.category}</Lbl></div>
           {cat.blocks.map(b=><div key={b.opcode} draggable onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))} title={b.hint}
             style={{display:"flex",alignItems:"center",gap:7,padding:"8px 10px",cursor:"grab",borderBottom:"1px solid #181818",userSelect:"none",
-              background:b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.isAction?"#1a2a20":"transparent"}}>
-            <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:b.linkType===LINK_ENTITY?"#638999":b.linkType===LINK_NUMBER?"#6a8fa8":"#5a9a6a"}}/>
+              background:b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.linkType===LINK_TEXT?"#182a1e":b.isAction?"#1a2a20":"transparent"}}>
+            <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:b.linkType===LINK_ENTITY?"#638999":b.linkType===LINK_NUMBER?"#6a8fa8":b.linkType===LINK_TEXT?"#5ba558":"#5a9a6a"}}/>
             <span style={{fontSize:12,color:C.text,fontFamily:"monospace"}}>{b.label}</span>
           </div>)}
         </div>)}
@@ -1423,11 +1454,15 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
   const isIf=node.opcode==="control.if";
   
-  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#d4a027":"#5a9a6a";
-  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":node.opcode==="anim.firstperson.play"?"#3a5c3a":node.opcode==="anim.firstperson.stop"?"#5c3a3a":node.opcode==="anim.handpose.set"?"#2a4a5c":node.opcode==="anim.handpose.reset"?"#3a3a5c":isIf?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#d4a027":"#5a9a6a";
+  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":"#5a9a6a";
+  const isAnimBlock = node.opcode.startsWith("anim.");
+  const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf;
+  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":isAnimBlock?"#3a5c3a":isLogicBlock?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#5ba558":"#5a9a6a";
 
   const isAnimPlay = node.opcode === "anim.firstperson.play";
   const isAnimStop = node.opcode === "anim.firstperson.stop";
+  const isAnimPause = node.opcode === "anim.firstperson.pause";
+  const isAnimResume = node.opcode === "anim.firstperson.resume";
   const isHandPoseSet = node.opcode === "anim.handpose.set";
   const isHandPoseReset = node.opcode === "anim.handpose.reset";
   const lblStr = node.opcode==="entity.event"?"Event Entity"
@@ -1476,6 +1511,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="control.if"?"If"
          :node.opcode==="anim.firstperson.play"?"Play FP Anim"
          :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
+         :node.opcode==="anim.firstperson.pause"?"Pause FP Anim on"
+         :node.opcode==="anim.firstperson.resume"?"Resume FP Anim on"
          :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
          :node.opcode}
@@ -1497,10 +1534,18 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>speed</span>
+          <SlotConn sk="playbackSpeed" sc="rgba(0,0,0,0.3)" connId={node.slots?.playbackSpeed} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isAnimStop&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimPause&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimResume&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isHandPoseSet&&<>
@@ -1554,7 +1599,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
 
   return (
     <div id={"node-"+node.id} onContextMenu={e=>{e.preventDefault(); e.stopPropagation(); if(window.__showYcsCtx) window.__showYcsCtx(node.id, e.clientX, e.clientY);}}
-      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?50:300,minHeight:50,height:node.height||(isVal?"auto":50),
+      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?50:50,width:isVal?undefined:"fit-content",minHeight:50,height:node.height||(isVal?"auto":50),
         display:isVal?"flex":"block", alignItems:isVal?"center":"stretch", padding:isVal?"8px 10px":"0", gap:isVal?10:0, boxSizing:"border-box", border:selected===node.id?"2px solid #fff":"2px solid transparent",
         zIndex:isVal?100:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,
         background:bg, borderRadius:10}}

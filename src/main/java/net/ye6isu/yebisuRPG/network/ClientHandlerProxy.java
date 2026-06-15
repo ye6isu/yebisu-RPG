@@ -52,4 +52,13 @@ public final class ClientHandlerProxy {
             call.run();
         }
     }
+
+    public static void onAnimPause(net.ye6isu.yebisuRPG.network.animation.AnimPausePayload payload,
+                                   IPayloadContext ctx) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            Runnable call = () ->
+                net.ye6isu.yebisuRPG.animation.client.AnimClientHandler.onAnimPause(payload, ctx);
+            call.run();
+        }
+    }
 }
