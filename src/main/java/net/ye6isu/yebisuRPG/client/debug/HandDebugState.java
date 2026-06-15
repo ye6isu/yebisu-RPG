@@ -21,45 +21,35 @@ public final class HandDebugState {
     public static final float BASE_RIGHT_RX = 0f;
     public static final float BASE_LEFT_RX  = 0f;
 
-    // Debug deltas — sliders/fields start at 0 and adjust relative to the base.
-    public static float rightTX = 0f;
-    public static float rightTY = 0f;
-    public static float rightTZ = 0f;
+    // Leg base calibration — adjust these to set the initial world position of each leg.
+    public static final float BASE_RIGHT_LEG_TX =  0.0160f;
+    public static final float BASE_RIGHT_LEG_TY =  1.6699f;
+    public static final float BASE_RIGHT_LEG_TZ =  0.223597f;
 
-    public static float leftTX = 0f;
-    public static float leftTY = 0f;
-    public static float leftTZ = 0f;
+    public static final float BASE_LEFT_LEG_TX  = -0.0160f;
+    public static final float BASE_LEFT_LEG_TY  =  1.6699f;
+    public static final float BASE_LEFT_LEG_TZ  =  0.223597f;
 
-    public static float rightRX = 0f;
-    public static float rightRY = 0f;
-    public static float rightRZ = 0f;
+    // Leg debug deltas — sliders start at 0.
+    public static float rightLegTX = 0f;
+    public static float rightLegTY = 0f;
+    public static float rightLegTZ = 0f;
+    public static float rightLegRX = 0f;
+    public static float rightLegRY = 0f;
+    public static float rightLegRZ = 0f;
+    public static float rightLegSX = 1f;
+    public static float rightLegSY = 1f;
+    public static float rightLegSZ = 1f;
 
-    public static float leftRX = 0f;
-    public static float leftRY = 0f;
-    public static float leftRZ = 0f;
-
-    // Debug square attached to the right hand.
-    public static float squareTX = 0f;
-    public static float squareTY = 0f;
-    public static float squareTZ = 0f;
-    public static float squareRX = 0f;
-    public static float squareRY = 0f;
-    public static float squareRZ = 0f;
-
-    // Item bone debug deltas (added on top of the geometry pivot position).
-    public static float rightITX = 0f;
-    public static float rightITY = 0f;
-    public static float rightITZ = 0f;
-    public static float rightIRX = 0f;
-    public static float rightIRY = 0f;
-    public static float rightIRZ = 0f;
-
-    public static float leftITX = 0f;
-    public static float leftITY = 0f;
-    public static float leftITZ = 0f;
-    public static float leftIRX = 0f;
-    public static float leftIRY = 0f;
-    public static float leftIRZ = 0f;
+    public static float leftLegTX = 0f;
+    public static float leftLegTY = 0f;
+    public static float leftLegTZ = 0f;
+    public static float leftLegRX = 0f;
+    public static float leftLegRY = 0f;
+    public static float leftLegRZ = 0f;
+    public static float leftLegSX = 1f;
+    public static float leftLegSY = 1f;
+    public static float leftLegSZ = 1f;
 
     private HandDebugState() {}
 }

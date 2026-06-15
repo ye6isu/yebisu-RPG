@@ -95,14 +95,25 @@ public abstract class MixinItemInHandRenderer {
         float rootRX = 0f, rootRY = 0f, rootRZ = 0f;
         float rootPX = 0f, rootPY = 0f, rootPZ = 0f;
         float rootSX = 1f, rootSY = 1f, rootSZ = 1f;
-        float rightRX, rightRY, rightRZ, leftRX, leftRY, leftRZ;
+        float rightRX = 0f, rightRY = 0f, rightRZ = 0f;
+        float leftRX  = 0f, leftRY  = 0f, leftRZ  = 0f;
         float rightPX = 0f, rightPY = 0f, rightPZ = 0f;
         float leftPX  = 0f, leftPY  = 0f, leftPZ  = 0f;
         float rightSX = 1f, rightSY = 1f, rightSZ = 1f;
         float leftSX  = 1f, leftSY  = 1f, leftSZ  = 1f;
+        float rightLegRX = 0f, rightLegRY = 0f, rightLegRZ = 0f;
+        float leftLegRX  = 0f, leftLegRY  = 0f, leftLegRZ  = 0f;
+        float rightLegPX = 0f, rightLegPY = 0f, rightLegPZ = 0f;
+        float leftLegPX  = 0f, leftLegPY  = 0f, leftLegPZ  = 0f;
+        float rightLegSX = 1f, rightLegSY = 1f, rightLegSZ = 1f;
+        float leftLegSX  = 1f, leftLegSY  = 1f, leftLegSZ  = 1f;
         if (HandDebugState.debugMode) {
-            rightRX = HandDebugState.rightRX; rightRY = HandDebugState.rightRY; rightRZ = HandDebugState.rightRZ;
-            leftRX  = HandDebugState.leftRX;  leftRY  = HandDebugState.leftRY;  leftRZ  = HandDebugState.leftRZ;
+            rightLegRX = HandDebugState.rightLegRX; rightLegRY = HandDebugState.rightLegRY; rightLegRZ = HandDebugState.rightLegRZ;
+            leftLegRX  = HandDebugState.leftLegRX;  leftLegRY  = HandDebugState.leftLegRY;  leftLegRZ  = HandDebugState.leftLegRZ;
+            rightLegPX = HandDebugState.rightLegTX; rightLegPY = HandDebugState.rightLegTY; rightLegPZ = HandDebugState.rightLegTZ;
+            leftLegPX  = HandDebugState.leftLegTX;  leftLegPY  = HandDebugState.leftLegTY;  leftLegPZ  = HandDebugState.leftLegTZ;
+            rightLegSX = HandDebugState.rightLegSX; rightLegSY = HandDebugState.rightLegSY; rightLegSZ = HandDebugState.rightLegSZ;
+            leftLegSX  = HandDebugState.leftLegSX;  leftLegSY  = HandDebugState.leftLegSY;  leftLegSZ  = HandDebugState.leftLegSZ;
         } else {
             HandAnimationLoader.BonePose root = anim != null ? anim.bone("root") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
             HandAnimationLoader.BonePose r    = anim != null ? anim.bone("right_arm") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
@@ -116,6 +127,14 @@ public abstract class MixinItemInHandRenderer {
             leftPX  = l.position().evalX(timeSecs); leftPY  = l.position().evalY(timeSecs); leftPZ  = l.position().evalZ(timeSecs);
             rightSX = r.scale().evalX(timeSecs);    rightSY = r.scale().evalY(timeSecs);    rightSZ = r.scale().evalZ(timeSecs);
             leftSX  = l.scale().evalX(timeSecs);    leftSY  = l.scale().evalY(timeSecs);    leftSZ  = l.scale().evalZ(timeSecs);
+            HandAnimationLoader.BonePose rl = anim != null ? anim.bone("right_leg") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            HandAnimationLoader.BonePose ll = anim != null ? anim.bone("left_leg")  : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            rightLegRX = rl.rotation().evalX(timeSecs); rightLegRY = rl.rotation().evalY(timeSecs); rightLegRZ = rl.rotation().evalZ(timeSecs);
+            leftLegRX  = ll.rotation().evalX(timeSecs); leftLegRY  = ll.rotation().evalY(timeSecs); leftLegRZ  = ll.rotation().evalZ(timeSecs);
+            rightLegPX = rl.position().evalX(timeSecs); rightLegPY = rl.position().evalY(timeSecs); rightLegPZ = rl.position().evalZ(timeSecs);
+            leftLegPX  = ll.position().evalX(timeSecs); leftLegPY  = ll.position().evalY(timeSecs); leftLegPZ  = ll.position().evalZ(timeSecs);
+            rightLegSX = rl.scale().evalX(timeSecs);    rightLegSY = rl.scale().evalY(timeSecs);    rightLegSZ = rl.scale().evalZ(timeSecs);
+            leftLegSX  = ll.scale().evalX(timeSecs);    leftLegSY  = ll.scale().evalY(timeSecs);    leftLegSZ  = ll.scale().evalZ(timeSecs);
         }
 
         var window = mc.getWindow();
@@ -186,14 +205,14 @@ public abstract class MixinItemInHandRenderer {
         RenderSystem.disableCull();
 
         float rRX = HandDebugState.BASE_RIGHT_RX + rightRX;
-        float rTX = HandDebugState.BASE_RIGHT_TX + (HandDebugState.debugMode ? HandDebugState.rightTX : 0f);
-        float rTY = HandDebugState.BASE_RIGHT_TY + (HandDebugState.debugMode ? HandDebugState.rightTY : 0f);
-        float rTZ = HandDebugState.BASE_RIGHT_TZ + (HandDebugState.debugMode ? HandDebugState.rightTZ : 0f);
+        float rTX = HandDebugState.BASE_RIGHT_TX;
+        float rTY = HandDebugState.BASE_RIGHT_TY;
+        float rTZ = HandDebugState.BASE_RIGHT_TZ;
 
         float lRX = HandDebugState.BASE_LEFT_RX + leftRX;
-        float lTX = HandDebugState.BASE_LEFT_TX + (HandDebugState.debugMode ? HandDebugState.leftTX : 0f);
-        float lTY = HandDebugState.BASE_LEFT_TY + (HandDebugState.debugMode ? HandDebugState.leftTY : 0f);
-        float lTZ = HandDebugState.BASE_LEFT_TZ + (HandDebugState.debugMode ? HandDebugState.leftTZ : 0f);
+        float lTX = HandDebugState.BASE_LEFT_TX;
+        float lTY = HandDebugState.BASE_LEFT_TY;
+        float lTZ = HandDebugState.BASE_LEFT_TZ;
 
         // Render arm skin + sleeve + emissive.
         renderArmSkin(playerModel.rightArm, playerModel.rightSleeve,
@@ -203,6 +222,20 @@ public abstract class MixinItemInHandRenderer {
         renderArmSkin(playerModel.leftArm, playerModel.leftSleeve,
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
                 leftSX, leftSY, leftSZ,
+                skinTex, emissiveTex, bufferSource, packedLight);
+
+        // Render leg skin + pants overlay + emissive.
+        renderArmSkin(playerModel.rightLeg, playerModel.rightPants,
+                rightLegRX, rightLegRY, rightLegRZ,
+                HandDebugState.BASE_RIGHT_LEG_TX, HandDebugState.BASE_RIGHT_LEG_TY, HandDebugState.BASE_RIGHT_LEG_TZ,
+                rightLegPX, rightLegPY, rightLegPZ,
+                rightLegSX, rightLegSY, rightLegSZ,
+                skinTex, emissiveTex, bufferSource, packedLight);
+        renderArmSkin(playerModel.leftLeg, playerModel.leftPants,
+                leftLegRX, leftLegRY, leftLegRZ,
+                HandDebugState.BASE_LEFT_LEG_TX, HandDebugState.BASE_LEFT_LEG_TY, HandDebugState.BASE_LEFT_LEG_TZ,
+                leftLegPX, leftLegPY, leftLegPZ,
+                leftLegSX, leftLegSY, leftLegSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
 
         // Read item-socket bones from the animation (right_item_socket / left_item_socket).
@@ -412,15 +445,6 @@ public abstract class MixinItemInHandRenderer {
         float finalSocketPX = socketPX, finalSocketPY = socketPY, finalSocketPZ = socketPZ;
         float finalSocketRX = socketRX, finalSocketRY = socketRY, finalSocketRZ = socketRZ;
         float finalSocketSX = socketSX, finalSocketSY = socketSY, finalSocketSZ = socketSZ;
-        if (HandDebugState.debugMode) {
-            if (isRightHand) {
-                finalSocketPX += HandDebugState.rightITX; finalSocketPY += HandDebugState.rightITY; finalSocketPZ += HandDebugState.rightITZ;
-                finalSocketRX += HandDebugState.rightIRX; finalSocketRY += HandDebugState.rightIRY; finalSocketRZ += HandDebugState.rightIRZ;
-            } else {
-                finalSocketPX += HandDebugState.leftITX; finalSocketPY += HandDebugState.leftITY; finalSocketPZ += HandDebugState.leftITZ;
-                finalSocketRX += HandDebugState.leftIRX; finalSocketRY += HandDebugState.leftIRY; finalSocketRZ += HandDebugState.leftIRZ;
-            }
-        }
         if (finalSocketPX != 0f || finalSocketPY != 0f || finalSocketPZ != 0f)
             pose.translate(-finalSocketPX * ITEM_SOCKET_RATIO, -finalSocketPZ * ITEM_SOCKET_RATIO, finalSocketPY * ITEM_SOCKET_RATIO);
         if (finalSocketRX != 0f) pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-finalSocketRX));

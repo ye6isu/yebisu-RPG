@@ -540,17 +540,13 @@ function compileActionNode(node, nodes, methodKey) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
     const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
-    const loopMode = node.fields?.loopMode ?? "PLAY_ONCE";
-    const loopArg = loopMode === "PLAY_ONCE"
-      ? "null"
-      : `net.ye6isu.yebisuRPG.animation.AnimationLoopMode.${loopMode}`;
     return [
       "if (" + ent + " instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {",
       "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_ae,",
       "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
-      "        " + loopArg + ");",
+      "        null);",
       "}",
     ];
   }
@@ -1158,7 +1154,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:"",loopMode:"PLAY_ONCE"}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -1503,12 +1499,6 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <select value={node.fields?.loopMode??"PLAY_ONCE"} onMouseDown={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"loopMode",e.target.value);}}
-            style={{height:26,background:"rgba(0,0,0,0.4)",border:"none",borderRadius:4,padding:"0 6px",color:"#fff",fontSize:12,fontFamily:"sans-serif",cursor:"pointer",outline:"none"}}>
-            <option value="PLAY_ONCE">Play Once</option>
-            <option value="HOLD_LAST">Hold Last Frame</option>
-            <option value="LOOP">Loop</option>
-          </select>
       </>}
       {isAnimStop&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
