@@ -3,6 +3,7 @@ package net.ye6isu.yebisuRPG.animation.client;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.ye6isu.yebisuRPG.network.animation.AnimPausePayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.animation.HandPosePayload;
@@ -47,5 +48,9 @@ public final class AnimClientHandler {
 
     public static void onHandPose(HandPosePayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.setHandPose(payload));
+    }
+
+    public static void onAnimPause(AnimPausePayload payload, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.pause(payload));
     }
 }

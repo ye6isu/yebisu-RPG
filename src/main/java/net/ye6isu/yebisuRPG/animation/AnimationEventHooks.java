@@ -16,6 +16,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.ye6isu.yebisuRPG.network.animation.AnimPausePayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.util.NetworkUtils;
 import net.ye6isu.yebisuRPG.yebisuRPG;
@@ -123,11 +124,15 @@ public final class AnimationEventHooks {
             int progressTicks = (int) Math.min(entry.elapsedTicks(now), Integer.MAX_VALUE);
             AnimTriggerPayload catchUp = AnimTriggerPayload.catchUp(
                     entry.entityId(), entry.category(), entry.animId(), progressTicks,
-                    entry.filePath(), entry.loopModeOverride());
+                    entry.filePath(), entry.playbackSpeed());
             NetworkUtils.sendToPlayer(observer, catchUp);
-            LOGGER.debug("[AnimHooks] StartTracking catch-up: observer={} entity={} cat={} anim={} progress={}t",
+            if (entry.isPaused()) {
+                long frozenMs = entry.pausedAtScaledTicks() * 50L;
+                NetworkUtils.sendToPlayer(observer, AnimPausePayload.pause(entry.entityId(), entry.category(), frozenMs));
+            }
+            LOGGER.debug("[AnimHooks] StartTracking catch-up: observer={} entity={} cat={} anim={} progress={}t speed={} paused={}",
                     observer.getName().getString(), tracked.getId(),
-                    entry.category(), entry.animId(), progressTicks);
+                    entry.category(), entry.animId(), progressTicks, entry.playbackSpeed(), entry.isPaused());
         }
     }
 
@@ -163,11 +168,15 @@ public final class AnimationEventHooks {
                 int progressTicks = (int) Math.min(entry.elapsedTicks(now), Integer.MAX_VALUE);
                 AnimTriggerPayload catchUp = AnimTriggerPayload.catchUp(
                         entry.entityId(), entry.category(), entry.animId(), progressTicks,
-                        entry.filePath(), entry.loopModeOverride());
+                        entry.filePath(), entry.playbackSpeed());
                 NetworkUtils.sendToPlayer(joining, catchUp);
-                LOGGER.debug("[AnimHooks] Login catch-up: joining={} entity={} cat={} anim={} progress={}t",
+                if (entry.isPaused()) {
+                    long frozenMs = entry.pausedAtScaledTicks() * 50L;
+                    NetworkUtils.sendToPlayer(joining, AnimPausePayload.pause(entry.entityId(), entry.category(), frozenMs));
+                }
+                LOGGER.debug("[AnimHooks] Login catch-up: joining={} entity={} cat={} anim={} progress={}t speed={} paused={}",
                         joining.getName().getString(), entity.getId(),
-                        entry.category(), entry.animId(), progressTicks);
+                        entry.category(), entry.animId(), progressTicks, entry.playbackSpeed(), entry.isPaused());
             }
         }
     }

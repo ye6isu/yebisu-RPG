@@ -1,39 +1,73 @@
 package net.ye6isu.yebisuRPG.animation;
 
 /**
- * Immutable snapshot of one active animation slot on the server.
+ * Mutable snapshot of one active animation slot on the server.
  *
- * Stored in AnimationRegistry as:
- *   Map<entityId, EnumMap<AnimationCategory, AnimationEntry>>
- *
- * Not persisted to NBT — animation state is transient. On server restart all
- * entities return to their default pose naturally.
- *
- * @param entityId   entity.getId() — matches the value sent over the wire
- * @param category   which render pathway this entry drives
- * @param animId     key matching the Blockbench export filename (e.g. "attack_slash")
- * @param startTick  level.getGameTime() captured at the moment triggerAnimation() was called;
- *                   used to compute the progress delta for late-joiner catch-up
- * @param filePath         resource path of the source JSON file, or {@code null} for the default
- * @param loopModeOverride forces a specific loop behaviour; {@code null} defers to the JSON
+ * @param entityId      entity.getId()
+ * @param category      which render pathway this entry drives
+ * @param animId        key matching the Blockbench export filename
+ * @param startTick     level.getGameTime() at the moment triggerAnimation() was called
+ * @param filePath      resource path of the source JSON file, or {@code null} for the default
+ * @param playbackSpeed speed multiplier (1.0 = normal, 0.5 = half, 2.0 = double)
  */
-public record AnimationEntry(
-        int entityId,
-        AnimationCategory category,
-        String animId,
-        long startTick,
-        String filePath,
-        AnimationLoopMode loopModeOverride
-) {
+public final class AnimationEntry {
+
+    private final int entityId;
+    private final AnimationCategory category;
+    private final String animId;
+    private final long startTick;
+    private final String filePath;
+    private final float playbackSpeed;
+
     /**
-     * Computes how many ticks have elapsed since this animation started.
-     * Used by AnimationEventHooks to locate the current hurtbox window and
-     * by the pairing hook to build the late-joiner progress delta payload.
-     *
-     * @param currentTick  level.getGameTime() at the moment of the query
-     * @return elapsed ticks, clamped to zero if somehow called before startTick
+     * Speed-scaled elapsed ticks at the moment pause() was called, or -1 if not paused.
+     * Stored in speed-scaled units to match what the client receives in the catch-up payload.
+     */
+    private long pausedAtScaledTicks = -1L;
+
+    public AnimationEntry(int entityId, AnimationCategory category, String animId,
+                          long startTick, String filePath, float playbackSpeed) {
+        this.entityId      = entityId;
+        this.category      = category;
+        this.animId        = animId;
+        this.startTick     = startTick;
+        this.filePath      = filePath;
+        this.playbackSpeed = playbackSpeed;
+    }
+
+    /**
+     * Returns how many speed-scaled ticks have elapsed.
+     * While paused this returns the frozen value; otherwise it computes live.
      */
     public long elapsedTicks(long currentTick) {
-        return Math.max(0L, currentTick - startTick);
+        if (pausedAtScaledTicks >= 0) return pausedAtScaledTicks;
+        return Math.max(0L, (long)((currentTick - startTick) * playbackSpeed));
     }
+
+    /** Freezes playback at the current elapsed position. */
+    public void pause(long currentTick) {
+        if (pausedAtScaledTicks < 0)
+            pausedAtScaledTicks = elapsedTicks(currentTick);
+    }
+
+    /**
+     * Resumes playback from the frozen position.
+     * Returns the frozen progress in speed-scaled ticks so the caller can
+     * check whether the animation has already expired.
+     */
+    public long resume(long currentTick) {
+        long frozen = pausedAtScaledTicks;
+        pausedAtScaledTicks = -1L;
+        return frozen;
+    }
+
+    public boolean isPaused() { return pausedAtScaledTicks >= 0; }
+
+    public int               entityId()          { return entityId;          }
+    public AnimationCategory category()           { return category;          }
+    public String            animId()             { return animId;            }
+    public long              startTick()          { return startTick;         }
+    public String            filePath()           { return filePath;          }
+    public float             playbackSpeed()      { return playbackSpeed;     }
+    public long              pausedAtScaledTicks(){ return pausedAtScaledTicks; }
 }

@@ -29,8 +29,9 @@ public class NorbitTheOrbitItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
                 if ((player.isCrouching())) {
-          if (player instanceof net.minecraft.world.entity.Entity _se && !level.isClientSide()) {
-              net.ye6isu.yebisuRPG.animation.AnimationAPI.stopFirstPersonAnimation(_se);
+          if (player instanceof net.minecraft.world.entity.Entity _pe && !level.isClientSide()) {
+              net.ye6isu.yebisuRPG.animation.AnimationAPI.pauseAnimation(_pe,
+                  net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY);
           }
         } else {
           if (player instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {
@@ -38,7 +39,7 @@ public class NorbitTheOrbitItem extends Item {
                   net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,
                   "anim4",
                   "yebisurpg:animations/animations.json",
-                  null);
+                  0.5f);
           }
         }
         return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));

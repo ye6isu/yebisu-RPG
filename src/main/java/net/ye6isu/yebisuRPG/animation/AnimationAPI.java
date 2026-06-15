@@ -3,8 +3,8 @@ package net.ye6isu.yebisuRPG.animation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.ye6isu.yebisuRPG.network.animation.AnimPausePayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
-import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.util.NetworkUtils;
 import org.slf4j.Logger;
@@ -68,22 +68,20 @@ public final class AnimationAPI {
      *                    (e.g. {@code "attack_slash"}, {@code "rifle_fire"})
      */
     public static void triggerAnimation(Entity entity, AnimationCategory category, String animId) {
-        triggerAnimation(entity, category, animId, null, null);
+        triggerAnimation(entity, category, animId, null, 1f);
     }
 
     public static void triggerAnimation(Entity entity, AnimationCategory category,
                                         String animId, String filePath) {
-        triggerAnimation(entity, category, animId, filePath, null);
+        triggerAnimation(entity, category, animId, filePath, 1f);
     }
 
     /**
-     * @param filePath         source JSON resource path, or {@code null} for the default
-     * @param loopModeOverride forces loop behaviour overriding the JSON's own field;
-     *                         {@code null} defers to the JSON
+     * @param filePath      source JSON resource path, or {@code null} for the default
+     * @param playbackSpeed speed multiplier (1.0 = normal, 0.5 = half speed, 2.0 = double)
      */
     public static void triggerAnimation(Entity entity, AnimationCategory category,
-                                        String animId, String filePath,
-                                        AnimationLoopMode loopModeOverride) {
+                                        String animId, String filePath, float playbackSpeed) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] triggerAnimation called client-side for entity={} cat={} anim={}; ignoring.",
                     entity.getId(), category, animId);
@@ -92,16 +90,16 @@ public final class AnimationAPI {
 
         long startTick = entity.level().getGameTime();
         AnimationEntry entry = new AnimationEntry(entity.getId(), category, animId, startTick,
-                filePath, loopModeOverride);
+                filePath, playbackSpeed);
 
         AnimationRegistry.get().put(entry);
 
         AnimTriggerPayload payload = AnimTriggerPayload.fresh(entity.getId(), category, animId,
-                filePath, loopModeOverride);
+                filePath, playbackSpeed);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
 
-        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} loop={} startTick={}",
-                entity.getId(), category, animId, filePath, loopModeOverride, startTick);
+        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} speed={} startTick={}",
+                entity.getId(), category, animId, filePath, playbackSpeed, startTick);
     }
 
     // -------------------------------------------------------------------------
@@ -147,6 +145,60 @@ public final class AnimationAPI {
 
         LOGGER.debug("[AnimationAPI] stop: entity={} cat={} (was anim={})",
                 entity.getId(), category, removed.animId());
+    }
+
+    // -------------------------------------------------------------------------
+    // pauseAnimation / resumeAnimation
+    // -------------------------------------------------------------------------
+
+    /**
+     * Freezes the active animation for the given entity/category slot at its current position.
+     * Frozen progress is saved in {@link AnimationEntry} so late joiners receive the correct
+     * catch-up position. Silent no-op if no animation is playing or already paused.
+     */
+    public static void pauseAnimation(Entity entity, AnimationCategory category) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] pauseAnimation called client-side for entity={} cat={}; ignoring.",
+                    entity.getId(), category);
+            return;
+        }
+
+        AnimationEntry entry = AnimationRegistry.get().get(entity.getId(), category);
+        if (entry == null || entry.isPaused()) return;
+
+        long now = entity.level().getGameTime();
+        entry.pause(now);
+
+        // frozenProgressMs = speed-scaled ticks × MS_PER_TICK
+        long frozenMs = entry.pausedAtScaledTicks() * 50L;
+        AnimPausePayload payload = AnimPausePayload.pause(entity.getId(), category, frozenMs);
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+
+        LOGGER.debug("[AnimationAPI] pause: entity={} cat={} frozenMs={}", entity.getId(), category, frozenMs);
+    }
+
+    /**
+     * Resumes a previously paused animation from where it was frozen.
+     * If the animation expired while paused (play-once finished), clients will stop it.
+     * Silent no-op if no animation is registered or it is not paused.
+     */
+    public static void resumeAnimation(Entity entity, AnimationCategory category) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] resumeAnimation called client-side for entity={} cat={}; ignoring.",
+                    entity.getId(), category);
+            return;
+        }
+
+        AnimationEntry entry = AnimationRegistry.get().get(entity.getId(), category);
+        if (entry == null || !entry.isPaused()) return;
+
+        long now = entity.level().getGameTime();
+        entry.resume(now);
+
+        AnimPausePayload payload = AnimPausePayload.resume(entity.getId(), category);
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+
+        LOGGER.debug("[AnimationAPI] resume: entity={} cat={}", entity.getId(), category);
     }
 
     // -------------------------------------------------------------------------

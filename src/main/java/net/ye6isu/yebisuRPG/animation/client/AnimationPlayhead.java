@@ -8,192 +8,130 @@ import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
 /**
  * CLIENT-ONLY per-slot playback cursor for one active custom animation.
  *
- * <p>One instance lives inside {@link ClientAnimationEngine} for each
- * (entityId, {@link AnimationCategory}) pair that has been triggered.
- * It tracks elapsed time in milliseconds so renderers can query a
- * sub-tick-accurate position within the animation timeline regardless
- * of the game's fixed 50 ms tick rate.</p>
- *
  * <h2>Time model</h2>
- * <p>The playhead owns a {@code startMs} wall-clock timestamp captured
- * the moment the playhead is created (or fast-forwarded). Querying
- * {@link #getCurrentTimeMs()} at render time subtracts that origin from
- * {@link System#currentTimeMillis()}, producing a value renderers hand
- * directly to Bedrock {@code AnimationDefinition} selectors (which accept
- * animation time in seconds as a float).</p>
+ * <p>{@code startMs} is a wall-clock origin. {@code getCurrentTimeSecs()} returns
+ * {@code (now - startMs) / 1000 * speed}. Pausing freezes the perceived time by
+ * recording the frozen ms and stopping {@code startMs} from advancing.</p>
  *
- * <h2>Fast-forward (late-joiner catch-up)</h2>
- * <p>When the server sends a catch-up {@link net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload}
- * with {@code progressTicks > 0}, {@link #fastForward(int)} shifts {@code startMs}
- * backward by the equivalent milliseconds so the playhead immediately reads as
- * if it had been running since the original trigger tick.</p>
- *
- * <h2>State machine</h2>
- * <pre>
- *   PLAYING ──stopAnimation()──► BLENDING_OUT ──blend complete──► DONE
- *      ▲                                                             │
- *      └────────────────────────triggerAnimation()───────────────────┘
- *                                (replaces entry in engine map)
- * </pre>
- * DONE playheads are removed from the engine map by {@link ClientAnimationEngine}
- * after the blend finishes; they are never reused.
+ * <h2>Pause model</h2>
+ * <p>When paused, {@code frozenMs >= 0} and queries return that fixed value.
+ * On resume, {@code startMs} is recalculated so the live formula immediately
+ * yields the same position the animation was frozen at.</p>
  */
 @OnlyIn(Dist.CLIENT)
 public final class AnimationPlayhead {
 
-    /** Milliseconds per server tick (20 TPS). */
     public static final long MS_PER_TICK = 50L;
 
-    // -------------------------------------------------------------------------
-    // State enum
-    // -------------------------------------------------------------------------
-
     public enum State { PLAYING, BLENDING_OUT, DONE }
-
-    // -------------------------------------------------------------------------
-    // Fields
-    // -------------------------------------------------------------------------
 
     private final int entityId;
     private final AnimationCategory category;
     private final String animId;
-    /** Resource path of the JSON file that owns this animation, e.g. {@code "yebisurpg:animations/animations.json"}. */
     private final String filePath;
-    /**
-     * Loop mode override set by the trigger payload. {@code null} means use whatever
-     * the JSON declares. Takes priority over the JSON's own {@code "loop"} field so the
-     * YCS block (or any API caller) can force loop/hold without editing the asset file.
-     */
-    private final AnimationLoopMode loopModeOverride;
+    private final float playbackSpeed;
 
-    /**
-     * Wall-clock origin in milliseconds. Subtracting this from
-     * {@link System#currentTimeMillis()} gives the animation's elapsed time.
-     * Shifted backward by {@link #fastForward(int)} for late-joiner alignment.
-     */
     private long startMs;
-
+    private long frozenMs = -1L; // >= 0 while paused
     private State state = State.PLAYING;
 
-    // -------------------------------------------------------------------------
-    // Construction
-    // -------------------------------------------------------------------------
-
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId) {
-        this(entityId, category, animId, null, null);
+        this(entityId, category, animId, null, 1f);
     }
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId, String filePath) {
-        this(entityId, category, animId, filePath, null);
+        this(entityId, category, animId, filePath, 1f);
     }
 
-    /**
-     * @param filePath         resource path of the animation JSON, or {@code null} for the default
-     * @param loopModeOverride forces a specific loop behaviour, overriding the JSON's own field;
-     *                         {@code null} means defer to the JSON
-     */
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
-                             String filePath, AnimationLoopMode loopModeOverride) {
-        this.entityId         = entityId;
-        this.category         = category;
-        this.animId           = animId;
-        this.filePath         = filePath;
-        this.loopModeOverride = loopModeOverride;
-        this.startMs          = System.currentTimeMillis();
+                             String filePath, float playbackSpeed) {
+        this.entityId      = entityId;
+        this.category      = category;
+        this.animId        = animId;
+        this.filePath      = filePath;
+        this.playbackSpeed = playbackSpeed;
+        this.startMs       = System.currentTimeMillis();
     }
 
-    // -------------------------------------------------------------------------
-    // Fast-forward (late-joiner catch-up)
-    // -------------------------------------------------------------------------
+    // ── Fast-forward ──────────────────────────────────────────────────────────
 
     /**
-     * Shifts the playhead origin backward by {@code ticks × 50 ms} so the
-     * playhead reads as if it started that many ticks ago.
-     *
-     * <p>Must be called immediately after construction when the incoming
-     * {@link net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload#progressTicks()}
-     * is greater than zero. Safe to call with {@code ticks == 0} (no-op).</p>
-     *
-     * @param ticks elapsed server ticks reported in the catch-up payload
+     * Shifts the playhead to align with the server's current position.
+     * progressTicks are speed-scaled; divide by speed to get real wall-clock ms.
      */
     public void fastForward(int ticks) {
-        if (ticks > 0) startMs -= (long) ticks * MS_PER_TICK;
+        if (ticks > 0 && playbackSpeed > 0f)
+            startMs -= (long)(ticks * MS_PER_TICK / playbackSpeed);
     }
 
-    // -------------------------------------------------------------------------
-    // Runtime queries
-    // -------------------------------------------------------------------------
+    // ── Pause / Resume ────────────────────────────────────────────────────────
 
     /**
-     * Returns the animation's current elapsed time in milliseconds.
-     * Sub-tick accurate — safe to call every render frame.
-     *
-     * <p>Renderers convert this to seconds by dividing by 1000f before handing
-     * it to an {@code AnimationDefinition} selector.</p>
+     * Freezes playback at {@code frozenProgressMs} (speed-scaled ms from the server).
+     * Safe to call multiple times — only the first call while unpaused takes effect.
      */
+    public void pause(long frozenProgressMs) {
+        if (frozenMs < 0) frozenMs = frozenProgressMs;
+    }
+
+    /**
+     * Resumes from the frozen position. Recalculates {@code startMs} so the live
+     * formula immediately yields the same perceived time as the frozen value.
+     * Returns the frozen ms so the engine can check whether the animation expired.
+     */
+    public long resume() {
+        long frozen = frozenMs;
+        frozenMs = -1L;
+        if (frozen >= 0 && playbackSpeed > 0f) {
+            // startMs = now - (frozen / speed)  →  getCurrentTimeMs() = frozen / speed
+            // then * speed = frozen perceived ms
+            startMs = System.currentTimeMillis() - (long)(frozen / playbackSpeed);
+        }
+        return frozen;
+    }
+
+    public boolean isPaused() { return frozenMs >= 0; }
+
+    // ── Time queries ──────────────────────────────────────────────────────────
+
     public long getCurrentTimeMs() {
+        if (frozenMs >= 0) return frozenMs;
         return System.currentTimeMillis() - startMs;
     }
 
-    /**
-     * Convenience form of {@link #getCurrentTimeMs()} returned as seconds.
-     * Matches the float time parameter expected by Minecraft's Bedrock animation
-     * {@code AnimationDefinition} infrastructure.
-     */
+    /** Speed-scaled seconds — what renderers pass to the animation sampler. */
     public float getCurrentTimeSecs() {
-        return getCurrentTimeMs() / 1000f;
+        return getCurrentTimeMs() / 1000f * playbackSpeed;
     }
 
-    // -------------------------------------------------------------------------
-    // State transitions
-    // -------------------------------------------------------------------------
+    // ── Loop support ──────────────────────────────────────────────────────────
 
-    /**
-     * Resets the playhead for looping — shifts {@code startMs} forward by exactly
-     * one animation length so elapsed time wraps seamlessly without losing overshoot.
-     *
-     * @param animLengthMs the animation length in milliseconds
-     */
     public void restart(long animLengthMs) {
-        startMs += animLengthMs;
+        startMs += (playbackSpeed > 0f ? (long)(animLengthMs / playbackSpeed) : animLengthMs);
     }
 
-    /**
-     * Transitions the playhead to {@link State#BLENDING_OUT}.
-     * Called by {@link ClientAnimationEngine} when an
-     * {@link net.ye6isu.yebisuRPG.network.animation.AnimStopPayload} is received.
-     * No-op if already blending or done.
-     */
+    // ── State transitions ─────────────────────────────────────────────────────
+
     public void beginBlendOut() {
         if (state == State.PLAYING) state = State.BLENDING_OUT;
     }
 
-    /**
-     * Marks the playhead as fully done after the blend finishes.
-     * Called by {@link AnimationBlender} when the 2-tick window elapses.
-     */
     public void markDone() {
         state = State.DONE;
     }
 
-    // -------------------------------------------------------------------------
-    // Accessors
-    // -------------------------------------------------------------------------
+    // ── Accessors ─────────────────────────────────────────────────────────────
 
-    public int              entityId()         { return entityId; }
-    public AnimationCategory category()        { return category; }
-    public String           animId()           { return animId;   }
-    /** The resource path of the source JSON file, or {@code null} for the default file. */
-    public String           filePath()         { return filePath; }
-    /** The loop mode override, or {@code null} to defer to the JSON. */
-    public AnimationLoopMode loopModeOverride() { return loopModeOverride; }
-    /**
-     * Returns the effective loop mode: the override if set, otherwise the JSON's own value.
-     */
+    public int               entityId()      { return entityId;      }
+    public AnimationCategory category()      { return category;      }
+    public String            animId()        { return animId;        }
+    public String            filePath()      { return filePath;      }
+    public float             playbackSpeed() { return playbackSpeed; }
+    public State             state()         { return state;         }
+    public boolean           isPlaying()     { return state == State.PLAYING; }
+    public boolean           isDone()        { return state == State.DONE;    }
+
     public AnimationLoopMode effectiveLoopMode(HandAnimationLoader.AnimData anim) {
-        return loopModeOverride != null ? loopModeOverride : anim.loopMode();
+        return anim.loopMode();
     }
-    public State            state()     { return state;    }
-    public boolean          isPlaying() { return state == State.PLAYING; }
-    public boolean          isDone()    { return state == State.DONE;    }
 }
