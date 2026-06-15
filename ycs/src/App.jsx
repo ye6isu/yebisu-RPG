@@ -584,13 +584,14 @@ function compileActionNode(node, nodes, methodKey) {
     const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
     const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f";
     const speedArg = typeof speed === "string" && !speed.endsWith("f") ? speed + "f" : speed;
+    const lookAtMask = node.fields?.lookAtMask || 0;
     return [
       "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpa && !level.isClientSide()) {",
       "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_tpa,",
       "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY_THIRD_PERSON,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
-      "        " + speedArg + ");",
+      "        " + speedArg + ", " + lookAtMask + ");",
       "}",
     ];
   }
@@ -1614,6 +1615,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isAnimTPPlay&&<>
+          <span style={{cursor:"pointer",opacity:0.6,fontSize:14,position:"relative"}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -1648,11 +1650,14 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   if (isIf) {
       return (
         <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
-            {showSettings&&<div style={{position:"absolute",left:0,top:-45,background:"#222",border:"2px solid #444",padding:"6px 10px",borderRadius:10,zIndex:100,display:"flex",gap:8,pointerEvents:"auto"}}>
-               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={(e)=>{e.stopPropagation();setShowSettings(false)}}>X</div>
-               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id, "elseIfCount", (node.fields?.elseIfCount||0)+1)}>+ Else If</div>
-               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id, "elseIfCount", Math.max(0, (node.fields?.elseIfCount||0)-1))}>- Else If</div>
-               <div style={{color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id, "hasElse", !node.fields?.hasElse)}>{node.fields?.hasElse?"- Else":"+ Else"}</div>
+            {showSettings&&<div style={{position:"absolute",left:0,top:-90,background:"#222",border:"2px solid #444",padding:"8px 12px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:6,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
+               <div style={{color:"#aaa",fontSize:12,fontWeight:700,marginBottom:2}}>If Block Settings</div>
+               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={(e)=>{e.stopPropagation();setShowSettings(false)}}>✕</div>
+                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#3a5c3a",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id,"elseIfCount",(node.fields?.elseIfCount||0)+1)}>+ Else If</div>
+                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#5a3a3a",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id,"elseIfCount",Math.max(0,(node.fields?.elseIfCount||0)-1))}>− Else If</div>
+                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id,"hasElse",!node.fields?.hasElse)}>{node.fields?.hasElse?"− Else":"+ Else"}</div>
+               </div>
             </div>}
             
             <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
@@ -1691,6 +1696,26 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
 
       
       {isVal ? valContent : commonHeader}
+      {showSettings&&isAnimTPPlay&&(()=>{
+        const mask = node.fields?.lookAtMask||0;
+        const CB = ({bit,label})=>(
+          <label style={{display:"flex",alignItems:"center",gap:4,color:"#fff",fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"lookAtMask",(mask^bit));}}>
+            <input type="checkbox" checked={!!(mask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+            {label}
+          </label>
+        );
+        return <div style={{position:"absolute",left:0,top:-80,background:"#222",border:"2px solid #444",padding:"8px 12px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:6,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{color:"#aaa",fontSize:12,fontWeight:700,marginBottom:2}}>Look-At (faces player view)</div>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+            <CB bit={1}  label="Head"/>
+            <CB bit={2}  label="Torso"/>
+            <CB bit={4}  label="Right Arm"/>
+            <CB bit={8}  label="Left Arm"/>
+            <CB bit={16} label="Right Leg"/>
+            <CB bit={32} label="Left Leg"/>
+          </div>
+        </div>;
+      })()}
     </div>
   );
 }

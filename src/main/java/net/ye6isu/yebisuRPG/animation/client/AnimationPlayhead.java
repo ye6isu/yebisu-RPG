@@ -25,31 +25,46 @@ public final class AnimationPlayhead {
 
     public enum State { PLAYING, BLENDING_OUT, DONE }
 
+    // Bitmask: bit0=head, bit1=torso, bit2=rightArm, bit3=leftArm, bit4=rightLeg, bit5=leftLeg
+    public static final int LOOK_HEAD      = 1 << 0;
+    public static final int LOOK_TORSO     = 1 << 1;
+    public static final int LOOK_RIGHT_ARM = 1 << 2;
+    public static final int LOOK_LEFT_ARM  = 1 << 3;
+    public static final int LOOK_RIGHT_LEG = 1 << 4;
+    public static final int LOOK_LEFT_LEG  = 1 << 5;
+
     private final int entityId;
     private final AnimationCategory category;
     private final String animId;
     private final String filePath;
     private final float playbackSpeed;
+    private final int lookAtMask;
 
     private long startMs;
     private long frozenMs = -1L; // >= 0 while paused
     private State state = State.PLAYING;
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId) {
-        this(entityId, category, animId, null, 1f);
+        this(entityId, category, animId, null, 1f, 0);
     }
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId, String filePath) {
-        this(entityId, category, animId, filePath, 1f);
+        this(entityId, category, animId, filePath, 1f, 0);
     }
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
                              String filePath, float playbackSpeed) {
+        this(entityId, category, animId, filePath, playbackSpeed, 0);
+    }
+
+    public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
+                             String filePath, float playbackSpeed, int lookAtMask) {
         this.entityId      = entityId;
         this.category      = category;
         this.animId        = animId;
         this.filePath      = filePath;
         this.playbackSpeed = playbackSpeed;
+        this.lookAtMask    = lookAtMask;
         this.startMs       = System.currentTimeMillis();
     }
 
@@ -127,9 +142,11 @@ public final class AnimationPlayhead {
     public String            animId()        { return animId;        }
     public String            filePath()      { return filePath;      }
     public float             playbackSpeed() { return playbackSpeed; }
+    public int               lookAtMask()    { return lookAtMask;    }
     public State             state()         { return state;         }
     public boolean           isPlaying()     { return state == State.PLAYING; }
     public boolean           isDone()        { return state == State.DONE;    }
+    public boolean           looksAt(int bit){ return (lookAtMask & bit) != 0; }
 
     public AnimationLoopMode effectiveLoopMode(HandAnimationLoader.AnimData anim) {
         return anim.loopMode();

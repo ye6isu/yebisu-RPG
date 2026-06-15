@@ -82,6 +82,12 @@ public final class AnimationAPI {
      */
     public static void triggerAnimation(Entity entity, AnimationCategory category,
                                         String animId, String filePath, float playbackSpeed) {
+        triggerAnimation(entity, category, animId, filePath, playbackSpeed, 0);
+    }
+
+    public static void triggerAnimation(Entity entity, AnimationCategory category,
+                                        String animId, String filePath, float playbackSpeed,
+                                        int lookAtMask) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] triggerAnimation called client-side for entity={} cat={} anim={}; ignoring.",
                     entity.getId(), category, animId);
@@ -95,11 +101,11 @@ public final class AnimationAPI {
         AnimationRegistry.get().put(entry);
 
         AnimTriggerPayload payload = AnimTriggerPayload.fresh(entity.getId(), category, animId,
-                filePath, playbackSpeed);
+                filePath, playbackSpeed, lookAtMask);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
 
-        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} speed={} startTick={}",
-                entity.getId(), category, animId, filePath, playbackSpeed, startTick);
+        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} speed={} lookAt={} startTick={}",
+                entity.getId(), category, animId, filePath, playbackSpeed, lookAtMask, startTick);
     }
 
     // -------------------------------------------------------------------------
@@ -138,7 +144,11 @@ public final class AnimationAPI {
     }
 
     public static void triggerThirdPersonAnimation(Entity entity, String animId, String filePath, float playbackSpeed) {
-        triggerAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON, animId, filePath, playbackSpeed);
+        triggerAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON, animId, filePath, playbackSpeed, 0);
+    }
+
+    public static void triggerThirdPersonAnimation(Entity entity, String animId, String filePath, float playbackSpeed, int lookAtMask) {
+        triggerAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON, animId, filePath, playbackSpeed, lookAtMask);
     }
 
     public static void stopThirdPersonAnimation(Entity entity) {

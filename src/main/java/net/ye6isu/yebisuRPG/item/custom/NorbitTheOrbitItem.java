@@ -33,7 +33,7 @@ public class NorbitTheOrbitItem extends Item {
                 net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY_THIRD_PERSON,
                 "tp1",
                 "yebisurpg:animations/player.animation.json",
-                0.5f);
+                1f, 15);
         }
         return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

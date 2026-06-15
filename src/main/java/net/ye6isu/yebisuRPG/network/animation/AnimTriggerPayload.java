@@ -34,7 +34,8 @@ public record AnimTriggerPayload(
         String animId,
         int progressTicks,
         String filePath,
-        float playbackSpeed
+        float playbackSpeed,
+        int lookAtMask
 ) implements BasePayload {
 
     public static final CustomPacketPayload.Type<AnimTriggerPayload> TYPE =
@@ -42,14 +43,30 @@ public record AnimTriggerPayload(
                     ResourceLocation.fromNamespaceAndPath("yebisurpg", "anim_trigger"));
 
     public static final StreamCodec<ByteBuf, AnimTriggerPayload> STREAM_CODEC =
-            StreamCodec.composite(
-                    ByteBufCodecs.VAR_INT,         AnimTriggerPayload::entityId,
-                    ByteBufCodecs.VAR_INT,         AnimTriggerPayload::categoryOrdinal,
-                    ByteBufCodecs.stringUtf8(64),  AnimTriggerPayload::animId,
-                    ByteBufCodecs.VAR_INT,         AnimTriggerPayload::progressTicks,
-                    ByteBufCodecs.stringUtf8(256), AnimTriggerPayload::filePath,
-                    ByteBufCodecs.FLOAT,           AnimTriggerPayload::playbackSpeed,
-                    AnimTriggerPayload::new);
+            new StreamCodec<>() {
+                @Override
+                public AnimTriggerPayload decode(ByteBuf buf) {
+                    int    entityId        = ByteBufCodecs.VAR_INT.decode(buf);
+                    int    categoryOrdinal = ByteBufCodecs.VAR_INT.decode(buf);
+                    String animId          = ByteBufCodecs.stringUtf8(64).decode(buf);
+                    int    progressTicks   = ByteBufCodecs.VAR_INT.decode(buf);
+                    String filePath        = ByteBufCodecs.stringUtf8(256).decode(buf);
+                    float  playbackSpeed   = ByteBufCodecs.FLOAT.decode(buf);
+                    int    lookAtMask      = ByteBufCodecs.VAR_INT.decode(buf);
+                    return new AnimTriggerPayload(entityId, categoryOrdinal, animId,
+                            progressTicks, filePath, playbackSpeed, lookAtMask);
+                }
+                @Override
+                public void encode(ByteBuf buf, AnimTriggerPayload p) {
+                    ByteBufCodecs.VAR_INT.encode(buf, p.entityId());
+                    ByteBufCodecs.VAR_INT.encode(buf, p.categoryOrdinal());
+                    ByteBufCodecs.stringUtf8(64).encode(buf, p.animId());
+                    ByteBufCodecs.VAR_INT.encode(buf, p.progressTicks());
+                    ByteBufCodecs.stringUtf8(256).encode(buf, p.filePath());
+                    ByteBufCodecs.FLOAT.encode(buf, p.playbackSpeed());
+                    ByteBufCodecs.VAR_INT.encode(buf, p.lookAtMask());
+                }
+            };
 
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
@@ -66,30 +83,44 @@ public record AnimTriggerPayload(
     // ── Factories ────────────────────────────────────────────────────────────
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category, String animId) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0, "", 1f);
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0, "", 1f, 0);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
                                            String animId, String filePath) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "", 1f);
+                filePath != null ? filePath : "", 1f, 0);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
                                            String animId, String filePath, float playbackSpeed) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "", playbackSpeed);
+                filePath != null ? filePath : "", playbackSpeed, 0);
+    }
+
+    public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
+                                           String animId, String filePath, float playbackSpeed,
+                                           int lookAtMask) {
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
                                              String animId, int progressTicks) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks, "", 1f);
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks, "", 1f, 0);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
                                              String animId, int progressTicks,
                                              String filePath, float playbackSpeed) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
-                filePath != null ? filePath : "", playbackSpeed);
+                filePath != null ? filePath : "", playbackSpeed, 0);
+    }
+
+    public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
+                                             String animId, int progressTicks,
+                                             String filePath, float playbackSpeed, int lookAtMask) {
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask);
     }
 }
