@@ -73,6 +73,7 @@ public final class AnimationEventHooks {
     private static final Set<AnimationCategory> HURTBOX_CATEGORIES = Collections.unmodifiableSet(
             EnumSet.of(
                     AnimationCategory.ENTITY,
+                    AnimationCategory.ENTITY_THIRD_PERSON,
                     AnimationCategory.ITEM_MAIN_HAND,
                     AnimationCategory.ITEM_OFF_HAND));
 

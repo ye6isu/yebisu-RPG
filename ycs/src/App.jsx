@@ -578,6 +578,46 @@ function compileActionNode(node, nodes, methodKey) {
       "}",
     ];
   }
+  if (node.opcode === "anim.thirdperson.play") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
+    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
+    const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f";
+    const speedArg = typeof speed === "string" && !speed.endsWith("f") ? speed + "f" : speed;
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpa && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_tpa,",
+      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY_THIRD_PERSON,",
+      "        \"" + animName.replace(/"/g, '\\"') + "\",",
+      "        \"" + filePath.replace(/"/g, '\\"') + "\",",
+      "        " + speedArg + ");",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.thirdperson.stop") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tps && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.stopThirdPersonAnimation(_tps);",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.thirdperson.pause") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpp && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.pauseThirdPersonAnimation(_tpp);",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.thirdperson.resume") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpr && !level.isClientSide()) {",
+      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.resumeThirdPersonAnimation(_tpr);",
+      "}",
+    ];
+  }
   if (node.opcode === "anim.handpose.set") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
@@ -653,6 +693,23 @@ const PALETTE_BLOCKS = [
       slotDefs:[
         {key:"entity", accepts:LINK_ENTITY, label:"entity"},
       ] },
+    { opcode:"anim.thirdperson.play", label:"Play Third-Person Anim", isAction:true,
+      hint:"Play TP Anim [Text Link] for [Entity Link] with playback speed [Number Link] from file [Text Link]",
+      slotDefs:[
+        {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
+        {key:"entity",        accepts:LINK_ENTITY, label:"entity"},
+        {key:"playbackSpeed", accepts:LINK_NUMBER, label:"playback speed"},
+        {key:"filePath",      accepts:LINK_TEXT,   label:"from file"},
+      ] },
+    { opcode:"anim.thirdperson.stop", label:"Stop Third-Person Anim", isAction:true,
+      hint:"Stop any playing third-person animation on an entity",
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+    { opcode:"anim.thirdperson.pause", label:"Pause Third-Person Anim", isAction:true,
+      hint:"Freeze the playing third-person animation on an entity at its current position",
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+    { opcode:"anim.thirdperson.resume", label:"Resume Third-Person Anim", isAction:true,
+      hint:"Resume a paused third-person animation; if expired while paused, stops it",
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
     { opcode:"anim.handpose.set", label:"Set FP Hand Pose", isAction:true,
       hint:"Set FP hand pose to [text link] for [Entity Link] from [text link]",
       slotDefs:[
@@ -1463,6 +1520,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isAnimStop = node.opcode === "anim.firstperson.stop";
   const isAnimPause = node.opcode === "anim.firstperson.pause";
   const isAnimResume = node.opcode === "anim.firstperson.resume";
+  const isAnimTPPlay = node.opcode === "anim.thirdperson.play";
+  const isAnimTPStop = node.opcode === "anim.thirdperson.stop";
+  const isAnimTPPause = node.opcode === "anim.thirdperson.pause";
+  const isAnimTPResume = node.opcode === "anim.thirdperson.resume";
   const isHandPoseSet = node.opcode === "anim.handpose.set";
   const isHandPoseReset = node.opcode === "anim.handpose.reset";
   const lblStr = node.opcode==="entity.event"?"Event Entity"
@@ -1513,6 +1574,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
          :node.opcode==="anim.firstperson.pause"?"Pause FP Anim on"
          :node.opcode==="anim.firstperson.resume"?"Resume FP Anim on"
+         :node.opcode==="anim.thirdperson.play"?"Play TP Anim"
+         :node.opcode==="anim.thirdperson.stop"?"Stop TP Anim on"
+         :node.opcode==="anim.thirdperson.pause"?"Pause TP Anim on"
+         :node.opcode==="anim.thirdperson.resume"?"Resume TP Anim on"
          :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
          :node.opcode}
@@ -1546,6 +1611,24 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isAnimResume&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimTPPlay&&<>
+          <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>speed</span>
+          <SlotConn sk="playbackSpeed" sc="rgba(0,0,0,0.3)" connId={node.slots?.playbackSpeed} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
+          <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimTPStop&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimTPPause&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAnimTPResume&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isHandPoseSet&&<>

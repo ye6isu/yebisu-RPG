@@ -8,11 +8,17 @@ package net.ye6isu.yebisuRPG.animation;
 public enum AnimationCategory {
 
     /**
-     * Primary skeletal bones of a custom mob, or a player executing a modded ability
-     * (spellcast, dodge roll, etc.). Drives AnimationDefinition-based bone transforms
-     * on the entity's model directly.
+     * First-person animation — drives the custom arm/leg geometry rendered by
+     * MixinItemInHandRenderer. Independent from ENTITY_THIRD_PERSON.
      */
     ENTITY,
+
+    /**
+     * Third-person animation — drives PlayerModel bones (rightArm, leftArm, body,
+     * rightLeg, leftLeg, head) via MixinPlayerModel using HandAnimationLoader JSON.
+     * Independent from ENTITY (first-person). Suppresses vanilla swing when active.
+     */
+    ENTITY_THIRD_PERSON,
 
     /**
      * The custom multi-part item structure held in the main hand slot.

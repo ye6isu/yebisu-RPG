@@ -16,9 +16,10 @@ public enum AnimationLoopMode {
     public static AnimationLoopMode from(String s) {
         if (s == null) return PLAY_ONCE;
         return switch (s.toLowerCase(java.util.Locale.ROOT)) {
-            case "hold"         -> HOLD_LAST;
-            case "loop", "true" -> LOOP;
-            default             -> PLAY_ONCE;
+            case "hold", "hold_on_last_frame" -> HOLD_LAST;
+            case "loop", "true"               -> LOOP;
+            case "once", "false", "play_once" -> PLAY_ONCE;
+            default                           -> PLAY_ONCE;
         };
     }
 }
