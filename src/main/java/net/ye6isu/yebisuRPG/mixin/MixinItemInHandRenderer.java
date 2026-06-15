@@ -208,15 +208,19 @@ public abstract class MixinItemInHandRenderer {
         // Read item-socket bones from the animation (right_item_socket / left_item_socket).
         float rightIPX = 0f, rightIPY = 0f, rightIPZ = 0f;
         float rightIRX = 0f, rightIRY = 0f, rightIRZ = 0f;
+        float rightISX = 1f, rightISY = 1f, rightISZ = 1f;
         float leftIPX  = 0f, leftIPY  = 0f, leftIPZ  = 0f;
         float leftIRX  = 0f, leftIRY  = 0f, leftIRZ  = 0f;
+        float leftISX  = 1f, leftISY  = 1f, leftISZ  = 1f;
         if (anim != null) {
             HandAnimationLoader.BonePose ri = anim.bone("right_item_socket");
             HandAnimationLoader.BonePose li = anim.bone("left_item_socket");
             rightIPX = ri.position().evalX(timeSecs); rightIPY = ri.position().evalY(timeSecs); rightIPZ = ri.position().evalZ(timeSecs);
             rightIRX = ri.rotation().evalX(timeSecs); rightIRY = ri.rotation().evalY(timeSecs); rightIRZ = ri.rotation().evalZ(timeSecs);
+            rightISX = ri.scale().evalX(timeSecs);    rightISY = ri.scale().evalY(timeSecs);    rightISZ = ri.scale().evalZ(timeSecs);
             leftIPX  = li.position().evalX(timeSecs); leftIPY  = li.position().evalY(timeSecs); leftIPZ  = li.position().evalZ(timeSecs);
             leftIRX  = li.rotation().evalX(timeSecs); leftIRY  = li.rotation().evalY(timeSecs); leftIRZ  = li.rotation().evalZ(timeSecs);
+            leftISX  = li.scale().evalX(timeSecs);    leftISY  = li.scale().evalY(timeSecs);    leftISZ  = li.scale().evalZ(timeSecs);
         }
 
         // Render held items using vanilla renderRightHand / renderLeftHand on our calibrated pose.
@@ -226,11 +230,13 @@ public abstract class MixinItemInHandRenderer {
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
                 rightSX, rightSY, rightSZ,
                 rightIPX, rightIPY, rightIPZ, rightIRX, rightIRY, rightIRZ,
+                rightISX, rightISY, rightISZ,
                 player, bufferSource, packedLight, true);
         renderHandWithItem(
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
                 leftSX, leftSY, leftSZ,
                 leftIPX, leftIPY, leftIPZ, leftIRX, leftIRY, leftIRZ,
+                leftISX, leftISY, leftISZ,
                 player, bufferSource, packedLight, false);
 
         RenderSystem.enableCull();
@@ -357,6 +363,7 @@ public abstract class MixinItemInHandRenderer {
             float sx, float sy, float sz,
             float socketPX, float socketPY, float socketPZ,
             float socketRX, float socketRY, float socketRZ,
+            float socketSX, float socketSY, float socketSZ,
             AbstractClientPlayer player,
             MultiBufferSource.BufferSource bufferSource, int packedLight,
             boolean isRightHand) {
@@ -404,6 +411,7 @@ public abstract class MixinItemInHandRenderer {
         //    Debug mode overrides with HandDebugState sliders on top.
         float finalSocketPX = socketPX, finalSocketPY = socketPY, finalSocketPZ = socketPZ;
         float finalSocketRX = socketRX, finalSocketRY = socketRY, finalSocketRZ = socketRZ;
+        float finalSocketSX = socketSX, finalSocketSY = socketSY, finalSocketSZ = socketSZ;
         if (HandDebugState.debugMode) {
             if (isRightHand) {
                 finalSocketPX += HandDebugState.rightITX; finalSocketPY += HandDebugState.rightITY; finalSocketPZ += HandDebugState.rightITZ;
@@ -418,6 +426,10 @@ public abstract class MixinItemInHandRenderer {
         if (finalSocketRX != 0f) pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-finalSocketRX));
         if (finalSocketRZ != 0f) pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-finalSocketRZ));
         if (finalSocketRY != 0f) pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-finalSocketRY));
+        // Item socket scale — multiplicative on top of the arm scale already in the stack.
+        // Axis remap: JSON X→game X, JSON Y→game Z, JSON Z→game Y.
+        if (finalSocketSX != 1f || finalSocketSY != 1f || finalSocketSZ != 1f)
+            pose.scale(finalSocketSX, finalSocketSZ, finalSocketSY);
 
         // For the left hand, mirror X around the item's pivot so asymmetric items
         // (shield, sword, bow, crossbow, trident) face the correct direction.
