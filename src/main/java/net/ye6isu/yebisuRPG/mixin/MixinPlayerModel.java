@@ -9,6 +9,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
+import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.AnimationBlender;
 import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
@@ -166,12 +167,16 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         HandAnimationLoader.BonePose rLeg    = pose(anim, "right_leg");
         HandAnimationLoader.BonePose lLeg    = pose(anim, "left_leg");
 
-        applyBone(this.head,     head,  timeSecs, weight);
-        applyBone(this.body,     torso, timeSecs, weight);
-        applyBone(this.rightArm, rArm,  timeSecs, weight);
-        applyBone(this.leftArm,  lArm,  timeSecs, weight);
-        applyBone(this.rightLeg, rLeg,  timeSecs, weight);
-        applyBone(this.leftLeg,  lLeg,  timeSecs, weight);
+        int mask = (playhead != null) ? playhead.lookAtMask() : 0;
+        float yawRad   = mask != 0 ? (float) Math.toRadians(netHeadYaw)  : 0f;
+        float pitchRad = mask != 0 ? (float) Math.toRadians(headPitch)   : 0f;
+
+        applyBone(this.head,     head,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_HEAD)      != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_HEAD)      != 0 ? pitchRad : 0f);
+        applyBone(this.body,     torso, timeSecs, weight, (mask & AnimationPlayhead.LOOK_TORSO)     != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_TORSO)     != 0 ? pitchRad : 0f);
+        applyBone(this.rightArm, rArm,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_RIGHT_ARM) != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_RIGHT_ARM) != 0 ? pitchRad : 0f);
+        applyBone(this.leftArm,  lArm,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_LEFT_ARM)  != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_LEFT_ARM)  != 0 ? pitchRad : 0f);
+        applyBone(this.rightLeg, rLeg,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_RIGHT_LEG) != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_RIGHT_LEG) != 0 ? pitchRad : 0f);
+        applyBone(this.leftLeg,  lLeg,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_LEFT_LEG)  != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_LEFT_LEG)  != 0 ? pitchRad : 0f);
 
         // Sync overlay parts — vanilla's copyFrom calls ran before our bones were set.
         this.hat.copyFrom(this.head);
@@ -197,24 +202,40 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
      * Scale: multiplied onto xScale/yScale/zScale fields (1.0 = no change).
      */
     private static void applyBone(ModelPart bone, HandAnimationLoader.BonePose pose,
-                                   float t, float weight) {
-        // Rotation (radians) — lerp from current vanilla value toward anim value.
-        float rx = (float) Math.toRadians(pose.rotation().evalX(t));
-        float ry = (float) Math.toRadians(-pose.rotation().evalY(t)); // negate Y
+                                   float t, float weight, float lookYaw, float lookPitch) {
+        // Rotation: anim value + look-at offset.
+        float rx = (float) Math.toRadians(pose.rotation().evalX(t)) + lookPitch * weight;
+        float ry = (float) Math.toRadians(-pose.rotation().evalY(t)) + lookYaw  * weight;
         float rz = (float) Math.toRadians(pose.rotation().evalZ(t));
         bone.xRot = lerp(bone.xRot, rx, weight);
         bone.yRot = lerp(bone.yRot, ry, weight);
         bone.zRot = lerp(bone.zRot, rz, weight);
 
-        // Position: scale factor converts Blockbench model units to HumanoidModel space.
-        // Increase this to make position keyframes move bones further, decrease to shrink.
+        // Position: re-express the body-local delta in camera space.
+        // Build camera basis vectors from yaw+pitch, then map body axes onto them
+        // so each axis contribution is fully independent — no gimbal coupling.
         final float POS_SCALE = 16f / 16f;
-        bone.x += pose.position().evalX(t) * POS_SCALE * weight;
-        bone.y += -pose.position().evalY(t) * POS_SCALE * weight;
-        bone.z += pose.position().evalZ(t) * POS_SCALE * weight;
+        float dx =  pose.position().evalX(t) * POS_SCALE * weight;
+        float dy = -pose.position().evalY(t) * POS_SCALE * weight;
+        float dz =  pose.position().evalZ(t) * POS_SCALE * weight;
+        if (lookYaw != 0f || lookPitch != 0f) {
+            float cosY = (float) Math.cos(lookYaw),  sinY = (float) Math.sin(lookYaw);
+            float cosP = (float) Math.cos(lookPitch), sinP = (float) Math.sin(lookPitch);
+            // Camera basis in body-local space:
+            // right   = ( cosY,       0,    -sinY )
+            // up      = ( sinY*sinP,  cosP,  cosY*sinP )
+            // forward = ( sinY*cosP, -sinP,  cosY*cosP )
+            // Output = dx*right + dy*up + dz*forward
+            bone.x += dx * cosY        + dy * sinY * sinP + dz * sinY * cosP;
+            bone.y +=                    dy * cosP         - dz * sinP;
+            bone.z += dx * (-sinY)     + dy * cosY * sinP + dz * cosY * cosP;
+        } else {
+            bone.x += dx;
+            bone.y += dy;
+            bone.z += dz;
+        }
 
-        // Scale — lerp from rest (1) toward anim value, assigned directly.
-        // resetPose() already set xScale/yScale/zScale to 1, so *= would compound.
+        // Scale — assigned directly since resetPose() already set to 1.
         bone.xScale = lerp(1f, pose.scale().evalX(t), weight);
         bone.yScale = lerp(1f, pose.scale().evalY(t), weight);
         bone.zScale = lerp(1f, pose.scale().evalZ(t), weight);

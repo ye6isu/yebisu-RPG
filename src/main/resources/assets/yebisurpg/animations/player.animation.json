@@ -37,7 +37,7 @@
 					},
 					"scale": {
 						"1": {
-							"vector": [20, 20, 20],
+							"vector": [2, 2, 2],
 							"easing": "easeOutElastic"
 						},
 						"0.5": {
