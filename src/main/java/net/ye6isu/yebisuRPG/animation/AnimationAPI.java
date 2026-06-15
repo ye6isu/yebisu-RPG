@@ -127,6 +127,32 @@ public final class AnimationAPI {
         stopAnimation(entity, AnimationCategory.ENTITY);
     }
 
+    // ── Third-person convenience wrappers ─────────────────────────────────────
+
+    public static void triggerThirdPersonAnimation(Entity entity, String animId) {
+        triggerAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON, animId, null, 1f);
+    }
+
+    public static void triggerThirdPersonAnimation(Entity entity, String animId, String filePath) {
+        triggerAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON, animId, filePath, 1f);
+    }
+
+    public static void triggerThirdPersonAnimation(Entity entity, String animId, String filePath, float playbackSpeed) {
+        triggerAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON, animId, filePath, playbackSpeed);
+    }
+
+    public static void stopThirdPersonAnimation(Entity entity) {
+        stopAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON);
+    }
+
+    public static void pauseThirdPersonAnimation(Entity entity) {
+        pauseAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON);
+    }
+
+    public static void resumeThirdPersonAnimation(Entity entity) {
+        resumeAnimation(entity, AnimationCategory.ENTITY_THIRD_PERSON);
+    }
+
     public static void stopAnimation(Entity entity, AnimationCategory category) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] stopAnimation called client-side for entity={} cat={}; ignoring.",

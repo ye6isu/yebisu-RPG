@@ -27,6 +27,38 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
 
     public MixinPlayerRenderer() { super(null, null, 0); }
 
+    /**
+     * Vanilla PlayerRenderer.setupRotations (via LivingEntityRenderer) translates
+     * the entire model down by ~0.125 blocks when the player is crouching. This is
+     * a PoseStack-level transform, invisible to bone resets in setupAnim.
+     * When a third-person animation is active we cancel that shift by pushing it back up.
+     */
+    @Inject(
+        method = "setupRotations(Lnet/minecraft/client/player/AbstractClientPlayer;Lcom/mojang/blaze3d/vertex/PoseStack;FFFF)V",
+        at = @At("RETURN")
+    )
+    private void yebisurpg$cancelCrouchTranslate(
+            AbstractClientPlayer player,
+            PoseStack poseStack,
+            float ageInTicks,
+            float bodyYaw,
+            float partialTick,
+            float scale,
+            CallbackInfo ci) {
+
+        if (!player.isCrouching()) return;
+
+        int entityId = player.getId();
+        ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
+        AnimationPlayhead playhead = engine.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+        AnimationBlender  blender  = engine.getBlender(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+        if (playhead == null && blender == null) return;
+
+        // Vanilla sneaking translates Y by -0.125 (in entity/block space, before scale).
+        // We push back up by +0.125 to restore the standing Y origin.
+        poseStack.translate(0.0, 0.125, 0.0);
+    }
+
     @Inject(method = "renderRightHand", at = @At("TAIL"))
     private void yebisurpg$emissiveRightHand(
             PoseStack poseStack, MultiBufferSource buffer,
