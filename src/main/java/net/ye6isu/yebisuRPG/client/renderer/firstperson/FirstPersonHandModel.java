@@ -13,50 +13,42 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * First-person arm model built from the provided Bedrock geometry.
+ * First-person arm + leg model built from the provided Bedrock geometry.
  *
- * Geometry hierarchy:
- *   root
- *    └─ right_arm  pivot [-5, 22, 0]  (relative to Camera pivot [0, 27, 4])
- *    └─ left_arm   pivot [ 5, 22, 0]
+ * Camera pivot: [0, 27, 4]
  *
- * The "Camera" bone is not a renderable part — it's just the origin.
- * We place the root at that camera origin and express each arm's pivot
- * as an offset from it.
- *
- * Bedrock → Java model conversion:
- *   partOffset.x  =  bedrockPivot.x  - cameraPivot.x
- *   partOffset.y  = -(bedrockPivot.y - cameraPivot.y)   (Y axis flips)
- *   partOffset.z  =  bedrockPivot.z  - cameraPivot.z
- *
+ * Bedrock → Java conversion:
+ *   partOffset.x  =  bedrockPivot.x - cameraPivot.x
+ *   partOffset.y  = -(bedrockPivot.y - cameraPivot.y)
+ *   partOffset.z  =  bedrockPivot.z - cameraPivot.z
  *   boxMin.x = cubeOrigin.x - bedrockPivot.x
  *   boxMin.y = -(cubeOrigin.y - bedrockPivot.y) - cubeHeight
  *   boxMin.z = cubeOrigin.z - bedrockPivot.z
  *
- * Camera pivot: [0, 27, 4]
+ * right_arm: pivot=[-8,21,-8]  offset=[-8, 6, -12]  box origin=[-11,11.07,-10] size=[4,12,4]
+ *   boxMin = [-11-(-8), -(11.07-21)-12, -10-(-8)] = [-3, -1.07, -2]
+ * left_arm:  pivot=[8,21,-8]   offset=[8, 6, -12]   box origin=[7,11.07,-10]  size=[4,12,4]
+ *   boxMin = [7-8, -(11.07-21)-12, -10-(-8)] = [-1, -1.07, -2]
  *
- * right_arm: bedrockPivot=[-5,22,0]  cubeOrigin=[-8,12,-2]  size=[4,12,4]
- *   partOffset = [-5-0, -(22-27), 0-4] = [-5, 5, -4]
- *   boxMin     = [-8-(-5), -(12-22)-12, -2-0] = [-3, -2, -2]
- *
- * left_arm: bedrockPivot=[5,22,0]  cubeOrigin=[4,12,-2]  size=[4,12,4]
- *   partOffset = [5-0, -(22-27), 0-4] = [5, 5, -4]
- *   boxMin     = [4-5, -(12-22)-12, -2-0] = [-1, -2, -2]
- *
- * UV from geometry (per-face box UVs, 64x64 skin):
- *   right_arm east=40,20  (standard vanilla right arm layout)
- *   left_arm  east=32,52  (standard vanilla left arm layout)
+ * right_leg: pivot=[-2,12,-8]  offset=[-2, 15, -12]  box origin=[-4,0,-10] size=[4,12,4]
+ *   boxMin = [-4-(-2), -(0-12)-12, -10-(-8)] = [-2, 0, -2]
+ * left_leg:  pivot=[2,12,-8]   offset=[2, 15, -12]   box origin=[0,0,-10]  size=[4,12,4]
+ *   boxMin = [0-2, -(0-12)-12, -10-(-8)] = [-2, 0, -2]
  */
 @OnlyIn(Dist.CLIENT)
 public final class FirstPersonHandModel extends Model {
 
     public final ModelPart rightArm;
     public final ModelPart leftArm;
+    public final ModelPart rightLeg;
+    public final ModelPart leftLeg;
 
     public FirstPersonHandModel(ModelPart root) {
         super(RenderType::entitySolid);
         this.rightArm = root.getChild("right_arm");
         this.leftArm  = root.getChild("left_arm");
+        this.rightLeg = root.getChild("right_leg");
+        this.leftLeg  = root.getChild("left_leg");
     }
 
     public static LayerDefinition createLayer() {
@@ -75,6 +67,18 @@ public final class FirstPersonHandModel extends Model {
                 .addBox(-1f, -2f, -2f, 4, 12, 4),
             PartPose.offset(5f, 5f, -4f));
 
+        root.addOrReplaceChild("right_leg",
+            CubeListBuilder.create()
+                .texOffs(0, 16)
+                .addBox(-9f, -11.07f, -2f, 4, 12, 4),
+            PartPose.offset(-2f, 15f, -12f));
+
+        root.addOrReplaceChild("left_leg",
+            CubeListBuilder.create()
+                .texOffs(16, 48)
+                .addBox(-2f, -0.07f, -2f, 4, 12, 4),
+            PartPose.offset(9f, 4f, -12f));
+
         return LayerDefinition.create(mesh, 64, 64);
     }
 
@@ -83,5 +87,7 @@ public final class FirstPersonHandModel extends Model {
                                int packedLight, int packedOverlay, int color) {
         rightArm.render(poseStack, buffer, packedLight, packedOverlay, color);
         leftArm.render(poseStack, buffer, packedLight, packedOverlay, color);
+        rightLeg.render(poseStack, buffer, packedLight, packedOverlay, color);
+        leftLeg.render(poseStack, buffer, packedLight, packedOverlay, color);
     }
 }

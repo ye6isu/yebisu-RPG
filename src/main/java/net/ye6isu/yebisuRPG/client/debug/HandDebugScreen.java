@@ -19,16 +19,15 @@ public class HandDebugScreen extends Screen {
 
     private static final float R_MIN = -180f, R_MAX = 180f;
     private static final float T_MIN = -3f,   T_MAX = 3f;
+    private static final float S_MIN = 0f,    S_MAX = 4f;
 
-    // Slider width + gap + text-field width = column width
     private static final int FIELD_W = 52;
     private static final int GAP     = 4;
 
-    // Keep references so we can sync slider↔field on reset
     private final List<SliderWithField> rows = new ArrayList<>();
 
     public HandDebugScreen() {
-        super(Component.literal("Hand Debug"));
+        super(Component.literal("Leg Debug"));
     }
 
     @Override public boolean isPauseScreen() { return false; }
@@ -41,62 +40,41 @@ public class HandDebugScreen extends Screen {
         HandDebugState.debugMode = true;
         rows.clear();
 
-        int colW  = width / 2 - 20;
+        int colW    = width / 2 - 20;
         int sliderW = colW - FIELD_W - GAP;
-        int col1  = 10, col2 = width / 2 + 10;
+        int col1    = 10, col2 = width / 2 + 10;
         int y = 30, step = 22;
 
-        // ── Translation rows ─────────────────────────────────────────────
-        rows.add(addRow(col1, y,        sliderW, "L TX", T_MIN, T_MAX, HandDebugState.leftTX,  v -> HandDebugState.leftTX  = v, () -> HandDebugState.leftTX));
-        rows.add(addRow(col1, y+step,   sliderW, "L TY", T_MIN, T_MAX, HandDebugState.leftTY,  v -> HandDebugState.leftTY  = v, () -> HandDebugState.leftTY));
-        rows.add(addRow(col1, y+step*2, sliderW, "L TZ", T_MIN, T_MAX, HandDebugState.leftTZ,  v -> HandDebugState.leftTZ  = v, () -> HandDebugState.leftTZ));
+        // ── Translation ──────────────────────────────────────────────────────
+        rows.add(addRow(col1, y,        sliderW, "L TX", T_MIN, T_MAX, HandDebugState.leftLegTX,  v -> HandDebugState.leftLegTX  = v, () -> HandDebugState.leftLegTX));
+        rows.add(addRow(col1, y+step,   sliderW, "L TY", T_MIN, T_MAX, HandDebugState.leftLegTY,  v -> HandDebugState.leftLegTY  = v, () -> HandDebugState.leftLegTY));
+        rows.add(addRow(col1, y+step*2, sliderW, "L TZ", T_MIN, T_MAX, HandDebugState.leftLegTZ,  v -> HandDebugState.leftLegTZ  = v, () -> HandDebugState.leftLegTZ));
 
-        rows.add(addRow(col2, y,        sliderW, "R TX", T_MIN, T_MAX, HandDebugState.rightTX, v -> HandDebugState.rightTX = v, () -> HandDebugState.rightTX));
-        rows.add(addRow(col2, y+step,   sliderW, "R TY", T_MIN, T_MAX, HandDebugState.rightTY, v -> HandDebugState.rightTY = v, () -> HandDebugState.rightTY));
-        rows.add(addRow(col2, y+step*2, sliderW, "R TZ", T_MIN, T_MAX, HandDebugState.rightTZ, v -> HandDebugState.rightTZ = v, () -> HandDebugState.rightTZ));
+        rows.add(addRow(col2, y,        sliderW, "R TX", T_MIN, T_MAX, HandDebugState.rightLegTX, v -> HandDebugState.rightLegTX = v, () -> HandDebugState.rightLegTX));
+        rows.add(addRow(col2, y+step,   sliderW, "R TY", T_MIN, T_MAX, HandDebugState.rightLegTY, v -> HandDebugState.rightLegTY = v, () -> HandDebugState.rightLegTY));
+        rows.add(addRow(col2, y+step*2, sliderW, "R TZ", T_MIN, T_MAX, HandDebugState.rightLegTZ, v -> HandDebugState.rightLegTZ = v, () -> HandDebugState.rightLegTZ));
 
-        // ── Rotation rows ────────────────────────────────────────────────
+        // ── Rotation ─────────────────────────────────────────────────────────
         int ry = y + step * 4;
 
-        rows.add(addRow(col1, ry,        sliderW, "L RX", R_MIN, R_MAX, HandDebugState.leftRX,  v -> HandDebugState.leftRX  = v, () -> HandDebugState.leftRX));
-        rows.add(addRow(col1, ry+step,   sliderW, "L RY", R_MIN, R_MAX, HandDebugState.leftRY,  v -> HandDebugState.leftRY  = v, () -> HandDebugState.leftRY));
-        rows.add(addRow(col1, ry+step*2, sliderW, "L RZ", R_MIN, R_MAX, HandDebugState.leftRZ,  v -> HandDebugState.leftRZ  = v, () -> HandDebugState.leftRZ));
+        rows.add(addRow(col1, ry,        sliderW, "L RX", R_MIN, R_MAX, HandDebugState.leftLegRX,  v -> HandDebugState.leftLegRX  = v, () -> HandDebugState.leftLegRX));
+        rows.add(addRow(col1, ry+step,   sliderW, "L RY", R_MIN, R_MAX, HandDebugState.leftLegRY,  v -> HandDebugState.leftLegRY  = v, () -> HandDebugState.leftLegRY));
+        rows.add(addRow(col1, ry+step*2, sliderW, "L RZ", R_MIN, R_MAX, HandDebugState.leftLegRZ,  v -> HandDebugState.leftLegRZ  = v, () -> HandDebugState.leftLegRZ));
 
-        rows.add(addRow(col2, ry,        sliderW, "R RX", R_MIN, R_MAX, HandDebugState.rightRX, v -> HandDebugState.rightRX = v, () -> HandDebugState.rightRX));
-        rows.add(addRow(col2, ry+step,   sliderW, "R RY", R_MIN, R_MAX, HandDebugState.rightRY, v -> HandDebugState.rightRY = v, () -> HandDebugState.rightRY));
-        rows.add(addRow(col2, ry+step*2, sliderW, "R RZ", R_MIN, R_MAX, HandDebugState.rightRZ, v -> HandDebugState.rightRZ = v, () -> HandDebugState.rightRZ));
+        rows.add(addRow(col2, ry,        sliderW, "R RX", R_MIN, R_MAX, HandDebugState.rightLegRX, v -> HandDebugState.rightLegRX = v, () -> HandDebugState.rightLegRX));
+        rows.add(addRow(col2, ry+step,   sliderW, "R RY", R_MIN, R_MAX, HandDebugState.rightLegRY, v -> HandDebugState.rightLegRY = v, () -> HandDebugState.rightLegRY));
+        rows.add(addRow(col2, ry+step*2, sliderW, "R RZ", R_MIN, R_MAX, HandDebugState.rightLegRZ, v -> HandDebugState.rightLegRZ = v, () -> HandDebugState.rightLegRZ));
 
-        // ── Item translation rows ────────────────────────────────────────────
-        int iy = ry + step * 4;
+        // ── Scale ─────────────────────────────────────────────────────────────
+        int sy = ry + step * 4;
 
-        rows.add(addRow(col1, iy,        sliderW, "L ITX", T_MIN, T_MAX, HandDebugState.leftITX,  v -> HandDebugState.leftITX  = v, () -> HandDebugState.leftITX));
-        rows.add(addRow(col1, iy+step,   sliderW, "L ITY", T_MIN, T_MAX, HandDebugState.leftITY,  v -> HandDebugState.leftITY  = v, () -> HandDebugState.leftITY));
-        rows.add(addRow(col1, iy+step*2, sliderW, "L ITZ", T_MIN, T_MAX, HandDebugState.leftITZ,  v -> HandDebugState.leftITZ  = v, () -> HandDebugState.leftITZ));
+        rows.add(addRow(col1, sy,        sliderW, "L SX", S_MIN, S_MAX, HandDebugState.leftLegSX,  v -> HandDebugState.leftLegSX  = v, () -> HandDebugState.leftLegSX));
+        rows.add(addRow(col1, sy+step,   sliderW, "L SY", S_MIN, S_MAX, HandDebugState.leftLegSY,  v -> HandDebugState.leftLegSY  = v, () -> HandDebugState.leftLegSY));
+        rows.add(addRow(col1, sy+step*2, sliderW, "L SZ", S_MIN, S_MAX, HandDebugState.leftLegSZ,  v -> HandDebugState.leftLegSZ  = v, () -> HandDebugState.leftLegSZ));
 
-        rows.add(addRow(col2, iy,        sliderW, "R ITX", T_MIN, T_MAX, HandDebugState.rightITX, v -> HandDebugState.rightITX = v, () -> HandDebugState.rightITX));
-        rows.add(addRow(col2, iy+step,   sliderW, "R ITY", T_MIN, T_MAX, HandDebugState.rightITY, v -> HandDebugState.rightITY = v, () -> HandDebugState.rightITY));
-        rows.add(addRow(col2, iy+step*2, sliderW, "R ITZ", T_MIN, T_MAX, HandDebugState.rightITZ, v -> HandDebugState.rightITZ = v, () -> HandDebugState.rightITZ));
-
-        // ── Item rotation rows ───────────────────────────────────────────────
-        int irY = iy + step * 4;
-
-        rows.add(addRow(col1, irY,        sliderW, "L IRX", R_MIN, R_MAX, HandDebugState.leftIRX,  v -> HandDebugState.leftIRX  = v, () -> HandDebugState.leftIRX));
-        rows.add(addRow(col1, irY+step,   sliderW, "L IRY", R_MIN, R_MAX, HandDebugState.leftIRY,  v -> HandDebugState.leftIRY  = v, () -> HandDebugState.leftIRY));
-        rows.add(addRow(col1, irY+step*2, sliderW, "L IRZ", R_MIN, R_MAX, HandDebugState.leftIRZ,  v -> HandDebugState.leftIRZ  = v, () -> HandDebugState.leftIRZ));
-
-        rows.add(addRow(col2, irY,        sliderW, "R IRX", R_MIN, R_MAX, HandDebugState.rightIRX, v -> HandDebugState.rightIRX = v, () -> HandDebugState.rightIRX));
-        rows.add(addRow(col2, irY+step,   sliderW, "R IRY", R_MIN, R_MAX, HandDebugState.rightIRY, v -> HandDebugState.rightIRY = v, () -> HandDebugState.rightIRY));
-        rows.add(addRow(col2, irY+step*2, sliderW, "R IRZ", R_MIN, R_MAX, HandDebugState.rightIRZ, v -> HandDebugState.rightIRZ = v, () -> HandDebugState.rightIRZ));
-
-        // ── Debug square (right hand) ────────────────────────────────────────
-        int sqY = 30;
-        int col3 = width * 3 / 4 - colW / 2;
-        rows.add(addRow(col3, sqY,        sliderW, "SQ TX", T_MIN, T_MAX, HandDebugState.squareTX, v -> HandDebugState.squareTX = v, () -> HandDebugState.squareTX));
-        rows.add(addRow(col3, sqY+step,   sliderW, "SQ TY", T_MIN, T_MAX, HandDebugState.squareTY, v -> HandDebugState.squareTY = v, () -> HandDebugState.squareTY));
-        rows.add(addRow(col3, sqY+step*2, sliderW, "SQ TZ", T_MIN, T_MAX, HandDebugState.squareTZ, v -> HandDebugState.squareTZ = v, () -> HandDebugState.squareTZ));
-        rows.add(addRow(col3, sqY+step*4, sliderW, "SQ RX", R_MIN, R_MAX, HandDebugState.squareRX, v -> HandDebugState.squareRX = v, () -> HandDebugState.squareRX));
-        rows.add(addRow(col3, sqY+step*5, sliderW, "SQ RY", R_MIN, R_MAX, HandDebugState.squareRY, v -> HandDebugState.squareRY = v, () -> HandDebugState.squareRY));
-        rows.add(addRow(col3, sqY+step*6, sliderW, "SQ RZ", R_MIN, R_MAX, HandDebugState.squareRZ, v -> HandDebugState.squareRZ = v, () -> HandDebugState.squareRZ));
+        rows.add(addRow(col2, sy,        sliderW, "R SX", S_MIN, S_MAX, HandDebugState.rightLegSX, v -> HandDebugState.rightLegSX = v, () -> HandDebugState.rightLegSX));
+        rows.add(addRow(col2, sy+step,   sliderW, "R SY", S_MIN, S_MAX, HandDebugState.rightLegSY, v -> HandDebugState.rightLegSY = v, () -> HandDebugState.rightLegSY));
+        rows.add(addRow(col2, sy+step*2, sliderW, "R SZ", S_MIN, S_MAX, HandDebugState.rightLegSZ, v -> HandDebugState.rightLegSZ = v, () -> HandDebugState.rightLegSZ));
 
         addRenderableWidget(Button.builder(Component.literal("Reset"), btn -> resetAll())
             .bounds(width / 2 - 40, height - 30, 80, 20).build());
@@ -124,7 +102,6 @@ public class HandDebugScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        // Sync fields from live state each frame (handles slider drags updating the field).
         for (SliderWithField row : rows) {
             float live = row.getter.get();
             String want = fmt(live);
@@ -136,51 +113,27 @@ public class HandDebugScreen extends Screen {
         super.render(g, mx, my, pt);
 
         int c1 = 10, c2 = width / 2 + 10;
-        g.drawString(font, "LEFT ARM",    c1, 16,           0xFF00AAFF);
-        g.drawString(font, "RIGHT ARM",   c2, 16,           0xFFFFAA00);
-        g.drawString(font, "ARM ROT",     c1, 16 + 22 * 3,  0xFFAAAAAA);
-        g.drawString(font, "ARM ROT",     c2, 16 + 22 * 3,  0xFFAAAAAA);
-        int c3 = width * 3 / 4 - (width / 2 - 20) / 2;
-        g.drawString(font, "SQ OFFSET",   c3, 16,           0xFFFF44FF);
-        g.drawString(font, "SQ ROTATION", c3, 16 + 22 * 3,  0xFFAAAAAA);
-        g.drawString(font, "LEFT ITEM",   c1, 16 + 22 * 7,  0xFF00FF88);
-        g.drawString(font, "RIGHT ITEM",  c2, 16 + 22 * 7,  0xFFFFCC44);
-        g.drawString(font, "ITEM ROT",    c1, 16 + 22 * 11, 0xFFAAAAAA);
-        g.drawString(font, "ITEM ROT",    c2, 16 + 22 * 11, 0xFFAAAAAA);
+        g.drawString(font, "LEFT LEG",  c1, 16,           0xFF00AAFF);
+        g.drawString(font, "RIGHT LEG", c2, 16,           0xFFFFAA00);
+        g.drawString(font, "LEG ROT",   c1, 16 + 22 * 3,  0xFFAAAAAA);
+        g.drawString(font, "LEG ROT",   c2, 16 + 22 * 3,  0xFFAAAAAA);
+        g.drawString(font, "LEG SCALE", c1, 16 + 22 * 7,  0xFF88FF88);
+        g.drawString(font, "LEG SCALE", c2, 16 + 22 * 7,  0xFF88FF88);
 
-        // ── Live readout ─────────────────────────────────────────────────
-        int by = height - 64;
-        g.drawString(font, "--- Absolute (BASE + delta) ---", 10, by, 0xFF888888);
+        int by = height - 42;
+        g.drawString(font,
+            String.format("Left  T: X=%.3f  Y=%.3f  Z=%.3f  R: X=%.2f  Y=%.2f  Z=%.2f  S: X=%.2f  Y=%.2f  Z=%.2f",
+                HandDebugState.leftLegTX, HandDebugState.leftLegTY, HandDebugState.leftLegTZ,
+                HandDebugState.leftLegRX, HandDebugState.leftLegRY, HandDebugState.leftLegRZ,
+                HandDebugState.leftLegSX, HandDebugState.leftLegSY, HandDebugState.leftLegSZ),
+            10, by, 0xFF00AAFF);
 
         g.drawString(font,
-            String.format("Left  T: X=%.3f  Y=%.3f  Z=%.3f  |  R: X=%.2f  Y=%.2f  Z=%.2f",
-                HandDebugState.BASE_LEFT_TX  + HandDebugState.leftTX,
-                HandDebugState.BASE_LEFT_TY  + HandDebugState.leftTY,
-                HandDebugState.BASE_LEFT_TZ  + HandDebugState.leftTZ,
-                HandDebugState.BASE_LEFT_RX  + HandDebugState.leftRX,
-                HandDebugState.leftRY, HandDebugState.leftRZ),
-            10, by + 14, 0xFF00AAFF);
-
-        g.drawString(font,
-            String.format("Right T: X=%.3f  Y=%.3f  Z=%.3f  |  R: X=%.2f  Y=%.2f  Z=%.2f",
-                HandDebugState.BASE_RIGHT_TX + HandDebugState.rightTX,
-                HandDebugState.BASE_RIGHT_TY + HandDebugState.rightTY,
-                HandDebugState.BASE_RIGHT_TZ + HandDebugState.rightTZ,
-                HandDebugState.BASE_RIGHT_RX + HandDebugState.rightRX,
-                HandDebugState.rightRY, HandDebugState.rightRZ),
-            10, by + 28, 0xFFFFAA00);
-
-        g.drawString(font,
-            String.format("Left  delta: dTX=%.3f  dTY=%.3f  dTZ=%.3f  dRX=%.2f  dRY=%.2f  dRZ=%.2f",
-                HandDebugState.leftTX,  HandDebugState.leftTY,  HandDebugState.leftTZ,
-                HandDebugState.leftRX,  HandDebugState.leftRY,  HandDebugState.leftRZ),
-            10, by + 44, 0xFF6688AA);
-
-        g.drawString(font,
-            String.format("Right delta: dTX=%.3f  dTY=%.3f  dTZ=%.3f  dRX=%.2f  dRY=%.2f  dRZ=%.2f",
-                HandDebugState.rightTX, HandDebugState.rightTY, HandDebugState.rightTZ,
-                HandDebugState.rightRX, HandDebugState.rightRY, HandDebugState.rightRZ),
-            10, by + 56, 0xFFAA8833);
+            String.format("Right T: X=%.3f  Y=%.3f  Z=%.3f  R: X=%.2f  Y=%.2f  Z=%.2f  S: X=%.2f  Y=%.2f  Z=%.2f",
+                HandDebugState.rightLegTX, HandDebugState.rightLegTY, HandDebugState.rightLegTZ,
+                HandDebugState.rightLegRX, HandDebugState.rightLegRY, HandDebugState.rightLegRZ,
+                HandDebugState.rightLegSX, HandDebugState.rightLegSY, HandDebugState.rightLegSZ),
+            10, by + 14, 0xFFFFAA00);
     }
 
     @Override
@@ -190,16 +143,12 @@ public class HandDebugScreen extends Screen {
     }
 
     private void resetAll() {
-        HandDebugState.rightTX = HandDebugState.rightTY = HandDebugState.rightTZ = 0f;
-        HandDebugState.leftTX  = HandDebugState.leftTY  = HandDebugState.leftTZ  = 0f;
-        HandDebugState.rightRX = HandDebugState.rightRY = HandDebugState.rightRZ = 0f;
-        HandDebugState.leftRX  = HandDebugState.leftRY  = HandDebugState.leftRZ  = 0f;
-        HandDebugState.squareTX = HandDebugState.squareTY = HandDebugState.squareTZ = 0f;
-        HandDebugState.squareRX = HandDebugState.squareRY = HandDebugState.squareRZ = 0f;
-        HandDebugState.rightITX = HandDebugState.rightITY = HandDebugState.rightITZ = 0f;
-        HandDebugState.leftITX  = HandDebugState.leftITY  = HandDebugState.leftITZ  = 0f;
-        HandDebugState.rightIRX = HandDebugState.rightIRY = HandDebugState.rightIRZ = 0f;
-        HandDebugState.leftIRX  = HandDebugState.leftIRY  = HandDebugState.leftIRZ  = 0f;
+        HandDebugState.rightLegTX = HandDebugState.rightLegTY = HandDebugState.rightLegTZ = 0f;
+        HandDebugState.leftLegTX  = HandDebugState.leftLegTY  = HandDebugState.leftLegTZ  = 0f;
+        HandDebugState.rightLegRX = HandDebugState.rightLegRY = HandDebugState.rightLegRZ = 0f;
+        HandDebugState.leftLegRX  = HandDebugState.leftLegRY  = HandDebugState.leftLegRZ  = 0f;
+        HandDebugState.rightLegSX = HandDebugState.rightLegSY = HandDebugState.rightLegSZ = 1f;
+        HandDebugState.leftLegSX  = HandDebugState.leftLegSY  = HandDebugState.leftLegSZ  = 1f;
         clearWidgets();
         init();
     }
@@ -207,8 +156,6 @@ public class HandDebugScreen extends Screen {
     private static String fmt(float v) {
         return String.format("%.3f", v);
     }
-
-    // ── Slider that can be set programmatically from the text field ───────
 
     private static class LabeledSlider extends AbstractSliderButton {
         private final String label;
