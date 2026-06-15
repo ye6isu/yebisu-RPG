@@ -54,6 +54,15 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         AnimationBlender  blender  = engine.getBlender(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
         if (playhead == null && blender == null) return;
 
+        // Only cancel if the animation file actually loaded (same guard as bone apply).
+        if (playhead != null) {
+            net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim =
+                playhead.filePath() != null
+                    ? net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId(), playhead.filePath())
+                    : net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId());
+            if (anim == null && blender == null) return;
+        }
+
         // Vanilla sneaking translates Y by -0.125 (in entity/block space, before scale).
         // We push back up by +0.125 to restore the standing Y origin.
         poseStack.translate(0.0, 0.125, 0.0);

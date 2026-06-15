@@ -46,6 +46,7 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
     protected MixinPlayerModel(ModelPart root) { super(root); }
 
 
+
     /**
      * Fired at the very start of setupAnim, before HumanoidModel writes anything.
      * When a third-person animation is active we zero the fields that drive vanilla
@@ -171,6 +172,9 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         applyBone(this.leftArm,  lArm,  timeSecs, weight);
         applyBone(this.rightLeg, rLeg,  timeSecs, weight);
         applyBone(this.leftLeg,  lLeg,  timeSecs, weight);
+
+        // Sync overlay parts — vanilla's copyFrom calls ran before our bones were set.
+        this.hat.copyFrom(this.head);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
