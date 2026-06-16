@@ -32,11 +32,60 @@ const TIERS=["Wood","Stone","Iron","Diamond","Netherite","YE6ISU"];
 const TIER_MAP={Wood:"Tiers.WOOD",Stone:"Tiers.STONE",Iron:"Tiers.IRON",Diamond:"Tiers.DIAMOND",Netherite:"Tiers.NETHERITE",YE6ISU:"ModToolTiers.YE6ISU"};
 const TOOL_TYPES=["Sword","Pickaxe","Axe","Shovel","Hoe"];
 const SOUND_TYPES=["STONE","WOOD","METAL","GRASS","SAND","GRAVEL","GLASS","CLOTH","SNOW","LANTERN","CHAIN","COPPER","DEEPSLATE","TUFF","CALCITE"];
-const CREATIVE_TABS=[{value:"",label:"(none)"},{value:"ModCreativeModeTabs.YEBISURPG_ITEMS_TAB",label:"yebisu RPG Items"},{value:"ModCreativeModeTabs.YEBISURPG_BLOCK_TAB",label:"yebisu RPG Blocks"},{value:"vanilla:combat",label:"Combat"},{value:"vanilla:tools_and_utilities",label:"Tools & Utilities"},{value:"vanilla:food_and_drinks",label:"Food & Drinks"},{value:"vanilla:ingredients",label:"Ingredients"},{value:"vanilla:building_blocks",label:"Building Blocks"},{value:"vanilla:redstone",label:"Redstone"},{value:"vanilla:natural_blocks",label:"Natural Blocks"}];
-const COMMON_TAGS=["minecraft:axes","minecraft:hoes","minecraft:pickaxes","minecraft:shovels","minecraft:swords","minecraft:tools","minecraft:logs","minecraft:planks","minecraft:slabs","minecraft:stairs","minecraft:fences","minecraft:doors","minecraft:trapdoors","minecraft:walls","minecraft:buttons","minecraft:pressure_plates","minecraft:flowers","minecraft:saplings","minecraft:coals","minecraft:diamonds","neoforge:foods","neoforge:tools","neoforge:gems","neoforge:ingots","neoforge:nuggets","neoforge:ores","neoforge:storage_blocks","minecraft:mineable/pickaxe","minecraft:mineable/axe","minecraft:mineable/shovel","minecraft:mineable/hoe","minecraft:needs_stone_tool","minecraft:needs_iron_tool","minecraft:needs_diamond_tool"];
-const VANILLA_INGR=["minecraft:air","minecraft:iron_ingot","minecraft:gold_ingot","minecraft:diamond","minecraft:emerald","minecraft:netherite_ingot","minecraft:oak_planks","minecraft:birch_planks","minecraft:stick","minecraft:cobblestone","minecraft:stone","minecraft:obsidian","minecraft:iron_block","minecraft:gold_block","minecraft:diamond_block","minecraft:coal","minecraft:charcoal","minecraft:flint","minecraft:leather","minecraft:string","minecraft:feather","minecraft:bone","minecraft:blaze_rod","minecraft:ender_pearl","minecraft:glass","minecraft:sand","minecraft:gravel","minecraft:redstone","minecraft:lapis_lazuli","minecraft:quartz","minecraft:copper_ingot","minecraft:amethyst_shard","minecraft:oak_log"];
+const BUILTIN_CREATIVE_TABS=[{value:"",label:"(none)",vanilla:false},{value:"ModCreativeModeTabs.YEBISURPG_ITEMS_TAB",label:"yebisu RPG Items",vanilla:false},{value:"ModCreativeModeTabs.YEBISURPG_BLOCK_TAB",label:"yebisu RPG Blocks",vanilla:false},{value:"vanilla:combat",label:"Combat",vanilla:true},{value:"vanilla:tools_and_utilities",label:"Tools & Utilities",vanilla:true},{value:"vanilla:food_and_drinks",label:"Food & Drinks",vanilla:true},{value:"vanilla:ingredients",label:"Ingredients",vanilla:true},{value:"vanilla:building_blocks",label:"Building Blocks",vanilla:true},{value:"vanilla:redstone",label:"Redstone",vanilla:true},{value:"vanilla:natural_blocks",label:"Natural Blocks",vanilla:true}];
+// Custom tabs (added via the Tabs editor) are merged in at runtime — see useCreativeTabs().
+function useVanillaItems(){
+  const[vanillaItems,setVanillaItems]=useState([]);
+  useEffect(()=>{fetch(`${BASE}/items/vanilla`).then(r=>r.json()).then(j=>{if(j.ok)setVanillaItems(j.items||[]);}).catch(()=>{});},[]);
+  return vanillaItems;
+}
+function useCreativeTabs(){
+  const[customTabs,setCustomTabs]=useState([]);
+  const reload=useCallback(()=>{fetch(`${BASE}/creativetabs/list`).then(r=>r.json()).then(j=>{if(j.ok)setCustomTabs(j.tabs||[]);}).catch(()=>{});},[]);
+  useEffect(()=>{reload();},[reload]);
+  const options=useMemo(()=>[...BUILTIN_CREATIVE_TABS,...customTabs.map(t=>({value:`ModCreativeModeTabs.${t.key.toUpperCase()}`,label:t.titleText||t.key,vanilla:false,custom:true,key:t.key}))],[customTabs]);
+  return{customTabs,options,reload};
+}
+const COMMON_TAGS=[
+  // Vanilla tool/equipment groups
+  "minecraft:axes","minecraft:hoes","minecraft:pickaxes","minecraft:shovels","minecraft:swords","minecraft:tools",
+  "minecraft:trim_templates","minecraft:trim_materials","minecraft:foot_armor","minecraft:leg_armor","minecraft:chest_armor","minecraft:head_armor","minecraft:armor_enchantable",
+  // Vanilla wood/building block groups
+  "minecraft:logs","minecraft:logs_that_burn","minecraft:planks","minecraft:slabs","minecraft:stairs","minecraft:fences","minecraft:fence_gates","minecraft:doors","minecraft:trapdoors","minecraft:walls","minecraft:buttons","minecraft:pressure_plates","minecraft:wooden_buttons","minecraft:wooden_pressure_plates","minecraft:wooden_doors","minecraft:wooden_trapdoors","minecraft:wooden_fences","minecraft:wooden_stairs","minecraft:wooden_slabs","minecraft:saplings","minecraft:leaves","minecraft:wool","minecraft:wool_carpets","minecraft:beds","minecraft:banners","minecraft:candles","minecraft:rails","minecraft:boats","minecraft:chest_boats",
+  // Vanilla nature/flora/food groups
+  "minecraft:flowers","minecraft:small_flowers","minecraft:tall_flowers","minecraft:crops","minecraft:saplings","minecraft:dirt","minecraft:sand","minecraft:stone_bricks","minecraft:terracotta","minecraft:climbable","minecraft:fishes","minecraft:bee_food","minecraft:flower_pots",
+  // Vanilla mineral/ore groups
+  "minecraft:coals","minecraft:diamonds","minecraft:emeralds","minecraft:gold_ores","minecraft:iron_ores","minecraft:diamond_ores","minecraft:emerald_ores","minecraft:lapis_ores","minecraft:redstone_ores","minecraft:copper_ores","minecraft:coal_ores",
+  // Vanilla mining-requirement groups
+  "minecraft:mineable/pickaxe","minecraft:mineable/axe","minecraft:mineable/shovel","minecraft:mineable/hoe","minecraft:needs_wooden_tool","minecraft:needs_stone_tool","minecraft:needs_iron_tool","minecraft:needs_diamond_tool","minecraft:needs_netherite_tool",
+  // Vanilla enchantability/durability groups
+  "minecraft:durability_enchantable","minecraft:enchantable/sword","minecraft:enchantable/bow","minecraft:enchantable/armor","minecraft:enchantable/mining","minecraft:enchantable/mining_loot","minecraft:enchantable/fishing_trident_durability","minecraft:enchantable/fire_aspect",
+  // NeoForge common groups (neoforge: namespace)
+  "neoforge:foods","neoforge:tools","neoforge:tools/swords","neoforge:tools/pickaxes","neoforge:tools/axes","neoforge:tools/shovels","neoforge:tools/hoes","neoforge:tools/shears","neoforge:tools/bows","neoforge:tools/crossbows","neoforge:tools/fishing_rods","neoforge:tools/shields","neoforge:tools/tridents",
+  "neoforge:armors","neoforge:armors/helmets","neoforge:armors/chestplates","neoforge:armors/leggings","neoforge:armors/boots",
+  "neoforge:gems","neoforge:gems/diamond","neoforge:gems/emerald","neoforge:gems/amethyst","neoforge:gems/quartz","neoforge:gems/prismarine",
+  "neoforge:ingots","neoforge:ingots/iron","neoforge:ingots/gold","neoforge:ingots/copper","neoforge:ingots/netherite",
+  "neoforge:nuggets","neoforge:nuggets/iron","neoforge:nuggets/gold",
+  "neoforge:ores","neoforge:ores/iron","neoforge:ores/gold","neoforge:ores/copper","neoforge:ores/diamond","neoforge:ores/emerald","neoforge:ores/lapis","neoforge:ores/redstone","neoforge:ores/coal",
+  "neoforge:raw_materials","neoforge:raw_materials/iron","neoforge:raw_materials/gold","neoforge:raw_materials/copper",
+  "neoforge:storage_blocks","neoforge:storage_blocks/iron","neoforge:storage_blocks/gold","neoforge:storage_blocks/copper","neoforge:storage_blocks/diamond","neoforge:storage_blocks/emerald","neoforge:storage_blocks/lapis","neoforge:storage_blocks/redstone","neoforge:storage_blocks/coal","neoforge:storage_blocks/raw_iron","neoforge:storage_blocks/raw_gold","neoforge:storage_blocks/raw_copper",
+  "neoforge:rods/wooden","neoforge:dusts","neoforge:dusts/redstone","neoforge:dusts/glowstone","neoforge:dyes","neoforge:string","neoforge:glass_blocks","neoforge:glass_panes","neoforge:fences","neoforge:fence_gates","neoforge:concretes","neoforge:enchanting_fuels","neoforge:furnace_fuels","neoforge:salads","neoforge:pies","neoforge:stripped_logs","neoforge:stripped_wood","neoforge:barrels","neoforge:bookshelves","neoforge:chests","neoforge:cobblestones","neoforge:crops","neoforge:crops/wheat","neoforge:crops/carrot","neoforge:crops/potato","neoforge:crops/beetroot","neoforge:crops/nether_wart","neoforge:villager_plantable_seeds",
+];
 const VANILLA_EFFECTS=["MobEffects.MOVEMENT_SPEED","MobEffects.MOVEMENT_SLOWDOWN","MobEffects.DIG_SPEED","MobEffects.DIG_SLOWDOWN","MobEffects.DAMAGE_BOOST","MobEffects.HEAL","MobEffects.HARM","MobEffects.DAMAGE_RESISTANCE","MobEffects.JUMP","MobEffects.CONFUSION","MobEffects.REGENERATION","MobEffects.FIRE_RESISTANCE","MobEffects.WATER_BREATHING","MobEffects.INVISIBILITY","MobEffects.BLINDNESS","MobEffects.NIGHT_VISION","MobEffects.HUNGER","MobEffects.WEAKNESS","MobEffects.POISON","MobEffects.WITHER","MobEffects.HEALTH_BOOST","MobEffects.ABSORPTION","MobEffects.SATURATION","MobEffects.GLOWING","MobEffects.LEVITATION","MobEffects.LUCK","MobEffects.UNLUCK","MobEffects.SLOW_FALLING","MobEffects.CONDUIT_POWER","MobEffects.DOLPHINS_GRACE","MobEffects.BAD_OMEN","MobEffects.HERO_OF_THE_VILLAGE","MobEffects.DARKNESS","MobEffects.TRIAL_OMEN","MobEffects.RAID_OMEN","MobEffects.WIND_CHARGED","MobEffects.WEAVING","MobEffects.OOZING","MobEffects.INFESTED"];
-const TAG_GROUPS=[{label:"Any Wood Planks",tag:"minecraft:planks"},{label:"Any Wood Log",tag:"minecraft:logs"},{label:"Any Stone",tag:"minecraft:stone_crafting_materials"},{label:"Any Iron Ingot",tag:"neoforge:ingots/iron"},{label:"Any Gold Ingot",tag:"neoforge:ingots/gold"},{label:"Any Copper Ingot",tag:"neoforge:ingots/copper"},{label:"Any Diamond",tag:"neoforge:gems/diamond"},{label:"Any Emerald",tag:"neoforge:gems/emerald"},{label:"Any Coal",tag:"minecraft:coals"},{label:"Any Wool",tag:"minecraft:wool"},{label:"Any Glass",tag:"neoforge:glass_blocks"},{label:"Any Stick",tag:"neoforge:rods/wooden"}];
+// Custom human labels for tags whose auto-derived label (see tagLabel()) reads
+// awkwardly. Any tag not listed here falls back to the auto-derived label, so
+// COMMON_TAGS doesn't need a matching entry here to show up in pickers.
+const TAG_LABEL_OVERRIDES={
+  "minecraft:planks":"Any Wood Planks","minecraft:logs":"Any Wood Log","minecraft:coals":"Any Coal","minecraft:wool":"Any Wool",
+  "neoforge:ingots/iron":"Any Iron Ingot","neoforge:ingots/gold":"Any Gold Ingot","neoforge:ingots/copper":"Any Copper Ingot",
+  "neoforge:gems/diamond":"Any Diamond","neoforge:gems/emerald":"Any Emerald","neoforge:glass_blocks":"Any Glass","neoforge:rods/wooden":"Any Stick",
+};
+function tagLabel(tag){
+  if(TAG_LABEL_OVERRIDES[tag])return TAG_LABEL_OVERRIDES[tag];
+  const path=tag.split(":")[1]||tag;
+  return"Any "+path.split("/").pop().split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" ");
+}
+const TAG_GROUPS=COMMON_TAGS.map(tag=>({tag,label:tagLabel(tag)}));
 const C={bg:"#161616",panel:"#141414",pb:"#3a3a3c",tabBar:"#212121",card:"#1e1e1e",prev:"#0e0e0e",text:"#f0f0ec",dim:"#787872",faint:"#343430",accent:"#5a9fd4",inp:"#181818",inpB:"#252528",r:6.5};
 const SI={lbl:{fontSize:11,color:C.dim,textTransform:"uppercase",letterSpacing:.8,fontWeight:400},inp:{background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"7px 10px",color:C.text,fontSize:13,fontFamily:"'JetBrains Mono',monospace",outline:"none",width:"100%"}};
 const FormCtx=createContext(null);
@@ -47,7 +96,7 @@ async function api(ep,body){try{const r=await fetch(`${BASE}${ep}`,{method:"POST
 const Lbl=({children,c})=><span style={{...SI.lbl,color:c||C.dim}}>{children}</span>;
 function Btn({children,onClick,v="d",sm,dis,style:extStyle={}}){const vs={d:{bg:"#222226",c:C.text},p:{bg:C.accent,c:"#06080e"},dan:{bg:"#200e0e",c:"#ff7777"},g:{bg:"transparent",c:C.dim,b:`1px solid ${C.inpB}`}};const vv=vs[v]||vs.d;return<button disabled={dis} onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:5,padding:sm?"3px 10px":"7px 16px",fontSize:sm?11:13,border:vv.b||"none",borderRadius:4,cursor:dis?"not-allowed":"pointer",fontFamily:"'JetBrains Mono',monospace",fontWeight:500,opacity:dis?0.35:1,background:vv.bg,color:vv.c,whiteSpace:"nowrap",...extStyle}}>{children}</button>;}
 function Inp({label,value,onChange,placeholder,type="text",style={}}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<input type={type} value={value??""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{...SI.inp,...style}}/></div>;}
-function Sel({label,value,onChange,options}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<div style={{position:"relative"}}><select value={value} onChange={e=>onChange(e.target.value)} style={{...SI.inp,paddingRight:28,cursor:"pointer"}}>{options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select><span style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:C.dim,fontSize:10}}>▾</span></div></div>;}
+function Sel({label,value,onChange,options,disabled=false}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<div style={{position:"relative"}}><select value={value} onChange={e=>onChange(e.target.value)} disabled={disabled} style={{...SI.inp,paddingRight:28,cursor:disabled?"default":"pointer",opacity:disabled?0.5:1}}>{options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select><span style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:C.dim,fontSize:10}}>▾</span></div></div>;}
 function Chk({label,checked,onChange}){return<label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><div onClick={()=>onChange(!checked)} style={{width:14,height:14,border:`1px solid ${checked?C.accent:C.inpB}`,borderRadius:3,background:checked?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{checked&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}</div><span style={{fontSize:13,color:"#b0b0aa"}}>{label}</span></label>;}
 function Txta({label,value,onChange,placeholder,rows=3}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<textarea value={value??""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...SI.inp,resize:"vertical"}}/></div>;}
 function Sect({title,children,open:init=true,accent}){const[o,setO]=useState(init);return<div style={{border:`1px solid ${C.inpB}`,borderRadius:C.r,overflow:"hidden"}}><div onClick={()=>setO(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#191919",cursor:"pointer"}}><span style={{fontSize:12,color:accent||C.accent,fontWeight:500}}>{title}</span><span style={{color:C.faint,fontSize:10}}>{o?"▲":"▼"}</span></div>{o&&<div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:9,background:"#141414"}}>{children}</div>}</div>;}
@@ -497,7 +546,62 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
     if (node.opcode === "entity.look_client_y") return `(${ent}.getViewVector(1.0F).y)`;
     if (node.opcode === "entity.look_client_z") return `(${ent}.getViewVector(1.0F).z)`;
   }
+  if (node.opcode === "variable.get") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    return varGetExpr(node.fields?.varName, node.fields?.varType, node.fields?.varDefault, ent);
+  }
   return null;
+}
+// ─── Variable Get/Set block helpers ─────────────────────────────────────────
+// EntityVar getters/setters are scoped per-entity (EntityVarCapability.get(entity)),
+// matching net.ye6isu.yebisuRPG.data.EntityVarMap's per-entity storage. Each
+// generated call defines the variable first (idempotent — vars.define is a no-op
+// if already defined) so the var is guaranteed present regardless of where the
+// Get/Set block ends up being used.
+function varTypeToLink(type) {
+  if (type === "bool") return LINK_LOGIC;
+  if (type === "string") return LINK_TEXT;
+  return LINK_NUMBER; // int | float
+}
+function varGetterMethod(type) {
+  if (type === "bool") return "getBool";
+  if (type === "string") return "getString";
+  if (type === "float") return "getFloat";
+  return "getInt";
+}
+function varSetterMethod(type) {
+  if (type === "bool") return "setBool";
+  if (type === "string") return "setString";
+  if (type === "float") return "setFloat";
+  return "setInt";
+}
+function varDefaultLiteral(type, def) {
+  if (type === "bool") return def ? "true" : "false";
+  if (type === "string") return `"${(def ?? "").toString().replace(/"/g, '\\"')}"`;
+  if (type === "float") return `${parseFloat(def) || 0}f`;
+  return `${parseInt(def) || 0}`;
+}
+function varOfFactory(type) {
+  if (type === "bool") return "ofBool";
+  if (type === "string") return "ofString";
+  if (type === "float") return "ofFloat";
+  return "ofInt";
+}
+function varsExpr(ent) {
+  return `net.ye6isu.yebisuRPG.data.EntityVarCapability.get(${ent})`;
+}
+// vars.define(...) returns `this`, so define+get/set chain into a single expression —
+// no separate statement needs to be emitted before the get/set call.
+function varDefinedExpr(varName, type, def, ent) {
+  return `${varsExpr(ent)}.define("${varName}", net.ye6isu.yebisuRPG.data.EntityVar.${varOfFactory(type)}(${varDefaultLiteral(type, def)}))`;
+}
+function varGetExpr(varName, type, def, ent) {
+  type = type || "int";
+  return `(${varDefinedExpr(varName, type, def, ent)}.${varGetterMethod(type)}("${varName}"))`;
+}
+function varSetStmt(varName, type, def, ent, valueExpr) {
+  type = type || "int";
+  return `${varDefinedExpr(varName, type, def, ent)}.${varSetterMethod(type)}("${varName}", ${valueExpr});`;
 }
 function getChain(startNextId, nodes) {
   const chain = [], seen = new Set();
@@ -641,6 +745,12 @@ function compileActionNode(node, nodes, methodKey) {
       "}",
     ];
   }
+  if (node.opcode === "variable.set") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const type = node.fields?.varType || "int";
+    const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? varDefaultLiteral(type, node.fields?.varDefault);
+    return [varSetStmt(node.fields?.varName, type, node.fields?.varDefault, ent, valueExpr)];
+  }
   return ["// unknown: " + node.opcode];
 }
 const PALETTE_BLOCKS = [
@@ -727,6 +837,30 @@ const PALETTE_BLOCKS = [
       ] },
   ]},
 ];
+// ─── Dynamic "Variables" palette category ───────────────────────────────────
+// One Get + one Set block per declared EntityVar (see VariablesPage), so the
+// canvas palette always reflects whatever's in ycs_variables.json. Item-type
+// variables are declaration-only for now — there's no item-stack link type for
+// them to plug into other blocks yet, so they're excluded here.
+function buildPaletteWithVariables(variables) {
+  const usable = (variables || []).filter(v => v.type !== "item");
+  if (!usable.length) return PALETTE_BLOCKS;
+  const varBlocks = usable.flatMap(v => {
+    const link = varTypeToLink(v.type);
+    const label = v.titleText || v.name;
+    return [
+      { opcode:"variable.get", label:`Get ${label}`, linkType:link,
+        hint:`Get ${v.type} variable "${v.name}" for [Entity Link]`,
+        varName:v.name, varType:v.type, varDefault:v.default,
+        slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+      { opcode:"variable.set", label:`Set ${label}`, isAction:true,
+        hint:`Set ${v.type} variable "${v.name}" to [${link} Link] for [Entity Link]`,
+        varName:v.name, varType:v.type, varDefault:v.default,
+        slotDefs:[{key:"value", accepts:link, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+    ];
+  });
+  return [...PALETTE_BLOCKS, { category:"Variables", blocks:varBlocks }];
+}
 
 // ─── Visual Scripting: Code Engine ────────────────────────────────────────────
 function ycsInjectMethod(code, methodKey) {
@@ -900,6 +1034,623 @@ function ItemProv({initial,formOverride,onFormChange,children}){const[form,setFo
 function BlockProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...BLOCK_DEF,...initial}:BLOCK_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 function TexProv({initial,children}){const[form,setForm]=useState(initial?{...TEX_DEF,...initial}:TEX_DEF);const F=useCallback((k,v)=>setForm(f=>({...f,[k]:v})),[]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 
+// ─── Creative Tabs management page ──────────────────────────────────────────
+// Built-in tabs (the two hand-written ones + vanilla) are listed read-only —
+// no edit button — per requirement that only mod-added tabs are manageable.
+// Custom tabs support add/edit/delete (full rewrite via /creativetabs/save)
+// and drag-and-drop reordering of the mod items/blocks assigned to them
+// (persisted via /creativetabs/reorder-items into ycs_tabs.json).
+function tabIconPreview(tab,allItems,allBlocks,textures){
+  if(!tab.iconRef)return null;
+  const[kind,id]=tab.iconRef.split(":");
+  if(kind==="vanilla")return null; // no local texture data available for vanilla items
+  const pool=kind==="block"?allBlocks:allItems;
+  const e=pool.find(x=>x.id===id);
+  if(!e)return null;
+  const t=textures.find(tx=>tx.id===e.textureId);
+  return t?.dataUrl||e.textureDataUrl||null;
+}
+function IconPicker({label,value,onChange,allItems,allBlocks,textures}){
+  const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
+  const vanillaItems=useVanillaItems();
+  const pool=useMemo(()=>[...allItems.map(x=>({...x,kind:"item"})),...allBlocks.map(x=>({...x,kind:"block"})),...vanillaItems.map(x=>({...x,kind:"vanilla"}))],[allItems,allBlocks,vanillaItems]);
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return pool.filter(x=>!q||x.id.includes(q)||(x.displayName||"").toLowerCase().includes(q));},[pool,srch]);
+  const sel=pool.find(x=>`${x.kind}:${x.id}`===value);
+  const prevUrl=sel?(textures.find(tx=>tx.id===sel.textureId)?.dataUrl||sel.textureDataUrl):null;
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    {label&&<Lbl>{label}</Lbl>}
+    <div style={{position:"relative"}}>
+      <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"6px 9px"}}>
+        <AImg url={prevUrl} size={22}/>
+        <span style={{flex:1,color:sel?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?(sel.displayName||sel.id):"(choose icon)"}</span>
+        <span style={{color:C.dim}}>▾</span>
+      </div>
+      {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:260,display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+        <div style={{overflowY:"auto",flex:1}}>
+          {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;return<div key={`${x.kind}:${x.id}`} onClick={()=>{onChange(`${x.kind}:${x.id}`);setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value===`${x.kind}:${x.id}`?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
+            <AImg url={u} size={20}/>
+            <div><div style={{fontSize:12,color:C.text}}>{x.displayName||x.id}</div><div style={{fontSize:10,color:C.dim}}>{x.kind}:{x.id}</div></div>
+          </div>;})}
+          {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
+        </div>
+      </div>}
+    </div>
+  </div>;
+}
+function TabEditor({tab,allItems,allBlocks,textures,onSave,onCancel,onDelete}){
+  const[name,setName]=useState(tab?.titleText||"");
+  const[iconRef,setIconRef]=useState(tab?.iconRef||"");
+  const[key,setKey]=useState(tab?.key||"");
+  const isNew=!tab;
+  const keyErr=isNew?(key&&!/^[a-z][a-z0-9_]*$/.test(key)?"a-z 0-9 _ only, must start with a letter":null):null;
+  return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <div style={{fontSize:13,color:C.accent,fontWeight:600}}>{isNew?"New Creative Tab":"Edit Creative Tab"}</div>
+    {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Tab key (internal id)</Lbl>
+      <input value={key} onChange={e=>setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${key&&keyErr?"#6a2a2a":C.inpB}`}}/>
+      {key&&keyErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{keyErr}</span>}
+    </div>}
+    <Inp label="Display name" value={name} onChange={setName}/>
+    <IconPicker label="Icon" value={iconRef} onChange={setIconRef} allItems={allItems} allBlocks={allBlocks} textures={textures}/>
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <Btn v="p" dis={!name.trim()||(isNew&&(!key.trim()||!!keyErr))} onClick={()=>onSave({key:isNew?key:tab.key,titleText:name.trim(),iconRef})}>Save</Btn>
+      <Btn v="g" onClick={onCancel}>Cancel</Btn>
+      {!isNew&&<Btn v="dan" onClick={()=>onDelete(tab.key)} style={{marginLeft:"auto"}}>Delete tab</Btn>}
+    </div>
+  </div>;
+}
+function TabItemReorder({tabValue,allItems,allBlocks,textures,onReordered}){
+  const entryKey=x=>x.kind==="block"?`block:${x.id}`:x.id;
+  const assigned=useMemo(()=>[...allItems.map(x=>({...x,kind:"item"})),...allBlocks.map(x=>({...x,kind:"block"}))].filter(x=>x.creativeTab===tabValue),[allItems,allBlocks,tabValue]);
+  const[order,setOrder]=useState(assigned.map(entryKey));
+  useEffect(()=>{setOrder(assigned.map(entryKey));},[assigned.map(entryKey).join(",")]);
+  const[dragIdx,setDragIdx]=useState(null);
+  const items=order.map(k=>assigned.find(x=>entryKey(x)===k)).filter(Boolean);
+  const move=async(to)=>{
+    if(dragIdx===null||dragIdx===to)return;
+    const next=[...order];const[m]=next.splice(dragIdx,1);next.splice(to,0,m);
+    setOrder(next);setDragIdx(null);
+    await api("/creativetabs/reorder-items",{tabKey:TAB_VALUE_TO_KEY_CLIENT(tabValue),order:next});
+    onReordered&&onReordered();
+  };
+  if(!items.length)return<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No mod items assigned to this tab yet.</div>;
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    {items.map((x,i)=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;
+      return<div key={entryKey(x)} draggable
+        onDragStart={()=>setDragIdx(i)}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={()=>move(i)}
+        style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:dragIdx===i?"#1a2438":"#1a1a1a",border:`1px solid ${C.inpB}`,borderRadius:4,cursor:"grab"}}>
+        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        <AImg url={u} size={20}/>
+        <span style={{fontSize:12,color:C.text,flex:1}}>{x.displayName||x.id}</span>
+        <span style={{fontSize:10,color:C.dim}}>{x.kind}</span>
+      </div>;})}
+  </div>;
+}
+function TabsPage({allItems,allBlocks,textures,reloadMod,onEditingChange,newTrigger,editing,setEditing,viewing,setViewing}){
+  const{customTabs,options,reload}=useCreativeTabs();
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing||!!viewing);},[editing,viewing,onEditingChange]);
+  const prevTrigger=useRef(newTrigger);
+  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing("new");}},[newTrigger]);
+  const builtins=options.filter(o=>o.value&&!o.vanilla&&!o.custom);
+  const vanillaList=options.filter(o=>o.vanilla);
+  const customList=options.filter(o=>o.custom);
+  const saveTab=async(t)=>{
+    const next=customTabs.filter(c=>c.key!==t.key).concat([{key:t.key,iconRef:t.iconRef}]);
+    // preserve order: if editing existing, keep its position; if new, append
+    const ordered=customTabs.some(c=>c.key===t.key)?customTabs.map(c=>c.key===t.key?{key:t.key,iconRef:t.iconRef}:c):[...customTabs,{key:t.key,iconRef:t.iconRef}];
+    await api("/creativetabs/save",{tabs:ordered.map(c=>({key:c.key,iconRef:c.iconRef,titleText:c.key===t.key?t.titleText:(options.find(o=>o.key===c.key)?.label||c.key)}))});
+    setEditing(null);reload();reloadMod();
+  };
+  const deleteTab=async(key)=>{
+    const next=customTabs.filter(c=>c.key!==key);
+    await api("/creativetabs/save",{tabs:next.map(c=>({key:c.key,iconRef:c.iconRef,titleText:options.find(o=>o.key===c.key)?.label||c.key}))});
+    setEditing(null);reload();reloadMod();
+  };
+  const moveCustomTab=async(fromIdx,toIdx)=>{
+    if(fromIdx===toIdx)return;
+    const arr=[...customTabs];const[m]=arr.splice(fromIdx,1);arr.splice(toIdx,0,m);
+    await api("/creativetabs/save",{tabs:arr.map(c=>({key:c.key,iconRef:c.iconRef,titleText:options.find(o=>o.key===c.key)?.label||c.key}))});
+    reload();
+  };
+  const[dragTabIdx,setDragTabIdx]=useState(null);
+
+  if(editing){
+    const target=editing==="new"?null:editing;
+    return<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
+      <TabEditor tab={target} allItems={allItems} allBlocks={allBlocks} textures={textures} onSave={saveTab} onCancel={()=>setEditing(null)} onDelete={deleteTab}/>
+      {target&&<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,padding:16,overflowY:"auto"}}>
+        <div style={{fontSize:13,color:C.accent,fontWeight:600,marginBottom:10}}>Item order in this tab</div>
+        <TabItemReorder tabValue={`ModCreativeModeTabs.${target.key.toUpperCase()}`} allItems={allItems} allBlocks={allBlocks} textures={textures} onReordered={reloadMod}/>
+      </div>}
+    </div>;
+  }
+
+  if(viewing){
+    return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,padding:16,overflowY:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <Btn sm v="g" onClick={()=>setViewing(null)}>← Back</Btn>
+        <div style={{fontSize:13,color:C.accent,fontWeight:600}}>{viewing.label} — drag to reorder</div>
+      </div>
+      <TabItemReorder tabValue={viewing.value} allItems={allItems} allBlocks={allBlocks} textures={textures} onReordered={reloadMod}/>
+    </div>;
+  }
+
+  const Section=({title,list,editable,dragReorder,clickToView})=><div style={{marginBottom:18}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>{title}</div>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {list.map((o,i)=>{
+        const tabObj=customTabs.find(c=>c.key===o.key);
+        const icon=tabObj?tabIconPreview(tabObj,allItems,allBlocks,textures):null;
+        return<div key={o.value}
+          draggable={!!dragReorder}
+          onDragStart={()=>dragReorder&&setDragTabIdx(i)}
+          onDragOver={e=>dragReorder&&e.preventDefault()}
+          onDrop={()=>dragReorder&&moveCustomTab(dragTabIdx,i)}
+          onClick={()=>clickToView&&setViewing(o)}
+          style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:dragReorder?"grab":(clickToView?"pointer":"default")}}>
+          {dragReorder&&<span style={{color:C.faint,fontSize:11}}>⠿</span>}
+          {icon?<AImg url={icon} size={24}/>:<div style={{width:24,height:24}}/>}
+          <span style={{fontSize:13,color:C.text,flex:1}}>{o.label}</span>
+          {editable&&<Btn sm v="g" onClick={e=>{e.stopPropagation();setEditing(tabObj?{...tabObj,titleText:o.label}:null);}}>Edit</Btn>}
+        </div>;
+      })}
+    </div>
+  </div>;
+
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <Section title="MOD TABS (built-in) — click to view & reorder items" list={builtins} editable={false} clickToView={true}/>
+    <Section title="MOD TABS (custom — drag to reorder tabs, click row to view items, Edit to manage)" list={customList} editable={true} dragReorder={true} clickToView={true}/>
+    <Section title="VANILLA TABS" list={vanillaList} editable={false}/>
+  </div>;
+}
+
+// ─── Keybinds management page ───────────────────────────────────────────────
+// Mirrors TabsPage's add/edit/delete/reorder pattern. Each keybind only has a
+// key id, display label, a GLFW key, an optional modifier, and a category —
+// what it *does* is intentionally left unimplemented until that design is
+// decided (see YCS_GUIDELINES.md).
+// bindCode: "NONE" | "<KEY_<glfw name>|MOUSE_<button index>>[+CTRL|+ALT|+SHIFT]"
+// At most one modifier — NeoForge's KeyMapping/KeyModifier only supports a
+// single modifier per bind (Ctrl, Alt, or Shift, not combinations), but
+// wiring it through KeyModifier means the Controls screen shows "Ctrl + F"
+// natively with no mixin needed (see bind(...) overload in ModKeybinds.java).
+const CODE_TO_GLFW_KEY={Backquote:"GRAVE_ACCENT",Minus:"MINUS",Equal:"EQUAL",BracketLeft:"LEFT_BRACKET",BracketRight:"RIGHT_BRACKET",Semicolon:"SEMICOLON",Quote:"APOSTROPHE",Comma:"COMMA",Period:"PERIOD",Slash:"SLASH",Backslash:"BACKSLASH",Space:"SPACE",Tab:"TAB",Enter:"ENTER",Backspace:"BACKSPACE",CapsLock:"CAPS_LOCK",ArrowUp:"UP",ArrowDown:"DOWN",ArrowLeft:"LEFT",ArrowRight:"RIGHT",Insert:"INSERT",Delete:"DELETE",Home:"HOME",End:"END",PageUp:"PAGE_UP",PageDown:"PAGE_DOWN"};
+const MODIFIER_CODES=new Set(["ShiftLeft","ShiftRight","ControlLeft","ControlRight","AltLeft","AltRight"]);
+const KEY_OPTIONS=(()=>{
+  const opts=[];
+  for(let i=0;i<26;i++)opts.push({value:"KEY_"+String.fromCharCode(65+i),label:String.fromCharCode(65+i)});
+  for(let i=0;i<=9;i++)opts.push({value:"KEY_"+i,label:String(i)});
+  for(let i=1;i<=25;i++)opts.push({value:"KEY_F"+i,label:"F"+i});
+  Object.values(CODE_TO_GLFW_KEY).forEach(name=>{if(!opts.some(o=>o.value==="KEY_"+name))opts.push({value:"KEY_"+name,label:name.replace(/_/g," ")});});
+  opts.push({value:"MOUSE_2",label:"Mouse 3 (middle)"},{value:"MOUSE_3",label:"Mouse 4"},{value:"MOUSE_4",label:"Mouse 5"});
+  return opts;
+})();
+function splitBindCode(code){
+  if(!code||code==="NONE")return{base:"NONE",mod:"NONE"};
+  const[base,mod]=code.split("+");
+  return{base,mod:mod||"NONE"};
+}
+function joinBindCode(base,mod){
+  if(!base||base==="NONE")return"NONE";
+  return mod&&mod!=="NONE"?`${base}+${mod}`:base;
+}
+function domEventToBindCode(e){
+  let base=null;
+  if(e.code?.startsWith("Key"))base="KEY_"+e.code.slice(3).toUpperCase();
+  else if(e.code?.startsWith("Digit"))base="KEY_"+e.code.slice(5);
+  else if(e.code?.startsWith("F")&&/^F\d+$/.test(e.code))base="KEY_"+e.code;
+  else if(CODE_TO_GLFW_KEY[e.code])base="KEY_"+CODE_TO_GLFW_KEY[e.code];
+  if(!base)return null;
+  const mod=e.ctrlKey?"CTRL":e.altKey?"ALT":e.shiftKey?"SHIFT":"NONE";
+  return joinBindCode(base,mod);
+}
+function bindCodeLabel(code){
+  const{base,mod}=splitBindCode(code);
+  if(base==="NONE")return"(none)";
+  const baseLabel=base.startsWith("MOUSE_")?"Mouse "+(parseInt(base.slice(6))+1):base.slice(4).replace(/_/g," ");
+  const modLabel=mod==="CTRL"?"Ctrl":mod==="ALT"?"Alt":mod==="SHIFT"?"Shift":null;
+  return modLabel?`${modLabel} + ${baseLabel}`:baseLabel;
+}
+function RecordKeyButton({value,onChange}){
+  const[recording,setRecording]=useState(false);
+  const{base,mod}=splitBindCode(value);
+  useEffect(()=>{
+    if(!recording)return;
+    const onKey=e=>{
+      if(MODIFIER_CODES.has(e.code))return;
+      e.preventDefault();const code=domEventToBindCode(e);if(code){onChange(code);setRecording(false);}
+    };
+    const onMouse=e=>{e.preventDefault();const m=e.ctrlKey?"CTRL":e.altKey?"ALT":e.shiftKey?"SHIFT":"NONE";onChange(joinBindCode("MOUSE_"+e.button,m));setRecording(false);};
+    window.addEventListener("keydown",onKey,true);
+    window.addEventListener("mousedown",onMouse,true);
+    return()=>{window.removeEventListener("keydown",onKey,true);window.removeEventListener("mousedown",onMouse,true);};
+  },[recording,onChange]);
+  return<div style={{display:"flex",flexDirection:"column",gap:8}}>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <Btn v={recording?"p":"d"} onClick={()=>setRecording(v=>!v)}>{recording?"Press a key or mouse button…":"Record"}</Btn>
+      <div style={{width:180}}><Sel value={base} onChange={v=>onChange(joinBindCode(v,mod))} options={[{value:"NONE",label:"(none)"},...KEY_OPTIONS]}/></div>
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:12}}>
+      <div style={{width:120}}><Sel value={mod} onChange={v=>onChange(joinBindCode(base,v))} options={[{value:"NONE",label:"No modifier"},{value:"CTRL",label:"Ctrl"},{value:"ALT",label:"Alt"},{value:"SHIFT",label:"Shift"}]}/></div>
+      <Pill color="#1a2438">{bindCodeLabel(value)}</Pill>
+      {base!=="NONE"&&!recording&&<Btn sm v="g" onClick={()=>onChange("NONE")}>Clear</Btn>}
+    </div>
+  </div>;
+}
+function useKeybinds(){
+  const[keybinds,setKeybinds]=useState([]);
+  const[categories,setCategories]=useState({own:"CATEGORY",ownLabel:"yebisu RPG (this mod)",vanilla:[],custom:[]});
+  const reload=useCallback(()=>{fetch(`${BASE}/keybinds/list`).then(r=>r.json()).then(j=>{if(j.ok){setKeybinds(j.keybinds||[]);if(j.categories)setCategories(j.categories);}}).catch(()=>{});},[]);
+  useEffect(()=>{reload();},[reload]);
+  return{keybinds,categories,reload};
+}
+function categoryLabel(cat){
+  if(!cat||cat==="CATEGORY")return"yebisu RPG (this mod)";
+  return cat.startsWith("key.categories.")?cat.slice("key.categories.".length).replace(/^./,c=>c.toUpperCase()):cat;
+}
+function CategoryPicker({value,categories,onChange}){
+  const known=["CATEGORY",...categories.vanilla,...categories.custom];
+  const isCustom=value&&!known.includes(value);
+  const[customMode,setCustomMode]=useState(isCustom);
+  const options=[{value:"CATEGORY",label:"yebisu RPG (this mod)"},...categories.vanilla.map(c=>({value:c,label:categoryLabel(c)})),...categories.custom.map(c=>({value:c,label:c})),{value:"__custom__",label:"+ New custom category…"}];
+  if(customMode)return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    <Lbl>Category</Lbl>
+    <div style={{display:"flex",gap:8}}>
+      <input value={value} onChange={e=>onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g,""))} placeholder="key.categories.my_mod" style={SI.inp}/>
+      <Btn sm v="g" onClick={()=>{setCustomMode(false);onChange("CATEGORY");}}>Cancel</Btn>
+    </div>
+  </div>;
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    <Lbl>Category</Lbl>
+    <Sel value={known.includes(value)?value:"CATEGORY"} onChange={v=>{if(v==="__custom__"){setCustomMode(true);onChange("");}else onChange(v);}} options={options}/>
+  </div>;
+}
+function KeybindEditor({bind,name,setName,keyId,setKeyId,bindCode,setBindCode,category,setCategory,categories,onSave,onCancel,onDelete}){
+  const isNew=!bind;
+  const keyErr=isNew?(keyId&&!/^[a-z][a-z0-9_]*$/.test(keyId)?"a-z 0-9 _ only, must start with a letter":null):null;
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Keybind":"Edit Keybind"}</div>
+    {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Key id (internal id)</Lbl>
+      <input value={keyId} onChange={e=>setKeyId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${keyId&&keyErr?"#6a2a2a":C.inpB}`}}/>
+      {keyId&&keyErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{keyErr}</span>}
+    </div>}
+    <Inp label="Display name" value={name} onChange={setName}/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Default binding</Lbl>
+      <RecordKeyButton value={bindCode} onChange={setBindCode}/>
+    </div>
+    <CategoryPicker value={category} categories={categories} onChange={setCategory}/>
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <Btn v="p" dis={!name.trim()||(isNew&&(!keyId.trim()||!!keyErr))} onClick={()=>onSave({key:isNew?keyId:bind.key,titleText:name.trim(),bindCode,category:category||"CATEGORY"})}>Save</Btn>
+      <Btn v="g" onClick={onCancel}>Cancel</Btn>
+      {!isNew&&<Btn v="dan" onClick={()=>onDelete(bind.key)} style={{marginLeft:"auto"}}>Delete</Btn>}
+    </div>
+  </div>;
+}
+function KeybindPreviewPanel({name,keyId,bindCode,category}){
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <Lbl>Preview</Lbl>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 11px",borderRadius:5,background:C.card,border:`1px solid ${C.inpB}`}}>
+      <span style={{fontSize:13,color:C.text}}>{name||keyId||"(unnamed)"}</span>
+      <Pill color={C.inp}>{bindCodeLabel(bindCode)}</Pill>
+    </div>
+    <div style={{fontSize:11,color:C.faint,fontFamily:"monospace"}}>key.yebisurpg.{keyId||"…"}</div>
+    <div style={{fontSize:11,color:C.faint,marginTop:8}}>This is how the binding will appear in the vanilla Controls screen, under the <b>{categoryLabel(category)}</b> category.</div>
+  </div>;
+}
+function KeybindsPage({reloadMod,onEditingChange,newTrigger,editing,setEditing}){
+  const{keybinds,categories,reload}=useKeybinds();
+  const[dragIdx,setDragIdx]=useState(null);
+  const[name,setName]=useState("");
+  const[keyId,setKeyId]=useState("");
+  const[bindCode,setBindCode]=useState("NONE");
+  const[category,setCategory]=useState("CATEGORY");
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
+  const prevTrigger=useRef(newTrigger);
+  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing("new");}},[newTrigger]);
+  useEffect(()=>{
+    if(!editing)return;
+    const target=editing==="new"?null:editing;
+    setName(target?.titleText||"");setKeyId(target?.key||"");setBindCode(target?.bindCode||"NONE");setCategory(target?.category||"CATEGORY");
+  },[editing]);
+
+  const persist=async(list)=>{await api("/keybinds/save",{keybinds:list});reload();reloadMod&&reloadMod();};
+  const saveBind=async(b)=>{
+    const exists=keybinds.some(k=>k.key===b.key);
+    const next=exists?keybinds.map(k=>k.key===b.key?b:k):[...keybinds,b];
+    await persist(next);setEditing(null);
+  };
+  const deleteBind=async(key)=>{await persist(keybinds.filter(k=>k.key!==key));setEditing(null);};
+  const moveBind=async(from,to)=>{if(from===to)return;const arr=[...keybinds];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
+
+  if(editing){
+    const target=editing==="new"?null:editing;
+    return<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <KeybindEditor bind={target} name={name} setName={setName} keyId={keyId} setKeyId={setKeyId} bindCode={bindCode} setBindCode={setBindCode} category={category} setCategory={setCategory} categories={categories} onSave={saveBind} onCancel={()=>setEditing(null)} onDelete={deleteBind}/>
+      </div>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <KeybindPreviewPanel name={name} keyId={keyId} bindCode={bindCode} category={category}/>
+      </div>
+    </div>;
+  }
+
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>KEYBINDS (drag to reorder, click to edit)</div>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {keybinds.map((k,i)=><div key={k.key}
+        draggable
+        onDragStart={()=>setDragIdx(i)}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={()=>{moveBind(dragIdx,i);setDragIdx(null);}}
+        onClick={()=>setEditing(k)}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
+        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        <span style={{fontSize:13,color:C.text,flex:1}}>{k.titleText||k.key}</span>
+        <Pill color="#1a2438">{bindCodeLabel(k.bindCode)}</Pill>
+      </div>)}
+      {!keybinds.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No keybinds yet.</div>}
+    </div>
+  </div>;
+}
+// ─── Interfaces management page (GUI/HUD screens) ──────────────────────────
+// Mirrors KeybindsPage's add/edit/delete/reorder pattern. Each interface only
+// has an id, display name, and a kind (gui|hud) — what it actually renders is
+// intentionally left unimplemented until that design is decided, the same
+// deferral used for keybind actions (see YCS_GUIDELINES.md).
+function useInterfaces(){
+  const[interfaces,setInterfaces]=useState([]);
+  const reload=useCallback(()=>{fetch(`${BASE}/interfaces/list`).then(r=>r.json()).then(j=>{if(j.ok)setInterfaces(j.interfaces||[]);}).catch(()=>{});},[]);
+  useEffect(()=>{reload();},[reload]);
+  return{interfaces,reload};
+}
+function InterfaceEditor({iface,name,setName,ifaceId,setIfaceId,kind,setKind,onSave,onCancel,onDelete}){
+  const isNew=!iface;
+  const idErr=isNew?(ifaceId&&!/^[a-z][a-z0-9_]*$/.test(ifaceId)?"a-z 0-9 _ only, must start with a letter":null):null;
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Interface":"Edit Interface"}</div>
+    {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Interface id (internal id)</Lbl>
+      <input value={ifaceId} onChange={e=>setIfaceId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${ifaceId&&idErr?"#6a2a2a":C.inpB}`}}/>
+      {ifaceId&&idErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{idErr}</span>}
+    </div>}
+    <Inp label="Display name" value={name} onChange={setName}/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Kind</Lbl>
+      <Sel value={kind} onChange={setKind} options={[{value:"gui",label:"GUI (screen)"},{value:"hud",label:"HUD (overlay)"}]}/>
+    </div>
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <Btn v="p" dis={!name.trim()||(isNew&&(!ifaceId.trim()||!!idErr))} onClick={()=>onSave({id:isNew?ifaceId:iface.id,titleText:name.trim(),kind})}>Save</Btn>
+      <Btn v="g" onClick={onCancel}>Cancel</Btn>
+      {!isNew&&<Btn v="dan" onClick={()=>onDelete(iface.id)} style={{marginLeft:"auto"}}>Delete</Btn>}
+    </div>
+  </div>;
+}
+function InterfacePreviewPanel({name,ifaceId,kind}){
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <Lbl>Preview</Lbl>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 11px",borderRadius:5,background:C.card,border:`1px solid ${C.inpB}`}}>
+      <span style={{fontSize:13,color:C.text}}>{name||ifaceId||"(unnamed)"}</span>
+      <Pill color={C.inp}>{kind==="hud"?"HUD":"GUI"}</Pill>
+    </div>
+    <div style={{fontSize:11,color:C.faint,fontFamily:"monospace"}}>screen.yebisurpg.{ifaceId||"…"}</div>
+    <div style={{fontSize:11,color:C.faint,marginTop:8}}>Layout/rendering for this {kind==="hud"?"HUD overlay":"GUI screen"} is not wired up yet — only the id/name/kind plumbing exists so far.</div>
+  </div>;
+}
+function InterfacesPage({onEditingChange,newTrigger,editing,setEditing}){
+  const{interfaces,reload}=useInterfaces();
+  const[dragIdx,setDragIdx]=useState(null);
+  const[name,setName]=useState("");
+  const[ifaceId,setIfaceId]=useState("");
+  const[kind,setKind]=useState("gui");
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
+  const prevTrigger=useRef(newTrigger);
+  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing("new");}},[newTrigger]);
+  useEffect(()=>{
+    if(!editing)return;
+    const target=editing==="new"?null:editing;
+    setName(target?.titleText||"");setIfaceId(target?.id||"");setKind(target?.kind||"gui");
+  },[editing]);
+
+  const persist=async(list)=>{await api("/interfaces/save",{interfaces:list});reload();};
+  const saveIface=async(i)=>{
+    const exists=interfaces.some(x=>x.id===i.id);
+    const next=exists?interfaces.map(x=>x.id===i.id?i:x):[...interfaces,i];
+    await persist(next);setEditing(null);
+  };
+  const deleteIface=async(id)=>{await persist(interfaces.filter(x=>x.id!==id));setEditing(null);};
+  const moveIface=async(from,to)=>{if(from===to)return;const arr=[...interfaces];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
+
+  if(editing){
+    const target=editing==="new"?null:editing;
+    return<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <InterfaceEditor iface={target} name={name} setName={setName} ifaceId={ifaceId} setIfaceId={setIfaceId} kind={kind} setKind={setKind} onSave={saveIface} onCancel={()=>setEditing(null)} onDelete={deleteIface}/>
+      </div>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <InterfacePreviewPanel name={name} ifaceId={ifaceId} kind={kind}/>
+      </div>
+    </div>;
+  }
+
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>INTERFACES (drag to reorder, click to edit)</div>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {interfaces.map((i,idx)=><div key={i.id}
+        draggable
+        onDragStart={()=>setDragIdx(idx)}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={()=>{moveIface(dragIdx,idx);setDragIdx(null);}}
+        onClick={()=>setEditing(i)}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
+        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        <span style={{fontSize:13,color:C.text,flex:1}}>{i.titleText||i.id}</span>
+        <Pill color="#1a2438">{i.kind==="hud"?"HUD":"GUI"}</Pill>
+      </div>)}
+      {!interfaces.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No interfaces yet.</div>}
+    </div>
+  </div>;
+}
+// ─── Variables management page (EntityVar declarations) ────────────────────
+// Mirrors InterfacesPage's add/edit/delete/reorder pattern. Each variable has
+// a name, a type (matches net.ye6isu.yebisuRPG.data.EntityVarType: int|float|
+// bool|string|item), a default value, and — for item vars — a dropOnDeath
+// flag. Generating the vars.define(...) call-sites in Java (where/when each
+// var actually gets attached to an entity) is intentionally left
+// unimplemented until that design is decided (see YCS_GUIDELINES.md).
+const VAR_TYPES=[{value:"int",label:"Int"},{value:"float",label:"Float"},{value:"bool",label:"Bool"},{value:"string",label:"String"},{value:"item",label:"Item Stack"}];
+function defaultForType(type){return type==="bool"?false:type==="string"?"":type==="item"?{itemId:null,count:1}:0;}
+function useVariables(){
+  const[variables,setVariables]=useState([]);
+  const reload=useCallback(()=>{fetch(`${BASE}/variables/list`).then(r=>r.json()).then(j=>{if(j.ok)setVariables(j.variables||[]);}).catch(()=>{});},[]);
+  useEffect(()=>{reload();},[reload]);
+  return{variables,reload};
+}
+function ItemStackPicker({label,value,onChange,allItems,textures}){
+  const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
+  const vanillaItems=useVanillaItems();
+  const pool=useMemo(()=>[...allItems,...vanillaItems],[allItems,vanillaItems]);
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return pool.filter(x=>!q||x.id.includes(q)||(x.displayName||"").toLowerCase().includes(q));},[pool,srch]);
+  const sel=pool.find(x=>x.id===value?.itemId);
+  const prevUrl=sel?(textures.find(tx=>tx.id===sel.textureId)?.dataUrl||sel.textureDataUrl):null;
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    {label&&<Lbl>{label}</Lbl>}
+    <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+      <div style={{position:"relative",flex:1}}>
+        <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"6px 9px",boxSizing:"border-box",height:33}}>
+          <AImg url={prevUrl} size={22}/>
+          <span style={{flex:1,color:sel?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?(sel.displayName||sel.id):"(choose item)"}</span>
+          <span style={{color:C.dim}}>▾</span>
+        </div>
+        {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:260,display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+          <div style={{overflowY:"auto",flex:1}}>
+            {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;return<div key={x.id} onClick={()=>{onChange({...value,itemId:x.id});setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value?.itemId===x.id?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
+              <AImg url={u} size={20}/>
+              <div><div style={{fontSize:12,color:C.text}}>{x.displayName||x.id}</div><div style={{fontSize:10,color:C.dim}}>{x.id}</div></div>
+            </div>;})}
+            {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
+          </div>
+        </div>}
+      </div>
+      <input value={value?.count??1} onChange={e=>onChange({...value,count:Math.max(1,parseInt(e.target.value)||1)})} type="number" style={{...SI.inp,width:70,boxSizing:"border-box",height:33}}/>
+    </div>
+  </div>;
+}
+function VariableDefaultField({type,value,onChange,allItems,textures}){
+  if(type==="bool")return<div style={{display:"flex",flexDirection:"column",gap:4}}><Lbl>Default value</Lbl><Chk label="true" checked={!!value} onChange={onChange}/></div>;
+  if(type==="string")return<Inp label="Default value" value={value??""} onChange={onChange}/>;
+  if(type==="item")return<ItemStackPicker label="Default item stack" value={value} onChange={onChange} allItems={allItems} textures={textures}/>;
+  return<Inp label="Default value" value={value??0} onChange={v=>onChange(type==="float"?parseFloat(v)||0:parseInt(v)||0)} type="number"/>;
+}
+function VariableEditor({variable,name,setName,varName,setVarName,type,setType,defVal,setDefVal,dropOnDeath,setDropOnDeath,allItems,textures,onSave,onCancel,onDelete}){
+  const isNew=!variable;
+  const nameErr=isNew?(varName&&!/^[a-z][a-z0-9_]*$/.test(varName)?"a-z 0-9 _ only, must start with a letter":null):null;
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Variable":"Edit Variable"}</div>
+    {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Variable name (internal key)</Lbl>
+      <input value={varName} onChange={e=>setVarName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${varName&&nameErr?"#6a2a2a":C.inpB}`}}/>
+      {varName&&nameErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{nameErr}</span>}
+    </div>}
+    <Inp label="Display name" value={name} onChange={setName}/>
+    <Sel label="Type" value={type} onChange={v=>{setType(v);setDefVal(defaultForType(v));}} options={VAR_TYPES} disabled={!isNew}/>
+    <VariableDefaultField type={type} value={defVal} onChange={setDefVal} allItems={allItems} textures={textures}/>
+    {type==="item"&&<Chk label="Drop on death" checked={!!dropOnDeath} onChange={setDropOnDeath}/>}
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <Btn v="p" dis={!name.trim()||(isNew&&(!varName.trim()||!!nameErr))} onClick={()=>onSave({name:isNew?varName:variable.name,titleText:name.trim(),type,default:defVal,dropOnDeath})}>Save</Btn>
+      <Btn v="g" onClick={onCancel}>Cancel</Btn>
+      {!isNew&&<Btn v="dan" onClick={()=>onDelete(variable.name)} style={{marginLeft:"auto"}}>Delete</Btn>}
+    </div>
+  </div>;
+}
+function VariablePreviewPanel({name,varName,type,defVal,dropOnDeath,allItems,textures}){
+  const vanillaItems=useVanillaItems();
+  const selItem=type==="item"?[...allItems,...vanillaItems].find(x=>x.id===defVal?.itemId):null;
+  const selItemUrl=selItem?(textures.find(tx=>tx.id===selItem.textureId)?.dataUrl||selItem.textureDataUrl):null;
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+    <Lbl>Preview</Lbl>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 11px",borderRadius:5,background:C.card,border:`1px solid ${C.inpB}`}}>
+      <span style={{fontSize:13,color:C.text}}>{name||varName||"(unnamed)"}</span>
+      <Pill color={C.inp}>{VAR_TYPES.find(t=>t.value===type)?.label||type}</Pill>
+    </div>
+    {type==="item"&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",borderRadius:5,background:C.card,border:`1px solid ${C.inpB}`}}>
+      <AImg url={selItemUrl} size={22}/>
+      <span style={{fontSize:12,color:selItem?C.text:C.faint}}>{selItem?(selItem.displayName||selItem.id):"(no item selected)"} {defVal?.count>1?`x${defVal.count}`:""}</span>
+    </div>}
+    <div style={{fontSize:11,color:C.faint,fontFamily:"monospace"}}>vars.{type==="bool"?"getBool":type==="string"?"getString":type==="item"?"getItem":type==="float"?"getFloat":"getInt"}("{varName||"…"}")</div>
+    {type==="item"&&dropOnDeath&&<div style={{fontSize:11,color:C.faint}}>Drops on entity death.</div>}
+    <div style={{fontSize:11,color:C.faint,marginTop:8}}>Declaration only — where/when this variable gets attached to an entity (<code>vars.define(...)</code>) is not wired up yet.</div>
+  </div>;
+}
+function VariablesPage({onEditingChange,newTrigger,editing,setEditing,allItems,textures}){
+  const{variables,reload}=useVariables();
+  const[dragIdx,setDragIdx]=useState(null);
+  const[name,setName]=useState("");
+  const[varName,setVarName]=useState("");
+  const[type,setType]=useState("int");
+  const[defVal,setDefVal]=useState(0);
+  const[dropOnDeath,setDropOnDeath]=useState(false);
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
+  const prevTrigger=useRef(newTrigger);
+  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing("new");}},[newTrigger]);
+  useEffect(()=>{
+    if(!editing)return;
+    const target=editing==="new"?null:editing;
+    setName(target?.titleText||"");setVarName(target?.name||"");setType(target?.type||"int");setDefVal(target?.default??defaultForType(target?.type||"int"));setDropOnDeath(!!target?.dropOnDeath);
+  },[editing]);
+
+  const persist=async(list)=>{await api("/variables/save",{variables:list});reload();};
+  const saveVar=async(v)=>{
+    const exists=variables.some(x=>x.name===v.name);
+    const next=exists?variables.map(x=>x.name===v.name?v:x):[...variables,v];
+    await persist(next);setEditing(null);
+  };
+  const deleteVar=async(name)=>{await persist(variables.filter(x=>x.name!==name));setEditing(null);};
+  const moveVar=async(from,to)=>{if(from===to)return;const arr=[...variables];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
+
+  if(editing){
+    const target=editing==="new"?null:editing;
+    return<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <VariableEditor variable={target} name={name} setName={setName} varName={varName} setVarName={setVarName} type={type} setType={setType} defVal={defVal} setDefVal={setDefVal} dropOnDeath={dropOnDeath} setDropOnDeath={setDropOnDeath} allItems={allItems} textures={textures} onSave={saveVar} onCancel={()=>setEditing(null)} onDelete={deleteVar}/>
+      </div>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <VariablePreviewPanel name={name} varName={varName} type={type} defVal={defVal} dropOnDeath={dropOnDeath} allItems={allItems} textures={textures}/>
+      </div>
+    </div>;
+  }
+
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>VARIABLES (drag to reorder, click to edit)</div>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {variables.map((v,idx)=><div key={v.name}
+        draggable
+        onDragStart={()=>setDragIdx(idx)}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={()=>{moveVar(dragIdx,idx);setDragIdx(null);}}
+        onClick={()=>setEditing(v)}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
+        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        <span style={{fontSize:13,color:C.text,flex:1}}>{v.titleText||v.name}</span>
+        <Pill color={C.inp}>{VAR_TYPES.find(t=>t.value===v.type)?.label||v.type}</Pill>
+      </div>)}
+      {!variables.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No variables yet.</div>}
+    </div>
+  </div>;
+}
+function TAB_VALUE_TO_KEY_CLIENT(value){
+  if(value.startsWith("vanilla:"))return value.replace("vanilla:","");
+  if(value==="ModCreativeModeTabs.YEBISURPG_ITEMS_TAB")return"yebisurpg_items_tab";
+  if(value==="ModCreativeModeTabs.YEBISURPG_BLOCK_TAB")return"yebisurpg_blocks_tab";
+  const m=/^ModCreativeModeTabs\.(\w+)$/.exec(value);
+  return m?m[1].toLowerCase():value;
+}
+
 function CardGrid({entries,onDelete,onOpen,emptyLabel}){
   const[hov,setHov]=useState(null);
   return<div style={{flex:1,padding:"20px 20px 90px",overflowY:"auto",position:"relative"}}>
@@ -1001,26 +1752,69 @@ function TexRight(){
   </div>;
 }
 
-function RecipePanel({modItems=[],modBlocks=[]}){
+// Unified ingredient picker: searches mod items/blocks, the full vanilla item
+// registry, and every tag in COMMON_TAGS as one flat, icon-backed, sorted list.
+// Replaces the old split list+toggle-hidden-tags-panel UI.
+function IngredientPicker({value,onChange,modItems,modBlocks,vanillaItems,textures}){
+  const[srch,setSrch]=useState("");
+  const entries=useMemo(()=>{
+    const tagE=TAG_GROUPS.map(g=>({ref:`#${g.tag}`,label:g.label,sub:g.tag,isTag:true}));
+    const modE=[...modItems.map(x=>({...x,kind:"item"})),...modBlocks.map(x=>({...x,kind:"block"}))]
+      .map(x=>({ref:`${MODID}:${x.id}`,label:x.displayName||x.id,sub:`${MODID}:${x.id}`,tex:x,isTag:false}));
+    const vanE=vanillaItems.map(x=>({ref:x.id,label:x.displayName||x.id,sub:x.id,tex:x,isTag:false}));
+    return[...tagE,...modE,...vanE];
+  },[modItems,modBlocks,vanillaItems]);
+  const filt=useMemo(()=>{
+    const q=srch.toLowerCase().trim();
+    if(!q)return entries;
+    return entries.filter(e=>e.label.toLowerCase().includes(q)||e.sub.toLowerCase().includes(q));
+  },[entries,srch]);
+  return<div style={{display:"flex",flexDirection:"column",gap:6,minHeight:0}}>
+    <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search items, blocks, #tags…" style={{...SI.inp,fontSize:12}}/>
+    <div style={{maxHeight:240,overflowY:"auto",display:"flex",flexDirection:"column",gap:1,border:`1px solid ${C.inpB}`,borderRadius:4,padding:3}}>
+      {filt.slice(0,200).map(e=>{
+        const u=e.tex?(textures.find(tx=>tx.id===e.tex.textureId)?.dataUrl||e.tex.textureDataUrl):null;
+        const isSel=value===e.ref;
+        return<div key={e.ref} draggable onDragStart={ev=>ev.dataTransfer.setData("item",e.ref)} onClick={()=>onChange(isSel?"":e.ref)}
+          style={{display:"flex",alignItems:"center",gap:7,padding:"4px 6px",cursor:"pointer",borderRadius:3,
+            background:isSel?(e.isTag?"#1a1a2e":"#192a19"):"transparent",
+            border:`1px solid ${isSel?(e.isTag?"#2a2a5a":"#2a5a2a"):"transparent"}`}}>
+          {e.isTag?<span style={{width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#8888ff",flexShrink:0}}>#</span>:<AImg url={u} size={18}/>}
+          <span style={{fontSize:11,fontFamily:"monospace",color:isSel?(e.isTag?"#8888ff":"#5acc5a"):C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{e.label}</span>
+          <span style={{fontSize:9,color:C.faint,whiteSpace:"nowrap"}}>{e.sub}</span>
+        </div>;
+      })}
+      {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:11}}>no results</div>}
+    </div>
+  </div>;
+}
+function RecipePanel({modItems=[],modBlocks=[],textures=[]}){
   const{form,F}=useContext(FormCtx);
-  const[srch,setSrch]=useState("");const[sel,setSel]=useState("");const[showTags,setShowTags]=useState(false);
+  const[sel,setSel]=useState("");
+  const vanillaItems=useVanillaItems();
   const recipe=form.recipe||{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1};
   const setR=upd=>F("recipe",{...recipe,...upd});
-  const allIngr=useMemo(()=>{const mod=modItems.map(x=>`${MODID}:${x.id}`).concat(modBlocks.map(x=>`${MODID}:${x.id}`));const tagE=TAG_GROUPS.map(g=>`#${g.tag}`);const all=[...tagE,...VANILLA_INGR,...mod];const q=srch.toLowerCase();return q?all.filter(x=>x.toLowerCase().includes(q)):all;},[srch,modItems,modBlocks]);
   const cells=Array.from({length:9},(_,i)=>{const row=Math.floor(i/3),col=i%3,ch=recipe.pattern[row][col];return ch===" "?null:recipe.keys[ch]||null;});
   const setCell=(i,item)=>{const row=Math.floor(i/3),col=i%3;const pat=recipe.pattern.map(r=>[...r]);const keys={...recipe.keys};if(!item||item==="minecraft:air"){pat[row][col]=" ";const used=new Set(pat.flat().filter(c=>c!==" "));for(const k of Object.keys(keys))if(!used.has(k))delete keys[k];}else{const ex=Object.entries(keys).find(([,v])=>v===item)?.[0];const used=new Set(pat.flat().filter(c=>c!==" "));let ch=ex;if(!ch){ch="ABCDEFGHIJKLMNOPQRSTUVWXYZ#@$%&".split("").find(c=>!used.has(c))||"?";keys[ch]=item;}pat[row][col]=ch;}setR({pattern:pat.map(r=>r.join("")),keys});};
-  const dN=item=>item.startsWith("#")?TAG_GROUPS.find(g=>`#${g.tag}`===item)?.label||item:item.split(":")[1]||item;
+  const itemFor=ref=>{if(!ref||ref.startsWith("#"))return null;if(ref.startsWith(`${MODID}:`)){const id=ref.slice(MODID.length+1);return modItems.find(x=>x.id===id)||modBlocks.find(x=>x.id===id)||null;}return vanillaItems.find(x=>x.id===ref)||null;};
+  const dN=item=>{if(!item)return"";if(item.startsWith("#"))return TAG_GROUPS.find(g=>`#${g.tag}`===item)?.label||item;const it=itemFor(item);return it?.displayName||item.split(":")[1]||item;};
   return<div style={{flex:1,padding:"14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:10}}>
     <div style={{display:"flex",gap:4}}><Sel label="" value={recipe.type||"shaped"} onChange={v=>setR({type:v})} options={["shaped","shapeless"]}/><Inp label="" value={recipe.result||1} onChange={v=>setR({result:parseInt(v)||1})} type="number" style={{width:56}}/></div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,52px)",gap:3}}>
-      {cells.map((item,i)=>{const e=!item||item==="minecraft:air";const iT=item&&item.startsWith("#");return<div key={i} onClick={()=>{if(sel)setCell(i,sel);}} onDragOver={ev=>ev.preventDefault()} onDrop={ev=>{ev.preventDefault();setCell(i,ev.dataTransfer.getData("item"));}} style={{width:52,height:52,background:e?"#141414":iT?"#1a1a2e":"#192a19",border:`1px solid ${e?C.inpB:iT?"#2a2a5a":"#2a5a2a"}`,borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sel?"crosshair":"default",position:"relative",overflow:"hidden"}}>{!e&&<><div style={{fontSize:9,color:iT?"#8888ff":"#aaa",textAlign:"center",padding:2,lineHeight:1.1}}>{dN(item)}</div><span onClick={ev=>{ev.stopPropagation();setCell(i,null);}} style={{position:"absolute",top:1,right:2,fontSize:8,cursor:"pointer",color:"#cc6a6a"}}>✕</span></>}{e&&<span style={{color:"#222",fontSize:18}}>+</span>}</div>;})}
+      {cells.map((item,i)=>{
+        const e=!item||item==="minecraft:air";const iT=item&&item.startsWith("#");
+        const it=itemFor(item);const u=it?(textures.find(tx=>tx.id===it.textureId)?.dataUrl||it.textureDataUrl):null;
+        return<div key={i} title={item?dN(item):""} onClick={()=>{if(sel)setCell(i,sel);}} onDragOver={ev=>ev.preventDefault()} onDrop={ev=>{ev.preventDefault();setCell(i,ev.dataTransfer.getData("item"));}} style={{width:52,height:52,background:e?"#141414":iT?"#1a1a2e":"#192a19",border:`1px solid ${e?C.inpB:iT?"#2a2a5a":"#2a5a2a"}`,borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sel?"crosshair":"default",position:"relative",overflow:"hidden",gap:2}}>
+          {!e&&<>
+            {iT?<span style={{fontSize:14,color:"#8888ff"}}>#</span>:<AImg url={u} size={28}/>}
+            <div style={{fontSize:8,color:iT?"#8888ff":"#aaa",textAlign:"center",padding:"0 2px",lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{dN(item)}</div>
+            <span onClick={ev=>{ev.stopPropagation();setCell(i,null);}} style={{position:"absolute",top:1,right:2,fontSize:8,cursor:"pointer",color:"#cc6a6a"}}>✕</span>
+          </>}
+          {e&&<span style={{color:"#222",fontSize:18}}>+</span>}
+        </div>;})}
     </div>
-    {sel&&<div style={{fontSize:10,color:"#5acc5a"}}>→ {dN(sel)}</div>}
-    <div style={{display:"flex",gap:6,alignItems:"center"}}><input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,fontSize:11,flex:1}}/><Btn sm v={showTags?"p":"g"} onClick={()=>setShowTags(v=>!v)}>#tags</Btn></div>
-    {showTags&&<div style={{display:"flex",flexDirection:"column",gap:1}}>{TAG_GROUPS.map(g=><div key={g.tag} draggable onDragStart={e=>e.dataTransfer.setData("item",`#${g.tag}`)} onClick={()=>setSel(sel===`#${g.tag}`?"":(`#${g.tag}`))} style={{padding:"3px 8px",fontSize:11,fontFamily:"monospace",cursor:"pointer",borderRadius:2,background:sel===`#${g.tag}`?"#1a1a2e":"#141414",color:sel===`#${g.tag}`?"#8888ff":C.dim,border:`1px solid ${sel===`#${g.tag}`?"#2a2a5a":"#1a1a1a"}`}}>{g.label}</div>)}</div>}
-    <div style={{maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:1}}>
-      {allIngr.filter(x=>!x.startsWith("#")).slice(0,80).map(item=><div key={item} draggable onDragStart={e=>e.dataTransfer.setData("item",item)} onClick={()=>setSel(item===sel?"":item)} style={{padding:"3px 6px",fontSize:11,fontFamily:"monospace",cursor:"pointer",borderRadius:2,background:sel===item?"#192a19":"#141414",color:sel===item?"#5acc5a":C.text,border:`1px solid ${sel===item?"#2a5a2a":"#1a1a1a"}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item}</div>)}
-    </div>
+    {sel&&<div style={{display:"flex",alignItems:"center",gap:6,fontSize:10,color:"#5acc5a"}}><span>placing →</span>{itemFor(sel)&&<AImg url={textures.find(tx=>tx.id===itemFor(sel).textureId)?.dataUrl||itemFor(sel).textureDataUrl} size={14}/>}<span>{dN(sel)}</span></div>}
+    <IngredientPicker value={sel} onChange={setSel} modItems={modItems} modBlocks={modBlocks} vanillaItems={vanillaItems} textures={textures}/>
   </div>;
 }
 
@@ -1064,13 +1858,13 @@ function TooltipPanel(){
   </div>;
 }
 
-function RecipePanelWrapper({modItems,modBlocks}){
+function RecipePanelWrapper({modItems,modBlocks,textures}){
   const{form,F}=useContext(FormCtx);
   return<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
     <div style={{padding:"10px 14px",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
       <Chk label="Add custom recipe?" checked={!!form.hasRecipe} onChange={v=>F("hasRecipe",v)}/>
     </div>
-    {form.hasRecipe?<RecipePanel modItems={modItems} modBlocks={modBlocks}/>:<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>enable above to edit</div>}
+    {form.hasRecipe?<RecipePanel modItems={modItems} modBlocks={modBlocks} textures={textures}/>:<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>enable above to edit</div>}
   </div>;
 }
 
@@ -1143,6 +1937,8 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
 }
 function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
+  const{variables}=useVariables();
+  const palette=useMemo(()=>buildPaletteWithVariables(variables),[variables]);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
   const[nodes,setNodes]=useState(init);
   const[selected,setSelected]=useState(null);
@@ -1244,8 +2040,9 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const upd=fn=>setNodes(prev => recalcLayout(fn(prev)));
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
+    const isVarBlock=bd.opcode.startsWith("variable.get.")||bd.opcode.startsWith("variable.set.");
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:isVarBlock?{varName:bd.varName,varType:bd.varType,varDefault:bd.varDefault}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -1444,7 +2241,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
     </div>
     <div style={{display:"flex",flex:1,overflow:"hidden"}}>
       <div style={{width:190,borderRight:"1px solid "+C.inpB,overflowY:"auto",flexShrink:0,background:"#111113",userSelect:"none",zIndex:10}}>
-        {PALETTE_BLOCKS.map(cat=><div key={cat.category}>
+        {palette.map(cat=><div key={cat.category}>
           <div style={{padding:"6px 10px 4px",background:"#141416",borderBottom:"1px solid "+C.inpB}}><Lbl>{cat.category}</Lbl></div>
           {cat.blocks.map(b=><div key={b.opcode} draggable onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))} title={b.hint}
             style={{display:"flex",alignItems:"center",gap:7,padding:"8px 10px",cursor:"grab",borderBottom:"1px solid #181818",userSelect:"none",
@@ -1542,6 +2339,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
        :node.opcode==="entity.is_crouching"?"Is Crouching?"
        :node.opcode==="logic.true"?"True"
        :node.opcode==="logic.false"?"False"
+       :node.opcode==="variable.get"?`Get ${node.fields?.varName||"?"} for`
        :node.opcode;
 
   const valContent = (
@@ -1583,6 +2381,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="anim.thirdperson.resume"?"Resume TP Anim on"
          :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
+         :node.opcode==="variable.set"?`Set ${node.fields?.varName||"?"} to`
          :node.opcode}
       </span>
       {isIf&&<>
@@ -1643,6 +2442,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isHandPoseReset&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="variable.set"&&<>
+          <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}
@@ -1824,8 +2628,8 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
     setBusyKey(null);
   };
 
-  return<div style={{padding:"14px 12px",display:"flex",flexDirection:"column",gap:7}}>
-    <div style={{fontSize:10,color:C.dim,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Override Methods</div>
+  return<div style={{padding:"14px",display:"flex",flexDirection:"column",gap:7}}>
+    <Lbl>Override Methods</Lbl>
     {ITEM_METHODS.filter(m=>!m.hidden).map(m=>{
       const isOn=enabled.includes(m.key);
       const busy=busyKey===m.key;
@@ -1848,12 +2652,12 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
             {visuallyOn&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
           </div>
           <div style={{minWidth:0}}>
-            <div style={{fontSize:12,color:visuallyOn?C.text:"#787872",fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+            <div style={{fontSize:13,color:visuallyOn?C.text:C.dim,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
               {m.label}
-              {hasBlocks&&<span style={{fontSize:9,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
-              {disabled&&<span style={{fontSize:9,color:"#e8a868",background:"#3a2010",padding:"1px 5px",borderRadius:3}}>requires Air Interaction</span>}
+              {hasBlocks&&<span style={{fontSize:10,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
+              {disabled&&<span style={{fontSize:10,color:"#e8a868",background:"#3a2010",padding:"1px 5px",borderRadius:3}}>requires Air Interaction</span>}
             </div>
-            <div style={{fontSize:10,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>
+            <div style={{fontSize:11,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>
           </div>
         </div>
         {visuallyOn&&m.key!=="continuousUse"&&<Btn sm v="p" onClick={()=>onEnterEditor(m.key)} style={{marginLeft:8,flexShrink:0}}>Edit</Btn>}
@@ -1902,7 +2706,7 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
       {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey={highlightFaceKey||"textureId"} label={faceLabel}/>}
       {activePanel==="tags"&&<TagsPanel/>}
       {activePanel==="tooltip"&&<TooltipPanel/>}
-      {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks}/>}
+      {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks} textures={textures}/>}
       {activePanel==="code"&&<CodePanel textures={textures} isBlock={isBlock}/>}
     </div>
   </div>;
@@ -1910,6 +2714,7 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
 
 function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,consoleH,activePanel,setActivePanel,rightView,setRightView}){
   const{form,F}=useContext(FormCtx);
+  const{options:creativeTabOptions}=useCreativeTabs();
   const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
   const texId=(form.textureId||"").startsWith("__direct__")?null:form.textureId;
   const selTex=textures.find(t=>t.id===texId);
@@ -1977,7 +2782,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
   const updEff=(i,k,v)=>F("foodEffects",effs.map((e,idx)=>idx===i?{...e,[k]:v}:e));
 
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
-    <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Item":"New Item"}</span>{isEdit&&<Pill color="#1a2438">editing</Pill>}</div>
+    <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Item":"New Item"}</span></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
       <IdField label="Item ID" value={form.id} onChange={v=>{F("id",v);if(!isEdit){F("constName",v.toUpperCase());F("displayName",v.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" "));}}}/>
       <ConstField form={form} F={F}/>
@@ -1996,7 +2801,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       </div>
       {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>animated — mcmeta auto-written</span>}
     </div>
-    <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
+    <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
     <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
       <div style={{flex:1}}>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -2093,6 +2898,7 @@ function ItemRight({textures,modItems=[],activePanel,setActivePanel,rightView,se
 
 function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlocks=[],showCons,consoleH,activePanel,setActivePanel,setHighlightFaceKey}){
   const{form,F}=useContext(FormCtx);
+  const{options:creativeTabOptions}=useCreativeTabs();
   const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
   const orient=form.orientationType||"simple",isAdv=orient==="pillar"||orient==="directional";
   const tags=form.tags||[];
@@ -2195,7 +3001,7 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
         <TexRow label="Right" fkey="textureRightId"/>
       </div>}
     </div>
-    <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={CREATIVE_TABS}/>
+    <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/><Sel label="Sound" value={form.soundType} onChange={v=>F("soundType",v)} options={SOUND_TYPES}/></div>
     {orient==="simple"&&<Sect title={<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",margin:"-4px 0"}}><input type="checkbox" checked={!!form.showVariants} onChange={e=>F("showVariants",e.target.checked)} style={{cursor:"pointer",margin:0}}/><span style={{fontSize:13,fontWeight:500,color:C.text}}>Add Variants</span></label>}>
       {form.showVariants&&<div style={{marginTop:8}}>
@@ -2255,6 +3061,19 @@ export default function App(){
   const[activePanel,setActivePanel]=useState(null);
   const[rightView,setRightView]=useState({mode:"methodList",editingMethod:null});
   const[highlightFaceKey,setHighlightFaceKey]=useState("textureId");
+  const[tabsPageEditing,setTabsPageEditing]=useState(false);
+  const[tabsPageNewTrigger,setTabsPageNewTrigger]=useState(0);
+  const[tabsEditingTarget,setTabsEditingTarget]=useState(null); // null | "new" | {key,...}
+  const[tabsViewingTarget,setTabsViewingTarget]=useState(null); // null | option
+  const[keybindsPageEditing,setKeybindsPageEditing]=useState(false);
+  const[keybindsPageNewTrigger,setKeybindsPageNewTrigger]=useState(0);
+  const[keybindsEditingTarget,setKeybindsEditingTarget]=useState(null); // null | "new" | {key,...}
+  const[interfacesPageEditing,setInterfacesPageEditing]=useState(false);
+  const[interfacesPageNewTrigger,setInterfacesPageNewTrigger]=useState(0);
+  const[interfacesEditingTarget,setInterfacesEditingTarget]=useState(null); // null | "new" | {id,...}
+  const[variablesPageEditing,setVariablesPageEditing]=useState(false);
+  const[variablesPageNewTrigger,setVariablesPageNewTrigger]=useState(0);
+  const[variablesEditingTarget,setVariablesEditingTarget]=useState(null); // null | "new" | {name,...}
   const{rs,running,run}=useRun();
   const isElectron=typeof window!=="undefined"&&window.ycsNative?.isElectron;
   const native=typeof window!=="undefined"?window.ycsNative:null;
@@ -2313,7 +3132,18 @@ export default function App(){
   };
   const inEd=(tab==="textures"&&texEd!=null)||(tab==="items"&&itemEd!=null)||(tab==="blocks"&&blockEd!=null);
   const fabBottom=showCons?consH+5+30:30;
-  const TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"}];
+  const ALL_TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"},{id:"tabs",l:"Tabs"},{id:"keybinds",l:"Keybinds"},{id:"interfaces",l:"Interfaces"},{id:"variables",l:"Variables"}];
+  const[tabOrder,setTabOrder]=useLS("ycs_tab_order",ALL_TABS.map(t=>t.id));
+  const TABS=useMemo(()=>{
+    const byId=new Map(ALL_TABS.map(t=>[t.id,t]));
+    const known=tabOrder.filter(id=>byId.has(id));
+    const missing=ALL_TABS.filter(t=>!known.includes(t.id)).map(t=>t.id);
+    return[...known,...missing].map(id=>byId.get(id));
+  },[tabOrder]);
+  const[tabDragIdx,setTabDragIdx]=useState(null);
+  const moveTab=(from,to)=>{if(from==null||to==null||from===to)return;const ids=TABS.map(t=>t.id);const[m]=ids.splice(from,1);ids.splice(to,0,m);setTabOrder(ids);};
+  const tabStripRef=useRef(null);
+  const onTabStripWheel=e=>{if(!tabStripRef.current)return;if(e.deltaY===0)return;e.preventDefault();tabStripRef.current.scrollLeft+=e.deltaY;};
 
   const renderPane=()=>{
     if(tab==="textures"){
@@ -2356,6 +3186,18 @@ export default function App(){
       return<BlockProv initial={init} formOverride={blockEd.liveForm||null} onFormChange={f=>setBlockEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={cancelBlock} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={blockEntries} emptyLabel="No blocks yet." onDelete={delBlock} onOpen={e=>setBlockEd({target:e})}/></div>;
     }
+    if(tab==="tabs"){
+      return<TabsPage allItems={allItems} allBlocks={allBlocks} textures={textures} reloadMod={reloadMod} onEditingChange={setTabsPageEditing} newTrigger={tabsPageNewTrigger} editing={tabsEditingTarget} setEditing={setTabsEditingTarget} viewing={tabsViewingTarget} setViewing={setTabsViewingTarget}/>;
+    }
+    if(tab==="keybinds"){
+      return<KeybindsPage reloadMod={reloadMod} onEditingChange={setKeybindsPageEditing} newTrigger={keybindsPageNewTrigger} editing={keybindsEditingTarget} setEditing={setKeybindsEditingTarget}/>;
+    }
+    if(tab==="interfaces"){
+      return<InterfacesPage onEditingChange={setInterfacesPageEditing} newTrigger={interfacesPageNewTrigger} editing={interfacesEditingTarget} setEditing={setInterfacesEditingTarget}/>;
+    }
+    if(tab==="variables"){
+      return<VariablesPage onEditingChange={setVariablesPageEditing} newTrigger={variablesPageNewTrigger} editing={variablesEditingTarget} setEditing={setVariablesEditingTarget} allItems={allItems} textures={textures}/>;
+    }
     return null;
   };
 
@@ -2377,9 +3219,16 @@ export default function App(){
 
       {/* ROW 2: Tab bar — tabs on left, gradle dots on right aligned with window buttons above */}
       <div style={{height:36,background:C.tabBar,display:"flex",alignItems:"center",paddingLeft:8,flexShrink:0,zIndex:20}}>
-        {/* Tabs sit at bottom of bar */}
-        <div style={{display:"flex",alignItems:"flex-end",alignSelf:"stretch",flex:1}}>
-          {TABS.map(t=>{const a=tab===t.id;return<button key={t.id} onClick={()=>switchTab(t.id)} style={{width:TAB_W,height:TAB_H,background:a?C.bg:"#2e2e2e",border:"none",borderRadius:"6.5px 6.5px 0 0",color:C.text,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"pointer",flexShrink:0,marginRight:3,opacity:a?1:0.65}}>{t.l}</button>;})}
+        {/* Tabs sit at bottom of bar — drag to reorder, wheel to scroll when overflowing */}
+        <div ref={tabStripRef} onWheel={onTabStripWheel} style={{display:"flex",alignItems:"flex-end",alignSelf:"stretch",flex:1,overflowX:"auto",scrollbarWidth:"none"}}>
+          {TABS.map((t,i)=>{const a=tab===t.id;return<button key={t.id}
+            draggable
+            onDragStart={()=>setTabDragIdx(i)}
+            onDragOver={e=>e.preventDefault()}
+            onDrop={()=>{moveTab(tabDragIdx,i);setTabDragIdx(null);}}
+            onDragEnd={()=>setTabDragIdx(null)}
+            onClick={()=>switchTab(t.id)}
+            style={{width:TAB_W,height:TAB_H,background:a?C.bg:"#2e2e2e",border:"none",borderRadius:"6.5px 6.5px 0 0",color:C.text,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"grab",flexShrink:0,marginRight:3,opacity:tabDragIdx===i?0.4:a?1:0.65}}>{t.l}</button>;})}
         </div>
         {/* Gradle dots — vertically centered in tab bar row, right-aligned with window buttons */}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingRight:13,WebkitAppRegion:"no-drag",flexShrink:0}}>
@@ -2392,7 +3241,7 @@ export default function App(){
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,padding:`5px 5px ${showCons?0:5}px 5px`,gap:5}}>
         {renderPane()}
       </div>
-      {!inEd&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else setBlockEd({});}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
+      {!inEd&&!(tab==="tabs"&&tabsPageEditing)&&!(tab==="keybinds"&&keybindsPageEditing)&&!(tab==="interfaces"&&interfacesPageEditing)&&!(tab==="variables"&&variablesPageEditing)&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else if(tab==="blocks")setBlockEd({});else if(tab==="tabs")setTabsPageNewTrigger(t=>t+1);else if(tab==="keybinds")setKeybindsPageNewTrigger(t=>t+1);else if(tab==="interfaces")setInterfacesPageNewTrigger(t=>t+1);else if(tab==="variables")setVariablesPageNewTrigger(t=>t+1);}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
       {showCons&&<div style={{flexShrink:0,padding:"0 5px 5px"}}>
         <div onMouseDown={onConsDrag} style={{height:7,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:36,height:3,borderRadius:2,background:"#2e2e2e"}}/></div>
         <div style={{height:consH,background:"#0a0a0a",border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",overflow:"hidden"}}>

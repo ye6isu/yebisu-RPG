@@ -47,9 +47,12 @@ public final class EntityVarMap {
     /**
      * Defines a variable. If the key already exists, the existing value is kept
      * (safe to call on every tick or spawn without overwriting live data).
+     * Returns {@code this} so define+get/set can be chained in a single expression
+     * (used by YCS-generated Get/Set Variable blocks).
      */
-    public void define(String key, EntityVar defaultVar) {
+    public EntityVarMap define(String key, EntityVar defaultVar) {
         vars.putIfAbsent(key, defaultVar);
+        return this;
     }
 
     /** Returns {@code true} if the key has been defined. */

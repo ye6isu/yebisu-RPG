@@ -11,6 +11,7 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.ye6isu.yebisuRPG.attribute.AttributeRangeFix;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.data.EntityVarCapability;
@@ -61,6 +62,7 @@ public class yebisuRPG {
     private void commonSetup(FMLCommonSetupEvent event) {
         // Runs on both client and server during mod loading.
         // Use for things that need to happen on both sides (capability registration, etc.)
+        AttributeRangeFix.apply();
     }
 
     private void clientSetup(FMLClientSetupEvent event) {

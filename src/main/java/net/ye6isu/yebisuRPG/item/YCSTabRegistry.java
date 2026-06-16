@@ -9,6 +9,7 @@ import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
 import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class YCSTabRegistry {
@@ -72,7 +73,7 @@ public final class YCSTabRegistry {
                 return Map.of();
             }
             String json = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            Type type = new TypeToken<Map<String, String>>(){}.getType();
+            Type type = new TypeToken<LinkedHashMap<String, String>>(){}.getType();
             Map<String, String> result = new Gson().fromJson(json, type);
             System.out.println("[YCSTabRegistry] Loaded " + (result != null ? result.size() : 0) + " entries");
             return result != null ? result : Map.of();

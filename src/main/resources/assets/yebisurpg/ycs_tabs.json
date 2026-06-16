@@ -13,18 +13,19 @@
   "block:ye6isu_block": "yebisurpg_blocks_tab",
   "block:ye6isu_ore": "yebisurpg_blocks_tab",
 
-  "joe_spawn_egg": "yebisurpg_items_tab",
-  "norbit_the_orbit": "yebisurpg_items_tab",
-  "plank": "yebisurpg_items_tab",
-  "plank_boots": "yebisurpg_items_tab",
-  "plank_chestplate": "yebisurpg_items_tab",
-  "plank_helmet": "yebisurpg_items_tab",
-  "plank_leggings": "yebisurpg_items_tab",
-  "walkman": "yebisurpg_items_tab",
   "ye6isu": "yebisurpg_items_tab",
-  "ye6isu_axe": "yebisurpg_items_tab",
-  "ye6isu_hoe": "yebisurpg_items_tab",
+  "plank": "yebisurpg_items_tab",
+  "walkman": "yebisurpg_items_tab",
+  "ye6isu_sword": "yebisurpg_items_tab",
   "ye6isu_pickaxe": "yebisurpg_items_tab",
   "ye6isu_shovel": "yebisurpg_items_tab",
-  "ye6isu_sword": "yebisurpg_items_tab"
+  "ye6isu_axe": "yebisurpg_items_tab",
+  "ye6isu_hoe": "yebisurpg_items_tab",
+  "plank_helmet": "yebisurpg_items_tab",
+  "plank_chestplate": "yebisurpg_items_tab",
+  "plank_leggings": "yebisurpg_items_tab",
+  "plank_boots": "yebisurpg_items_tab",
+  "joe_spawn_egg": "yebisurpg_items_tab",
+
+  "norbit_the_orbit": "test_tab"
 }
