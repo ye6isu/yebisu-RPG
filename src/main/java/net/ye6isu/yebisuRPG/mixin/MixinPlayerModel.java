@@ -9,7 +9,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.animation.AnimationLoopMode;
-import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.AnimationBlender;
 import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
@@ -46,18 +45,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
     protected MixinPlayerModel(ModelPart root) { super(root); }
 
-
-
-    /**
-     * Fired at the very start of setupAnim, before HumanoidModel writes anything.
-     * When a third-person animation is active we zero the fields that drive vanilla
-     * swing, walk, and crouch so none of those motions bleed into our bones.
-     *
-     * attackTime  — drives the arm-swing arc
-     * swimAmount  — tilts the whole body forward when swimming
-     * The limbSwing/limbSwingAmount params drive leg/arm walking; we leave those
-     * because applyBone overwrites the bones with absolute values anyway.
-     */
     @Inject(
         method = "setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V",
         at = @At("HEAD")
@@ -70,7 +57,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         if (!(entity instanceof net.minecraft.client.player.AbstractClientPlayer)) return;
 
         // Always reset scale to 1 so a finished animation doesn't leave stale scale values.
-        // Vanilla setupAnim never writes xScale/yScale/zScale, so they persist across frames.
         this.head.xScale     = 1f; this.head.yScale     = 1f; this.head.zScale     = 1f;
         this.body.xScale     = 1f; this.body.yScale     = 1f; this.body.zScale     = 1f;
         this.rightArm.xScale = 1f; this.rightArm.yScale = 1f; this.rightArm.zScale = 1f;
@@ -83,7 +69,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         AnimationBlender  blender  = engine.getBlender(entity.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
         if (playhead == null && blender == null) return;
 
-        // Only suppress vanilla if the animation file actually loaded.
         HandAnimationLoader.AnimData anim = null;
         if (playhead != null) {
             anim = playhead.filePath() != null
@@ -92,9 +77,21 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         }
         if (anim == null && blender == null) return;
 
-        // Zero all vanilla pose modifiers so nothing bleeds through.
-        this.attackTime = 0f;  // arm swing arc
-        this.swimAmount = 0f;  // forward body tilt while swimming
+        int vanMask  = playhead != null ? playhead.vanillaMask()     : 0;
+        int moveMask = playhead != null ? playhead.vanillaMoveMask() : 0;
+        boolean isMoving = limbSwingAmount > 0.01f;
+
+        boolean rArmVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_ARM,
+                AnimationPlayhead.MOVE_RARM_MOVING, AnimationPlayhead.MOVE_RARM_STILL, isMoving);
+        boolean lArmVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_LEFT_ARM,
+                AnimationPlayhead.MOVE_LARM_MOVING, AnimationPlayhead.MOVE_LARM_STILL, isMoving);
+
+        // Suppress arm swing if EITHER arm is animation-driven (attackTime is global).
+        if (!rArmVan || !lArmVan) this.attackTime = 0f;
+
+        // Crouch: swimAmount drives body-forward tilt in vanilla — always suppress it.
+        // The PoseStack -0.125 Y shift is handled separately in MixinPlayerRenderer.
+        this.swimAmount = 0f;
     }
 
     @Inject(
@@ -122,7 +119,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
         float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
 
-        // Resolve animation data from the JSON loader.
         HandAnimationLoader.AnimData anim = null;
         if (playhead != null) {
             anim = playhead.filePath() != null
@@ -130,10 +126,8 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                     : HandAnimationLoader.INSTANCE.get(playhead.animId());
         }
 
-        // If file didn't load and there's no blend-out in progress, nothing to do.
         if (anim == null && blender == null) return;
 
-        // Compute time with HOLD_LAST clamping.
         float timeSecs = 0f;
         if (playhead != null && anim != null) {
             float raw = playhead.getCurrentTimeSecs();
@@ -142,44 +136,144 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                     : raw;
         }
 
-        // Blend weight: 1 = fully animation-driven, 0 = vanilla (during blend-out).
         float weight = 1.0f;
         if (blender != null && blender.isActive()) {
             weight = 1.0f - blender.getBlendAlpha(partialTick);
         }
         if (weight <= 0f) return;
 
-        // Reset all bones to their constructor rest pose — resetPose() restores the
-        // initial x/y/z/xRot/yRot/zRot/xScale/yScale/zScale that ModelPart stores
-        // internally when first built. This undoes ALL vanilla crouch/walk/swim offsets.
-        this.head.resetPose();
-        this.body.resetPose();
-        this.rightArm.resetPose();
-        this.leftArm.resetPose();
-        this.rightLeg.resetPose();
-        this.leftLeg.resetPose();
+        int lookMask = (playhead != null) ? playhead.lookAtMask()      : 0;
+        int vanMask  = (playhead != null) ? playhead.vanillaMask()     : 0;
+        int moveMask = (playhead != null) ? playhead.vanillaMoveMask() : 0;
+        boolean isMoving  = limbSwingAmount > 0.01f;
+        boolean crouching = entity instanceof net.minecraft.client.player.AbstractClientPlayer cp && cp.isCrouching();
+        boolean crouchPose = (vanMask & AnimationPlayhead.VAN_CROUCH) != 0 && crouching;
 
-        // Sample every bone channel from the JSON.
-        HandAnimationLoader.BonePose head    = pose(anim, "head");
-        HandAnimationLoader.BonePose torso   = pose(anim, "torso");
-        HandAnimationLoader.BonePose rArm    = pose(anim, "right_arm");
-        HandAnimationLoader.BonePose lArm    = pose(anim, "left_arm");
-        HandAnimationLoader.BonePose rLeg    = pose(anim, "right_leg");
-        HandAnimationLoader.BonePose lLeg    = pose(anim, "left_leg");
+        boolean headVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_HEAD,
+                AnimationPlayhead.MOVE_HEAD_MOVING,  AnimationPlayhead.MOVE_HEAD_STILL,  isMoving);
+        boolean torsoVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_TORSO,
+                AnimationPlayhead.MOVE_TORSO_MOVING, AnimationPlayhead.MOVE_TORSO_STILL, isMoving);
+        boolean rArmVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_ARM,
+                AnimationPlayhead.MOVE_RARM_MOVING,  AnimationPlayhead.MOVE_RARM_STILL,  isMoving);
+        boolean lArmVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_LEFT_ARM,
+                AnimationPlayhead.MOVE_LARM_MOVING,  AnimationPlayhead.MOVE_LARM_STILL,  isMoving);
+        boolean rLegVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_LEG,
+                AnimationPlayhead.MOVE_RLEG_MOVING,  AnimationPlayhead.MOVE_RLEG_STILL,  isMoving);
+        boolean lLegVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_LEFT_LEG,
+                AnimationPlayhead.MOVE_LLEG_MOVING,  AnimationPlayhead.MOVE_LLEG_STILL,  isMoving);
 
-        int mask = (playhead != null) ? playhead.lookAtMask() : 0;
-        float yawRad   = mask != 0 ? (float) Math.toRadians(netHeadYaw)  : 0f;
-        float pitchRad = mask != 0 ? (float) Math.toRadians(headPitch)   : 0f;
+        float yawRad   = (float) Math.toRadians(netHeadYaw);
+        float pitchRad = (float) Math.toRadians(headPitch);
 
-        applyBone(this.head,     head,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_HEAD)      != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_HEAD)      != 0 ? pitchRad : 0f);
-        applyBone(this.body,     torso, timeSecs, weight, (mask & AnimationPlayhead.LOOK_TORSO)     != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_TORSO)     != 0 ? pitchRad : 0f);
-        applyBone(this.rightArm, rArm,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_RIGHT_ARM) != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_RIGHT_ARM) != 0 ? pitchRad : 0f);
-        applyBone(this.leftArm,  lArm,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_LEFT_ARM)  != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_LEFT_ARM)  != 0 ? pitchRad : 0f);
-        applyBone(this.rightLeg, rLeg,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_RIGHT_LEG) != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_RIGHT_LEG) != 0 ? pitchRad : 0f);
-        applyBone(this.leftLeg,  lLeg,  timeSecs, weight, (mask & AnimationPlayhead.LOOK_LEFT_LEG)  != 0 ? yawRad : 0f, (mask & AnimationPlayhead.LOOK_LEFT_LEG)  != 0 ? pitchRad : 0f);
+        HandAnimationLoader.BonePose headP  = pose(anim, "head");
+        HandAnimationLoader.BonePose torsoP = pose(anim, "torso");
+        HandAnimationLoader.BonePose rArmP  = pose(anim, "right_arm");
+        HandAnimationLoader.BonePose lArmP  = pose(anim, "left_arm");
+        HandAnimationLoader.BonePose rLegP  = pose(anim, "right_leg");
+        HandAnimationLoader.BonePose lLegP  = pose(anim, "left_leg");
 
-        // Sync overlay parts — vanilla's copyFrom calls ran before our bones were set.
+        // When VAN_CROUCH is active, vanilla has already written the full crouch pose into
+        // the bones (before our inject). Snapshot every channel we care about BEFORE
+        // resetPose() wipes them, then re-apply them after our animation.
+        // Vanilla crouch sets: body.xRot=0.5, head/body/arms y shifts, legs y+z shifts.
+        float cvHeadY  = 0f, cvHeadXR  = 0f;
+        float cvBodyY  = 0f, cvBodyXR  = 0f;
+        float cvRArmY  = 0f, cvRArmXR  = 0f;
+        float cvLArmY  = 0f, cvLArmXR  = 0f;
+        float cvRLegY  = 0f, cvRLegZ   = 0f;
+        float cvLLegY  = 0f, cvLLegZ   = 0f;
+        if (crouchPose) {
+            // Snapshot deltas relative to vanilla rest positions so we can ADD them
+            // on top of applyBone's result rather than overwriting the anim position.
+            // Vanilla rest: head.y=0, body.y=0, arms.y=2, legs.y=12, legs.z=0.
+            if (!headVan)  { cvHeadY = this.head.y;            cvHeadXR = this.head.xRot; }
+            if (!torsoVan) { cvBodyY = this.body.y;            cvBodyXR = this.body.xRot; }
+            if (!rArmVan)  { cvRArmY = this.rightArm.y - 2f;  cvRArmXR = this.rightArm.xRot; }
+            if (!lArmVan)  { cvLArmY = this.leftArm.y  - 2f;  cvLArmXR = this.leftArm.xRot; }
+            if (!rLegVan)  { cvRLegY = this.rightLeg.y - 12f; cvRLegZ  = this.rightLeg.z; }
+            if (!lLegVan)  { cvLLegY = this.leftLeg.y  - 12f; cvLLegZ  = this.leftLeg.z; }
+        }
+
+        // Head yaw: when torso also has a yaw look-at, body.yRot already rotates the body
+        // in world-space. head.yRot is body-relative, so pass 0 for head yaw in that case —
+        // the torso rotation handles the world-space turn. If only head yaw is set, use yawRad.
+        boolean torsoHasYaw = (lookMask & AnimationPlayhead.LOOK_TORSO_YAW) != 0 && !torsoVan;
+        float headLookYaw   = (lookMask & AnimationPlayhead.LOOK_HEAD_YAW)   != 0
+                ? (torsoHasYaw ? 0f : yawRad) : 0f;
+        float headLookPitch = (lookMask & AnimationPlayhead.LOOK_HEAD_PITCH) != 0 ? pitchRad : 0f;
+
+        if (!headVan)  { this.head.resetPose();     applyBone(this.head,     headP,  timeSecs, weight, headLookYaw, headLookPitch); }
+        if (!torsoVan) { this.body.resetPose();     applyBone(this.body,     torsoP, timeSecs, weight,
+            (lookMask & AnimationPlayhead.LOOK_TORSO_YAW)   != 0 ? yawRad : 0f,
+            (lookMask & AnimationPlayhead.LOOK_TORSO_PITCH) != 0 ? pitchRad : 0f); }
+        if (!rArmVan)  { this.rightArm.resetPose(); applyBone(this.rightArm, rArmP,  timeSecs, weight,
+            (lookMask & AnimationPlayhead.LOOK_RARM_YAW)   != 0 ? yawRad : 0f,
+            (lookMask & AnimationPlayhead.LOOK_RARM_PITCH) != 0 ? pitchRad : 0f); }
+        if (!lArmVan)  { this.leftArm.resetPose();  applyBone(this.leftArm,  lArmP,  timeSecs, weight,
+            (lookMask & AnimationPlayhead.LOOK_LARM_YAW)   != 0 ? yawRad : 0f,
+            (lookMask & AnimationPlayhead.LOOK_LARM_PITCH) != 0 ? pitchRad : 0f); }
+        if (!rLegVan)  { this.rightLeg.resetPose(); applyBone(this.rightLeg, rLegP,  timeSecs, weight,
+            (lookMask & AnimationPlayhead.LOOK_RLEG_YAW)   != 0 ? yawRad : 0f,
+            (lookMask & AnimationPlayhead.LOOK_RLEG_PITCH) != 0 ? pitchRad : 0f); }
+        if (!lLegVan)  { this.leftLeg.resetPose();  applyBone(this.leftLeg,  lLegP,  timeSecs, weight,
+            (lookMask & AnimationPlayhead.LOOK_LLEG_YAW)   != 0 ? yawRad : 0f,
+            (lookMask & AnimationPlayhead.LOOK_LLEG_PITCH) != 0 ? pitchRad : 0f); }
+
+        // Re-apply crouch pose on top of our animation — the full set of y/z/xRot shifts
+        // that vanilla wrote before our inject. This gives 1:1 crouched static pose
+        // without any walk/swing animation leaking through.
+        if (crouchPose) {
+            // head/body: snapshot was absolute (rest y=0), add directly.
+            // arms/legs: snapshot was delta from rest, add on top of anim position.
+            if (!headVan)  { this.head.y    = lerp(this.head.y,    cvHeadY,              weight);
+                             this.head.xRot = lerp(this.head.xRot, this.head.xRot + cvHeadXR, weight); }
+            if (!torsoVan) { this.body.y    = lerp(this.body.y,    cvBodyY,              weight);
+                             this.body.xRot = lerp(this.body.xRot, this.body.xRot + cvBodyXR, weight); }
+            if (!rArmVan)  { this.rightArm.y   += cvRArmY * weight;
+                             this.rightArm.xRot = lerp(this.rightArm.xRot, this.rightArm.xRot + cvRArmXR, weight); }
+            if (!lArmVan)  { this.leftArm.y    += cvLArmY * weight;
+                             this.leftArm.xRot  = lerp(this.leftArm.xRot,  this.leftArm.xRot  + cvLArmXR,  weight); }
+            if (!rLegVan)  { this.rightLeg.y   += cvRLegY * weight;
+                             this.rightLeg.z    += cvRLegZ * weight; }
+            if (!lLegVan)  { this.leftLeg.y    += cvLLegY * weight;
+                             this.leftLeg.z     += cvLLegZ * weight; }
+        }
+
+        // When the torso has a yaw look-at rotation, rotate only the shoulder rest pivot
+        // around the body Y axis to keep arms attached. We separate the anim delta from
+        // the rest offset so only the pivot orbits, not the animation-driven position.
+        if (torsoHasYaw) {
+            float cosT = (float) Math.cos(this.body.yRot);
+            float sinT = (float) Math.sin(this.body.yRot);
+            // Right arm rest: x=-5, z=0. Left arm rest: x=5, z=0.
+            if (!rArmVan) {
+                float animDX = this.rightArm.x - (-5f);
+                float animDZ = this.rightArm.z;
+                this.rightArm.x = -5f * cosT + animDX;
+                this.rightArm.z = -(-5f) * sinT + animDZ;
+            }
+            if (!lArmVan) {
+                float animDX = this.leftArm.x - 5f;
+                float animDZ = this.leftArm.z;
+                this.leftArm.x = 5f * cosT + animDX;
+                this.leftArm.z = -(5f) * sinT + animDZ;
+            }
+        }
+
         this.hat.copyFrom(this.head);
+    }
+
+    /**
+     * Returns true if vanilla should own this part given the current move state.
+     * vanBit must be set, AND the relevant move bit(s) must permit the current state.
+     * If neither move bit is set the vanilla allowance is unconditional (both states).
+     */
+    private static boolean vanActive(int vanMask, int moveMask, int vanBit,
+                                     int movingBit, int stillBit, boolean isMoving) {
+        if ((vanMask & vanBit) == 0) return false;
+        int cond = moveMask & (movingBit | stillBit);
+        if (cond == 0) return true; // no condition set → always active
+        return isMoving ? (cond & movingBit) != 0 : (cond & stillBit) != 0;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -203,17 +297,16 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
      */
     private static void applyBone(ModelPart bone, HandAnimationLoader.BonePose pose,
                                    float t, float weight, float lookYaw, float lookPitch) {
-        // Rotation: anim value + look-at offset.
-        float rx = (float) Math.toRadians(pose.rotation().evalX(t)) + lookPitch * weight;
-        float ry = (float) Math.toRadians(-pose.rotation().evalY(t)) + lookYaw  * weight;
+        // Look-at offsets applied at full strength (not scaled by weight) — stays live
+        // during blend-out, vanishes cleanly once vanilla takes over after blend completes.
+        float rx = (float) Math.toRadians(pose.rotation().evalX(t)) + lookPitch;
+        float ry = (float) Math.toRadians(-pose.rotation().evalY(t)) + lookYaw;
         float rz = (float) Math.toRadians(pose.rotation().evalZ(t));
         bone.xRot = lerp(bone.xRot, rx, weight);
         bone.yRot = lerp(bone.yRot, ry, weight);
         bone.zRot = lerp(bone.zRot, rz, weight);
 
         // Position: re-express the body-local delta in camera space.
-        // Build camera basis vectors from yaw+pitch, then map body axes onto them
-        // so each axis contribution is fully independent — no gimbal coupling.
         final float POS_SCALE = 16f / 16f;
         float dx =  pose.position().evalX(t) * POS_SCALE * weight;
         float dy = -pose.position().evalY(t) * POS_SCALE * weight;
@@ -221,11 +314,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         if (lookYaw != 0f || lookPitch != 0f) {
             float cosY = (float) Math.cos(lookYaw),  sinY = (float) Math.sin(lookYaw);
             float cosP = (float) Math.cos(lookPitch), sinP = (float) Math.sin(lookPitch);
-            // Camera basis in body-local space:
-            // right   = ( cosY,       0,    -sinY )
-            // up      = ( sinY*sinP,  cosP,  cosY*sinP )
-            // forward = ( sinY*cosP, -sinP,  cosY*cosP )
-            // Output = dx*right + dy*up + dz*forward
             bone.x += dx * cosY        + dy * sinY * sinP + dz * sinY * cosP;
             bone.y +=                    dy * cosP         - dz * sinP;
             bone.z += dx * (-sinY)     + dy * cosY * sinP + dz * cosY * cosP;

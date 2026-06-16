@@ -9,8 +9,6 @@ import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
 import java.lang.reflect.Type;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 public final class YCSTabRegistry {
@@ -68,25 +66,19 @@ public final class YCSTabRegistry {
     }
 
     private static Map<String, String> loadJson() {
-        // Walk up from working dir to find project root (run/ -> project root)
-        try {
-            Path cwd = Path.of("").toAbsolutePath();
-            for (int i = 0; i <= 3; i++) {
-                Path candidate = cwd.resolve("src/main/resources/assets/yebisurpg/ycs_tabs.json");
-                if (Files.exists(candidate)) {
-                    String json = Files.readString(candidate);
-                    Type type = new TypeToken<Map<String, String>>(){}.getType();
-                    Map<String, String> result = new Gson().fromJson(json, type);
-                    System.out.println("[YCSTabRegistry] Loaded " + (result != null ? result.size() : 0) + " entries from " + candidate);
-                    return result != null ? result : Map.of();
-                }
-                if (cwd.getParent() == null) break;
-                cwd = cwd.getParent();
+        try (var stream = YCSTabRegistry.class.getResourceAsStream("/assets/yebisurpg/ycs_tabs.json")) {
+            if (stream == null) {
+                System.out.println("[YCSTabRegistry] ycs_tabs.json not found in jar");
+                return Map.of();
             }
-            System.out.println("[YCSTabRegistry] ycs_tabs.json not found, cwd=" + Path.of("").toAbsolutePath());
+            String json = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            Type type = new TypeToken<Map<String, String>>(){}.getType();
+            Map<String, String> result = new Gson().fromJson(json, type);
+            System.out.println("[YCSTabRegistry] Loaded " + (result != null ? result.size() : 0) + " entries");
+            return result != null ? result : Map.of();
         } catch (Exception e) {
             System.err.println("[YCSTabRegistry] Error: " + e.getMessage());
+            return Map.of();
         }
-        return Map.of();
     }
 }

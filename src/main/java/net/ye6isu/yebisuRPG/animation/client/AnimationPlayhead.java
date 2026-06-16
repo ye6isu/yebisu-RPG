@@ -25,13 +25,49 @@ public final class AnimationPlayhead {
 
     public enum State { PLAYING, BLENDING_OUT, DONE }
 
-    // Bitmask: bit0=head, bit1=torso, bit2=rightArm, bit3=leftArm, bit4=rightLeg, bit5=leftLeg
-    public static final int LOOK_HEAD      = 1 << 0;
-    public static final int LOOK_TORSO     = 1 << 1;
-    public static final int LOOK_RIGHT_ARM = 1 << 2;
-    public static final int LOOK_LEFT_ARM  = 1 << 3;
-    public static final int LOOK_RIGHT_LEG = 1 << 4;
-    public static final int LOOK_LEFT_LEG  = 1 << 5;
+    // lookAtMask — 2 bits per part (yaw, pitch), 6 parts = 12 bits
+    // Head=bits 0-1, Torso=2-3, RightArm=4-5, LeftArm=6-7, RightLeg=8-9, LeftLeg=10-11
+    public static final int LOOK_HEAD_YAW       = 1 << 0;
+    public static final int LOOK_HEAD_PITCH     = 1 << 1;
+    public static final int LOOK_TORSO_YAW      = 1 << 2;
+    public static final int LOOK_TORSO_PITCH    = 1 << 3;
+    public static final int LOOK_RARM_YAW       = 1 << 4;
+    public static final int LOOK_RARM_PITCH     = 1 << 5;
+    public static final int LOOK_LARM_YAW       = 1 << 6;
+    public static final int LOOK_LARM_PITCH     = 1 << 7;
+    public static final int LOOK_RLEG_YAW       = 1 << 8;
+    public static final int LOOK_RLEG_PITCH     = 1 << 9;
+    public static final int LOOK_LLEG_YAW       = 1 << 10;
+    public static final int LOOK_LLEG_PITCH     = 1 << 11;
+
+    // vanillaMask — 1 bit per part; if set, vanilla walk/swing fully owns that part (no anim overwrite)
+    // Crouch bit: allows the PoseStack -0.125 Y shift (crouched height) but still no bone tilt animation
+    // Head=bit0, Torso=bit1, RightArm=bit2, LeftArm=bit3, RightLeg=bit4, LeftLeg=bit5, Crouch=bit6
+    public static final int VAN_HEAD      = 1 << 0;
+    public static final int VAN_TORSO     = 1 << 1;
+    public static final int VAN_RIGHT_ARM = 1 << 2;
+    public static final int VAN_LEFT_ARM  = 1 << 3;
+    public static final int VAN_RIGHT_LEG = 1 << 4;
+    public static final int VAN_LEFT_LEG  = 1 << 5;
+    public static final int VAN_CROUCH    = 1 << 6;
+
+    // vanillaMoveMask — 2 bits per part controlling when vanilla is active: bit0=while moving, bit1=while still
+    // If both bits set → always; if neither → never active regardless of vanillaMask
+    // Head=bits 0-1, Torso=2-3, RightArm=4-5, LeftArm=6-7, RightLeg=8-9, LeftLeg=10-11, Crouch=12-13
+    public static final int MOVE_HEAD_MOVING    = 1 << 0;
+    public static final int MOVE_HEAD_STILL     = 1 << 1;
+    public static final int MOVE_TORSO_MOVING   = 1 << 2;
+    public static final int MOVE_TORSO_STILL    = 1 << 3;
+    public static final int MOVE_RARM_MOVING    = 1 << 4;
+    public static final int MOVE_RARM_STILL     = 1 << 5;
+    public static final int MOVE_LARM_MOVING    = 1 << 6;
+    public static final int MOVE_LARM_STILL     = 1 << 7;
+    public static final int MOVE_RLEG_MOVING    = 1 << 8;
+    public static final int MOVE_RLEG_STILL     = 1 << 9;
+    public static final int MOVE_LLEG_MOVING    = 1 << 10;
+    public static final int MOVE_LLEG_STILL     = 1 << 11;
+    public static final int MOVE_CROUCH_MOVING  = 1 << 12;
+    public static final int MOVE_CROUCH_STILL   = 1 << 13;
 
     private final int entityId;
     private final AnimationCategory category;
@@ -39,33 +75,47 @@ public final class AnimationPlayhead {
     private final String filePath;
     private final float playbackSpeed;
     private final int lookAtMask;
+    private final int vanillaMask;
+    private final int vanillaMoveMask;
 
     private long startMs;
     private long frozenMs = -1L; // >= 0 while paused
     private State state = State.PLAYING;
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId) {
-        this(entityId, category, animId, null, 1f, 0);
+        this(entityId, category, animId, null, 1f, 0, 0, 0);
     }
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId, String filePath) {
-        this(entityId, category, animId, filePath, 1f, 0);
+        this(entityId, category, animId, filePath, 1f, 0, 0, 0);
     }
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
                              String filePath, float playbackSpeed) {
-        this(entityId, category, animId, filePath, playbackSpeed, 0);
+        this(entityId, category, animId, filePath, playbackSpeed, 0, 0, 0);
     }
 
     public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
                              String filePath, float playbackSpeed, int lookAtMask) {
-        this.entityId      = entityId;
-        this.category      = category;
-        this.animId        = animId;
-        this.filePath      = filePath;
-        this.playbackSpeed = playbackSpeed;
-        this.lookAtMask    = lookAtMask;
-        this.startMs       = System.currentTimeMillis();
+        this(entityId, category, animId, filePath, playbackSpeed, lookAtMask, 0, 0);
+    }
+
+    public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
+                             String filePath, float playbackSpeed, int lookAtMask, int vanillaMask) {
+        this(entityId, category, animId, filePath, playbackSpeed, lookAtMask, vanillaMask, 0);
+    }
+
+    public AnimationPlayhead(int entityId, AnimationCategory category, String animId,
+                             String filePath, float playbackSpeed, int lookAtMask, int vanillaMask, int vanillaMoveMask) {
+        this.entityId        = entityId;
+        this.category        = category;
+        this.animId          = animId;
+        this.filePath        = filePath;
+        this.playbackSpeed   = playbackSpeed;
+        this.lookAtMask      = lookAtMask;
+        this.vanillaMask     = vanillaMask;
+        this.vanillaMoveMask = vanillaMoveMask;
+        this.startMs         = System.currentTimeMillis();
     }
 
     // ── Fast-forward ──────────────────────────────────────────────────────────
@@ -142,11 +192,14 @@ public final class AnimationPlayhead {
     public String            animId()        { return animId;        }
     public String            filePath()      { return filePath;      }
     public float             playbackSpeed() { return playbackSpeed; }
-    public int               lookAtMask()    { return lookAtMask;    }
-    public State             state()         { return state;         }
-    public boolean           isPlaying()     { return state == State.PLAYING; }
-    public boolean           isDone()        { return state == State.DONE;    }
-    public boolean           looksAt(int bit){ return (lookAtMask & bit) != 0; }
+    public int               lookAtMask()      { return lookAtMask;      }
+    public int               vanillaMask()     { return vanillaMask;     }
+    public int               vanillaMoveMask() { return vanillaMoveMask; }
+    public State             state()           { return state;           }
+    public boolean           isPlaying()       { return state == State.PLAYING; }
+    public boolean           isDone()          { return state == State.DONE;    }
+    public boolean           looksAt(int bit)  { return (lookAtMask & bit) != 0; }
+    public boolean           allowsVanilla(int bit){ return (vanillaMask & bit) != 0; }
 
     public AnimationLoopMode effectiveLoopMode(HandAnimationLoader.AnimData anim) {
         return anim.loopMode();
