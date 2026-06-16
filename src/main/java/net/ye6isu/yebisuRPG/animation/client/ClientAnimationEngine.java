@@ -86,7 +86,8 @@ public final class ClientAnimationEngine {
     public void trigger(AnimTriggerPayload payload) {
         AnimationPlayhead ph = new AnimationPlayhead(
                 payload.entityId(), payload.category(), payload.animId(),
-                payload.filePathOrNull(), payload.playbackSpeed(), payload.lookAtMask());
+                payload.filePathOrNull(), payload.playbackSpeed(),
+                payload.lookAtMask(), payload.vanillaMask(), payload.vanillaMoveMask());
         ph.fastForward(payload.progressTicks());
 
         playheads

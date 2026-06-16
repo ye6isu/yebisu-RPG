@@ -63,6 +63,9 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
             if (anim == null && blender == null) return;
         }
 
+        // If VAN_CROUCH is set, the user wants the crouched height — don't cancel the shift.
+        if (playhead != null && (playhead.vanillaMask() & AnimationPlayhead.VAN_CROUCH) != 0) return;
+
         // Vanilla sneaking translates Y by -0.125 (in entity/block space, before scale).
         // We push back up by +0.125 to restore the standing Y origin.
         poseStack.translate(0.0, 0.125, 0.0);

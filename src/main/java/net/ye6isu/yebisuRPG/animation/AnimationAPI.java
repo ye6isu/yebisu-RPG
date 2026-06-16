@@ -88,6 +88,18 @@ public final class AnimationAPI {
     public static void triggerAnimation(Entity entity, AnimationCategory category,
                                         String animId, String filePath, float playbackSpeed,
                                         int lookAtMask) {
+        triggerAnimation(entity, category, animId, filePath, playbackSpeed, lookAtMask, 0);
+    }
+
+    public static void triggerAnimation(Entity entity, AnimationCategory category,
+                                        String animId, String filePath, float playbackSpeed,
+                                        int lookAtMask, int vanillaMask) {
+        triggerAnimation(entity, category, animId, filePath, playbackSpeed, lookAtMask, vanillaMask, 0);
+    }
+
+    public static void triggerAnimation(Entity entity, AnimationCategory category,
+                                        String animId, String filePath, float playbackSpeed,
+                                        int lookAtMask, int vanillaMask, int vanillaMoveMask) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] triggerAnimation called client-side for entity={} cat={} anim={}; ignoring.",
                     entity.getId(), category, animId);
@@ -101,11 +113,11 @@ public final class AnimationAPI {
         AnimationRegistry.get().put(entry);
 
         AnimTriggerPayload payload = AnimTriggerPayload.fresh(entity.getId(), category, animId,
-                filePath, playbackSpeed, lookAtMask);
+                filePath, playbackSpeed, lookAtMask, vanillaMask, vanillaMoveMask);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
 
-        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} speed={} lookAt={} startTick={}",
-                entity.getId(), category, animId, filePath, playbackSpeed, lookAtMask, startTick);
+        LOGGER.debug("[AnimationAPI] trigger: entity={} cat={} anim={} file={} speed={} lookAt={} vanilla={} move={} startTick={}",
+                entity.getId(), category, animId, filePath, playbackSpeed, lookAtMask, vanillaMask, vanillaMoveMask, startTick);
     }
 
     // -------------------------------------------------------------------------

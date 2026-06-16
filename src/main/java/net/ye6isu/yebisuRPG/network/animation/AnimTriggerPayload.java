@@ -35,7 +35,9 @@ public record AnimTriggerPayload(
         int progressTicks,
         String filePath,
         float playbackSpeed,
-        int lookAtMask
+        int lookAtMask,
+        int vanillaMask,
+        int vanillaMoveMask
 ) implements BasePayload {
 
     public static final CustomPacketPayload.Type<AnimTriggerPayload> TYPE =
@@ -53,8 +55,10 @@ public record AnimTriggerPayload(
                     String filePath        = ByteBufCodecs.stringUtf8(256).decode(buf);
                     float  playbackSpeed   = ByteBufCodecs.FLOAT.decode(buf);
                     int    lookAtMask      = ByteBufCodecs.VAR_INT.decode(buf);
+                    int    vanillaMask     = ByteBufCodecs.VAR_INT.decode(buf);
+                    int    vanillaMoveMask = ByteBufCodecs.VAR_INT.decode(buf);
                     return new AnimTriggerPayload(entityId, categoryOrdinal, animId,
-                            progressTicks, filePath, playbackSpeed, lookAtMask);
+                            progressTicks, filePath, playbackSpeed, lookAtMask, vanillaMask, vanillaMoveMask);
                 }
                 @Override
                 public void encode(ByteBuf buf, AnimTriggerPayload p) {
@@ -65,6 +69,8 @@ public record AnimTriggerPayload(
                     ByteBufCodecs.stringUtf8(256).encode(buf, p.filePath());
                     ByteBufCodecs.FLOAT.encode(buf, p.playbackSpeed());
                     ByteBufCodecs.VAR_INT.encode(buf, p.lookAtMask());
+                    ByteBufCodecs.VAR_INT.encode(buf, p.vanillaMask());
+                    ByteBufCodecs.VAR_INT.encode(buf, p.vanillaMoveMask());
                 }
             };
 
@@ -83,44 +89,66 @@ public record AnimTriggerPayload(
     // ── Factories ────────────────────────────────────────────────────────────
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category, String animId) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0, "", 1f, 0);
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0, "", 1f, 0, 0, 0);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
                                            String animId, String filePath) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "", 1f, 0);
+                filePath != null ? filePath : "", 1f, 0, 0, 0);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
                                            String animId, String filePath, float playbackSpeed) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "", playbackSpeed, 0);
+                filePath != null ? filePath : "", playbackSpeed, 0, 0, 0);
     }
 
     public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
                                            String animId, String filePath, float playbackSpeed,
                                            int lookAtMask) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
-                filePath != null ? filePath : "", playbackSpeed, lookAtMask);
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask, 0, 0);
+    }
+
+    public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
+                                           String animId, String filePath, float playbackSpeed,
+                                           int lookAtMask, int vanillaMask) {
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask, vanillaMask, 0);
+    }
+
+    public static AnimTriggerPayload fresh(int entityId, AnimationCategory category,
+                                           String animId, String filePath, float playbackSpeed,
+                                           int lookAtMask, int vanillaMask, int vanillaMoveMask) {
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, 0,
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask, vanillaMask, vanillaMoveMask);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
                                              String animId, int progressTicks) {
-        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks, "", 1f, 0);
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks, "", 1f, 0, 0, 0);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
                                              String animId, int progressTicks,
                                              String filePath, float playbackSpeed) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
-                filePath != null ? filePath : "", playbackSpeed, 0);
+                filePath != null ? filePath : "", playbackSpeed, 0, 0, 0);
     }
 
     public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
                                              String animId, int progressTicks,
                                              String filePath, float playbackSpeed, int lookAtMask) {
         return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
-                filePath != null ? filePath : "", playbackSpeed, lookAtMask);
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask, 0, 0);
+    }
+
+    public static AnimTriggerPayload catchUp(int entityId, AnimationCategory category,
+                                             String animId, int progressTicks,
+                                             String filePath, float playbackSpeed, int lookAtMask,
+                                             int vanillaMask, int vanillaMoveMask) {
+        return new AnimTriggerPayload(entityId, category.ordinal(), animId, progressTicks,
+                filePath != null ? filePath : "", playbackSpeed, lookAtMask, vanillaMask, vanillaMoveMask);
     }
 }
