@@ -25,8 +25,8 @@ public final class AnimationPlayhead {
 
     public enum State { PLAYING, BLENDING_OUT, DONE }
 
-    // lookAtMask — 2 bits per part (yaw, pitch), 6 parts = 12 bits
-    // Head=bits 0-1, Torso=2-3, RightArm=4-5, LeftArm=6-7, RightLeg=8-9, LeftLeg=10-11
+    // lookAtMask — 2 bits per part (yaw, pitch), 7 parts = 14 bits
+    // Head=bits 0-1, Torso=2-3, RightArm=4-5, LeftArm=6-7, RightLeg=8-9, LeftLeg=10-11, Root=12-13
     public static final int LOOK_HEAD_YAW       = 1 << 0;
     public static final int LOOK_HEAD_PITCH     = 1 << 1;
     public static final int LOOK_TORSO_YAW      = 1 << 2;
@@ -39,10 +39,14 @@ public final class AnimationPlayhead {
     public static final int LOOK_RLEG_PITCH     = 1 << 9;
     public static final int LOOK_LLEG_YAW       = 1 << 10;
     public static final int LOOK_LLEG_PITCH     = 1 << 11;
+    public static final int LOOK_ROOT_YAW       = 1 << 12;
+    public static final int LOOK_ROOT_PITCH     = 1 << 13;
 
     // vanillaMask — 1 bit per part; if set, vanilla walk/swing fully owns that part (no anim overwrite)
     // Crouch bit: allows the PoseStack -0.125 Y shift (crouched height) but still no bone tilt animation
-    // Head=bit0, Torso=bit1, RightArm=bit2, LeftArm=bit3, RightLeg=bit4, LeftLeg=bit5, Crouch=bit6
+    // Sitting bit: allows riding leg splay and arm pull-back pose
+    // Head=bit0, Torso=bit1, RightArm=bit2, LeftArm=bit3, RightLeg=bit4, LeftLeg=bit5,
+    // Crouch=bit6, (bit7 reserved), Sitting=bit8
     public static final int VAN_HEAD      = 1 << 0;
     public static final int VAN_TORSO     = 1 << 1;
     public static final int VAN_RIGHT_ARM = 1 << 2;
@@ -50,6 +54,7 @@ public final class AnimationPlayhead {
     public static final int VAN_RIGHT_LEG = 1 << 4;
     public static final int VAN_LEFT_LEG  = 1 << 5;
     public static final int VAN_CROUCH    = 1 << 6;
+    public static final int VAN_SITTING   = 1 << 8;
 
     // vanillaMoveMask — 2 bits per part controlling when vanilla is active: bit0=while moving, bit1=while still
     // If both bits set → always; if neither → never active regardless of vanillaMask
@@ -68,6 +73,8 @@ public final class AnimationPlayhead {
     public static final int MOVE_LLEG_STILL     = 1 << 11;
     public static final int MOVE_CROUCH_MOVING  = 1 << 12;
     public static final int MOVE_CROUCH_STILL   = 1 << 13;
+    public static final int MOVE_SITTING_MOVING = 1 << 16;
+    public static final int MOVE_SITTING_STILL  = 1 << 17;
 
     private final int entityId;
     private final AnimationCategory category;

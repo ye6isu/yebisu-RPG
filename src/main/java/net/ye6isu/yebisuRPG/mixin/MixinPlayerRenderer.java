@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
@@ -28,11 +29,83 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
     public MixinPlayerRenderer() { super(null, null, 0); }
 
     /**
-     * Vanilla PlayerRenderer.setupRotations (via LivingEntityRenderer) translates
-     * the entire model down by ~0.125 blocks when the player is crouching. This is
-     * a PoseStack-level transform, invisible to bone resets in setupAnim.
-     * When a third-person animation is active we cancel that shift by pushing it back up.
+     * The JSON's "root" bone (the true parent of every other bone, distinct from
+     * HumanoidModel.body/"torso") drives the whole model's position/rotation/scale,
+     * optionally composed with the camera's pitch+yaw (Root Yaw/Pitch checkboxes)
+     * so the model stays aimed at the camera regardless of where the player looks,
+     * exactly like the first-person root-bone handling in MixinItemInHandRenderer.
      */
+    @Inject(
+        method = "setupRotations(Lnet/minecraft/client/player/AbstractClientPlayer;Lcom/mojang/blaze3d/vertex/PoseStack;FFFF)V",
+        at = @At("RETURN")
+    )
+    private void yebisurpg$applyRootLock(
+            AbstractClientPlayer player,
+            PoseStack poseStack,
+            float ageInTicks,
+            float bodyYaw,
+            float partialTick,
+            float scale,
+            CallbackInfo ci) {
+
+        ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
+        AnimationPlayhead playhead = engine.getPlayhead(player.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
+
+        int lookMask = playhead != null ? playhead.lookAtMask() : 0;
+        boolean rootLookPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
+        boolean rootLookYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
+        if (rootLookPitch || rootLookYaw) {
+            // Vanilla already baked a yaw rotation derived from bodyYaw into the
+            // PoseStack before this RETURN inject runs. Cancel that out, then apply
+            // the camera's actual pitch/yaw (independently toggleable) so the whole
+            // model faces the camera regardless of where the player looks.
+            if (rootLookPitch) {
+                float lerpedXRot = Mth.lerp(partialTick, player.xRotO, player.getXRot());
+                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-lerpedXRot));
+            }
+            if (rootLookYaw) {
+                float lerpedYRot = Mth.lerp(partialTick, player.yRotO, player.getYRot());
+                poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(bodyYaw - lerpedYRot));
+            }
+        }
+
+        // Apply the animation's own "root" bone pose on top, same convention as
+        // the first-person hand renderer (axis remap JSON->game: Z->X, X->Y, Y->Z;
+        // rotation signs negated for Y/X to match Blockbench's right-handed export).
+        // Runs whenever a third-person animation is active, independent of the
+        // face-cam lock above.
+        if (playhead == null) return;
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim =
+            playhead.filePath() != null
+                ? net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId(), playhead.filePath())
+                : net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId());
+        if (anim == null) return;
+
+        float timeSecs = playhead.getCurrentTimeSecs();
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.BonePose root = anim.bone("root");
+        float rootRX = root.rotation().evalX(timeSecs);
+        float rootRY = root.rotation().evalY(timeSecs);
+        float rootRZ = root.rotation().evalZ(timeSecs);
+        float rootPX = root.position().evalX(timeSecs) / 16f;
+        float rootPY = root.position().evalY(timeSecs) / 16f;
+        float rootPZ = root.position().evalZ(timeSecs) / 16f;
+        float rootSX = root.scale().evalX(timeSecs);
+        float rootSY = root.scale().evalY(timeSecs);
+        float rootSZ = root.scale().evalZ(timeSecs);
+
+        if (rootRX != 0f || rootRY != 0f || rootRZ != 0f || rootPX != 0f || rootPY != 0f || rootPZ != 0f
+                || rootSX != 1f || rootSY != 1f || rootSZ != 1f) {
+            final float ROOT_PIVOT_Y = 16f / 16f;
+            poseStack.translate(0f, ROOT_PIVOT_Y, 0f);
+            if (rootRZ != 0f) poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rootRZ));
+            if (rootRY != 0f) poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-rootRY));
+            if (rootRX != 0f) poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-rootRX));
+            if (rootSX != 1f || rootSY != 1f || rootSZ != 1f) poseStack.scale(rootSX, rootSY, rootSZ);
+            poseStack.translate(0f, -ROOT_PIVOT_Y, 0f);
+            poseStack.translate(-rootPX, rootPY, rootPZ);
+        }
+    }
+
     @Inject(
         method = "setupRotations(Lnet/minecraft/client/player/AbstractClientPlayer;Lcom/mojang/blaze3d/vertex/PoseStack;FFFF)V",
         at = @At("RETURN")
@@ -63,8 +136,16 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
             if (anim == null && blender == null) return;
         }
 
-        // If VAN_CROUCH is set, the user wants the crouched height — don't cancel the shift.
-        if (playhead != null && (playhead.vanillaMask() & AnimationPlayhead.VAN_CROUCH) != 0) return;
+        // If VAN_CROUCH is set AND the move condition permits it, keep the shift.
+        if (playhead != null && (playhead.vanillaMask() & AnimationPlayhead.VAN_CROUCH) != 0) {
+            boolean isMoving = player.getDeltaMovement().horizontalDistanceSqr() > 0.0001;
+            int moveMask = playhead.vanillaMoveMask();
+            int cond = moveMask & (AnimationPlayhead.MOVE_CROUCH_MOVING | AnimationPlayhead.MOVE_CROUCH_STILL);
+            boolean crouchActive = cond == 0
+                    || (isMoving ? (cond & AnimationPlayhead.MOVE_CROUCH_MOVING) != 0
+                                 : (cond & AnimationPlayhead.MOVE_CROUCH_STILL)  != 0);
+            if (crouchActive) return;
+        }
 
         // Vanilla sneaking translates Y by -0.125 (in entity/block space, before scale).
         // We push back up by +0.125 to restore the standing Y origin.

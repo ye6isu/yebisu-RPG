@@ -64,7 +64,7 @@ public class ModItems {
 
 
     public static final DeferredItem<Item> JOE_SPAWN_EGG = ITEMS.register("joe_spawn_egg",
-            () -> new DeferredSpawnEggItem(ModEntities.JOE, 0x31afaf, 0xffac00,
+            () -> new DeferredSpawnEggItem(ModEntities.JOE, 0xffffff, 0xffffff,
                     new Item.Properties()));
 
     //YCS_Mod_Items_START
