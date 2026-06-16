@@ -7,6 +7,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 import org.lwjgl.glfw.GLFW;
 
@@ -61,6 +62,12 @@ public final class ModKeybinds {
     // public static final KeyMapping OPEN_SKILL_TREE = bind("open_skill_tree", GLFW.GLFW_KEY_K);
     // public static final KeyMapping DODGE           = bind("dodge",           GLFW.GLFW_KEY_LEFT_ALT);
 
+    //YCS_Mod_Keybinds_START
+
+    public static final KeyMapping TEST_BIND = bind("test_bind", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KeyModifier.NONE, CATEGORY);
+
+    //YCS_Mod_Keybinds_END
+
     // ---------------------------------------------------------------------------------
 
     private ModKeybinds() {}
@@ -72,6 +79,12 @@ public final class ModKeybinds {
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(OPEN_HAND_DEBUG);
+
+        //YCS_Mod_Keybinds_Register_START
+
+        event.register(TEST_BIND);
+
+        //YCS_Mod_Keybinds_Register_END
     }
 
     // ---------------------------------------------------------------------------------
@@ -96,6 +109,26 @@ public final class ModKeybinds {
     }
 
     /**
+     * Creates a {@link KeyMapping} active during normal gameplay (not in GUIs),
+     * with an explicit {@link InputConstants.Type} so mouse buttons (and unbound
+     * defaults via {@link InputConstants#UNKNOWN}) are supported alongside keys.
+     *
+     * @param name short name, e.g. {@code "use_ability"}.
+     * @param type {@link InputConstants.Type#KEYSYM} for keyboard or
+     *             {@link InputConstants.Type#MOUSE} for mouse buttons.
+     * @param code GLFW key/button constant, or {@link InputConstants#UNKNOWN} for no default.
+     */
+    private static KeyMapping bind(String name, InputConstants.Type type, int code) {
+        return new KeyMapping(
+            "key." + yebisuRPG.MODID + "." + name,
+            KeyConflictContext.IN_GAME,
+            type,
+            code,
+            CATEGORY
+        );
+    }
+
+    /**
      * Creates a {@link KeyMapping} active only when a GUI is open.
      *
      * @param name    short name used for the translation key.
@@ -109,6 +142,34 @@ public final class ModKeybinds {
             InputConstants.Type.KEYSYM,
             glfwKey,
             CATEGORY
+        );
+    }
+
+    /**
+     * Creates a {@link KeyMapping} active during normal gameplay, with an explicit
+     * {@link InputConstants.Type}, single {@link KeyModifier} (Ctrl/Alt/Shift/None —
+     * NeoForge's {@code KeyMapping} only supports one modifier at a time, not
+     * combinations), and category, so the Controls screen shows e.g. "Ctrl + F"
+     * automatically via {@code KeyMapping.getTranslatedKeyMessage()}.
+     *
+     * @param name     short name, e.g. {@code "use_ability"}.
+     * @param type     {@link InputConstants.Type#KEYSYM} for keyboard or
+     *                 {@link InputConstants.Type#MOUSE} for mouse buttons.
+     * @param code     GLFW key/button constant, or {@link InputConstants#UNKNOWN} for no default.
+     * @param modifier {@link KeyModifier#CONTROL}, {@link KeyModifier#SHIFT},
+     *                 {@link KeyModifier#ALT}, or {@link KeyModifier#NONE}.
+     * @param category Controls-screen category translation key, e.g. {@link #CATEGORY}
+     *                 for this mod's own group or a vanilla one like
+     *                 {@code "key.categories.misc"} to slot into an existing group.
+     */
+    private static KeyMapping bind(String name, InputConstants.Type type, int code, KeyModifier modifier, String category) {
+        return new KeyMapping(
+            "key." + yebisuRPG.MODID + "." + name,
+            KeyConflictContext.IN_GAME,
+            modifier,
+            type,
+            code,
+            category
         );
     }
 }

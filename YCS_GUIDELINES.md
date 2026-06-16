@@ -120,6 +120,43 @@ Feature keys: `food`, `fuel`, `tooltip`
 
 ---
 
+## Keybinds
+
+- Managed in `client/ModKeybinds.java`, the existing keybind home (not a new file).
+- Field declarations live in `//YCS_Mod_Keybinds_START ... END`, using the `bind(name, InputConstants.Type, code, KeyModifier, category)` overload so keyboard/mouse/unbound defaults, a single modifier, and an arbitrary category are all supported:
+  ```java
+  public static final KeyMapping MY_ACTION = bind("my_action", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, KeyModifier.NONE, CATEGORY);
+  public static final KeyMapping MY_MOUSE_ACTION = bind("my_mouse_action", InputConstants.Type.MOUSE, GLFW.GLFW_MOUSE_BUTTON_4, KeyModifier.CONTROL, "key.categories.misc");
+  public static final KeyMapping MY_UNBOUND_ACTION = bind("my_unbound_action", InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), KeyModifier.NONE, CATEGORY);
+  ```
+- Registration calls live in `//YCS_Mod_Keybinds_Register_START ... END` inside `register(RegisterKeyMappingsEvent)`:
+  ```java
+  event.register(MY_ACTION);
+  ```
+- Stored as an ordered list in `ycs_keybinds.json` (`{key, bindCode, category}`); list order = declaration/registration order. `bindCode` is `"NONE"` (no default), or a base of `"KEY_<glfw name>"` (keyboard) / `"MOUSE_<button index>"` (mouse), optionally followed by **at most one** of `+CTRL`, `+ALT`, `+SHIFT` (e.g. `"KEY_K+CTRL"`).
+- In the YCS UI, the default binding is set via a "Record" button (captures the next keydown/mousedown) *and* a dropdown listing every key/mouse button — either can set the base key. A second dropdown picks the single modifier (None/Ctrl/Alt/Shift). Defaults to no key (`"NONE"`) for new keybinds.
+- **Single modifier only, wired into NeoForge's native `KeyModifier` — no mixin needed.** `KeyMapping`/`KeyModifier` only support one modifier at a time (Ctrl, Alt, Shift, or None), not combinations. Passing it through the `bind(...)` overload makes `KeyMapping.getTranslatedKeyMessage()` automatically render e.g. "Ctrl + F" in the vanilla Controls screen for free. An in-game hint while actually playing (JEI-Ctrl+F style) was explicitly deferred — there's no action/GUI context yet for it to attach to.
+- **Category** can be this mod's own (`CATEGORY`, shown as "yebisu RPG (this mod)"), an existing vanilla category (`key.categories.movement|gameplay|inventory|creative|multiplayer|ui|misc`), or a custom modded string (`key.categories.<anything>`) typed in via the UI's "+ New custom category…" option. `server.js`'s `/keybinds/list` returns `{own, ownLabel, vanilla, custom}` (custom = categories already in use that aren't `CATEGORY` or vanilla) so the editor's `CategoryPicker` can offer them as a dropdown.
+- Lang key: `key.yebisurpg.<key>`.
+- What a keybind *does* when pressed is intentionally not wired up by YCS yet — only declaration/registration/lang plumbing exists until that action design (e.g. wiring into the visual block-scripting system) is decided.
+
+## UI Conventions
+
+- "Add new" is always the floating "+" button (bottom-right FAB), shared across every top-level tab (Textures, Items, Blocks, Tabs, Keybinds) — never a page-local "+ New ..." button. A page-local button duplicates the FAB and is inconsistent with the rest of the app.
+- A page opts into the FAB by reporting its own "currently editing/viewing a single entry" state up to `App` (via an `onEditingChange` callback) so the FAB hides while a form/detail view is open, and by accepting a `newTrigger` prop (an incrementing counter) that it watches to open its "new entry" form when the FAB is clicked.
+- Switching top-level tabs (Textures/Items/Blocks/Tabs/Keybinds) must preserve whatever state you left a tab in — e.g. if you were mid-edit on an item, switching to Blocks and back to Items returns you to that same open edit form, not the list view. Textures/Items/Blocks already do this via `savedEdState` in `App`; any new page should follow the same pattern rather than resetting to its list view on every tab switch.
+- New editor panels must reuse the shared theme primitives (`C` color table, `Lbl`, `SI.inp`/`SI.lbl`, `Btn`) instead of inventing one-off font sizes or colors. Section labels use `Lbl` (11px uppercase dim), row titles are 13px, secondary/signature text is 11px — not arbitrary 10/12px values.
+- Editor left panels (`TabEditor`, `KeybindEditor`, `ItemLeft`, `BlockLeft`) fill the available flex space (`flex:1`, no `maxWidth` cap) so every editor panel is the same size regardless of which tab it's on. Don't add a `maxWidth` to a single editor panel — it makes that page look inconsistent with the others.
+- Single-pane list views (Textures/Items/Blocks card grid, Tabs list, Keybinds list) use only `background:C.panel,borderRadius:C.r` — no `border`. The `border:1px solid C.pb` is reserved for two-panel editor layouts, where each of the two side-by-side panels gets the border (see Textures' edit view: left = `TexLeft`, right = `TexRight`, each wrapped in its own bordered `flex:1` box).
+- A page that edits a single entry should mirror that two-panel editor layout instead of a single bordered box: a left panel with the form fields and a right panel with a live preview/info view, both same-size (`flex:1`) bordered boxes side by side. `KeybindsPage` follows this via `KeybindEditor` (left) + `KeybindPreviewPanel` (right).
+- Editor/preview header titles (`"Edit X"` / `"New X"`) are plain text — `fontSize:14,fontWeight:500`, no explicit `color` (defaults to `C.text`) — and carry no status pill next to them. Don't use `color:C.accent` on these titles or add an `editing` badge; that was tried for Items/Keybinds and reverted for being inconsistent with the rest of the app.
+- Preview-panel "current value" cards (e.g. `KeybindPreviewPanel`, `InterfacePreviewPanel`) use the same neutral card styling as everything else: `background:C.card`, `border:1px solid C.inpB`, and `Pill` color `C.inp`. Don't hardcode blue tints like `#1a2438`/`#0e2030`/`#2a3f5a` for these — those hex values are reserved for actual *selected/active-state* highlighting elsewhere in the app (drag targets, active list rows, selected texture swatches), not for a page's default chrome.
+- The top-level tab strip supports drag-to-reorder (each tab button is `draggable`, reordering writes the new id order to `tabOrder`) and mouse-wheel horizontal scrolling (the tab strip container listens for `onWheel` and applies `deltaY` to `scrollLeft`) for when there are more tabs than fit the window. Tab order is persisted across reloads via `useLS("ycs_tab_order", ...)`; new tabs are appended automatically by reconciling the canonical tab list against the saved order, so you don't need to touch this when adding a new top-level tab — just add it to the canonical list.
+
+## Scope for New Feature Categories
+
+When a new feature needs to touch a file/path not already listed under "Files YCS Manages", YCS does not assume a location or create a new file on its own — it checks for an existing class/file that can house it first (as was done for keybinds, reusing `ModKeybinds.java`) and asks the project owner before creating anything new.
+
 ## Cleanup Rules
 
 When you delete an item or block, YCS:
@@ -171,4 +208,4 @@ When you disable a method override:
 | `resources/data/.../loot_table/` | Loot table JSON files |
 | `resources/data/.../tags/` | Tag JSON files |
 
-YCS never touches files outside these paths.
+For any new feature/file category not already in this table, YCS does not assume a path or create a new file on its own — it asks the project owner whether an existing file/class can house it before creating anything new.

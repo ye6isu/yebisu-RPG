@@ -23,7 +23,10 @@ const YCS_MARKERS = [
   ['//YCS_Mod_Blocks_START', '//YCS_Mod_Blocks_END'],
   ['//YCS_Mod_Block_State_START', '//YCS_Mod_Block_State_END'],
   ['//YCS_Mod_Block_Loot_START', '//YCS_Mod_Block_Loot_END'],
-  ['//YCS_Mod_Item_Model_START', '//YCS_Mod_Item_Model_END']
+  ['//YCS_Mod_Item_Model_START', '//YCS_Mod_Item_Model_END'],
+  ['//YCS_Mod_Creative_Tabs_START', '//YCS_Mod_Creative_Tabs_END'],
+  ['//YCS_Mod_Keybinds_START', '//YCS_Mod_Keybinds_END'],
+  ['//YCS_Mod_Keybinds_Register_START', '//YCS_Mod_Keybinds_Register_END']
 ]
 const wf = (f, s) => {
   if (typeof s === 'string') {
@@ -141,9 +144,26 @@ app.get('/api/items/read', (_req, res) => {
       let textureDataUrl = null
       if (hasTexture) { try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {} }
       const tabKey = tabs[id] || ''
-      const creativeTab = TAB_KEY_TO_VALUE[tabKey] || ''
+      const creativeTab = tabKeyToValueMap()[tabKey] || ''
       items.push({ id, constName, displayName:lang[`item.${MODID}.${id}`]||id, itemType, customItemClass, toolType, tier, damage, speed, burnTime, hasTexture, textureDataUrl, creativeTab, source:'mod' })
     }
+    res.json({ ok:true, items })
+  } catch(e) { res.json({ ok:false, reason:e.message, items:[] }) }
+})
+
+// ─── Vanilla item registry (for item pickers) ──────────────────────────────────
+// Generated once via RunData -> YCSVanillaItemDumpProvider (see that class for why
+// this is a static file rather than a live JVM query). Re-run RunData if the
+// target Minecraft version changes and the vanilla item list needs updating.
+const VANILLA_ITEMS_JSON = jp(MOD_ROOT, 'assets', MODID, 'ycs_vanilla_items.json')
+app.get('/api/items/vanilla', (_req, res) => {
+  try {
+    const ids = JSON.parse(rf(VANILLA_ITEMS_JSON))
+    const items = ids.map(rl_id => {
+      const path = rl_id.split(':')[1] || rl_id
+      const displayName = path.split('_').map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join(' ')
+      return { id: rl_id, displayName, source: 'vanilla' }
+    })
     res.json({ ok:true, items })
   } catch(e) { res.json({ ok:false, reason:e.message, items:[] }) }
 })
@@ -175,7 +195,7 @@ app.get('/api/blocks/read', (_req, res) => {
       let textureDataUrl = null
       if (hasTexture) { try { textureDataUrl = 'data:image/png;base64,' + fs.readFileSync(texPath).toString('base64') } catch {} }
       const tabKey = tabs[`block:${id}`] || ''
-      const creativeTab = TAB_KEY_TO_VALUE[tabKey] || ''
+      const creativeTab = tabKeyToValueMap()[tabKey] || ''
       blocks.push({ id, constName:id.toUpperCase(), displayName:lang[`block.${MODID}.${id}`]||id, blockType, hasTexture, textureDataUrl, creativeTab, source:'mod' })
     }
     res.json({ ok:true, blocks })
@@ -596,7 +616,7 @@ app.post('/api/items/custom-class/write', (req, res) => {
 // ─── Creative tab — JSON-based via ycs_tabs.json ──────────────────────────────
 const TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_tabs.json'
 
-const TAB_VALUE_TO_KEY = {
+const STATIC_TAB_VALUE_TO_KEY = {
   'ModCreativeModeTabs.YEBISURPG_ITEMS_TAB': 'yebisurpg_items_tab',
   'ModCreativeModeTabs.YEBISURPG_BLOCK_TAB': 'yebisurpg_blocks_tab',
   'vanilla:combat':              'combat',
@@ -607,11 +627,29 @@ const TAB_VALUE_TO_KEY = {
   'vanilla:redstone':            'redstone_blocks',
   'vanilla:natural_blocks':      'natural_blocks',
 }
-const TAB_KEY_TO_VALUE = Object.fromEntries(Object.entries(TAB_VALUE_TO_KEY).map(([k,v])=>[v,k]))
+// Custom tabs (added via the Creative Tabs editor) extend the static map dynamically.
+function tabValueToKeyMap() {
+  const map = { ...STATIC_TAB_VALUE_TO_KEY }
+  for (const t of readCustomTabs()) map[`ModCreativeModeTabs.${t.key.toUpperCase()}`] = t.key
+  return map
+}
+function tabKeyToValueMap() {
+  return Object.fromEntries(Object.entries(tabValueToKeyMap()).map(([k,v])=>[v,k]))
+}
 
 function readTabsJson() { try { return JSON.parse(rf(TABS_JSON)) } catch { return {} } }
 function writeTabsJson(obj) {
-  const entries = Object.entries(obj).sort((a,b) => a[1]!==b[1]?a[1].localeCompare(b[1]):a[0].localeCompare(b[0]))
+  // Group by tab, preserving insertion order within each tab and the order
+  // tabs were first seen — new items append at the bottom of their tab's
+  // group instead of being re-sorted alphabetically.
+  const order = []
+  const groups = new Map()
+  for (const entry of Object.entries(obj)) {
+    const [, v] = entry
+    if (!groups.has(v)) { groups.set(v, []); order.push(v) }
+    groups.get(v).push(entry)
+  }
+  const entries = order.flatMap(v => groups.get(v))
   let out = "{\n", lastTab = null
   for (let i = 0; i < entries.length; i++) {
     const [k, v] = entries[i]
@@ -627,7 +665,7 @@ app.post('/api/creativetab', (req, res) => {
   try {
     const { ref, tabConst, itemId, blockId } = req.body
     if (!tabConst) return res.json({ ok:false, reason:'no tab selected' })
-    const tabKey = TAB_VALUE_TO_KEY[tabConst]
+    const tabKey = tabValueToKeyMap()[tabConst]
     if (!tabKey) return res.json({ ok:false, reason:`unknown tab: ${tabConst}` })
     let entryKey
     if (blockId) { entryKey = `block:${blockId}` }
@@ -668,6 +706,287 @@ app.post('/api/creativetab/remove', (req, res) => {
       if (idM) entryKey = idM[1]
     }
     if (entryKey) { const tabs = readTabsJson(); delete tabs[entryKey]; writeTabsJson(tabs) }
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+// ─── Custom creative tabs (add / edit / delete / reorder) ──────────────────────
+// Stored as an ordered list in CUSTOM_TABS_JSON; each tab is codegen'd into
+// ModCreativeModeTabs.java between the YCS_Mod_Creative_Tabs markers, in list order
+// (display order in-game follows withTabsBefore chaining built from this order).
+const CUSTOM_TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_custom_tabs.json'
+const CMT_FILE = jp(JAVA_ROOT,'item','ModCreativeModeTabs.java')
+
+function readCustomTabs() { try { return JSON.parse(rf(CUSTOM_TABS_JSON)) } catch { return [] } }
+function writeCustomTabs(list) { wf(CUSTOM_TABS_JSON, JSON.stringify(list, null, 2)) }
+
+// iconRef: "item:<id>" or "block:<id>" (mod-registered only)
+function iconRefToJava(iconRef) {
+  if (!iconRef) return null
+  const [kind, id] = iconRef.split(':')
+  if (kind === 'block') {
+    const bsrc = rf(jp(JAVA_ROOT,'block','ModBlocks.java'))
+    const m = new RegExp(`(\\w+)\\s*=\\s*registerBlock\\("${id}"`).exec(bsrc)
+    return m ? `new ItemStack(ModBlocks.${m[1]}.get())` : null
+  }
+  const isrc = rf(jp(JAVA_ROOT,'item','ModItems.java'))
+  const m = new RegExp(`(\\w+)\\s*=\\s*ITEMS\\.register\\("${id}"`).exec(isrc)
+  return m ? `new ItemStack(ModItems.${m[1]}.get())` : null
+}
+
+function regenerateCustomTabsBlock() {
+  const list = readCustomTabs()
+  const lines = []
+  for (let i = 0; i < list.length; i++) {
+    const t = list[i]
+    const iconJava = iconRefToJava(t.iconRef) || 'new ItemStack(net.minecraft.world.item.Items.BARRIER)'
+    lines.push(`    public static final Supplier<CreativeModeTab> ${t.key.toUpperCase()} = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("${t.key}", () -> CreativeModeTab.builder()`)
+    lines.push(`            .icon(() -> ${iconJava})`)
+    if (i > 0) lines.push(`            .withTabsBefore(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"${list[i-1].key}"))`)
+    lines.push(`            .title(Component.translatable("creativetab.${MODID}.${t.key}"))`)
+    lines.push(`            .build());`)
+    if (i < list.length-1) lines.push('')
+  }
+  let src = rf(CMT_FILE)
+  const startMarker = '//YCS_Mod_Creative_Tabs_START', endMarker = '//YCS_Mod_Creative_Tabs_END'
+  const sIdx = src.indexOf(startMarker), eIdx = src.indexOf(endMarker)
+  if (sIdx === -1 || eIdx === -1) throw new Error('YCS_Mod_Creative_Tabs markers not found')
+  src = src.slice(0, sIdx + startMarker.length) + '\n\n' + (lines.length ? lines.join('\n') + '\n\n    ' : '    ') + src.slice(eIdx)
+  wf(CMT_FILE, formatYCSSection(src, startMarker, endMarker))
+}
+
+app.get('/api/creativetabs/list', (_req, res) => {
+  try {
+    const lang = rl()
+    const list = readCustomTabs().map(t => ({ ...t, titleText: lang[`creativetab.${MODID}.${t.key}`] || t.key }))
+    res.json({ ok:true, tabs:list })
+  } catch(e) { res.json({ ok:false, reason:e.message, tabs:[] }) }
+})
+
+app.post('/api/creativetabs/save', (req, res) => {
+  // Full rewrite: list of {key, titleText, iconRef} in display order. Covers
+  // add (new key), edit (same key, changed titleText/iconRef), delete (omitted),
+  // and reorder (list order) in one call.
+  try {
+    const { tabs } = req.body
+    if (!Array.isArray(tabs)) return res.json({ ok:false, reason:'tabs must be an array' })
+    for (const t of tabs) {
+      if (!/^[a-z][a-z0-9_]*$/.test(t.key)) return res.json({ ok:false, reason:`invalid tab key: ${t.key}` })
+    }
+    const prev = readCustomTabs()
+    const prevKeys = new Set(prev.map(t => t.key))
+    const newKeys = new Set(tabs.map(t => t.key))
+
+    writeCustomTabs(tabs.map(t => ({ key:t.key, iconRef:t.iconRef||'' })))
+    regenerateCustomTabsBlock()
+
+    const lang = rl()
+    for (const t of tabs) lang[`creativetab.${MODID}.${t.key}`] = t.titleText || t.key
+    for (const k of prevKeys) if (!newKeys.has(k)) delete lang[`creativetab.${MODID}.${k}`]
+    wl(sortLang(lang))
+
+    // Reassign items pointed at a deleted tab back to (none) so they aren't orphaned.
+    const removedKeys = [...prevKeys].filter(k => !newKeys.has(k))
+    if (removedKeys.length) {
+      const itemTabs = readTabsJson()
+      let changed = false
+      for (const [entryId, tabKey] of Object.entries(itemTabs)) {
+        if (removedKeys.includes(tabKey)) { delete itemTabs[entryId]; changed = true }
+      }
+      if (changed) writeTabsJson(itemTabs)
+    }
+
+    markDirty()
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+// Reorders the mod items/blocks within one tab. order = array of entry keys
+// (item id, or "block:<id>") in the desired display order for that tab.
+app.post('/api/creativetabs/reorder-items', (req, res) => {
+  try {
+    const { tabKey, order } = req.body
+    if (!tabKey || !Array.isArray(order)) return res.json({ ok:false, reason:'tabKey and order required' })
+    const tabs = readTabsJson()
+    // Pull out entries for this tab, in the new order, then splice back in
+    // place of where they previously sat relative to other tabs.
+    const others = Object.entries(tabs).filter(([k,v]) => v !== tabKey)
+    const reordered = order.filter(k => tabs[k] === tabKey).map(k => [k, tabKey])
+    const merged = Object.fromEntries([...others, ...reordered])
+    writeTabsJson(merged)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+// ─── Keybinds (add / edit / delete / reorder) ───────────────────────────────────
+// Stored as an ordered list in KEYBINDS_JSON; each bind is codegen'd as a
+// `public static final KeyMapping NAME = bind("name", InputConstants.Type.X, code);` field
+// inside //YCS_Mod_Keybinds_START..END, and an `event.register(NAME);` line inside
+// //YCS_Mod_Keybinds_Register_START..END, both in ModKeybinds.java.
+// What a keybind *does* is intentionally left unimplemented — only the
+// declaration/registration/lang plumbing exists until the action design is decided.
+//
+// bindCode formats: "NONE" (no default — InputConstants.UNKNOWN), "KEY_<glfw name>"
+// (keyboard, e.g. "KEY_K" -> GLFW.GLFW_KEY_K), "MOUSE_<n>" (mouse button, e.g.
+// "MOUSE_0" -> GLFW.GLFW_MOUSE_BUTTON_0).
+const KEYBINDS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_keybinds.json'
+const KEYBINDS_FILE = jp(JAVA_ROOT,'client','ModKeybinds.java')
+
+function readKeybinds() { try { return JSON.parse(rf(KEYBINDS_JSON)) } catch { return [] } }
+function writeKeybinds(list) { wf(KEYBINDS_JSON, JSON.stringify(list, null, 2)) }
+
+function bindCodeToJava(bindCode) {
+  const parts = (bindCode || 'NONE').split('+')
+  const base = parts[0]
+  const modifier = parts.includes('CTRL') ? 'KeyModifier.CONTROL' : parts.includes('ALT') ? 'KeyModifier.ALT' : parts.includes('SHIFT') ? 'KeyModifier.SHIFT' : 'KeyModifier.NONE'
+  if (base === 'NONE') return ['InputConstants.Type.KEYSYM', 'InputConstants.UNKNOWN.getValue()', modifier]
+  if (base.startsWith('MOUSE_')) return ['InputConstants.Type.MOUSE', `GLFW.GLFW_MOUSE_BUTTON_${base.slice(6)}`, modifier]
+  return ['InputConstants.Type.KEYSYM', `GLFW.GLFW_${base}`, modifier]
+}
+
+function regenerateKeybindsBlock() {
+  const list = readKeybinds()
+  const fieldLines = list.map(k => {
+    const [type, code, modifier] = bindCodeToJava(k.bindCode || 'NONE')
+    const category = (!k.category || k.category === 'CATEGORY') ? 'CATEGORY' : `"${k.category}"`
+    return `    public static final KeyMapping ${k.key.toUpperCase()} = bind("${k.key}", ${type}, ${code}, ${modifier}, ${category});`
+  })
+  let src = rf(KEYBINDS_FILE)
+  const fStart = '//YCS_Mod_Keybinds_START', fEnd = '//YCS_Mod_Keybinds_END'
+  let sIdx = src.indexOf(fStart), eIdx = src.indexOf(fEnd)
+  if (sIdx === -1 || eIdx === -1) throw new Error('YCS_Mod_Keybinds markers not found')
+  src = src.slice(0, sIdx + fStart.length) + '\n\n' + (fieldLines.length ? fieldLines.join('\n') + '\n\n    ' : '    ') + src.slice(eIdx)
+
+  const regLines = list.map(k => `        event.register(${k.key.toUpperCase()});`)
+  const rStart = '//YCS_Mod_Keybinds_Register_START', rEnd = '//YCS_Mod_Keybinds_Register_END'
+  sIdx = src.indexOf(rStart); eIdx = src.indexOf(rEnd)
+  if (sIdx === -1 || eIdx === -1) throw new Error('YCS_Mod_Keybinds_Register markers not found')
+  src = src.slice(0, sIdx + rStart.length) + '\n\n' + (regLines.length ? regLines.join('\n') + '\n\n        ' : '        ') + src.slice(eIdx)
+
+  wf(KEYBINDS_FILE, src)
+}
+
+const VANILLA_KEY_CATEGORIES = ['key.categories.movement','key.categories.gameplay','key.categories.inventory','key.categories.creative','key.categories.multiplayer','key.categories.ui','key.categories.misc']
+
+app.get('/api/keybinds/list', (_req, res) => {
+  try {
+    const lang = rl()
+    const list = readKeybinds().map(k => ({ ...k, titleText: lang[`key.${MODID}.${k.key}`] || k.key, category: k.category || 'CATEGORY' }))
+    const customCats = [...new Set(list.map(k => k.category).filter(c => c !== 'CATEGORY' && !VANILLA_KEY_CATEGORIES.includes(c)))]
+    res.json({ ok:true, keybinds:list, categories:{ own:'CATEGORY', ownLabel:'yebisu RPG (this mod)', vanilla:VANILLA_KEY_CATEGORIES, custom:customCats } })
+  } catch(e) { res.json({ ok:false, reason:e.message, keybinds:[] }) }
+})
+
+app.post('/api/keybinds/save', (req, res) => {
+  // Full rewrite: list of {key, titleText, bindCode} in declaration order.
+  // Covers add (new key), edit (changed titleText/bindCode), delete (omitted),
+  // and reorder (list order) in one call.
+  try {
+    const { keybinds } = req.body
+    if (!Array.isArray(keybinds)) return res.json({ ok:false, reason:'keybinds must be an array' })
+    for (const k of keybinds) {
+      if (!/^[a-z][a-z0-9_]*$/.test(k.key)) return res.json({ ok:false, reason:`invalid keybind key: ${k.key}` })
+      if (!/^(NONE|(KEY_[A-Z0-9_]+|MOUSE_[0-9]+)(\+(CTRL|ALT|SHIFT))?)$/.test(k.bindCode || '')) return res.json({ ok:false, reason:`invalid bindCode for ${k.key}` })
+      if (k.category && !/^(CATEGORY|key\.categories\.[a-z0-9_.]+)$/.test(k.category)) return res.json({ ok:false, reason:`invalid category for ${k.key}` })
+    }
+    const prev = readKeybinds()
+    const prevKeys = new Set(prev.map(k => k.key))
+    const newKeys = new Set(keybinds.map(k => k.key))
+
+    writeKeybinds(keybinds.map(k => ({ key:k.key, bindCode:k.bindCode, category:k.category||'CATEGORY' })))
+    regenerateKeybindsBlock()
+
+    const lang = rl()
+    for (const k of keybinds) lang[`key.${MODID}.${k.key}`] = k.titleText || k.key
+    for (const k of prevKeys) if (!newKeys.has(k)) delete lang[`key.${MODID}.${k}`]
+    wl(sortLang(lang))
+
+    markDirty()
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+// ─── Interfaces (GUI/HUD screens — add / edit / delete / reorder) ──────────
+// Stored as an ordered list in INTERFACES_JSON. Each entry only has an id,
+// display name, and a kind (gui|hud) — what the interface actually renders
+// is intentionally left unimplemented until that design is decided, the
+// same deferral pattern used for keybind actions (see YCS_GUIDELINES.md).
+const INTERFACES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_interfaces.json'
+
+function readInterfaces() { try { return JSON.parse(rf(INTERFACES_JSON)) } catch { return [] } }
+function writeInterfaces(list) { wf(INTERFACES_JSON, JSON.stringify(list, null, 2)) }
+
+app.get('/api/interfaces/list', (_req, res) => {
+  try {
+    const lang = rl()
+    const list = readInterfaces().map(i => ({ ...i, titleText: lang[`screen.${MODID}.${i.id}`] || i.id }))
+    res.json({ ok:true, interfaces:list })
+  } catch(e) { res.json({ ok:false, reason:e.message, interfaces:[] }) }
+})
+
+app.post('/api/interfaces/save', (req, res) => {
+  // Full rewrite: list of {id, titleText, kind} in declaration order.
+  // Covers add, edit, delete (omitted), and reorder (list order) in one call.
+  try {
+    const { interfaces } = req.body
+    if (!Array.isArray(interfaces)) return res.json({ ok:false, reason:'interfaces must be an array' })
+    for (const i of interfaces) {
+      if (!/^[a-z][a-z0-9_]*$/.test(i.id)) return res.json({ ok:false, reason:`invalid interface id: ${i.id}` })
+      if (!['gui','hud'].includes(i.kind)) return res.json({ ok:false, reason:`invalid kind for ${i.id}` })
+    }
+    const prev = readInterfaces()
+    const prevIds = new Set(prev.map(i => i.id))
+    const newIds = new Set(interfaces.map(i => i.id))
+
+    writeInterfaces(interfaces.map(i => ({ id:i.id, kind:i.kind })))
+
+    const lang = rl()
+    for (const i of interfaces) lang[`screen.${MODID}.${i.id}`] = i.titleText || i.id
+    for (const id of prevIds) if (!newIds.has(id)) delete lang[`screen.${MODID}.${id}`]
+    wl(sortLang(lang))
+
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+// ─── Variables (EntityVar declarations — add / edit / delete / reorder) ───
+// Stored as an ordered list in VARIABLES_JSON. Mirrors net.ye6isu.yebisuRPG.data.EntityVar:
+// type is one of int|float|bool|string|item, with a default value and an
+// item-only dropOnDeath flag. This only manages the declaration list — it does
+// not yet generate the vars.define(...) call-sites in Java; where/when each
+// var actually gets defined on an entity is intentionally left unimplemented
+// until that design is decided (see YCS_GUIDELINES.md).
+const VARIABLES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_variables.json'
+
+function readVariables() { try { return JSON.parse(rf(VARIABLES_JSON)) } catch { return [] } }
+function writeVariables(list) { wf(VARIABLES_JSON, JSON.stringify(list, null, 2)) }
+
+app.get('/api/variables/list', (_req, res) => {
+  try {
+    res.json({ ok:true, variables: readVariables() })
+  } catch(e) { res.json({ ok:false, reason:e.message, variables:[] }) }
+})
+
+app.post('/api/variables/save', (req, res) => {
+  // Full rewrite: list of {name, type, default, dropOnDeath} in declaration order.
+  // Covers add, edit, delete (omitted), and reorder (list order) in one call.
+  try {
+    const { variables } = req.body
+    if (!Array.isArray(variables)) return res.json({ ok:false, reason:'variables must be an array' })
+    const VAR_TYPES = ['int','float','bool','string','item']
+    for (const v of variables) {
+      if (!/^[a-z][a-z0-9_]*$/.test(v.name)) return res.json({ ok:false, reason:`invalid variable name: ${v.name}` })
+      if (!VAR_TYPES.includes(v.type)) return res.json({ ok:false, reason:`invalid type for ${v.name}` })
+      if (v.type === 'item' && v.default != null && typeof v.default !== 'object') return res.json({ ok:false, reason:`invalid default item stack for ${v.name}` })
+    }
+    writeVariables(variables.map(v => ({
+      name: v.name,
+      type: v.type,
+      default: v.type === 'item'
+        ? { itemId: v.default?.itemId ?? null, count: Math.max(1, parseInt(v.default?.count) || 1) }
+        : (v.default ?? (v.type === 'bool' ? false : v.type === 'string' ? '' : 0)),
+      dropOnDeath: v.type === 'item' ? !!v.dropOnDeath : undefined
+    })))
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -880,7 +1199,7 @@ app.post('/api/blocks/register', (req, res) => {
       }
 
       if (langKey && langVal) { const r = insertLangGrouped(lang, langKey, langVal); if (!r.exists) Object.assign(lang, r.result) }
-      if (creativeTab && blockId) { const tabKey = TAB_VALUE_TO_KEY[creativeTab]; if (tabKey) tabs[`block:${blockId}`] = tabKey }
+      if (creativeTab && blockId) { const tabKey = tabValueToKeyMap()[creativeTab]; if (tabKey) tabs[`block:${blockId}`] = tabKey }
       results.push({constName:eCN, ok:true})
     }
 
@@ -943,7 +1262,7 @@ app.post('/api/blocks/update', (req, res) => {
       if (lootLine) { const lp = rf(lootFile); if (lp.includes(lootMarker)) wf(lootFile, lp.replace(lootMarker, '\n        '+lootLine+'\n'+lootMarker)) }
       if (modelLine) { const mp = rf(modelFile); if (mp.includes(modelMarker)) wf(modelFile, mp.replace(modelMarker, '\n        '+modelLine+'\n'+modelMarker)) }
       if (eLangKey && eLangVal) { const r = insertLangGrouped(lang, eLangKey, eLangVal); if (!r.exists) Object.assign(lang, r.result) }
-      if (creativeTab && blockId) { const tabKey = TAB_VALUE_TO_KEY[creativeTab]; if (tabKey) tabs[`block:${blockId}`] = tabKey }
+      if (creativeTab && blockId) { const tabKey = tabValueToKeyMap()[creativeTab]; if (tabKey) tabs[`block:${blockId}`] = tabKey }
     }
     wl(sortLang(lang))
 
