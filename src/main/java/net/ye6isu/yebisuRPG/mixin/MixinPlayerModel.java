@@ -198,8 +198,7 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         // in world-space. head.yRot is body-relative, so pass 0 for head yaw in that case —
         // the torso rotation handles the world-space turn. If only head yaw is set, use yawRad.
         boolean torsoHasYaw = (lookMask & AnimationPlayhead.LOOK_TORSO_YAW) != 0 && !torsoVan;
-        float headLookYaw   = (lookMask & AnimationPlayhead.LOOK_HEAD_YAW)   != 0
-                ? (torsoHasYaw ? 0f : yawRad) : 0f;
+        float headLookYaw   = (lookMask & AnimationPlayhead.LOOK_HEAD_YAW) != 0 ? yawRad : 0f;
         float headLookPitch = (lookMask & AnimationPlayhead.LOOK_HEAD_PITCH) != 0 ? pitchRad : 0f;
 
         if (!headVan)  { this.head.resetPose();     applyBone(this.head,     headP,  timeSecs, weight, headLookYaw, headLookPitch); }
@@ -225,8 +224,8 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         if (crouchPose) {
             // head/body: snapshot was absolute (rest y=0), add directly.
             // arms/legs: snapshot was delta from rest, add on top of anim position.
-            if (!headVan)  { this.head.y    = lerp(this.head.y,    cvHeadY,              weight);
-                             this.head.xRot = lerp(this.head.xRot, this.head.xRot + cvHeadXR, weight); }
+            // Only re-apply head y-shift; xRot is already set by applyBone (lookPitch).
+            if (!headVan)  { this.head.y = lerp(this.head.y, cvHeadY, weight); }
             if (!torsoVan) { this.body.y    = lerp(this.body.y,    cvBodyY,              weight);
                              this.body.xRot = lerp(this.body.xRot, this.body.xRot + cvBodyXR, weight); }
             if (!rArmVan)  { this.rightArm.y   += cvRArmY * weight;
