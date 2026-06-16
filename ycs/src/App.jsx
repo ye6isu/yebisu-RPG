@@ -1719,8 +1719,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           </label>
         );
         // lookAtMask: 2 bits per part (yaw=base, pitch=base+1) — Head=0,Torso=2,RArm=4,LArm=6,RLeg=8,LLeg=10
-        // vanillaMask: Head=1,Torso=2,RArm=4,LArm=8,RLeg=16,LLeg=32,Crouch=64
-        // vanillaMoveMask: 2 bits per part (moving=base, still=base+1) — Head=0,Torso=2,RArm=4,LArm=6,RLeg=8,LLeg=10,Crouch=12
+        // vanillaMask: Head=1,Torso=2,RArm=4,LArm=8,RLeg=16,LLeg=32,Crouch=64,Prone=128,Sitting=256
+        // vanillaMoveMask: 2 bits per part (moving=base, still=base+1) — Head=0,Torso=2,RArm=4,LArm=6,RLeg=8,LLeg=10,Crouch=12,Prone=14,Sitting=16
         const parts = [
           {label:"Head",      lookBase:0,  vanBit:1,   moveBase:0},
           {label:"Torso",     lookBase:2,  vanBit:2,   moveBase:2},
@@ -1731,7 +1731,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         ];
         const tdC = {textAlign:"center",padding:"1px 6px"};
         const hdC = {color:"#888",fontSize:11,padding:"0 6px",textAlign:"center"};
-        return <div style={{position:"absolute",left:0,top:-260,background:"#222",border:"2px solid #444",padding:"10px 14px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:8,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
+        return <div style={{position:"absolute",left:0,bottom:"100%",marginBottom:8,background:"#222",border:"2px solid #444",padding:"10px 14px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:8,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
           <div style={{color:"#aaa",fontSize:12,fontWeight:700}}>Face Direction</div>
           <table style={{borderCollapse:"collapse",fontSize:12,color:"#ccc"}}>
             <thead><tr>
@@ -1755,6 +1755,14 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 </tr>;
               })}
               <tr>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Root (Face Cam)</td>
+                <td style={tdC}><LookCB bit={1<<12}/></td>
+                <td style={tdC}><LookCB bit={1<<13}/></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
+                <td style={tdC}></td>
+                <td style={tdC}></td>
+              </tr>
+              <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Crouch</td>
                 <td style={tdC}></td>
                 <td style={tdC}></td>
@@ -1762,11 +1770,21 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,opacity:!!(vanMask&64)?1:0.3}}><MoveCB bit={1<<12}/></td>
                 <td style={{...tdC,opacity:!!(vanMask&64)?1:0.3}}><MoveCB bit={1<<13}/></td>
               </tr>
+              <tr>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Sitting</td>
+                <td style={tdC}></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={256} label=""/></td>
+                <td style={{...tdC,opacity:!!(vanMask&256)?1:0.3}}><MoveCB bit={1<<16}/></td>
+                <td style={{...tdC,opacity:!!(vanMask&256)?1:0.3}}><MoveCB bit={1<<17}/></td>
+              </tr>
             </tbody>
           </table>
           <div style={{color:"#666",fontSize:10,lineHeight:1.4}}>
             Vanilla: fully keeps vanilla motion for that part.<br/>
             Crouch: uses crouched height (toggle, no walk anim).<br/>
+            Sitting: riding leg splay + arm pull-back.<br/>
+            Root Yaw/Pitch: root bone stays aimed at the camera on that axis, regardless of where the player looks.<br/>
             Moving/Still: when neither checked, vanilla applies always.
           </div>
         </div>;

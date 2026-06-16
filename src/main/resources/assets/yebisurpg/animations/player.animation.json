@@ -19,6 +19,9 @@
 						"0": {
 							"vector": [0, 0, 0]
 						},
+						"1": {
+							"vector": [-90, 0, 360]
+						},
 						"0.5": {
 							"vector": [-90, 0, 0],
 							"easing": "easeOutElastic"
@@ -26,15 +29,6 @@
 					}
 				},
 				"left_arm": {
-					"rotation": {
-						"0": {
-							"vector": [0, 0, 0]
-						},
-						"0.5": {
-							"vector": [-90, 0, 0],
-							"easing": "easeOutElastic"
-						}
-					},
 					"position": {
 						"1": {
 							"vector": [0, 0, -25],
@@ -42,6 +36,15 @@
 						},
 						"0.5": {
 							"vector": [0, 0, 0]
+						}
+					},
+					"rotation": {
+						"0": {
+							"vector": [0, 0, 0]
+						},
+						"0.5": {
+							"vector": [-90, 0, 0],
+							"easing": "easeOutElastic"
 						}
 					},
 					"scale": {
