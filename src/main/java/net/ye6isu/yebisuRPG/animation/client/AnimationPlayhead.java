@@ -85,7 +85,10 @@ public final class AnimationPlayhead {
     private final int vanillaMask;
     private final int vanillaMoveMask;
 
+    public static final int BLEND_IN_TICKS = 3;
+
     private long startMs;
+    private final long createdMs;
     private long frozenMs = -1L; // >= 0 while paused
     private State state = State.PLAYING;
 
@@ -123,6 +126,7 @@ public final class AnimationPlayhead {
         this.vanillaMask     = vanillaMask;
         this.vanillaMoveMask = vanillaMoveMask;
         this.startMs         = System.currentTimeMillis();
+        this.createdMs       = this.startMs;
     }
 
     // ── Fast-forward ──────────────────────────────────────────────────────────
@@ -207,6 +211,13 @@ public final class AnimationPlayhead {
     public boolean           isDone()          { return state == State.DONE;    }
     public boolean           looksAt(int bit)  { return (lookAtMask & bit) != 0; }
     public boolean           allowsVanilla(int bit){ return (vanillaMask & bit) != 0; }
+
+    public float getBlendInWeight(float partialTick) {
+        long elapsedMs = System.currentTimeMillis() - createdMs;
+        float elapsedTicks = elapsedMs / (float) MS_PER_TICK + partialTick;
+        if (elapsedTicks >= BLEND_IN_TICKS) return 1.0f;
+        return Math.max(elapsedTicks / (float) BLEND_IN_TICKS, 0.0f);
+    }
 
     public AnimationLoopMode effectiveLoopMode(HandAnimationLoader.AnimData anim) {
         return anim.loopMode();

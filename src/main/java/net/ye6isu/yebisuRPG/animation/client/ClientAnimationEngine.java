@@ -8,6 +8,7 @@ import net.ye6isu.yebisuRPG.network.animation.AnimPausePayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.animation.HandPosePayload;
+import net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -68,6 +69,13 @@ public final class ClientAnimationEngine {
 
     // entityId → hand pose (animName + filePath) — shown when no animation is playing
     private final ConcurrentHashMap<Integer, HandPosePayload> handPoses = new ConcurrentHashMap<>();
+    // entityId → wall-clock ms when the first-person hand pose was set (for looping time)
+    private final ConcurrentHashMap<Integer, Long> handPoseStartMs = new ConcurrentHashMap<>();
+
+    // entityId → third-person pose — shown when no third-person animation is playing
+    private final ConcurrentHashMap<Integer, ThirdPersonPosePayload> thirdPersonPoses = new ConcurrentHashMap<>();
+    // entityId → wall-clock ms when the third-person pose was set (for looping time)
+    private final ConcurrentHashMap<Integer, Long> thirdPersonPoseStartMs = new ConcurrentHashMap<>();
 
     private ClientAnimationEngine() {}
 
@@ -315,8 +323,10 @@ public final class ClientAnimationEngine {
     public void setHandPose(HandPosePayload payload) {
         if (payload.isClear()) {
             handPoses.remove(payload.entityId());
+            handPoseStartMs.remove(payload.entityId());
         } else {
             handPoses.put(payload.entityId(), payload);
+            handPoseStartMs.put(payload.entityId(), System.currentTimeMillis());
         }
     }
 
@@ -333,6 +343,36 @@ public final class ClientAnimationEngine {
                 : HandAnimationLoader.INSTANCE.get(pose.animName());
     }
 
+    public void setThirdPersonPose(ThirdPersonPosePayload payload) {
+        if (payload.isClear()) {
+            thirdPersonPoses.remove(payload.entityId());
+            thirdPersonPoseStartMs.remove(payload.entityId());
+        } else {
+            thirdPersonPoses.put(payload.entityId(), payload);
+            thirdPersonPoseStartMs.put(payload.entityId(), System.currentTimeMillis());
+        }
+    }
+
+    public ThirdPersonPosePayload getThirdPersonPosePayload(int entityId) {
+        return thirdPersonPoses.get(entityId);
+    }
+
+    public HandAnimationLoader.AnimData getThirdPersonPose(int entityId) {
+        ThirdPersonPosePayload pose = thirdPersonPoses.get(entityId);
+        if (pose == null) return null;
+        String file = pose.filePath() == null || pose.filePath().isEmpty() ? null : pose.filePath();
+        return file != null
+                ? HandAnimationLoader.INSTANCE.get(pose.animName(), file)
+                : HandAnimationLoader.INSTANCE.get(pose.animName());
+    }
+
+    public float getPoseElapsedSecs(int entityId, boolean thirdPerson) {
+        ConcurrentHashMap<Integer, Long> startMap = thirdPerson ? thirdPersonPoseStartMs : handPoseStartMs;
+        Long startMs = startMap.get(entityId);
+        if (startMs == null) return 0f;
+        return (System.currentTimeMillis() - startMs) / 1000f;
+    }
+
     /**
      * Wipes all playheads, blenders, and hand poses. Called on client disconnect so stale state
      * from a previous session never bleeds into a new connection.
@@ -341,5 +381,8 @@ public final class ClientAnimationEngine {
         playheads.clear();
         blenders.clear();
         handPoses.clear();
+        handPoseStartMs.clear();
+        thirdPersonPoses.clear();
+        thirdPersonPoseStartMs.clear();
     }
 }

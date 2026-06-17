@@ -696,6 +696,13 @@ function compileActionNode(node, nodes, methodKey) {
     }
     return code.split("\n");
   }
+  if (node.opcode === "control.delay") {
+    const ticks = resolveSlotValue(node.slots?.delayTicks, nodes, methodKey) ?? (node.fields?.delayTicks ?? "1");
+    let code = "TickScheduler.INSTANCE.schedule((int)(" + ticks + "), () -> {\n";
+    if (node.slots?.do0) code += compileChain(node.slots.do0, nodes, methodKey).map(l=>"  "+l).join("\n") + "\n";
+    code += "});";
+    return code.split("\n");
+  }
   if (node.opcode === "effect.apply") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     const eff = node.fields?.effect || "MobEffects.REGENERATION";
@@ -817,6 +824,30 @@ function compileActionNode(node, nodes, methodKey) {
     return [
       "if (" + ent + " instanceof Entity _hr && !level.isClientSide()) {",
       "    AnimationAPI.resetFirstPersonHandPose(_hr);",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.tppose.set") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
+    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
+    const lookAtMask = node.fields?.lookAtMask || 0;
+    const vanillaMask = node.fields?.vanillaMask || 0;
+    const vanillaMoveMask = node.fields?.vanillaMoveMask || 0;
+    return [
+      "if (" + ent + " instanceof Entity _tps && !level.isClientSide()) {",
+      "    AnimationAPI.setThirdPersonPose(_tps,",
+      "        \"" + animName.replace(/"/g, '\\"') + "\",",
+      "        \"" + filePath.replace(/"/g, '\\"') + "\",",
+      "        " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ");",
+      "}",
+    ];
+  }
+  if (node.opcode === "anim.tppose.reset") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
+    return [
+      "if (" + ent + " instanceof Entity _tpr && !level.isClientSide()) {",
+      "    AnimationAPI.resetThirdPersonPose(_tpr);",
       "}",
     ];
   }
@@ -989,6 +1020,7 @@ const PALETTE_BLOCKS = [
     { opcode:"entity.is_crouching", label:"Is Crouching?", linkType:LINK_LOGIC, hint:"True if the entity is crouching/sneaking", slotDefs:[{key:"entity", accepts:LINK_ENTITY}] },
   ], actions:[
     { opcode:"control.if", label:"If", isAction:true, hint:"If statement", slotDefs:[{key:"condition",accepts:LINK_LOGIC}] },
+    { opcode:"control.delay", label:"Delay", isAction:true, hint:"Run actions after [Number] ticks delay (server-side)", slotDefs:[{key:"delayTicks",accepts:LINK_NUMBER,label:"ticks"}] },
   ]},
   { category:"Effects", data:[], actions:[
     { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
@@ -1040,6 +1072,16 @@ const PALETTE_BLOCKS = [
       ] },
     { opcode:"anim.handpose.reset", label:"Reset FP Hand Pose", isAction:true,
       hint:"Reset FP hand pose for [Entity] to vanilla default",
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+    { opcode:"anim.tppose.set", label:"Set TP Pose", isAction:true,
+      hint:"Set TP pose to [Text] for [Entity] from [Text]",
+      slotDefs:[
+        {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
+        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
+        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
+      ] },
+    { opcode:"anim.tppose.reset", label:"Reset TP Pose", isAction:true,
+      hint:"Reset TP pose for [Entity] to vanilla default",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
   ]},
 ];
@@ -1293,6 +1335,11 @@ function ycsSyncImports(code, enabledMethodKeys) {
   if (code.includes('AnimationAPI') || code.includes('AnimationCategory')) {
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationAPI');
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationCategory');
+  }
+
+  // control.delay — TickScheduler
+  if (code.includes('TickScheduler')) {
+    needed.add('net.ye6isu.yebisuRPG.util.TickScheduler');
   }
 
   // variable.get / variable.set — EntityVarCapability + EntityVar
@@ -2533,6 +2580,12 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
            }
            h += ih;
            n.height = ih;
+        } else if (n.opcode === "control.delay") {
+           let d0h = Math.max(0, getH(n.slots?.do0));
+           let ih = 50 + d0h;
+           n.gapHeights = { do0: d0h };
+           h += ih;
+           n.height = ih;
         } else {
            h += 50;
         }
@@ -2563,6 +2616,11 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
              innerY += Math.max(0, getH(n.slots?.doElse));
            }
            cy = innerY;
+        } else if (n.opcode === "control.delay") {
+           let innerY = cy + 50;
+           if (n.slots?.do0) layoutChain(n.slots.do0, sx + 30, innerY, depth + 1);
+           innerY += Math.max(0, getH(n.slots?.do0));
+           cy = innerY;
         } else {
            cy += 50;
         }
@@ -2579,7 +2637,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="control.delay"?{delayTicks:"20",elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:bd.opcode==="anim.tppose.set"?{animName:"",filePath:""}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -2687,9 +2745,9 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
                  if(n.id===dragged.id || getDescendants(dragged.id, nextNs).includes(n.id)) continue;
                  if(n.isAction||n.id==="start"){
                      let h = 50;
-                     if (n.opcode==="control.if") h = n.height || 50;
-                     if(n.opcode!=="control.if"){
-                       let snb={x:n.x+20,y:n.y+h}; 
+                     if (n.opcode==="control.if" || n.opcode==="control.delay") h = n.height || 50;
+                     if(n.opcode!=="control.if" && n.opcode!=="control.delay"){
+                       let snb={x:n.x+20,y:n.y+h};
                        let d=Math.hypot(mx-snb.x,my-snb.y);
                        if(d<md&&!n.nextId){md=d;cst=n.id;csk="nextId";}
                      } else {
@@ -2840,10 +2898,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const [showSettings, setShowSettings] = useState(false);
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
   const isIf=node.opcode==="control.if";
+  const isDelay=node.opcode==="control.delay";
   
   const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":"#5a9a6a";
   const isAnimBlock = node.opcode.startsWith("anim.");
-  const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf;
+  const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf || isDelay;
   const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":isAnimBlock?"#3a5c3a":isLogicBlock?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#5ba558":"#5a9a6a";
 
   const isAnimPlay = node.opcode === "anim.firstperson.play";
@@ -2856,6 +2915,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isAnimTPResume = node.opcode === "anim.thirdperson.resume";
   const isHandPoseSet = node.opcode === "anim.handpose.set";
   const isHandPoseReset = node.opcode === "anim.handpose.reset";
+  const isTPPoseSet = node.opcode === "anim.tppose.set";
+  const isTPPoseReset = node.opcode === "anim.tppose.reset";
   const isAttrGet = node.opcode === "attribute.get";
   const isAttrModAdd = node.opcode === "attribute.modifier.add";
   const isAttrModRemove = node.opcode === "attribute.modifier.remove";
@@ -2940,6 +3001,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
          :node.opcode==="effect.apply"?"Add Effect to"
          :node.opcode==="control.if"?"If"
+         :node.opcode==="control.delay"?"Delay"
          :node.opcode==="anim.firstperson.play"?"Play FP Anim"
          :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
          :node.opcode==="anim.firstperson.pause"?"Pause FP Anim on"
@@ -2950,6 +3012,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="anim.thirdperson.resume"?"Resume TP Anim on"
          :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
+         :node.opcode==="anim.tppose.set"?"Set TP Pose"
+         :node.opcode==="anim.tppose.reset"?"Reset TP Pose on"
          :node.opcode==="variable.set"?"Set Variable"
          :node.opcode==="entity.apply_motion"?"Apply Motion to"
          :node.opcode==="attribute.modifier.add"?"Add Attr Modifier"
@@ -2960,6 +3024,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {isIf&&<>
         <span style={{cursor:"pointer",opacity:0.6,fontSize:14}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
         <SlotConn sk="condition" sc="rgba(0,0,0,0.3)" connId={node.slots?.condition} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isDelay&&<>
+        <SlotConn sk="delayTicks" sc="rgba(0,0,0,0.3)" connId={node.slots?.delayTicks} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+        <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>ticks</span>
       </>}
       {node.opcode==="effect.apply"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -3029,6 +3097,17 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isHandPoseReset&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isTPPoseSet&&<>
+          <span style={{cursor:"pointer",opacity:0.6,fontSize:14,position:"relative"}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+          <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
+          <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isTPPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {node.opcode==="variable.set"&&<>
@@ -3107,6 +3186,15 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       );
   }
 
+  if (isDelay) {
+      return (
+        <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+            <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
+            <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
+        </div>
+      );
+  }
+
   return (
     <div id={"node-"+node.id} onContextMenu={e=>{e.preventDefault(); e.stopPropagation(); if(window.__showYcsCtx) window.__showYcsCtx(node.id, e.clientX, e.clientY);}}
       style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?50:50,width:isVal?undefined:"fit-content",minHeight:50,height:node.height||(isVal?"auto":50),
@@ -3118,7 +3206,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
 
       
       {isVal ? valContent : commonHeader}
-      {showSettings&&isAnimTPPlay&&(()=>{
+      {showSettings&&(isAnimTPPlay||isTPPoseSet)&&(()=>{
         const lookMask = node.fields?.lookAtMask||0;
         const vanMask  = node.fields?.vanillaMask||0;
         const moveMask = node.fields?.vanillaMoveMask||0;

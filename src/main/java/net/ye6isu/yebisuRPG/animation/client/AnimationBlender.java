@@ -43,7 +43,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 public final class AnimationBlender {
 
     /** Duration of the blend-out window in server/client ticks. */
-    public static final int BLEND_TICKS = 2;
+    public static final int BLEND_TICKS = 3;
 
     // -------------------------------------------------------------------------
     // Pose snapshot
