@@ -14,6 +14,7 @@ import net.neoforged.neoforge.event.entity.EntityAttributeModificationEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.ye6isu.yebisuRPG.attribute.AttributeRangeFix;
 import net.ye6isu.yebisuRPG.attribute.ModAttributes;
+import net.ye6isu.yebisuRPG.effect.ModEffects;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.data.EntityVarCapability;
@@ -47,6 +48,7 @@ public class yebisuRPG {
 
         EntityVarCapability.register(modEventBus);
         ModAttributes.register(modEventBus);
+        ModEffects.register(modEventBus);
         modEventBus.addListener(this::onAttributeModification);
 
         YCSTabRegistry.register(modEventBus);

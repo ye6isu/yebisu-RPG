@@ -1045,6 +1045,87 @@ app.post('/api/attributes/save', (req, res) => {
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
+// ─── Effects ──────────────────────────────────────────────────────────────────
+// Stored as an ordered list in EFFECTS_JSON.
+// Each entry: { id, constName, titleText, category, color, hasTexture, textureDataUrl }
+// Server writes Holder declarations between //YCS_Effects_START and //YCS_Effects_END
+// in ModEffects.java.
+
+const EFFECTS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_effects.json'
+const MOD_EFFECTS_JAVA = jp(JAVA_ROOT, 'effect', 'ModEffects.java')
+const EFFECT_TEXTURE_DIR = jp(MOD_ROOT, 'assets', MODID, 'textures', 'mob_effect')
+
+function readEffects() { try { return JSON.parse(rf(EFFECTS_JSON)) } catch { return [] } }
+function writeEffects(list) { wf(EFFECTS_JSON, JSON.stringify(list, null, 2)) }
+
+function writeEffectsJava(list) {
+  let src = rf(MOD_EFFECTS_JAVA)
+  const lines = list.map(e => {
+    const cat = e.category || 'NEUTRAL'
+    const colorHex = e.color ? `0x${parseInt(e.color, 10).toString(16)}` : '0xffffff'
+    return `    public static final Holder<MobEffect> ${e.constName} =\n` +
+           `        MOB_EFFECTS.register("${e.id}", () -> new MobEffect(MobEffectCategory.${cat}, ${colorHex}));\n`
+  })
+  src = src.replace(
+    /(\/\/YCS_Effects_START\n)[\s\S]*?(\/\/YCS_Effects_END)/,
+    `$1${lines.join('\n')}    $2`
+  )
+  wf(MOD_EFFECTS_JAVA, src)
+  markDirty()
+}
+
+function writeEffectTexture(id, dataUrl) {
+  if (!dataUrl) return
+  if (!fs.existsSync(EFFECT_TEXTURE_DIR)) fs.mkdirSync(EFFECT_TEXTURE_DIR, { recursive: true })
+  const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '')
+  fs.writeFileSync(jp(EFFECT_TEXTURE_DIR, `${id}.png`), Buffer.from(base64, 'base64'))
+}
+
+function deleteEffectTexture(id) {
+  const p = jp(EFFECT_TEXTURE_DIR, `${id}.png`)
+  if (fs.existsSync(p)) fs.unlinkSync(p)
+}
+
+app.get('/api/effects/list', (_req, res) => {
+  try {
+    res.json({ ok:true, effects: readEffects() })
+  } catch(e) { res.json({ ok:false, reason:e.message, effects:[] }) }
+})
+
+app.post('/api/effects/save', (req, res) => {
+  try {
+    const { effects } = req.body
+    if (!Array.isArray(effects)) return res.json({ ok:false, reason:'effects must be an array' })
+    for (const e of effects) {
+      if (!/^[a-z][a-z0-9_]*$/.test(e.id)) return res.json({ ok:false, reason:`invalid effect id: ${e.id}` })
+      if (!/^[A-Z][A-Z0-9_]*$/.test(e.constName)) return res.json({ ok:false, reason:`invalid constName: ${e.constName}` })
+      if (!['BENEFICIAL','HARMFUL','NEUTRAL'].includes(e.category))
+        return res.json({ ok:false, reason:`invalid category: ${e.category}` })
+    }
+    // Detect deleted effects and clean up textures
+    const old = readEffects()
+    const newIds = new Set(effects.map(e => e.id))
+    for (const o of old) { if (!newIds.has(o.id)) deleteEffectTexture(o.id) }
+    // Write textures for effects that have them
+    for (const e of effects) {
+      if (e.hasTexture && e.textureDataUrl) {
+        writeEffectTexture(e.id, e.textureDataUrl)
+        delete e.textureDataUrl // don't persist base64 in JSON
+        e.hasTexture = true
+      }
+    }
+    writeEffects(effects)
+    writeEffectsJava(effects)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+app.get('/api/textures/mob_effect/:name', (req, res) => {
+  const p = jp(EFFECT_TEXTURE_DIR, req.params.name)
+  if (fs.existsSync(p)) res.sendFile(p)
+  else res.status(404).end()
+})
+
 // ─── Tags ──────────────────────────────────────────────────────────────────────
 // Markers: //YCS_Mod_Item_Tags_START / //YCS_Mod_Item_Tags_END in ModItemTagProvider.java
 //          //YCS_Mod_Block_Tags_START / //YCS_Mod_Block_Tags_END in ModBlockTagProvider.java
