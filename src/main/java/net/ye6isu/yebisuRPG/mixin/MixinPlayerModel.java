@@ -74,7 +74,9 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
         AnimationPlayhead playhead = engine.getPlayhead(entity.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
         AnimationBlender  blender  = engine.getBlender(entity.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
-        if (playhead == null && blender == null) return;
+        HandAnimationLoader.AnimData poseAnimHead = (playhead == null)
+                ? engine.getThirdPersonPose(entity.getId()) : null;
+        if (playhead == null && blender == null && poseAnimHead == null) return;
 
         HandAnimationLoader.AnimData anim = null;
         if (playhead != null) {
@@ -82,10 +84,15 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                     ? HandAnimationLoader.INSTANCE.get(playhead.animId(), playhead.filePath())
                     : HandAnimationLoader.INSTANCE.get(playhead.animId());
         }
+        if (anim == null && poseAnimHead != null) anim = poseAnimHead;
         if (anim == null && blender == null) return;
 
-        int vanMask  = playhead != null ? playhead.vanillaMask()     : 0;
-        int moveMask = playhead != null ? playhead.vanillaMoveMask() : 0;
+        net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload tpPoseHead =
+                (playhead == null && poseAnimHead != null) ? engine.getThirdPersonPosePayload(entity.getId()) : null;
+        int vanMask  = playhead != null ? playhead.vanillaMask()
+                     : (tpPoseHead != null) ? tpPoseHead.vanillaMask() : 0;
+        int moveMask = playhead != null ? playhead.vanillaMoveMask()
+                     : (tpPoseHead != null) ? tpPoseHead.vanillaMoveMask() : 0;
         boolean isMoving = entity.getDeltaMovement().horizontalDistanceSqr() > 0.0001;
 
         boolean rArmVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_ARM,
@@ -118,7 +125,11 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         AnimationPlayhead playhead = engine.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
         AnimationBlender  blender  = engine.getBlender(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
 
-        if (playhead == null && blender == null) return;
+        HandAnimationLoader.AnimData poseAnim = (playhead == null)
+                ? engine.getThirdPersonPose(entityId)
+                : null;
+
+        if (playhead == null && blender == null && poseAnim == null) return;
 
         float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
 
@@ -128,11 +139,21 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                     ? HandAnimationLoader.INSTANCE.get(playhead.animId(), playhead.filePath())
                     : HandAnimationLoader.INSTANCE.get(playhead.animId());
         }
+        if (anim == null && poseAnim != null) anim = poseAnim;
 
         if (anim == null && blender == null) return;
 
+        boolean isPoseMode = (playhead == null && poseAnim != null);
+
         float timeSecs = 0f;
-        if (playhead != null && anim != null) {
+        if (isPoseMode && anim != null) {
+            if (anim.loopMode() == AnimationLoopMode.LOOP && anim.length() > 0f) {
+                float elapsed = engine.getPoseElapsedSecs(entityId, true);
+                timeSecs = elapsed % anim.length();
+            } else {
+                timeSecs = anim.length();
+            }
+        } else if (playhead != null && anim != null) {
             float raw = playhead.getCurrentTimeSecs();
             timeSecs = (playhead.effectiveLoopMode(anim) == AnimationLoopMode.HOLD_LAST)
                     ? Math.min(raw, anim.length())
@@ -140,17 +161,22 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         }
 
         float weight = 1.0f;
-        if (blender != null && blender.isActive()) {
-            weight = 1.0f - blender.getBlendAlpha(partialTick);
+        if (playhead != null) {
+            weight *= playhead.getBlendInWeight(partialTick);
         }
-        // Never fully zero — a zero weight lerps all bones to reset pose for one frame
-        // before the blender finishes, causing a visible snap. Clamp to a small floor
-        // so we hold the last animated pose until the blender is truly done and removed.
+        if (blender != null && blender.isActive()) {
+            weight *= 1.0f - blender.getBlendAlpha(partialTick);
+        }
         if (weight <= 0f) weight = 0.001f;
 
-        int lookMask = (playhead != null) ? playhead.lookAtMask()      : 0;
-        int vanMask  = (playhead != null) ? playhead.vanillaMask()     : 0;
-        int moveMask = (playhead != null) ? playhead.vanillaMoveMask() : 0;
+        net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload tpPose =
+                isPoseMode ? engine.getThirdPersonPosePayload(entityId) : null;
+        int lookMask = (playhead != null) ? playhead.lookAtMask()
+                     : (tpPose != null) ? tpPose.lookAtMask() : 0;
+        int vanMask  = (playhead != null) ? playhead.vanillaMask()
+                     : (tpPose != null) ? tpPose.vanillaMask() : 0;
+        int moveMask = (playhead != null) ? playhead.vanillaMoveMask()
+                     : (tpPose != null) ? tpPose.vanillaMoveMask() : 0;
         // Use actual velocity for immediate response rather than smoothed limbSwingAmount.
         boolean isMoving = entity.getDeltaMovement().horizontalDistanceSqr() > 0.0001;
         boolean crouching = entity instanceof net.minecraft.client.player.AbstractClientPlayer cp && cp.isCrouching();

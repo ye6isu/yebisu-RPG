@@ -7,6 +7,7 @@ import net.ye6isu.yebisuRPG.network.animation.AnimPausePayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimStopPayload;
 import net.ye6isu.yebisuRPG.network.animation.AnimTriggerPayload;
 import net.ye6isu.yebisuRPG.network.animation.HandPosePayload;
+import net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload;
 
 /**
  * CLIENT-ONLY entry point for incoming animation packets.
@@ -52,5 +53,9 @@ public final class AnimClientHandler {
 
     public static void onAnimPause(AnimPausePayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.pause(payload));
+    }
+
+    public static void onThirdPersonPose(ThirdPersonPosePayload payload, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.setThirdPersonPose(payload));
     }
 }

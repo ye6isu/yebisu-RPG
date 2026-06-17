@@ -269,6 +269,48 @@ public final class AnimationAPI {
     }
 
     /**
+     * Sets a persistent third-person pose for an entity.
+     * The pose is shown whenever no animation is actively playing on the ENTITY_THIRD_PERSON slot.
+     * Supports the same settings as triggerThirdPersonAnimation (lookAtMask, vanillaMask, vanillaMoveMask).
+     */
+    public static void setThirdPersonPose(Entity entity, String animName, String filePath) {
+        setThirdPersonPose(entity, animName, filePath, 0, 0, 0);
+    }
+
+    public static void setThirdPersonPose(Entity entity, String animName, String filePath,
+                                           int lookAtMask) {
+        setThirdPersonPose(entity, animName, filePath, lookAtMask, 0, 0);
+    }
+
+    public static void setThirdPersonPose(Entity entity, String animName, String filePath,
+                                           int lookAtMask, int vanillaMask) {
+        setThirdPersonPose(entity, animName, filePath, lookAtMask, vanillaMask, 0);
+    }
+
+    public static void setThirdPersonPose(Entity entity, String animName, String filePath,
+                                           int lookAtMask, int vanillaMask, int vanillaMoveMask) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] setThirdPersonPose called client-side for entity={}; ignoring.", entity.getId());
+            return;
+        }
+        var payload = net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload.set(
+                entity.getId(), animName, filePath, lookAtMask, vanillaMask, vanillaMoveMask);
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+    }
+
+    /**
+     * Resets the entity's third-person pose back to vanilla default.
+     */
+    public static void resetThirdPersonPose(Entity entity) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] resetThirdPersonPose called client-side for entity={}; ignoring.", entity.getId());
+            return;
+        }
+        var payload = net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload.clear(entity.getId());
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+    }
+
+    /**
      * Resets the entity's first-person hand pose back to vanilla default.
      */
     public static void resetFirstPersonHandPose(Entity entity) {

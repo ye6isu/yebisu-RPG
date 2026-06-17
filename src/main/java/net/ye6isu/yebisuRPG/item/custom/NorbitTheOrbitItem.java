@@ -13,6 +13,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Entity;
 import net.ye6isu.yebisuRPG.animation.AnimationAPI;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.util.TickScheduler;
 import net.ye6isu.yebisuRPG.data.EntityVarCapability;
 import net.ye6isu.yebisuRPG.data.EntityVar;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -38,13 +39,21 @@ public class NorbitTheOrbitItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                player.setDeltaMovement((double)((((player.getLookAngle().x))*(2))), (double)((((player.getLookAngle().y))*(2))), (double)((((player.getLookAngle().z))*(2))));
-        if (player instanceof Entity _tpa && !level.isClientSide()) {
-            AnimationAPI.triggerAnimation(_tpa,
-                AnimationCategory.ENTITY_THIRD_PERSON,
-                "tp2",
-                "yebisurpg:animations/player.animation.json",
-                1f, 12288, 0, 0);
+                if ((player.isCrouching())) {
+          if (player instanceof Entity _tps && !level.isClientSide()) {
+              AnimationAPI.stopThirdPersonAnimation(_tps);
+          }
+        } else {
+          TickScheduler.INSTANCE.schedule((int)(40), () -> {
+            if (player instanceof Entity _tpa && !level.isClientSide()) {
+                AnimationAPI.triggerAnimation(_tpa,
+                    AnimationCategory.ENTITY_THIRD_PERSON,
+                    "tp2",
+                    "yebisurpg:animations/player.animation.json",
+                    1f, 0, 0, 0);
+            }
+            player.setDeltaMovement((double)((((player.getLookAngle().x))*(-1))), (double)((((player.getLookAngle().y))*(-1))), (double)((((player.getLookAngle().z))*(-1))));
+          });
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

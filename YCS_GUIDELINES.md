@@ -112,11 +112,23 @@ Feature keys: `food`, `fuel`, `tooltip`
 - Click **Save** to compile all canvas blocks into the method body on disk.
 
 ### Block palette categories
-- **Universal Flow & Logic** — If/Do, Repeat, Math, Logic, Boolean, Return
+- **Universal Flow & Logic** — If/Do, Delay, Repeat, Math, Logic, Boolean, Return
 - **Context Data Blocks** — Get Level, Get Player, Get Entity, Get Item (dynamic getters)
 - **World Actions** — set block, get block, spawn particle, play sound, strike lightning
 - **Entity & Movement** — deal damage, apply effect, set velocity, get health
 - **Item Actions** — damage stack, shrink stack, return interaction result
+
+### Container blocks (blocks with child body slots)
+
+Container blocks are blocks that hold other action blocks inside them (like `control.if` holds its "do" body). When creating a new block that needs child actions, **always** reuse the `control.if` container pattern — stripped down without else/elseif if not needed:
+
+1. **Palette definition**: include `isAction:true` and a `slotDefs` array for any header slots (conditions, values). Default fields **must** include `elseIfCount:0, hasElse:false` so the shared container snap/layout code works.
+2. **Code generation** (`compileBlock`): use `compileChain(node.slots.do0, ...)` for the body, same as `control.if`.
+3. **Layout** (`getH` / `layoutChain`): add an `else if (n.opcode === "your.opcode")` branch identical to `control.if` but without the elseIf/else loop — just `do0`.
+4. **Drop/snap logic**: the shared `else` branch already handles any opcode listed in the `control.if || control.delay` checks. Add your opcode to those checks (`n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode==="your.opcode"`).
+5. **Rendering** (`CanvasNode`): add an `if (isYourBlock)` return that copies the `isIf` return structure — header div + `do0` gap div — without the elseIf/else sections or settings panel.
+
+The key invariant: container blocks must appear in **every** place `control.if` is checked in the snap/layout code, or child blocks won't snap inside them.
 
 ---
 

@@ -61,4 +61,13 @@ public final class ClientHandlerProxy {
             call.run();
         }
     }
+
+    public static void onThirdPersonPose(net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload payload,
+                                          IPayloadContext ctx) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            Runnable call = () ->
+                net.ye6isu.yebisuRPG.animation.client.AnimClientHandler.onThirdPersonPose(payload, ctx);
+            call.run();
+        }
+    }
 }

@@ -81,8 +81,13 @@ public abstract class MixinItemInHandRenderer {
 
         float timeSecs;
         if (playhead == null) {
-            // Hand pose: sample at last frame to show the idle/hold position.
-            timeSecs = anim != null ? anim.length() : 0f;
+            // Hand pose: looping anims play continuously, others hold last frame.
+            if (anim != null && anim.loopMode() == AnimationLoopMode.LOOP && anim.length() > 0f) {
+                float elapsed = ClientAnimationEngine.INSTANCE.getPoseElapsedSecs(entityId, false);
+                timeSecs = elapsed % anim.length();
+            } else {
+                timeSecs = anim != null ? anim.length() : 0f;
+            }
         } else {
             float raw = playhead.getCurrentTimeSecs();
             if (anim != null && playhead.effectiveLoopMode(anim) == AnimationLoopMode.HOLD_LAST) {
