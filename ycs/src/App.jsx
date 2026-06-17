@@ -507,6 +507,7 @@ const LINK_ENTITY = "entity";
 const LINK_NUMBER = "number";
 const LINK_LOGIC = "logic";
 const LINK_TEXT = "text";
+const LINK_ITERATOR = "iterator";
 
 function resolveEntityVar(opcode, methodKey) {
   if (opcode === "entity.event") {
@@ -546,6 +547,36 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (node.opcode === "entity.is_crouching") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     return `(${ent}.isCrouching())`;
+  }
+  if (node.opcode === "aoe.iterator.entity") return "_iterEnt";
+  if (node.opcode.startsWith("entity.pos_")) {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    if (node.opcode === "entity.pos_x") return `(${ent}.getX())`;
+    if (node.opcode === "entity.pos_y") return `(${ent}.getY())`;
+    if (node.opcode === "entity.pos_z") return `(${ent}.getZ())`;
+  }
+  if (node.opcode.startsWith("entity.cam_")) {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const dist = resolveSlotValue(node.slots?.distance, nodes, methodKey) ?? "5";
+    if (node.opcode === "entity.cam_x") return `(${ent}.getX() + ${ent}.getLookAngle().normalize().x * (double)(${dist}))`;
+    if (node.opcode === "entity.cam_y") return `(${ent}.getY() + ${ent}.getEyeHeight() + ${ent}.getLookAngle().normalize().y * (double)(${dist}))`;
+    if (node.opcode === "entity.cam_z") return `(${ent}.getZ() + ${ent}.getLookAngle().normalize().z * (double)(${dist}))`;
+  }
+  if (node.opcode.startsWith("vector.normalize_")) {
+    const x1 = resolveSlotValue(node.slots?.x1, nodes, methodKey) ?? "0";
+    const y1 = resolveSlotValue(node.slots?.y1, nodes, methodKey) ?? "0";
+    const z1 = resolveSlotValue(node.slots?.z1, nodes, methodKey) ?? "0";
+    const x2 = resolveSlotValue(node.slots?.x2, nodes, methodKey) ?? "0";
+    const y2 = resolveSlotValue(node.slots?.y2, nodes, methodKey) ?? "0";
+    const z2 = resolveSlotValue(node.slots?.z2, nodes, methodKey) ?? "0";
+    const dx = `((double)(${x2})-(double)(${x1}))`;
+    const dy = `((double)(${y2})-(double)(${y1}))`;
+    const dz = `((double)(${z2})-(double)(${z1}))`;
+    const len = `Math.sqrt(${dx}*${dx}+${dy}*${dy}+${dz}*${dz})`;
+    const safe = `(${len} > 0.001 ? ${len} : 1.0)`;
+    if (node.opcode === "vector.normalize_x") return `(${dx} / ${safe})`;
+    if (node.opcode === "vector.normalize_y") return `(${dy} / ${safe})`;
+    if (node.opcode === "vector.normalize_z") return `(${dz} / ${safe})`;
   }
   if (node.opcode.startsWith("entity.look_")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -721,6 +752,69 @@ function compileActionNode(node, nodes, methodKey) {
     } else {
       return [`${ent}.push((double)(${x}), (double)(${y}), (double)(${z}));`];
     }
+  }
+  if (node.opcode?.startsWith("aoe.each.")) {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const ox = resolveSlotValue(node.slots?.offX, nodes, methodKey) ?? "0";
+    const oy = resolveSlotValue(node.slots?.offY, nodes, methodKey) ?? "0";
+    const oz = resolveSlotValue(node.slots?.offZ, nodes, methodKey) ?? "0";
+    const hasOff = ox !== "0" || oy !== "0" || oz !== "0";
+    const los = node.fields?.los !== false;
+    const losOrigin = node.fields?.losOrigin || "caller";
+    const showP = !!node.fields?.showParticles;
+    const shape = node.opcode.replace("aoe.each.", "");
+
+    let lines = [
+      "if (" + ent + ".level() instanceof net.minecraft.server.level.ServerLevel _sl) {",
+      "    net.minecraft.world.phys.Vec3[] _f = AoeShapes.frameFromEntity(" + ent + ");",
+      "    net.minecraft.world.phys.Vec3 _c = " + ent + ".getEyePosition();",
+    ];
+    if (hasOff) lines.push("    _c = _c.add(_f[0].scale((double)(" + ox + "))).add(_f[1].scale((double)(" + oy + "))).add(_f[2].scale((double)(" + oz + ")));");
+
+    let queryExpr, visExpr;
+    if (shape === "sphere") {
+      const radius = resolveSlotValue(node.slots?.radius, nodes, methodKey) ?? "5";
+      const losOriginExpr = losOrigin === "caller" ? ent + ".getEyePosition()" : "_c";
+      queryExpr = "AoeShapes.querySphere(_sl, _c, (double)(" + radius + "), " + ent + ", " + los + ", " + losOriginExpr + ")";
+      visExpr = showP ? "    AoeShapes.visualizeSphere(_sl, _c, (double)(" + radius + "));" : null;
+    } else if (shape === "box") {
+      const w = resolveSlotValue(node.slots?.width, nodes, methodKey) ?? "4";
+      const h = resolveSlotValue(node.slots?.height, nodes, methodKey) ?? "4";
+      const d = resolveSlotValue(node.slots?.depth, nodes, methodKey) ?? "4";
+      const losOriginExpr = losOrigin === "caller" ? ent + ".getEyePosition()" : "_c";
+      queryExpr = "AoeShapes.queryBox(_sl, _c, (double)(" + w + "), (double)(" + h + "), (double)(" + d + "), _f[2], _f[0], _f[1], " + ent + ", " + los + ", " + losOriginExpr + ")";
+      visExpr = showP ? "    AoeShapes.visualizeBox(_sl, _c, (double)(" + w + "), (double)(" + h + "), (double)(" + d + "), _f[2], _f[0], _f[1]);" : null;
+    } else if (shape === "cone") {
+      const dist = resolveSlotValue(node.slots?.distance, nodes, methodKey) ?? "8";
+      const angle = resolveSlotValue(node.slots?.angle, nodes, methodKey) ?? "60";
+      if (!hasOff) {
+        queryExpr = "AoeShapes.queryCone(_sl, " + ent + ", (double)(" + dist + "), (double)(" + angle + "), true, " + los + ")";
+        visExpr = showP ? "    AoeShapes.visualizeCone(_sl, " + ent + ", (double)(" + dist + "), (double)(" + angle + "));" : null;
+      } else {
+        queryExpr = "AoeShapes.queryConeOffset(_sl, " + ent + ", _c.subtract(" + ent + ".getEyePosition()), (double)(" + dist + "), (double)(" + angle + "), true, " + los + ")";
+        visExpr = showP ? "    AoeShapes.visualizeConeOffset(_sl, " + ent + ", _c.subtract(" + ent + ".getEyePosition()), (double)(" + dist + "), (double)(" + angle + "));" : null;
+      }
+    } else if (shape === "line") {
+      const dist = resolveSlotValue(node.slots?.distance, nodes, methodKey) ?? "10";
+      const w = resolveSlotValue(node.slots?.width, nodes, methodKey) ?? "1";
+      if (!hasOff) {
+        queryExpr = "AoeShapes.queryLine(_sl, " + ent + ", (double)(" + dist + "), (double)(" + w + "), true, " + los + ")";
+        visExpr = showP ? "    AoeShapes.visualizeLine(_sl, " + ent + ", (double)(" + dist + "), (double)(" + w + "));" : null;
+      } else {
+        queryExpr = "AoeShapes.queryLineOffset(_sl, " + ent + ", _c.subtract(" + ent + ".getEyePosition()), (double)(" + dist + "), (double)(" + w + "), true, " + los + ")";
+        visExpr = showP ? "    AoeShapes.visualizeLineOffset(_sl, " + ent + ", _c.subtract(" + ent + ".getEyePosition()), (double)(" + dist + "), (double)(" + w + "));" : null;
+      }
+    }
+
+    if (visExpr) lines.push(visExpr);
+    lines.push("    for (net.minecraft.world.entity.LivingEntity _iterEnt : " + queryExpr + ") {");
+    if (node.slots?.do0) {
+      const body = compileChain(node.slots.do0, nodes, methodKey).map(l => "      " + l);
+      lines.push(...body);
+    }
+    lines.push("    }");
+    lines.push("}");
+    return lines;
   }
   if (node.opcode === "anim.firstperson.play") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
@@ -922,6 +1016,7 @@ function compileActionNode(node, nodes, methodKey) {
 }
 // Module-level caches so CanvasNode can read shared data without prop drilling.
 let __modAttributesCache = [];
+let __modEffectsCache = [];
 let __variablesCache = [];
 // Extra scale attributes registered by this mod (yebisurpg:scale.*).
 const PEHKUI_SCALES = [
@@ -999,6 +1094,7 @@ const PALETTE_BLOCKS = [
   { category:"Entity", data:[
     { opcode:"entity.event",  label:"Event Entity",  linkType:LINK_ENTITY, hint:"Entity that triggered this method" },
     { opcode:"entity.target", label:"Target Entity", linkType:LINK_ENTITY, hint:"Target entity (hurtEnemy/interactLivingEntity)" },
+    { opcode:"aoe.iterator.entity", label:"Iterator Entity", linkType:LINK_ENTITY, hint:"Current entity in a For Each Entity loop" },
   ], actions:[] },
   { category:"Text", data:[
     { opcode:"text.literal", label:"Text", linkType:LINK_TEXT, hint:"A literal text/string value" },
@@ -1007,6 +1103,18 @@ const PALETTE_BLOCKS = [
     { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
     { opcode:"number.math", label:"Math", linkType:LINK_NUMBER, hint:"Apply an operator to two numbers",
       slotDefs:[{key:"a",accepts:LINK_NUMBER},{key:"b",accepts:LINK_NUMBER}] },
+    { opcode:"entity.pos_x", label:"Pos X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.pos_y", label:"Pos Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.pos_z", label:"Pos Z of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
+    { opcode:"entity.cam_x", label:"X at dist from", linkType:LINK_NUMBER, slotDefs:[{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"entity",accepts:LINK_ENTITY,label:"entity"}] },
+    { opcode:"entity.cam_y", label:"Y at dist from", linkType:LINK_NUMBER, slotDefs:[{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"entity",accepts:LINK_ENTITY,label:"entity"}] },
+    { opcode:"entity.cam_z", label:"Z at dist from", linkType:LINK_NUMBER, slotDefs:[{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"entity",accepts:LINK_ENTITY,label:"entity"}] },
+    { opcode:"vector.normalize_x", label:"Dir X from→to", linkType:LINK_NUMBER, hint:"X component of normalized direction from (x1,y1,z1) to (x2,y2,z2)",
+      slotDefs:[{key:"x1",accepts:LINK_NUMBER,label:"x1"},{key:"y1",accepts:LINK_NUMBER,label:"y1"},{key:"z1",accepts:LINK_NUMBER,label:"z1"},{key:"x2",accepts:LINK_NUMBER,label:"x2"},{key:"y2",accepts:LINK_NUMBER,label:"y2"},{key:"z2",accepts:LINK_NUMBER,label:"z2"}] },
+    { opcode:"vector.normalize_y", label:"Dir Y from→to", linkType:LINK_NUMBER, hint:"Y component of normalized direction from (x1,y1,z1) to (x2,y2,z2)",
+      slotDefs:[{key:"x1",accepts:LINK_NUMBER,label:"x1"},{key:"y1",accepts:LINK_NUMBER,label:"y1"},{key:"z1",accepts:LINK_NUMBER,label:"z1"},{key:"x2",accepts:LINK_NUMBER,label:"x2"},{key:"y2",accepts:LINK_NUMBER,label:"y2"},{key:"z2",accepts:LINK_NUMBER,label:"z2"}] },
+    { opcode:"vector.normalize_z", label:"Dir Z from→to", linkType:LINK_NUMBER, hint:"Z component of normalized direction from (x1,y1,z1) to (x2,y2,z2)",
+      slotDefs:[{key:"x1",accepts:LINK_NUMBER,label:"x1"},{key:"y1",accepts:LINK_NUMBER,label:"y1"},{key:"z1",accepts:LINK_NUMBER,label:"z1"},{key:"x2",accepts:LINK_NUMBER,label:"x2"},{key:"y2",accepts:LINK_NUMBER,label:"y2"},{key:"z2",accepts:LINK_NUMBER,label:"z2"}] },
     { opcode:"entity.look_x", label:"Look Dir X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_y", label:"Look Dir Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_z", label:"Look Dir Z of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
@@ -1027,6 +1135,16 @@ const PALETTE_BLOCKS = [
       slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"duration",accepts:LINK_NUMBER},{key:"level",accepts:LINK_NUMBER}] },
     { opcode:"entity.apply_motion", label:"Apply Motion", isAction:true, hint:"Add velocity to an entity (X/Y/Z). Set mode: add=impulse, set=override velocity.",
       slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"x",accepts:LINK_NUMBER},{key:"y",accepts:LINK_NUMBER},{key:"z",accepts:LINK_NUMBER}] },
+  ]},
+  { category:"AoE", data:[], actions:[
+    { opcode:"aoe.each.sphere", label:"For Each in Sphere", isAction:true, hint:"Run actions for each entity in sphere",
+      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"radius",accepts:LINK_NUMBER,label:"radius"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
+    { opcode:"aoe.each.box", label:"For Each in Box", isAction:true, hint:"Run actions for each entity in box",
+      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"width",accepts:LINK_NUMBER,label:"width"},{key:"height",accepts:LINK_NUMBER,label:"height"},{key:"depth",accepts:LINK_NUMBER,label:"depth"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
+    { opcode:"aoe.each.cone", label:"For Each in Cone", isAction:true, hint:"Run actions for each entity in cone",
+      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"angle",accepts:LINK_NUMBER,label:"angle°"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
+    { opcode:"aoe.each.line", label:"For Each in Line", isAction:true, hint:"Run actions for each entity in line",
+      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"width",accepts:LINK_NUMBER,label:"width"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
   ]},
   { category:"Animations", data:[], actions:[
     { opcode:"anim.firstperson.play", label:"Play First-Person Anim", isAction:true,
@@ -1129,6 +1247,57 @@ function AttrDropdown({nodeId,value,onChange}){
   return<div ref={anchorRef} style={{position:"relative",display:"inline-block"}} onMouseDown={e=>e.stopPropagation()}>
     <div onClick={openDropdown}
       style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:12,fontFamily:"sans-serif",fontWeight:700,cursor:"pointer",padding:"0 22px 0 6px",display:"flex",alignItems:"center",minWidth:100,maxWidth:160,overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",position:"relative"}}>
+      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected?.label||"—"}</span>
+      <span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"#aaa"}}>▾</span>
+    </div>
+    {list}
+  </div>;
+}
+const VANILLA_EFFECT_LABELS={"MobEffects.MOVEMENT_SPEED":"Speed","MobEffects.MOVEMENT_SLOWDOWN":"Slowness","MobEffects.DIG_SPEED":"Haste","MobEffects.DIG_SLOWDOWN":"Mining Fatigue","MobEffects.DAMAGE_BOOST":"Strength","MobEffects.HEAL":"Instant Health","MobEffects.HARM":"Instant Damage","MobEffects.DAMAGE_RESISTANCE":"Resistance","MobEffects.JUMP":"Jump Boost","MobEffects.CONFUSION":"Nausea","MobEffects.REGENERATION":"Regeneration","MobEffects.FIRE_RESISTANCE":"Fire Resistance","MobEffects.WATER_BREATHING":"Water Breathing","MobEffects.INVISIBILITY":"Invisibility","MobEffects.BLINDNESS":"Blindness","MobEffects.NIGHT_VISION":"Night Vision","MobEffects.HUNGER":"Hunger","MobEffects.WEAKNESS":"Weakness","MobEffects.POISON":"Poison","MobEffects.WITHER":"Wither","MobEffects.HEALTH_BOOST":"Health Boost","MobEffects.ABSORPTION":"Absorption","MobEffects.SATURATION":"Saturation","MobEffects.GLOWING":"Glowing","MobEffects.LEVITATION":"Levitation","MobEffects.LUCK":"Luck","MobEffects.UNLUCK":"Bad Luck","MobEffects.SLOW_FALLING":"Slow Falling","MobEffects.CONDUIT_POWER":"Conduit Power","MobEffects.DOLPHINS_GRACE":"Dolphin's Grace","MobEffects.BAD_OMEN":"Bad Omen","MobEffects.HERO_OF_THE_VILLAGE":"Hero of the Village","MobEffects.DARKNESS":"Darkness","MobEffects.TRIAL_OMEN":"Trial Omen","MobEffects.RAID_OMEN":"Raid Omen","MobEffects.WIND_CHARGED":"Wind Charged","MobEffects.WEAVING":"Weaving","MobEffects.OOZING":"Oozing","MobEffects.INFESTED":"Infested"};
+function EffectDropdown({nodeId,value,onChange}){
+  const allEffects=[...VANILLA_EFFECTS.map(e=>({id:e,label:VANILLA_EFFECT_LABELS[e]||e})),...__modEffectsCache.map(e=>({id:`ModEffects.${e.constName}`,label:(e.titleText||e.id)+" (mod)"}))];
+  const[open,setOpen]=useState(false);
+  const[query,setQuery]=useState("");
+  const[rect,setRect]=useState(null);
+  const anchorRef=useRef(null);
+  const inputRef=useRef(null);
+  const selected=allEffects.find(a=>a.id===(value||""))||allEffects[0];
+  const filtered=query.trim()===""?allEffects:allEffects.filter(a=>a.label.toLowerCase().includes(query.toLowerCase())||a.id.toLowerCase().includes(query.toLowerCase()));
+  const pick=(id)=>{onChange(id);setOpen(false);setQuery("");};
+  const openDropdown=(e)=>{
+    e.stopPropagation();
+    if(!open){
+      const r=anchorRef.current?.getBoundingClientRect();
+      if(r)setRect(r);
+      setTimeout(()=>inputRef.current&&inputRef.current.focus(),0);
+    }
+    setOpen(o=>!o);
+  };
+  useEffect(()=>{
+    if(!open)return;
+    const close=()=>setOpen(false);
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[open]);
+  const list=open&&rect?ReactDOM.createPortal(
+    <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
+      style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(200,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
+      <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
+        placeholder="Search…" style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
+      <div style={{overflowY:"auto",maxHeight:180}} onWheel={e=>e.stopPropagation()}>
+        {filtered.map(a=><div key={a.id} onMouseDown={e=>{e.stopPropagation();pick(a.id);}}
+          style={{padding:"5px 10px",fontSize:12,color:a.id===(value||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:a.id===(value||"")?"#2a2a2a":"transparent"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#2a2a2a"} onMouseLeave={e=>e.currentTarget.style.background=a.id===(value||"")?"#2a2a2a":"transparent"}>
+          {a.label}
+        </div>)}
+        {filtered.length===0&&<div style={{padding:"5px 10px",color:"#666",fontSize:12}}>No results</div>}
+      </div>
+    </div>,
+    document.body
+  ):null;
+  return<div ref={anchorRef} style={{position:"relative",display:"inline-block"}} onMouseDown={e=>e.stopPropagation()}>
+    <div onClick={openDropdown}
+      style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:12,fontFamily:"sans-serif",fontWeight:700,cursor:"pointer",padding:"0 22px 0 6px",display:"flex",alignItems:"center",minWidth:100,maxWidth:200,overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",position:"relative"}}>
       <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected?.label||"—"}</span>
       <span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"#aaa"}}>▾</span>
     </div>
@@ -1331,6 +1500,11 @@ function ycsSyncImports(code, enabledMethodKeys) {
     needed.add('net.minecraft.world.effect.MobEffects');
   }
 
+  // ModEffects (custom mod effects)
+  if (code.includes('ModEffects.')) {
+    needed.add('net.ye6isu.yebisuRPG.effect.ModEffects');
+  }
+
   // anim.* — AnimationAPI + AnimationCategory
   if (code.includes('AnimationAPI') || code.includes('AnimationCategory')) {
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationAPI');
@@ -1340,6 +1514,11 @@ function ycsSyncImports(code, enabledMethodKeys) {
   // control.delay — TickScheduler
   if (code.includes('TickScheduler')) {
     needed.add('net.ye6isu.yebisuRPG.util.TickScheduler');
+  }
+
+  // aoe.* — AoeShapes
+  if (code.includes('AoeShapes')) {
+    needed.add('net.ye6isu.yebisuRPG.util.AoeShapes');
   }
 
   // variable.get / variable.set — EntityVarCapability + EntityVar
@@ -2003,6 +2182,12 @@ function useAttributes(){
   useEffect(()=>{reload();},[reload]);
   return{attributes,reload};
 }
+function useEffects(){
+  const[effects,setEffects]=useState([]);
+  const reload=useCallback(()=>{fetch(`${BASE}/effects/list`).then(r=>r.json()).then(j=>{if(j.ok)setEffects(j.effects||[]);}).catch(()=>{});},[]);
+  useEffect(()=>{reload();},[reload]);
+  return{effects,reload};
+}
 function ItemStackPicker({label,value,onChange,allItems,textures}){
   const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
   const vanillaItems=useVanillaItems();
@@ -2222,6 +2407,107 @@ function AttributesPage({onEditingChange,newTrigger,editing,setEditing}){
         {a.syncToClient&&<Pill color="#1a2438">synced</Pill>}
       </div>)}
       {!attributes.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No attributes yet.</div>}
+    </div>
+  </div>;
+}
+const EFFECT_SENTINEL="new";
+const EFFECT_CATEGORIES=[{value:"BENEFICIAL",label:"Beneficial"},{value:"HARMFUL",label:"Harmful"},{value:"NEUTRAL",label:"Neutral"}];
+function EffectEditor({effect,id,setId,constName,setConstName,customConst,setCustomConst,titleText,setTitleText,category,setCategory,color,setColor,hasTexture,setHasTexture,textureDataUrl,setTextureDataUrl,onSave,onCancel,onDelete}){
+  const isNew=!effect;
+  const idErr=id&&!/^[a-z][a-z0-9_]*$/.test(id)?"lowercase letters, digits, underscores only":null;
+  const cnErr=constName&&!/^[A-Z][A-Z0-9_]*$/.test(constName)?"UPPER_SNAKE_CASE only":null;
+  const canSave=id&&constName&&!idErr&&!cnErr&&category;
+  const fRef=useRef();
+  const onTexFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setTextureDataUrl(ev.target.result);setHasTexture(true);};r.readAsDataURL(f);};
+  return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{fontSize:14,fontWeight:500,color:C.text}}>{isNew?"New Effect":"Edit Effect"}</div>
+    <Inp label="Display Name" value={titleText} onChange={v=>setTitleText(v)} placeholder="e.g. Slimey"/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>ID (registry key)</Lbl>{idErr&&<span style={{fontSize:11,color:"#ff7777"}}>{idErr}</span>}</div>
+      <input value={id} onChange={e=>{const v=e.target.value;setId(v);if(!customConst)setConstName(autoConstName(v));}} style={{...SI.inp}} placeholder="e.g. slimey"/>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:6}}><Lbl>Const Name</Lbl><Chk label="custom" checked={customConst} onChange={v=>setCustomConst(v)}/></div>{cnErr&&<span style={{fontSize:11,color:"#ff7777"}}>{cnErr}</span>}</div>
+      <input value={customConst?constName:autoConstName(id)} onChange={e=>setConstName(e.target.value)} disabled={!customConst} style={{...SI.inp,color:customConst?C.text:C.faint,opacity:customConst?1:0.6}}/>
+    </div>
+    <Sel label="Category" value={category} onChange={v=>setCategory(v)} options={EFFECT_CATEGORIES}/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Color (decimal)</Lbl>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <input type="number" value={color} onChange={e=>setColor(e.target.value)} style={{...SI.inp,flex:1}} placeholder="e.g. 3402751"/>
+        <div style={{width:28,height:28,borderRadius:4,border:"1px solid #333",background:`#${(parseInt(color)||0).toString(16).padStart(6,"0")}`}}/>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Effect Texture (18×18 PNG)</Lbl>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <Btn sm v="g" onClick={()=>fRef.current?.click()}>Choose file</Btn>
+        {(hasTexture||textureDataUrl)&&<div style={{width:28,height:28,borderRadius:4,border:"1px solid #333",overflow:"hidden"}}><img src={textureDataUrl||""} style={{width:"100%",height:"100%",imageRendering:"pixelated"}} alt=""/></div>}
+        {hasTexture&&<Btn sm v="dan" onClick={()=>{setHasTexture(false);setTextureDataUrl("");}}>Remove</Btn>}
+      </div>
+      <input ref={fRef} type="file" accept="image/png" style={{display:"none"}} onChange={onTexFile}/>
+    </div>
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <Btn v="p" dis={!canSave} onClick={()=>onSave({id,constName:customConst?constName:autoConstName(id),titleText,category,color:parseInt(color)||0,hasTexture:!!hasTexture,textureDataUrl:textureDataUrl||undefined})}>Save</Btn>
+      <Btn v="g" onClick={onCancel}>Cancel</Btn>
+      {!isNew&&<Btn v="dan" style={{marginLeft:"auto"}} onClick={()=>onDelete(effect.id)}>Delete</Btn>}
+    </div>
+  </div>;
+}
+function EffectsPage({onEditingChange,newTrigger,editing,setEditing}){
+  const{effects,reload}=useEffects();
+  const[dragIdx,setDragIdx]=useState(null);
+  const[id,setId]=useState("");
+  const[constName,setConstName]=useState("");
+  const[customConst,setCustomConst]=useState(false);
+  const[titleText,setTitleText]=useState("");
+  const[category,setCategory]=useState("BENEFICIAL");
+  const[color,setColor]=useState(0);
+  const[hasTexture,setHasTexture]=useState(false);
+  const[textureDataUrl,setTextureDataUrl]=useState("");
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
+  const prevTrigger=useRef(newTrigger);
+  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing(EFFECT_SENTINEL);}},[newTrigger]);
+  useEffect(()=>{
+    if(!editing)return;
+    const t=editing===EFFECT_SENTINEL?null:editing;
+    setId(t?.id||"");setConstName(t?.constName||"");setCustomConst(false);setTitleText(t?.titleText||"");
+    setCategory(t?.category||"BENEFICIAL");setColor(t?.color??0);setHasTexture(t?.hasTexture||false);setTextureDataUrl(t?.textureDataUrl||"");
+  },[editing]);
+  const persist=async(list)=>{const r=await api("/effects/save",{effects:list});if(r.ok)reload();return r;};
+  const saveEffect=async(v)=>{
+    const exists=effects.some(x=>x.id===v.id);
+    const next=exists?effects.map(x=>x.id===v.id?v:x):[...effects,v];
+    const r=await persist(next);if(r.ok)setEditing(null);
+  };
+  const deleteEffect=async(eid)=>{await persist(effects.filter(x=>x.id!==eid));setEditing(null);};
+  const moveEffect=async(from,to)=>{if(from===to)return;const arr=[...effects];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
+  const catColor=c=>c==="BENEFICIAL"?"#1e3020":c==="HARMFUL"?"#301e1e":"#1e1e30";
+  if(editing){
+    const target=editing===EFFECT_SENTINEL?null:editing;
+    return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <EffectEditor effect={target} id={id} setId={setId} constName={constName} setConstName={setConstName} customConst={customConst} setCustomConst={setCustomConst} titleText={titleText} setTitleText={setTitleText} category={category} setCategory={setCategory} color={color} setColor={setColor} hasTexture={hasTexture} setHasTexture={setHasTexture} textureDataUrl={textureDataUrl} setTextureDataUrl={setTextureDataUrl} onSave={saveEffect} onCancel={()=>setEditing(null)} onDelete={deleteEffect}/>
+      </div>
+    </div>;
+  }
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>EFFECTS (drag to reorder, click to edit)</div>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {effects.map((e,idx)=><div key={e.id}
+        draggable
+        onDragStart={()=>setDragIdx(idx)}
+        onDragOver={ev=>ev.preventDefault()}
+        onDrop={()=>{moveEffect(dragIdx,idx);setDragIdx(null);}}
+        onClick={()=>setEditing(e)}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
+        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        {e.hasTexture&&<div style={{width:20,height:20,borderRadius:3,overflow:"hidden",flexShrink:0}}><img src={`${BASE}/textures/mob_effect/${e.id}.png`} style={{width:"100%",height:"100%",imageRendering:"pixelated"}} alt="" onError={ev=>ev.currentTarget.style.display="none"}/></div>}
+        <span style={{fontSize:13,color:C.text,flex:1}}>{e.titleText||e.id}</span>
+        <Pill color={catColor(e.category)}>{(e.category||"NEUTRAL").toLowerCase()}</Pill>
+        <div style={{width:14,height:14,borderRadius:3,border:"1px solid #333",background:`#${(e.color||0).toString(16).padStart(6,"0")}`,flexShrink:0}}/>
+      </div>)}
+      {!effects.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No effects yet.</div>}
     </div>
   </div>;
 }
@@ -2521,7 +2807,9 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
   const{variables}=useVariables();
   const{attributes:modAttributes}=useAttributes();
+  const{effects:modEffects}=useEffects();
   __modAttributesCache = modAttributes || [];
+  __modEffectsCache = modEffects || [];
   __variablesCache = variables || [];
   const palette=useMemo(()=>buildPalette(variables,modAttributes),[variables,modAttributes]);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
@@ -2580,7 +2868,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
            }
            h += ih;
            n.height = ih;
-        } else if (n.opcode === "control.delay") {
+        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.")) {
            let d0h = Math.max(0, getH(n.slots?.do0));
            let ih = 50 + d0h;
            n.gapHeights = { do0: d0h };
@@ -2616,7 +2904,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
              innerY += Math.max(0, getH(n.slots?.doElse));
            }
            cy = innerY;
-        } else if (n.opcode === "control.delay") {
+        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.")) {
            let innerY = cy + 50;
            if (n.slots?.do0) layoutChain(n.slots.do0, sx + 30, innerY, depth + 1);
            innerY += Math.max(0, getH(n.slots?.do0));
@@ -2637,7 +2925,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="control.delay"?{delayTicks:"20",elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:bd.opcode==="anim.tppose.set"?{animName:"",filePath:""}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="control.delay"?{delayTicks:"20",elseIfCount:0,hasElse:false}:bd.opcode.startsWith("aoe.each.")?{elseIfCount:0,hasElse:false,los:true,losOrigin:"caller",showParticles:true}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:bd.opcode==="anim.tppose.set"?{animName:"",filePath:""}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -2745,8 +3033,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
                  if(n.id===dragged.id || getDescendants(dragged.id, nextNs).includes(n.id)) continue;
                  if(n.isAction||n.id==="start"){
                      let h = 50;
-                     if (n.opcode==="control.if" || n.opcode==="control.delay") h = n.height || 50;
-                     if(n.opcode!=="control.if" && n.opcode!=="control.delay"){
+                     if (n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.")) h = n.height || 50;
+                     if(n.opcode!=="control.if" && n.opcode!=="control.delay" && !n.opcode.startsWith("aoe.each.")){
                        let snb={x:n.x+20,y:n.y+h};
                        let d=Math.hypot(mx-snb.x,my-snb.y);
                        if(d<md&&!n.nextId){md=d;cst=n.id;csk="nextId";}
@@ -2795,7 +3083,11 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
                const { nodeId, sk } = best;
                const parent = nextNs.find(x => x.id === nodeId);
                const isLogicSlot = parent.opcode === "control.if" && sk.startsWith("condition");
-               const def = parent?.slotDefs?.find(d => d.key === sk);
+               let def = parent?.slotDefs?.find(d => d.key === sk);
+               if (!def) {
+                   const paletteDef = PALETTE_BLOCKS.flatMap(c => [...(c.data||[]), ...(c.actions||[])]).find(b => b.opcode === parent?.opcode);
+                   def = paletteDef?.slotDefs?.find(d => d.key === sk);
+               }
                const varSetValueAccepts = (parent?.opcode === "variable.set" && sk === "value") ? varTypeToLink(parent?.fields?.varType || "int") : null;
                if ((varSetValueAccepts && varSetValueAccepts === dragged.linkType) || (def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
                    nextNs = nextNs.map(x => x.id === parent.id ? {...x, slots: {...(x.slots||{}), [sk]: dragged.id}} : x);
@@ -2899,10 +3191,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
   const isIf=node.opcode==="control.if";
   const isDelay=node.opcode==="control.delay";
+  const isAoeEach=node.opcode.startsWith("aoe.each.");
   
   const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":"#5a9a6a";
-  const isAnimBlock = node.opcode.startsWith("anim.");
-  const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf || isDelay;
+  const isAnimBlock = node.opcode.startsWith("anim.") || (node.opcode.startsWith("aoe.") && node.opcode !== "aoe.iterator.entity");
+  const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf || isDelay || isAoeEach;
   const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":isAnimBlock?"#3a5c3a":isLogicBlock?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#5ba558":"#5a9a6a";
 
   const isAnimPlay = node.opcode === "anim.firstperson.play";
@@ -2922,9 +3215,19 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isAttrModRemove = node.opcode === "attribute.modifier.remove";
   const lblStr = node.opcode==="entity.event"?"Event Entity"
        :node.opcode==="entity.target"?"Target Entity"
+       :node.opcode==="aoe.iterator.entity"?"Iterator Entity"
        :node.opcode==="number.literal"?null
        :node.opcode==="number.math"?null
        :node.opcode==="text.literal"?null
+       :node.opcode==="entity.pos_x"?"Pos X of"
+       :node.opcode==="entity.pos_y"?"Pos Y of"
+       :node.opcode==="entity.pos_z"?"Pos Z of"
+       :node.opcode==="entity.cam_x"?"X at"
+       :node.opcode==="entity.cam_y"?"Y at"
+       :node.opcode==="entity.cam_z"?"Z at"
+       :node.opcode==="vector.normalize_x"?"Normalize X"
+       :node.opcode==="vector.normalize_y"?"Normalize Y"
+       :node.opcode==="vector.normalize_z"?"Normalize Z"
        :node.opcode==="entity.look_x"?"Get Look Direction X of"
        :node.opcode==="entity.look_y"?"Get Look Direction Y of"
        :node.opcode==="entity.look_z"?"Get Look Direction Z of"
@@ -2983,7 +3286,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!isAttrGet&&node.opcode!=="variable.get"&&node.opcode!=="number.math"&&node.slotDefs?.map(def => (
-          <SlotConn key={def.key} sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <React.Fragment key={def.key}>
+            {def.label&&<span style={{fontSize:11,fontFamily:"sans-serif",color:"rgba(255,255,255,0.6)",fontWeight:700}}>{def.label}</span>}
+            <SlotConn sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          </React.Fragment>
       ))}
     </>
   );
@@ -3002,6 +3308,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="effect.apply"?"Add Effect to"
          :node.opcode==="control.if"?"If"
          :node.opcode==="control.delay"?"Delay"
+         :node.opcode==="aoe.each.sphere"?"For Each in Sphere"
+         :node.opcode==="aoe.each.box"?"For Each in Box"
+         :node.opcode==="aoe.each.cone"?"For Each in Cone"
+         :node.opcode==="aoe.each.line"?"For Each in Line"
+         :node.opcode==="aoe.iterator.entity"?"Iterator Entity"
          :node.opcode==="anim.firstperson.play"?"Play FP Anim"
          :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
          :node.opcode==="anim.firstperson.pause"?"Pause FP Anim on"
@@ -3031,8 +3342,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       </>}
       {node.opcode==="effect.apply"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <input value={node.fields?.effect??"MobEffects.REGENERATION"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"effect",e.target.value);}} onMouseDown={e=>{e.stopPropagation();if(onSelect)onSelect(node.id);}} placeholder="effect"
-            style={{height:30,width:200,background:"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"0 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",boxSizing:"border-box"}}/>
+          <EffectDropdown nodeId={node.id} value={node.fields?.effect} onChange={v=>onFieldChange&&onFieldChange(node.id,"effect",v)}/>
           <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Duration</span>
           <SlotConn sk="duration" sc="rgba(0,0,0,0.3)" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Level</span>
@@ -3110,6 +3420,49 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {isTPPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
+      {node.opcode==="aoe.each.sphere"&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>r</span>
+          <SlotConn sk="radius" sc="rgba(0,0,0,0.3)" connId={node.slots?.radius} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"los",!(node.fields?.los!==false));}}><input type="checkbox" checked={node.fields?.los!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>LoS</label>
+          {node.fields?.los!==false&&<select value={node.fields?.losOrigin||"caller"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"losOrigin",e.target.value);}} onMouseDown={e=>e.stopPropagation()} style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:10,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 4px"}}><option value="center">from Center</option><option value="caller">from Caller</option></select>}
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",!node.fields?.showParticles);}}><input type="checkbox" checked={!!node.fields?.showParticles} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Vis</label>
+          <span style={{fontSize:10,color:"#888"}}>X</span><SlotConn sk="offX" sc="rgba(0,0,0,0.3)" connId={node.slots?.offX} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="aoe.each.box"&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>W</span><SlotConn sk="width" sc="rgba(0,0,0,0.3)" connId={node.slots?.width} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>H</span><SlotConn sk="height" sc="rgba(0,0,0,0.3)" connId={node.slots?.height} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>D</span><SlotConn sk="depth" sc="rgba(0,0,0,0.3)" connId={node.slots?.depth} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"los",!(node.fields?.los!==false));}}><input type="checkbox" checked={node.fields?.los!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>LoS</label>
+          {node.fields?.los!==false&&<select value={node.fields?.losOrigin||"caller"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"losOrigin",e.target.value);}} onMouseDown={e=>e.stopPropagation()} style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:10,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 4px"}}><option value="center">from Center</option><option value="caller">from Caller</option></select>}
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",!node.fields?.showParticles);}}><input type="checkbox" checked={!!node.fields?.showParticles} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Vis</label>
+          <span style={{fontSize:10,color:"#888"}}>X</span><SlotConn sk="offX" sc="rgba(0,0,0,0.3)" connId={node.slots?.offX} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="aoe.each.cone"&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>dist</span><SlotConn sk="distance" sc="rgba(0,0,0,0.3)" connId={node.slots?.distance} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>angle°</span><SlotConn sk="angle" sc="rgba(0,0,0,0.3)" connId={node.slots?.angle} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"los",!(node.fields?.los!==false));}}><input type="checkbox" checked={node.fields?.los!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>LoS</label>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",!node.fields?.showParticles);}}><input type="checkbox" checked={!!node.fields?.showParticles} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Vis</label>
+          <span style={{fontSize:10,color:"#888"}}>X</span><SlotConn sk="offX" sc="rgba(0,0,0,0.3)" connId={node.slots?.offX} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="aoe.each.line"&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>dist</span><SlotConn sk="distance" sc="rgba(0,0,0,0.3)" connId={node.slots?.distance} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>width</span><SlotConn sk="width" sc="rgba(0,0,0,0.3)" connId={node.slots?.width} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"los",!(node.fields?.los!==false));}}><input type="checkbox" checked={node.fields?.los!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>LoS</label>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",!node.fields?.showParticles);}}><input type="checkbox" checked={!!node.fields?.showParticles} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Vis</label>
+          <span style={{fontSize:10,color:"#888"}}>X</span><SlotConn sk="offX" sc="rgba(0,0,0,0.3)" connId={node.slots?.offX} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
       {node.opcode==="variable.set"&&<>
           <VarDropdown nodeId={node.id} varName={node.fields?.varName} varType={node.fields?.varType} onChange={(n,t,d)=>{if(onFieldChange){onFieldChange(node.id,"varName",n);onFieldChange(node.id,"varType",t);onFieldChange(node.id,"varDefault",d);}}}/>
           <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -3182,6 +3535,15 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                   <div style={{height:node.gapHeights?.doElse||0,background:"transparent"}}/>
               </div>
             )}
+        </div>
+      );
+  }
+
+  if (isAoeEach) {
+      return (
+        <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+            <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
+            <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
         </div>
       );
   }
@@ -3783,6 +4145,9 @@ export default function App(){
   const[attributesPageEditing,setAttributesPageEditing]=useState(false);
   const[attributesPageNewTrigger,setAttributesPageNewTrigger]=useState(0);
   const[attributesEditingTarget,setAttributesEditingTarget]=useState(null);
+  const[effectsPageEditing,setEffectsPageEditing]=useState(false);
+  const[effectsPageNewTrigger,setEffectsPageNewTrigger]=useState(0);
+  const[effectsEditingTarget,setEffectsEditingTarget]=useState(null);
   const[variablesEditingTarget,setVariablesEditingTarget]=useState(null); // null | "new" | {name,...}
   const{rs,running,run}=useRun();
   const isElectron=typeof window!=="undefined"&&window.ycsNative?.isElectron;
@@ -3842,7 +4207,7 @@ export default function App(){
   };
   const inEd=(tab==="textures"&&texEd!=null)||(tab==="items"&&itemEd!=null)||(tab==="blocks"&&blockEd!=null);
   const fabBottom=showCons?consH+5+30:30;
-  const ALL_TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"},{id:"tabs",l:"Tabs"},{id:"keybinds",l:"Keybinds"},{id:"interfaces",l:"Interfaces"},{id:"variables",l:"Variables"},{id:"attributes",l:"Attributes"}];
+  const ALL_TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"},{id:"tabs",l:"Tabs"},{id:"keybinds",l:"Keybinds"},{id:"interfaces",l:"Interfaces"},{id:"variables",l:"Variables"},{id:"attributes",l:"Attributes"},{id:"effects",l:"Effects"}];
   const[tabOrder,setTabOrder]=useLS("ycs_tab_order",ALL_TABS.map(t=>t.id));
   const TABS=useMemo(()=>{
     const byId=new Map(ALL_TABS.map(t=>[t.id,t]));
@@ -3911,6 +4276,9 @@ export default function App(){
     if(tab==="attributes"){
       return<AttributesPage onEditingChange={setAttributesPageEditing} newTrigger={attributesPageNewTrigger} editing={attributesEditingTarget} setEditing={setAttributesEditingTarget}/>;
     }
+    if(tab==="effects"){
+      return<EffectsPage onEditingChange={setEffectsPageEditing} newTrigger={effectsPageNewTrigger} editing={effectsEditingTarget} setEditing={setEffectsEditingTarget}/>;
+    }
     return null;
   };
 
@@ -3954,7 +4322,7 @@ export default function App(){
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,padding:`5px 5px ${showCons?0:5}px 5px`,gap:5}}>
         {renderPane()}
       </div>
-      {!inEd&&!(tab==="tabs"&&tabsPageEditing)&&!(tab==="keybinds"&&keybindsPageEditing)&&!(tab==="interfaces"&&interfacesPageEditing)&&!(tab==="variables"&&variablesPageEditing)&&!(tab==="attributes"&&attributesPageEditing)&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else if(tab==="blocks")setBlockEd({});else if(tab==="tabs")setTabsPageNewTrigger(t=>t+1);else if(tab==="keybinds")setKeybindsPageNewTrigger(t=>t+1);else if(tab==="interfaces")setInterfacesPageNewTrigger(t=>t+1);else if(tab==="variables")setVariablesPageNewTrigger(t=>t+1);else if(tab==="attributes")setAttributesPageNewTrigger(t=>t+1);}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
+      {!inEd&&!(tab==="tabs"&&tabsPageEditing)&&!(tab==="keybinds"&&keybindsPageEditing)&&!(tab==="interfaces"&&interfacesPageEditing)&&!(tab==="variables"&&variablesPageEditing)&&!(tab==="attributes"&&attributesPageEditing)&&!(tab==="effects"&&effectsPageEditing)&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else if(tab==="blocks")setBlockEd({});else if(tab==="tabs")setTabsPageNewTrigger(t=>t+1);else if(tab==="keybinds")setKeybindsPageNewTrigger(t=>t+1);else if(tab==="interfaces")setInterfacesPageNewTrigger(t=>t+1);else if(tab==="variables")setVariablesPageNewTrigger(t=>t+1);else if(tab==="attributes")setAttributesPageNewTrigger(t=>t+1);else if(tab==="effects")setEffectsPageNewTrigger(t=>t+1);}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
       {showCons&&<div style={{flexShrink:0,padding:"0 5px 5px"}}>
         <div onMouseDown={onConsDrag} style={{height:7,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:36,height:3,borderRadius:2,background:"#2e2e2e"}}/></div>
         <div style={{height:consH,background:"#0a0a0a",border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",overflow:"hidden"}}>
