@@ -991,6 +991,60 @@ app.post('/api/variables/save', (req, res) => {
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
 
+// ─── Attributes ───────────────────────────────────────────────────────────────
+// Stored as an ordered list in ATTRIBUTES_JSON.
+// Each entry: { id, constName, titleText, min, base, max, syncToClient }
+// Server writes DeferredHolder declarations between //YCS_Attributes_START and //YCS_Attributes_END
+// in ModAttributes.java.
+
+const ATTRIBUTES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_attributes.json'
+const MOD_ATTRIBUTES_JAVA = jp(JAVA_ROOT, 'attribute', 'ModAttributes.java')
+
+function readAttributes() { try { return JSON.parse(rf(ATTRIBUTES_JSON)) } catch { return [] } }
+function writeAttributes(list) { wf(ATTRIBUTES_JSON, JSON.stringify(list, null, 2)) }
+
+function writeAttributesJava(list) {
+  let src = rf(MOD_ATTRIBUTES_JAVA)
+  const lines = list.map(a => {
+    const syncStr = a.syncToClient ? ', true' : ', false'
+    return `    public static final DeferredHolder<Attribute, Attribute> ${a.constName} =\n` +
+           `        ATTRIBUTES.register("${a.id}", () -> new RangedAttribute(\n` +
+           `            "${yebisuRPG_MODID}:${a.id}", ${a.base}D, ${a.min}D, ${a.max}D)${syncStr === ', true' ? '.setSyncable(true)' : ''});\n`
+  })
+  src = src.replace(
+    /(\/\/YCS_Attributes_START\n)[\s\S]*?(\/\/YCS_Attributes_END)/,
+    `$1${lines.join('\n')}    $2`
+  )
+  wf(MOD_ATTRIBUTES_JAVA, src)
+  markDirty()
+}
+
+const yebisuRPG_MODID = 'yebisurpg'
+
+app.get('/api/attributes/list', (_req, res) => {
+  try {
+    res.json({ ok:true, attributes: readAttributes() })
+  } catch(e) { res.json({ ok:false, reason:e.message, attributes:[] }) }
+})
+
+app.post('/api/attributes/save', (req, res) => {
+  try {
+    const { attributes } = req.body
+    if (!Array.isArray(attributes)) return res.json({ ok:false, reason:'attributes must be an array' })
+    for (const a of attributes) {
+      if (!/^[a-z][a-z0-9_]*$/.test(a.id)) return res.json({ ok:false, reason:`invalid attribute id: ${a.id}` })
+      if (!/^[A-Z][A-Z0-9_]*$/.test(a.constName)) return res.json({ ok:false, reason:`invalid constName: ${a.constName}` })
+      if (typeof a.min !== 'number' || typeof a.base !== 'number' || typeof a.max !== 'number')
+        return res.json({ ok:false, reason:`min/base/max must be numbers for ${a.id}` })
+      if (a.min > a.base || a.base > a.max)
+        return res.json({ ok:false, reason:`must satisfy min <= base <= max for ${a.id}` })
+    }
+    writeAttributes(attributes)
+    writeAttributesJava(attributes)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
 // ─── Tags ──────────────────────────────────────────────────────────────────────
 // Markers: //YCS_Mod_Item_Tags_START / //YCS_Mod_Item_Tags_END in ModItemTagProvider.java
 //          //YCS_Mod_Block_Tags_START / //YCS_Mod_Block_Tags_END in ModBlockTagProvider.java

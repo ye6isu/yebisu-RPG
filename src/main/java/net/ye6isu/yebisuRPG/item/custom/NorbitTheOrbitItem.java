@@ -10,6 +10,10 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.UseAnim;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.resources.ResourceLocation;
 //YCS_Import_END
 
 public class NorbitTheOrbitItem extends Item {
@@ -28,12 +32,21 @@ public class NorbitTheOrbitItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                if (player instanceof net.minecraft.world.entity.Entity _tpa && !level.isClientSide()) {
-            net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_tpa,
-                net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY_THIRD_PERSON,
-                "tp1",
-                "yebisurpg:animations/player.animation.json",
-                1f, 247, 64, 0);
+                if ((player.isCrouching())) {
+          if (player instanceof net.minecraft.world.entity.LivingEntity _armet) {
+              var _ari = _armet.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE);
+              if (_ari != null) _ari.removeModifier(net.minecraft.resources.ResourceLocation.parse("yebisurpg:testscale"));
+          }
+        } else {
+          if (player instanceof net.minecraft.world.entity.LivingEntity _amet) {
+              var _ai = _amet.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE);
+              if (_ai != null) {
+                  var _amid = net.minecraft.resources.ResourceLocation.parse("yebisurpg:testscale");
+                  _ai.removeModifier(_amid);
+                  _ai.addOrUpdateTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(
+                      _amid, (double)(10), net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+              }
+          }
         }
         return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

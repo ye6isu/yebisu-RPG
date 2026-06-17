@@ -550,6 +550,14 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     return varGetExpr(node.fields?.varName, node.fields?.varType, node.fields?.varDefault, ent);
   }
+  if (node.opcode === "attribute.get") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const attrRef = attrRegistryRef(node.fields?.attrId);
+    const layer = node.fields?.layer || "total";
+    if (layer === "base") return `(${ent} instanceof net.minecraft.world.entity.LivingEntity _aget ? _aget.getAttributeBaseValue(${attrRef}) : 0.0)`;
+    if (layer === "bonus") return `(${ent} instanceof net.minecraft.world.entity.LivingEntity _aget ? (_aget.getAttributeValue(${attrRef}) - _aget.getAttributeBaseValue(${attrRef})) : 0.0)`;
+    return `(${ent} instanceof net.minecraft.world.entity.LivingEntity _aget ? _aget.getAttributeValue(${attrRef}) : 0.0)`;
+  }
   return null;
 }
 // ─── Variable Get/Set block helpers ─────────────────────────────────────────
@@ -602,6 +610,48 @@ function varGetExpr(varName, type, def, ent) {
 function varSetStmt(varName, type, def, ent, valueExpr) {
   type = type || "int";
   return `${varDefinedExpr(varName, type, def, ent)}.${varSetterMethod(type)}("${varName}", ${valueExpr});`;
+}
+// Returns the Java expression to look up an attribute by registry id.
+// Vanilla attributes are accessed via net.minecraft.world.entity.ai.attributes.Attributes.<CONST>.
+// Mod attributes are accessed via net.ye6isu.yebisuRPG.attribute.ModAttributes.<CONST>.get().
+const VANILLA_ATTR_CONST = {
+  "generic.max_health":                     "Attributes.MAX_HEALTH",
+  "generic.max_absorption":                 "Attributes.MAX_ABSORPTION",
+  "generic.attack_damage":                  "Attributes.ATTACK_DAMAGE",
+  "generic.attack_speed":                   "Attributes.ATTACK_SPEED",
+  "generic.attack_knockback":               "Attributes.ATTACK_KNOCKBACK",
+  "generic.armor":                          "Attributes.ARMOR",
+  "generic.armor_toughness":                "Attributes.ARMOR_TOUGHNESS",
+  "generic.knockback_resistance":           "Attributes.KNOCKBACK_RESISTANCE",
+  "generic.movement_speed":                 "Attributes.MOVEMENT_SPEED",
+  "generic.flying_speed":                   "Attributes.FLYING_SPEED",
+  "generic.follow_range":                   "Attributes.FOLLOW_RANGE",
+  "generic.luck":                           "Attributes.LUCK",
+  "generic.gravity":                        "Attributes.GRAVITY",
+  "generic.jump_strength":                  "Attributes.JUMP_STRENGTH",
+  "generic.scale":                          "Attributes.SCALE",
+  "generic.step_height":                    "Attributes.STEP_HEIGHT",
+  "generic.safe_fall_distance":             "Attributes.SAFE_FALL_DISTANCE",
+  "generic.fall_damage_multiplier":         "Attributes.FALL_DAMAGE_MULTIPLIER",
+  "generic.burning_time":                   "Attributes.BURNING_TIME",
+  "generic.explosion_knockback_resistance": "Attributes.EXPLOSION_KNOCKBACK_RESISTANCE",
+  "generic.movement_efficiency":            "Attributes.MOVEMENT_EFFICIENCY",
+  "generic.oxygen_bonus":                   "Attributes.OXYGEN_BONUS",
+  "generic.water_movement_efficiency":      "Attributes.WATER_MOVEMENT_EFFICIENCY",
+  "player.block_break_speed":               "Attributes.BLOCK_BREAK_SPEED",
+  "player.block_interaction_range":         "Attributes.BLOCK_INTERACTION_RANGE",
+  "player.entity_interaction_range":        "Attributes.ENTITY_INTERACTION_RANGE",
+  "player.mining_efficiency":               "Attributes.MINING_EFFICIENCY",
+  "player.sneaking_speed":                  "Attributes.SNEAKING_SPEED",
+  "player.submerged_mining_speed":          "Attributes.SUBMERGED_MINING_SPEED",
+  "player.sweeping_damage_ratio":           "Attributes.SWEEPING_DAMAGE_RATIO",
+  "zombie.spawn_reinforcements":            "Attributes.SPAWN_REINFORCEMENTS_CHANCE",
+};
+function attrRegistryRef(attrId) {
+  if (!attrId) return "Attributes.MAX_HEALTH";
+  if (VANILLA_ATTR_CONST[attrId]) return `net.minecraft.world.entity.ai.attributes.${VANILLA_ATTR_CONST[attrId]}`;
+  const constName = attrId.toUpperCase();
+  return `net.ye6isu.yebisuRPG.attribute.ModAttributes.${constName}`;
 }
 function getChain(startNextId, nodes) {
   const chain = [], seen = new Set();
@@ -745,6 +795,54 @@ function compileActionNode(node, nodes, methodKey) {
       "}",
     ];
   }
+  if (node.opcode === "attribute.modifier.add") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const attrRef = attrRegistryRef(node.fields?.attrId);
+    const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? (node.fields?.value ?? "0");
+    const operation = node.fields?.operation || "flat";
+    if (operation === "base_set") return [
+      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _abset) {`,
+      `    var _absi = _abset.getAttribute(${attrRef});`,
+      `    if (_absi != null) _absi.setBaseValue((double)(${valueExpr}));`,
+      `}`,
+    ];
+    if (operation === "base_add") return [
+      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _abadd) {`,
+      `    var _abai = _abadd.getAttribute(${attrRef});`,
+      `    if (_abai != null) _abai.setBaseValue(_abai.getBaseValue() + (double)(${valueExpr}));`,
+      `}`,
+    ];
+    if (operation === "base_multiply") return [
+      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _abmul) {`,
+      `    var _abmi = _abmul.getAttribute(${attrRef});`,
+      `    if (_abmi != null) _abmi.setBaseValue(_abmi.getBaseValue() * (double)(${valueExpr}));`,
+      `}`,
+    ];
+    const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const op = operation === "multiply" ? "ADD_MULTIPLIED_TOTAL" : "ADD_VALUE";
+    return [
+      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _amet) {`,
+      `    var _ai = _amet.getAttribute(${attrRef});`,
+      `    if (_ai != null) {`,
+      `        var _amid = net.minecraft.resources.ResourceLocation.parse("yebisurpg:${modName}");`,
+      `        _ai.removeModifier(_amid);`,
+      `        _ai.addOrUpdateTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(`,
+      `            _amid, (double)(${valueExpr}), net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.${op}));`,
+      `    }`,
+      `}`,
+    ];
+  }
+  if (node.opcode === "attribute.modifier.remove") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const attrRef = attrRegistryRef(node.fields?.attrId);
+    const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    return [
+      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _armet) {`,
+      `    var _ari = _armet.getAttribute(${attrRef});`,
+      `    if (_ari != null) _ari.removeModifier(net.minecraft.resources.ResourceLocation.parse("yebisurpg:${modName}"));`,
+      `}`,
+    ];
+  }
   if (node.opcode === "variable.set") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const type = node.fields?.varType || "int";
@@ -753,15 +851,57 @@ function compileActionNode(node, nodes, methodKey) {
   }
   return ["// unknown: " + node.opcode];
 }
+// Module-level cache so CanvasNode can read mod attributes without prop drilling.
+let __modAttributesCache = [];
+// Vanilla attributes available in the attribute blocks alongside mod-defined ones.
+const VANILLA_ATTRIBUTES = [
+  // generic
+  { id:"generic.max_health",                    label:"Max Health" },
+  { id:"generic.max_absorption",                label:"Max Absorption" },
+  { id:"generic.attack_damage",                 label:"Attack Damage" },
+  { id:"generic.attack_speed",                  label:"Attack Speed" },
+  { id:"generic.attack_knockback",              label:"Attack Knockback" },
+  { id:"generic.armor",                         label:"Armor" },
+  { id:"generic.armor_toughness",               label:"Armor Toughness" },
+  { id:"generic.knockback_resistance",          label:"Knockback Resistance" },
+  { id:"generic.movement_speed",                label:"Movement Speed" },
+  { id:"generic.flying_speed",                  label:"Flying Speed" },
+  { id:"generic.follow_range",                  label:"Follow Range" },
+  { id:"generic.luck",                          label:"Luck" },
+  { id:"generic.gravity",                       label:"Gravity" },
+  { id:"generic.jump_strength",                 label:"Jump Strength" },
+  { id:"generic.scale",                         label:"Scale" },
+  { id:"generic.step_height",                   label:"Step Height" },
+  { id:"generic.safe_fall_distance",            label:"Safe Fall Distance" },
+  { id:"generic.fall_damage_multiplier",        label:"Fall Damage Multiplier" },
+  { id:"generic.burning_time",                  label:"Burning Time" },
+  { id:"generic.explosion_knockback_resistance",label:"Explosion Knockback Resistance" },
+  { id:"generic.movement_efficiency",           label:"Movement Efficiency" },
+  { id:"generic.oxygen_bonus",                  label:"Oxygen Bonus" },
+  { id:"generic.water_movement_efficiency",     label:"Water Movement Efficiency" },
+  // player-only
+  { id:"player.block_break_speed",              label:"Block Break Speed" },
+  { id:"player.block_interaction_range",        label:"Block Interaction Range" },
+  { id:"player.entity_interaction_range",       label:"Entity Interaction Range" },
+  { id:"player.mining_efficiency",              label:"Mining Efficiency" },
+  { id:"player.sneaking_speed",                 label:"Sneaking Speed" },
+  { id:"player.submerged_mining_speed",         label:"Submerged Mining Speed" },
+  { id:"player.sweeping_damage_ratio",          label:"Sweeping Damage Ratio" },
+  // mob-specific
+  { id:"zombie.spawn_reinforcements",           label:"Spawn Reinforcements Chance" },
+];
+
+// Each category has { data: [...], actions: [...] } subcategories.
+// data = link/value blocks (have a linkType, no isAction). actions = action blocks (isAction:true).
 const PALETTE_BLOCKS = [
-  { category:"Entity", blocks:[
+  { category:"Entity", data:[
     { opcode:"entity.event",  label:"Event Entity",  linkType:LINK_ENTITY, hint:"Entity that triggered this method" },
     { opcode:"entity.target", label:"Target Entity", linkType:LINK_ENTITY, hint:"Target entity (hurtEnemy/interactLivingEntity)" },
-  ]},
-  { category:"Text", blocks:[
-    { opcode:"text.literal", label:"Text Link", linkType:LINK_TEXT, hint:"A literal text/string value" },
-  ]},
-  { category:"Numbers", blocks:[
+  ], actions:[] },
+  { category:"Text", data:[
+    { opcode:"text.literal", label:"Text", linkType:LINK_TEXT, hint:"A literal text/string value" },
+  ], actions:[] },
+  { category:"Numbers", data:[
     { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
     { opcode:"entity.look_x", label:"Look Dir X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_y", label:"Look Dir Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
@@ -769,22 +909,21 @@ const PALETTE_BLOCKS = [
     { opcode:"entity.look_client_x", label:"Look Dir X (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_client_y", label:"Look Dir Y (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_client_z", label:"Look Dir Z (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-  ]},
-  { category:"Logic", blocks:[
+  ], actions:[] },
+  { category:"Logic", data:[
     { opcode:"logic.true", label:"True", linkType:LINK_LOGIC, hint:"True value" },
     { opcode:"logic.false", label:"False", linkType:LINK_LOGIC, hint:"False value" },
     { opcode:"entity.is_crouching", label:"Is Crouching?", linkType:LINK_LOGIC, hint:"True if the entity is crouching/sneaking", slotDefs:[{key:"entity", accepts:LINK_ENTITY}] },
-  ]},
-  { category:"Control", blocks:[
+  ], actions:[
     { opcode:"control.if", label:"If", isAction:true, hint:"If statement", slotDefs:[{key:"condition",accepts:LINK_LOGIC}] },
   ]},
-  { category:"Effects", blocks:[
+  { category:"Effects", data:[], actions:[
     { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
       slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"duration",accepts:LINK_NUMBER},{key:"level",accepts:LINK_NUMBER}] },
   ]},
-  { category:"Animations", blocks:[
+  { category:"Animations", data:[], actions:[
     { opcode:"anim.firstperson.play", label:"Play First-Person Anim", isAction:true,
-      hint:"Play FP Anim [Text Link] for [Entity Link] with playback speed [Number Link] from file [Text Link]",
+      hint:"Play FP Anim [Text] for [Entity] with playback speed [Number] from file [Text]",
       slotDefs:[
         {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
         {key:"entity",        accepts:LINK_ENTITY, label:"entity"},
@@ -793,21 +932,15 @@ const PALETTE_BLOCKS = [
       ] },
     { opcode:"anim.firstperson.stop", label:"Stop First-Person Anim", isAction:true,
       hint:"Stop any playing first-person animation on an entity",
-      slotDefs:[
-        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
-      ] },
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
     { opcode:"anim.firstperson.pause", label:"Pause First-Person Anim", isAction:true,
       hint:"Freeze the playing first-person animation on an entity at its current position",
-      slotDefs:[
-        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
-      ] },
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
     { opcode:"anim.firstperson.resume", label:"Resume First-Person Anim", isAction:true,
       hint:"Resume a paused first-person animation; if expired while paused, stops it",
-      slotDefs:[
-        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
-      ] },
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
     { opcode:"anim.thirdperson.play", label:"Play Third-Person Anim", isAction:true,
-      hint:"Play TP Anim [Text Link] for [Entity Link] with playback speed [Number Link] from file [Text Link]",
+      hint:"Play TP Anim [Text] for [Entity] with playback speed [Number] from file [Text]",
       slotDefs:[
         {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
         {key:"entity",        accepts:LINK_ENTITY, label:"entity"},
@@ -824,42 +957,127 @@ const PALETTE_BLOCKS = [
       hint:"Resume a paused third-person animation; if expired while paused, stops it",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
     { opcode:"anim.handpose.set", label:"Set FP Hand Pose", isAction:true,
-      hint:"Set FP hand pose to [text link] for [Entity Link] from [text link]",
+      hint:"Set FP hand pose to [Text] for [Entity] from [Text]",
       slotDefs:[
         {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
         {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
         {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
       ] },
     { opcode:"anim.handpose.reset", label:"Reset FP Hand Pose", isAction:true,
-      hint:"Reset FP hand pose for [Entity Link] to vanilla default",
-      slotDefs:[
-        {key:"entity", accepts:LINK_ENTITY, label:"entity"},
-      ] },
+      hint:"Reset FP hand pose for [Entity] to vanilla default",
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
   ]},
 ];
+function AttrDropdown({nodeId,value,onChange}){
+  const allAttrs=[...VANILLA_ATTRIBUTES,...__modAttributesCache.map(a=>({id:a.id,label:(a.titleText||a.id)+" (mod)"}))];
+  return<select value={value||""} onChange={e=>{e.stopPropagation();onChange(e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+    style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px",maxWidth:160}}>
+    {allAttrs.map(a=><option key={a.id} value={a.id}>{a.label}</option>)}
+  </select>;
+}
+function PaletteBlock({b}){
+  const bg=b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.linkType===LINK_TEXT?"#182a1e":b.isAction?"#1a2a20":"transparent";
+  const dot=b.linkType===LINK_ENTITY?"#638999":b.linkType===LINK_NUMBER?"#6a8fa8":b.linkType===LINK_TEXT?"#5ba558":"#5a9a6a";
+  return<div draggable onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))} title={b.hint}
+    style={{display:"flex",alignItems:"center",gap:7,padding:"7px 10px",cursor:"grab",borderBottom:"1px solid #181818",userSelect:"none",background:bg}}>
+    <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:dot}}/>
+    <span style={{fontSize:12,color:C.text,fontFamily:"monospace"}}>{b.label}</span>
+  </div>;
+}
+function PaletteSidebar({palette}){
+  const[collapsed,setCollapsed]=useState({});
+  const[subCollapsed,setSubCollapsed]=useState({});
+  const toggle=(key)=>setCollapsed(s=>({...s,[key]:!s[key]}));
+  const toggleSub=(key)=>setSubCollapsed(s=>({...s,[key]:!s[key]}));
+  return<div style={{width:190,borderRight:"1px solid "+C.inpB,overflowY:"auto",flexShrink:0,background:"#111113",userSelect:"none",zIndex:10}}>
+    {palette.map(cat=>{
+      const isOpen=!collapsed[cat.category];
+      const data=cat.data||[];
+      const actions=cat.actions||[];
+      const dataKey=cat.category+"_data";
+      const actKey=cat.category+"_actions";
+      const dataOpen=!subCollapsed[dataKey];
+      const actOpen=!subCollapsed[actKey];
+      return<div key={cat.category}>
+        <div onClick={()=>toggle(cat.category)} style={{padding:"6px 10px 4px",background:"#141416",borderBottom:"1px solid "+C.inpB,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <Lbl>{cat.category}</Lbl>
+          <span style={{fontSize:10,color:C.faint,fontFamily:"monospace"}}>{isOpen?"▾":"▸"}</span>
+        </div>
+        {isOpen&&<>
+          {data.length>0&&<>
+            <div onClick={()=>toggleSub(dataKey)} style={{padding:"4px 14px 4px 28px",background:"#131315",borderBottom:"1px solid #181818",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:10,color:C.dim,fontFamily:"monospace",letterSpacing:0.5}}>DATA</span>
+              <span style={{fontSize:9,color:C.faint,fontFamily:"monospace"}}>{dataOpen?"▾":"▸"}</span>
+            </div>
+            {dataOpen&&data.map(b=><PaletteBlock key={b.opcode} b={b}/>)}
+          </>}
+          {actions.length>0&&<>
+            <div onClick={()=>toggleSub(actKey)} style={{padding:"4px 14px 4px 28px",background:"#131315",borderBottom:"1px solid #181818",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:10,color:C.dim,fontFamily:"monospace",letterSpacing:0.5}}>ACTIONS</span>
+              <span style={{fontSize:9,color:C.faint,fontFamily:"monospace"}}>{actOpen?"▾":"▸"}</span>
+            </div>
+            {actOpen&&actions.map(b=><PaletteBlock key={b.opcode} b={b}/>)}
+          </>}
+        </>}
+      </div>;
+    })}
+  </div>;
+}
 // ─── Dynamic "Variables" palette category ───────────────────────────────────
 // One Get + one Set block per declared EntityVar (see VariablesPage), so the
 // canvas palette always reflects whatever's in ycs_variables.json. Item-type
 // variables are declaration-only for now — there's no item-stack link type for
 // them to plug into other blocks yet, so they're excluded here.
-function buildPaletteWithVariables(variables) {
+function buildPalette(variables, modAttributes) {
+  const result = [...PALETTE_BLOCKS];
+
+  // Variables category — one Get (data) + one Set (action) per declared var
   const usable = (variables || []).filter(v => v.type !== "item");
-  if (!usable.length) return PALETTE_BLOCKS;
-  const varBlocks = usable.flatMap(v => {
-    const link = varTypeToLink(v.type);
-    const label = v.titleText || v.name;
-    return [
-      { opcode:"variable.get", label:`Get ${label}`, linkType:link,
-        hint:`Get ${v.type} variable "${v.name}" for [Entity Link]`,
+  if (usable.length) {
+    const dataBlocks = usable.map(v => {
+      const link = varTypeToLink(v.type);
+      const label = v.titleText || v.name;
+      return { opcode:"variable.get", label:`Get ${label}`, linkType:link,
+        hint:`Get ${v.type} variable "${v.name}" for [Entity]`,
         varName:v.name, varType:v.type, varDefault:v.default,
-        slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-      { opcode:"variable.set", label:`Set ${label}`, isAction:true,
-        hint:`Set ${v.type} variable "${v.name}" to [${link} Link] for [Entity Link]`,
+        slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] };
+    });
+    const actionBlocks = usable.map(v => {
+      const link = varTypeToLink(v.type);
+      const label = v.titleText || v.name;
+      return { opcode:"variable.set", label:`Set ${label}`, isAction:true,
+        hint:`Set ${v.type} variable "${v.name}" to [${link}] for [Entity]`,
         varName:v.name, varType:v.type, varDefault:v.default,
-        slotDefs:[{key:"value", accepts:link, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    ];
-  });
-  return [...PALETTE_BLOCKS, { category:"Variables", blocks:varBlocks }];
+        slotDefs:[{key:"value", accepts:link, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] };
+    });
+    result.push({ category:"Variables", data:dataBlocks, actions:actionBlocks });
+  }
+
+  // Attributes category — Get (data) + Add/Remove Modifier (actions) for mod + vanilla attrs
+  const allAttrs = [
+    ...VANILLA_ATTRIBUTES,
+    ...(modAttributes || []).map(a => ({ id:a.id, label:a.titleText || a.id, mod:true })),
+  ];
+  if (allAttrs.length) {
+    result.push({
+      category:"Attributes",
+      data:[
+        { opcode:"attribute.get", label:"Get Attribute", linkType:LINK_NUMBER,
+          hint:"Read an attribute value (total / base / bonus) for [Entity]",
+          slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+      ],
+      actions:[
+        { opcode:"attribute.modifier.add", label:"Add Attr Modifier", isAction:true,
+          hint:"Add a named modifier (flat ADD_VALUE or % ADD_MULTIPLIED_TOTAL) to an attribute on [Entity]",
+          slotDefs:[{key:"value", accepts:LINK_NUMBER, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+        { opcode:"attribute.modifier.remove", label:"Remove Attr Modifier", isAction:true,
+          hint:"Remove a named modifier from an attribute on [Entity]",
+          slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+      ],
+    });
+  }
+
+  return result;
 }
 
 // ─── Visual Scripting: Code Engine ────────────────────────────────────────────
@@ -893,6 +1111,34 @@ function ycsSyncImports(code, enabledMethodKeys) {
     if (code.includes(`//YCS:${feat.key}:start`)) {
       feat.imports.forEach(i => needed.add(i));
     }
+  }
+  // Content-scan: add imports whenever specific generated patterns appear in the compiled code,
+  // regardless of which method the block is used in. One check per block family.
+
+  // effect.apply — LivingEntity cast, MobEffectInstance/MobEffects
+  if (code.includes('MobEffectInstance') || code.includes('.addEffect(')) {
+    needed.add('net.minecraft.world.entity.LivingEntity');
+    needed.add('net.minecraft.world.effect.MobEffectInstance');
+    needed.add('net.minecraft.world.effect.MobEffects');
+  }
+
+  // anim.* — AnimationAPI + AnimationCategory
+  if (code.includes('AnimationAPI') || code.includes('AnimationCategory')) {
+    needed.add('net.ye6isu.yebisuRPG.animation.AnimationAPI');
+    needed.add('net.ye6isu.yebisuRPG.animation.AnimationCategory');
+  }
+
+  // variable.get / variable.set — EntityVarCapability + EntityVar
+  if (code.includes('EntityVarCapability') || code.includes('EntityVar.')) {
+    needed.add('net.ye6isu.yebisuRPG.data.EntityVarCapability');
+    needed.add('net.ye6isu.yebisuRPG.data.EntityVar');
+  }
+
+  // attribute.get / attribute.modifier.add / attribute.modifier.remove
+  if (code.includes('AttributeModifier') || code.includes('getAttributeValue') || code.includes('getAttributeBaseValue')) {
+    needed.add('net.minecraft.world.entity.ai.attributes.Attributes');
+    needed.add('net.minecraft.world.entity.ai.attributes.AttributeModifier');
+    needed.add('net.minecraft.resources.ResourceLocation');
   }
 
   // 1. Remove the entire YCS import block if it exists
@@ -1510,6 +1756,12 @@ function useVariables(){
   useEffect(()=>{reload();},[reload]);
   return{variables,reload};
 }
+function useAttributes(){
+  const[attributes,setAttributes]=useState([]);
+  const reload=useCallback(()=>{fetch(`${BASE}/attributes/list`).then(r=>r.json()).then(j=>{if(j.ok)setAttributes(j.attributes||[]);}).catch(()=>{});},[]);
+  useEffect(()=>{reload();},[reload]);
+  return{attributes,reload};
+}
 function ItemStackPicker({label,value,onChange,allItems,textures}){
   const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
   const vanillaItems=useVanillaItems();
@@ -1640,6 +1892,95 @@ function VariablesPage({onEditingChange,newTrigger,editing,setEditing,allItems,t
         <Pill color={C.inp}>{VAR_TYPES.find(t=>t.value===v.type)?.label||v.type}</Pill>
       </div>)}
       {!variables.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No variables yet.</div>}
+    </div>
+  </div>;
+}
+const ATTR_SENTINEL="new";
+const ATTR_DEFAULT={id:"",constName:"",titleText:"",min:0,base:0,max:100,syncToClient:true};
+function autoConstName(id){return id.toUpperCase();}
+function AttributeEditor({attribute,id,setId,constName,setConstName,customConst,setCustomConst,titleText,setTitleText,min,setMin,base,setBase,max,setMax,syncToClient,setSyncToClient,onSave,onCancel,onDelete}){
+  const isNew=!attribute;
+  const idErr=id&&!/^[a-z][a-z0-9_]*$/.test(id)?"lowercase letters, digits, underscores only":null;
+  const cnErr=constName&&!/^[A-Z][A-Z0-9_]*$/.test(constName)?"UPPER_SNAKE_CASE only":null;
+  const rangeErr=(parseFloat(min)>parseFloat(base)||parseFloat(base)>parseFloat(max))?"must satisfy min ≤ base ≤ max":null;
+  const canSave=id&&constName&&!idErr&&!cnErr&&!rangeErr;
+  return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{fontSize:14,fontWeight:500,color:C.text}}>{isNew?"New Attribute":"Edit Attribute"}</div>
+    <Inp label="Display Name" value={titleText} onChange={v=>setTitleText(v)} placeholder="e.g. Stamina Max"/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>ID (registry key)</Lbl>{idErr&&<span style={{fontSize:11,color:"#ff7777"}}>{idErr}</span>}</div>
+      <input value={id} onChange={e=>{const v=e.target.value;setId(v);if(!customConst)setConstName(autoConstName(v));}} style={{...SI.inp}} placeholder="e.g. stamina_max"/>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:6}}><Lbl>Const Name</Lbl><Chk label="custom" checked={customConst} onChange={v=>setCustomConst(v)}/></div>{cnErr&&<span style={{fontSize:11,color:"#ff7777"}}>{cnErr}</span>}</div>
+      <input value={customConst?constName:autoConstName(id)} onChange={e=>setConstName(e.target.value)} disabled={!customConst} style={{...SI.inp,color:customConst?C.text:C.faint,opacity:customConst?1:0.6}}/>
+    </div>
+    <div style={{display:"flex",gap:10}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><Lbl>Min</Lbl><input type="number" value={min} onChange={e=>setMin(e.target.value)} style={{...SI.inp}}/></div>
+      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><Lbl>Base (default)</Lbl><input type="number" value={base} onChange={e=>setBase(e.target.value)} style={{...SI.inp}}/></div>
+      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><Lbl>Max</Lbl><input type="number" value={max} onChange={e=>setMax(e.target.value)} style={{...SI.inp}}/></div>
+    </div>
+    {rangeErr&&<span style={{fontSize:11,color:"#ff7777"}}>{rangeErr}</span>}
+    <Chk label="Sync to client (needed for HUD/client-side reads)" checked={syncToClient} onChange={v=>setSyncToClient(v)}/>
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <Btn v="p" dis={!canSave} onClick={()=>onSave({id,constName:customConst?constName:autoConstName(id),titleText,min:parseFloat(min),base:parseFloat(base),max:parseFloat(max),syncToClient})}>Save</Btn>
+      <Btn v="g" onClick={onCancel}>Cancel</Btn>
+      {!isNew&&<Btn v="dan" style={{marginLeft:"auto"}} onClick={()=>onDelete(attribute.id)}>Delete</Btn>}
+    </div>
+  </div>;
+}
+function AttributesPage({onEditingChange,newTrigger,editing,setEditing}){
+  const{attributes,reload}=useAttributes();
+  const[dragIdx,setDragIdx]=useState(null);
+  const[id,setId]=useState("");
+  const[constName,setConstName]=useState("");
+  const[customConst,setCustomConst]=useState(false);
+  const[titleText,setTitleText]=useState("");
+  const[min,setMin]=useState(0);
+  const[base,setBase]=useState(0);
+  const[max,setMax]=useState(100);
+  const[syncToClient,setSyncToClient]=useState(true);
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
+  const prevTrigger=useRef(newTrigger);
+  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing(ATTR_SENTINEL);}},[newTrigger]);
+  useEffect(()=>{
+    if(!editing)return;
+    const t=editing===ATTR_SENTINEL?null:editing;
+    setId(t?.id||"");setConstName(t?.constName||"");setCustomConst(false);setTitleText(t?.titleText||"");
+    setMin(t?.min??0);setBase(t?.base??0);setMax(t?.max??100);setSyncToClient(t?.syncToClient??true);
+  },[editing]);
+  const persist=async(list)=>{const r=await api("/attributes/save",{attributes:list});if(r.ok)reload();return r;};
+  const saveAttr=async(v)=>{
+    const exists=attributes.some(x=>x.id===v.id);
+    const next=exists?attributes.map(x=>x.id===v.id?v:x):[...attributes,v];
+    const r=await persist(next);if(r.ok)setEditing(null);
+  };
+  const deleteAttr=async(attrId)=>{await persist(attributes.filter(x=>x.id!==attrId));setEditing(null);};
+  const moveAttr=async(from,to)=>{if(from===to)return;const arr=[...attributes];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
+  if(editing){
+    const target=editing===ATTR_SENTINEL?null:editing;
+    return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <AttributeEditor attribute={target} id={id} setId={setId} constName={constName} setConstName={setConstName} customConst={customConst} setCustomConst={setCustomConst} titleText={titleText} setTitleText={setTitleText} min={min} setMin={setMin} base={base} setBase={setBase} max={max} setMax={setMax} syncToClient={syncToClient} setSyncToClient={setSyncToClient} onSave={saveAttr} onCancel={()=>setEditing(null)} onDelete={deleteAttr}/>
+      </div>
+    </div>;
+  }
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>ATTRIBUTES (drag to reorder, click to edit)</div>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {attributes.map((a,idx)=><div key={a.id}
+        draggable
+        onDragStart={()=>setDragIdx(idx)}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={()=>{moveAttr(dragIdx,idx);setDragIdx(null);}}
+        onClick={()=>setEditing(a)}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
+        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        <span style={{fontSize:13,color:C.text,flex:1}}>{a.titleText||a.id}</span>
+        <Pill color={C.inp} style={{fontSize:10}}>{a.min} / {a.base} / {a.max}</Pill>
+        {a.syncToClient&&<Pill color="#1a2438">synced</Pill>}
+      </div>)}
+      {!attributes.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No attributes yet.</div>}
     </div>
   </div>;
 }
@@ -1938,7 +2279,9 @@ function VisualEditorPanel({methodKey,form,F,onBack,className}){
 function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const def=ITEM_METHODS.find(m=>m.key===methodKey);
   const{variables}=useVariables();
-  const palette=useMemo(()=>buildPaletteWithVariables(variables),[variables]);
+  const{attributes:modAttributes}=useAttributes();
+  __modAttributesCache = modAttributes || [];
+  const palette=useMemo(()=>buildPalette(variables,modAttributes),[variables,modAttributes]);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
   const[nodes,setNodes]=useState(init);
   const[selected,setSelected]=useState(null);
@@ -2240,17 +2583,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
       <Btn sm v="p" onClick={save} dis={saving}>{saving?"...":"Save"}</Btn>
     </div>
     <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-      <div style={{width:190,borderRight:"1px solid "+C.inpB,overflowY:"auto",flexShrink:0,background:"#111113",userSelect:"none",zIndex:10}}>
-        {palette.map(cat=><div key={cat.category}>
-          <div style={{padding:"6px 10px 4px",background:"#141416",borderBottom:"1px solid "+C.inpB}}><Lbl>{cat.category}</Lbl></div>
-          {cat.blocks.map(b=><div key={b.opcode} draggable onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))} title={b.hint}
-            style={{display:"flex",alignItems:"center",gap:7,padding:"8px 10px",cursor:"grab",borderBottom:"1px solid #181818",userSelect:"none",
-              background:b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.linkType===LINK_TEXT?"#182a1e":b.isAction?"#1a2a20":"transparent"}}>
-            <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:b.linkType===LINK_ENTITY?"#638999":b.linkType===LINK_NUMBER?"#6a8fa8":b.linkType===LINK_TEXT?"#5ba558":"#5a9a6a"}}/>
-            <span style={{fontSize:12,color:C.text,fontFamily:"monospace"}}>{b.label}</span>
-          </div>)}
-        </div>)}
-      </div>
+      <PaletteSidebar palette={palette}/>
       <div ref={canvasRef} className="canvas-bg"
         style={{flex:1,position:"relative",overflow:"hidden",background:"#0d0d0f"}}
         onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}
@@ -2326,6 +2659,9 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isAnimTPResume = node.opcode === "anim.thirdperson.resume";
   const isHandPoseSet = node.opcode === "anim.handpose.set";
   const isHandPoseReset = node.opcode === "anim.handpose.reset";
+  const isAttrGet = node.opcode === "attribute.get";
+  const isAttrModAdd = node.opcode === "attribute.modifier.add";
+  const isAttrModRemove = node.opcode === "attribute.modifier.remove";
   const lblStr = node.opcode==="entity.event"?"Event Entity"
        :node.opcode==="entity.target"?"Target Entity"
        :node.opcode==="number.literal"?null
@@ -2340,6 +2676,9 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
        :node.opcode==="logic.true"?"True"
        :node.opcode==="logic.false"?"False"
        :node.opcode==="variable.get"?`Get ${node.fields?.varName||"?"} for`
+       :node.opcode==="attribute.get"?null
+       :node.opcode==="attribute.modifier.add"?null
+       :node.opcode==="attribute.modifier.remove"?null
        :node.opcode;
 
   const valContent = (
@@ -2352,7 +2691,18 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {node.opcode==="text.literal"&&<input value={node.fields?.value??""} placeholder="text…" onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(80, ((node.fields?.value||"").length*8)+24),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:14,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
 
-      {node.slotDefs?.map(def => (
+      {isAttrGet&&<>
+          <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
+          <select value={node.fields?.layer||"total"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"layer",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+            style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px"}}>
+            <option value="total">Total</option>
+            <option value="base">Base</option>
+            <option value="bonus">Bonus (Total − Base)</option>
+          </select>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>of</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {!isAttrGet&&node.slotDefs?.map(def => (
           <SlotConn key={def.key} sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       ))}
     </>
@@ -2382,6 +2732,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
          :node.opcode==="variable.set"?`Set ${node.fields?.varName||"?"} to`
+         :node.opcode==="attribute.modifier.add"?"Add Attr Modifier"
+         :node.opcode==="attribute.modifier.remove"?"Remove Attr Modifier"
          :node.opcode}
       </span>
       {isIf&&<>
@@ -2447,6 +2799,29 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {node.opcode==="variable.set"&&<>
           <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAttrModAdd&&<>
+          <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
+          <select value={node.fields?.operation||"flat"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"operation",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+            style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px"}}>
+            <option value="flat">Flat bonus (ADD_VALUE)</option>
+            <option value="multiply">% Multiplier (ADD_MULTIPLIED_TOTAL)</option>
+            <option value="base_set">Set Base</option>
+            <option value="base_add">Add to Base</option>
+            <option value="base_multiply">Multiply Base</option>
+          </select>
+          {!["base_set","base_add","base_multiply"].includes(node.fields?.operation)&&<input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="modifier name"
+            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>}
+          <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>on</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {isAttrModRemove&&<>
+          <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
+          <input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="modifier name"
+            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}
@@ -3073,6 +3448,9 @@ export default function App(){
   const[interfacesEditingTarget,setInterfacesEditingTarget]=useState(null); // null | "new" | {id,...}
   const[variablesPageEditing,setVariablesPageEditing]=useState(false);
   const[variablesPageNewTrigger,setVariablesPageNewTrigger]=useState(0);
+  const[attributesPageEditing,setAttributesPageEditing]=useState(false);
+  const[attributesPageNewTrigger,setAttributesPageNewTrigger]=useState(0);
+  const[attributesEditingTarget,setAttributesEditingTarget]=useState(null);
   const[variablesEditingTarget,setVariablesEditingTarget]=useState(null); // null | "new" | {name,...}
   const{rs,running,run}=useRun();
   const isElectron=typeof window!=="undefined"&&window.ycsNative?.isElectron;
@@ -3132,7 +3510,7 @@ export default function App(){
   };
   const inEd=(tab==="textures"&&texEd!=null)||(tab==="items"&&itemEd!=null)||(tab==="blocks"&&blockEd!=null);
   const fabBottom=showCons?consH+5+30:30;
-  const ALL_TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"},{id:"tabs",l:"Tabs"},{id:"keybinds",l:"Keybinds"},{id:"interfaces",l:"Interfaces"},{id:"variables",l:"Variables"}];
+  const ALL_TABS=[{id:"textures",l:"Textures"},{id:"items",l:"Items"},{id:"blocks",l:"Blocks"},{id:"tabs",l:"Tabs"},{id:"keybinds",l:"Keybinds"},{id:"interfaces",l:"Interfaces"},{id:"variables",l:"Variables"},{id:"attributes",l:"Attributes"}];
   const[tabOrder,setTabOrder]=useLS("ycs_tab_order",ALL_TABS.map(t=>t.id));
   const TABS=useMemo(()=>{
     const byId=new Map(ALL_TABS.map(t=>[t.id,t]));
@@ -3198,6 +3576,9 @@ export default function App(){
     if(tab==="variables"){
       return<VariablesPage onEditingChange={setVariablesPageEditing} newTrigger={variablesPageNewTrigger} editing={variablesEditingTarget} setEditing={setVariablesEditingTarget} allItems={allItems} textures={textures}/>;
     }
+    if(tab==="attributes"){
+      return<AttributesPage onEditingChange={setAttributesPageEditing} newTrigger={attributesPageNewTrigger} editing={attributesEditingTarget} setEditing={setAttributesEditingTarget}/>;
+    }
     return null;
   };
 
@@ -3241,7 +3622,7 @@ export default function App(){
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,padding:`5px 5px ${showCons?0:5}px 5px`,gap:5}}>
         {renderPane()}
       </div>
-      {!inEd&&!(tab==="tabs"&&tabsPageEditing)&&!(tab==="keybinds"&&keybindsPageEditing)&&!(tab==="interfaces"&&interfacesPageEditing)&&!(tab==="variables"&&variablesPageEditing)&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else if(tab==="blocks")setBlockEd({});else if(tab==="tabs")setTabsPageNewTrigger(t=>t+1);else if(tab==="keybinds")setKeybindsPageNewTrigger(t=>t+1);else if(tab==="interfaces")setInterfacesPageNewTrigger(t=>t+1);else if(tab==="variables")setVariablesPageNewTrigger(t=>t+1);}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
+      {!inEd&&!(tab==="tabs"&&tabsPageEditing)&&!(tab==="keybinds"&&keybindsPageEditing)&&!(tab==="interfaces"&&interfacesPageEditing)&&!(tab==="variables"&&variablesPageEditing)&&!(tab==="attributes"&&attributesPageEditing)&&<div onClick={()=>{if(tab==="textures")setTexEd({mode:"new"});else if(tab==="items")setItemEd({});else if(tab==="blocks")setBlockEd({});else if(tab==="tabs")setTabsPageNewTrigger(t=>t+1);else if(tab==="keybinds")setKeybindsPageNewTrigger(t=>t+1);else if(tab==="interfaces")setInterfacesPageNewTrigger(t=>t+1);else if(tab==="variables")setVariablesPageNewTrigger(t=>t+1);else if(tab==="attributes")setAttributesPageNewTrigger(t=>t+1);}} style={{position:"fixed",right:30,bottom:fabBottom,width:52,height:52,background:"#3a3a3c",borderRadius:C.r,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:28,color:C.text,boxShadow:"0 4px 20px rgba(0,0,0,.6)",zIndex:100,transition:"bottom .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#4a4a4c"} onMouseLeave={e=>e.currentTarget.style.background="#3a3a3c"}>+</div>}
       {showCons&&<div style={{flexShrink:0,padding:"0 5px 5px"}}>
         <div onMouseDown={onConsDrag} style={{height:7,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:36,height:3,borderRadius:2,background:"#2e2e2e"}}/></div>
         <div style={{height:consH,background:"#0a0a0a",border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",overflow:"hidden"}}>

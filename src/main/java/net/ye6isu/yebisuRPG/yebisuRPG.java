@@ -12,6 +12,7 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.ye6isu.yebisuRPG.attribute.AttributeRangeFix;
+import net.ye6isu.yebisuRPG.attribute.ModAttributes;
 import net.ye6isu.yebisuRPG.block.ModBlocks;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.data.EntityVarCapability;
@@ -44,6 +45,7 @@ public class yebisuRPG {
         ModSounds.register(modEventBus);
 
         EntityVarCapability.register(modEventBus);
+        ModAttributes.register(modEventBus);
 
         YCSTabRegistry.register(modEventBus);
 
