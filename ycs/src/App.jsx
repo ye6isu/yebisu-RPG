@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, createContext, useContext } from "react";
+import ReactDOM from "react-dom";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -365,7 +366,7 @@ const ITEM_METHODS=[
      "net.minecraft.world.effect.MobEffectInstance",
      "net.minecraft.world.effect.MobEffects",
    ],
-   stub:`    @Override\n    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {\n        player.startUsingItem(usedHand);\n        //YCS:use:body\n        return net.minecraft.world.InteractionResultHolder.consume(player.getItemInHand(usedHand));\n    }`},
+   stub:`    @Override\n    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {\n        player.startUsingItem(usedHand);\n        //YCS:use:body\n        return InteractionResultHolder.consume(player.getItemInHand(usedHand));\n    }`},
   {key:"continuousUse",label:"Continuous Use",sig:"onUseTick(Level, LivingEntity, ItemStack, int) + releaseUsing(ItemStack, Level, LivingEntity, int)",
    params:[{name:"stack",type:"ItemStack"},{name:"level",type:"Level"},{name:"livingEntity",type:"LivingEntity"},{name:"remainingUseDuration",type:"int"}],
    returnType:"void",
@@ -455,10 +456,10 @@ const YCS_FEATURES={
       let fx="";
       if(form.foodEffects?.length){
         fx=form.foodEffects.map(e=>
-          `\n            .effect(new net.minecraft.world.effect.MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`
+          `\n            .effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0,parseInt(e.level)-1)}), ${parseFloat(e.probability)||1.0}f)`
         ).join("");
       }
-      return `    //YCS:food:start\n    @Override\n    public net.minecraft.world.food.FoodProperties getFoodProperties(ItemStack stack, LivingEntity entity) {\n        return new FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }\n    //YCS:food:end`;
+      return `    //YCS:food:start\n    @Override\n    public FoodProperties getFoodProperties(ItemStack stack, LivingEntity entity) {\n        return new FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }\n    //YCS:food:end`;
     },
     // Simpler: we build the stub inline in ycsSyncFeature
   },
@@ -489,10 +490,10 @@ const YCS_FEATURES={
       let lines=[];
       if(n!=="null") lines.push(`        tooltipComponents.add(Component.translatable(${n}));`);
       if(h!=="null"){
-        lines.push(`        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);
+        lines.push(`        if (Screen.hasShiftDown()) {`);
         lines.push(`            tooltipComponents.add(Component.translatable(${h}));`);
         lines.push(`        } else {`);
-        lines.push(`            tooltipComponents.add(Component.translatable(${s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);
+        lines.push(`            tooltipComponents.add(Component.translatable(${s}).withStyle(ChatFormatting.YELLOW));`);
         lines.push(`        }`);
       }
       lines.push(`        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);`);
@@ -530,6 +531,15 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (!node) return null;
   if (node.opcode === "entity.event" || node.opcode === "entity.target") return resolveEntityVar(node.opcode, methodKey);
   if (node.opcode === "number.literal") return node.fields?.value ?? "0";
+  if (node.opcode === "number.math") {
+    const a = resolveSlotValue(node.slots?.a, nodes, methodKey) ?? "0";
+    const b = resolveSlotValue(node.slots?.b, nodes, methodKey) ?? "0";
+    const op = node.fields?.op || "+";
+    if (op === "min") return `(Math.min((double)(${a}),(double)(${b})))`;
+    if (op === "max") return `(Math.max((double)(${a}),(double)(${b})))`;
+    if (op === "pow") return `(Math.pow((double)(${a}),(double)(${b})))`;
+    return `((${a})${op}(${b}))`;
+  }
   if (node.opcode === "text.literal") return node.fields?.value ?? "";
   if (node.opcode === "logic.true") return "true";
   if (node.opcode === "logic.false") return "false";
@@ -552,11 +562,12 @@ function resolveSlotValue(slotNodeId, nodes, methodKey) {
   }
   if (node.opcode === "attribute.get") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
-    const attrRef = attrRegistryRef(node.fields?.attrId);
+    const attrId = node.fields?.attrId;
+    const attrRef = attrRegistryRef(attrId);
     const layer = node.fields?.layer || "total";
-    if (layer === "base") return `(${ent} instanceof net.minecraft.world.entity.LivingEntity _aget ? _aget.getAttributeBaseValue(${attrRef}) : 0.0)`;
-    if (layer === "bonus") return `(${ent} instanceof net.minecraft.world.entity.LivingEntity _aget ? (_aget.getAttributeValue(${attrRef}) - _aget.getAttributeBaseValue(${attrRef})) : 0.0)`;
-    return `(${ent} instanceof net.minecraft.world.entity.LivingEntity _aget ? _aget.getAttributeValue(${attrRef}) : 0.0)`;
+    if (layer === "base") return `(${ent} instanceof LivingEntity _aget ? _aget.getAttributeBaseValue(${attrRef}) : 0.0)`;
+    if (layer === "bonus") return `(${ent} instanceof LivingEntity _aget ? (_aget.getAttributeValue(${attrRef}) - _aget.getAttributeBaseValue(${attrRef})) : 0.0)`;
+    return `(${ent} instanceof LivingEntity _aget ? _aget.getAttributeValue(${attrRef}) : 0.0)`;
   }
   return null;
 }
@@ -596,12 +607,12 @@ function varOfFactory(type) {
   return "ofInt";
 }
 function varsExpr(ent) {
-  return `net.ye6isu.yebisuRPG.data.EntityVarCapability.get(${ent})`;
+  return `EntityVarCapability.get(${ent})`;
 }
 // vars.define(...) returns `this`, so define+get/set chain into a single expression —
 // no separate statement needs to be emitted before the get/set call.
 function varDefinedExpr(varName, type, def, ent) {
-  return `${varsExpr(ent)}.define("${varName}", net.ye6isu.yebisuRPG.data.EntityVar.${varOfFactory(type)}(${varDefaultLiteral(type, def)}))`;
+  return `${varsExpr(ent)}.define("${varName}", EntityVar.${varOfFactory(type)}(${varDefaultLiteral(type, def)}))`;
 }
 function varGetExpr(varName, type, def, ent) {
   type = type || "int";
@@ -649,9 +660,11 @@ const VANILLA_ATTR_CONST = {
 };
 function attrRegistryRef(attrId) {
   if (!attrId) return "Attributes.MAX_HEALTH";
-  if (VANILLA_ATTR_CONST[attrId]) return `net.minecraft.world.entity.ai.attributes.${VANILLA_ATTR_CONST[attrId]}`;
-  const constName = attrId.toUpperCase();
-  return `net.ye6isu.yebisuRPG.attribute.ModAttributes.${constName}`;
+  if (VANILLA_ATTR_CONST[attrId]) return VANILLA_ATTR_CONST[attrId];
+  // Strip namespace prefix (e.g. "yebisurpg:scale.hitbox_width" → "SCALE_HITBOX_WIDTH")
+  const path = attrId.includes(":") ? attrId.split(":")[1] : attrId;
+  const constName = path.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  return `ModAttributes.${constName}`;
 }
 function getChain(startNextId, nodes) {
   const chain = [], seen = new Set();
@@ -688,7 +701,19 @@ function compileActionNode(node, nodes, methodKey) {
     const eff = node.fields?.effect || "MobEffects.REGENERATION";
     const dur = resolveSlotValue(node.slots?.duration, nodes, methodKey) ?? (node.fields?.duration ?? "200");
     const lvl = resolveSlotValue(node.slots?.level, nodes, methodKey) ?? (node.fields?.level ?? "1");
-    return ["if (" + ent + " instanceof net.minecraft.world.entity.LivingEntity _et) { _et.addEffect(new net.minecraft.world.effect.MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1))); }"];
+    return ["if (" + ent + " instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1))); }"];
+  }
+  if (node.opcode === "entity.apply_motion") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const x = resolveSlotValue(node.slots?.x, nodes, methodKey) ?? node.fields?.x ?? "0";
+    const y = resolveSlotValue(node.slots?.y, nodes, methodKey) ?? node.fields?.y ?? "0";
+    const z = resolveSlotValue(node.slots?.z, nodes, methodKey) ?? node.fields?.z ?? "0";
+    const mode = node.fields?.mode || "add";
+    if (mode === "set") {
+      return [`${ent}.setDeltaMovement((double)(${x}), (double)(${y}), (double)(${z}));`];
+    } else {
+      return [`${ent}.push((double)(${x}), (double)(${y}), (double)(${z}));`];
+    }
   }
   if (node.opcode === "anim.firstperson.play") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
@@ -697,9 +722,9 @@ function compileActionNode(node, nodes, methodKey) {
     const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f";
     const speedArg = typeof speed === "string" && !speed.endsWith("f") ? speed + "f" : speed;
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _ae && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_ae,",
-      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY,",
+      "if (" + ent + " instanceof Entity _ae && !level.isClientSide()) {",
+      "    AnimationAPI.triggerAnimation(_ae,",
+      "        AnimationCategory.ENTITY,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
       "        " + speedArg + ");",
@@ -709,26 +734,26 @@ function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.firstperson.stop") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _se && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.stopFirstPersonAnimation(_se);",
+      "if (" + ent + " instanceof Entity _se && !level.isClientSide()) {",
+      "    AnimationAPI.stopFirstPersonAnimation(_se);",
       "}",
     ];
   }
   if (node.opcode === "anim.firstperson.pause") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _pe && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.pauseAnimation(_pe,",
-      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY);",
+      "if (" + ent + " instanceof Entity _pe && !level.isClientSide()) {",
+      "    AnimationAPI.pauseAnimation(_pe,",
+      "        AnimationCategory.ENTITY);",
       "}",
     ];
   }
   if (node.opcode === "anim.firstperson.resume") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _re && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.resumeAnimation(_re,",
-      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY);",
+      "if (" + ent + " instanceof Entity _re && !level.isClientSide()) {",
+      "    AnimationAPI.resumeAnimation(_re,",
+      "        AnimationCategory.ENTITY);",
       "}",
     ];
   }
@@ -742,9 +767,9 @@ function compileActionNode(node, nodes, methodKey) {
     const vanillaMask = node.fields?.vanillaMask || 0;
     const vanillaMoveMask = node.fields?.vanillaMoveMask || 0;
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpa && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.triggerAnimation(_tpa,",
-      "        net.ye6isu.yebisuRPG.animation.AnimationCategory.ENTITY_THIRD_PERSON,",
+      "if (" + ent + " instanceof Entity _tpa && !level.isClientSide()) {",
+      "    AnimationAPI.triggerAnimation(_tpa,",
+      "        AnimationCategory.ENTITY_THIRD_PERSON,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
       "        " + speedArg + ", " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ");",
@@ -754,24 +779,24 @@ function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.thirdperson.stop") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tps && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.stopThirdPersonAnimation(_tps);",
+      "if (" + ent + " instanceof Entity _tps && !level.isClientSide()) {",
+      "    AnimationAPI.stopThirdPersonAnimation(_tps);",
       "}",
     ];
   }
   if (node.opcode === "anim.thirdperson.pause") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpp && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.pauseThirdPersonAnimation(_tpp);",
+      "if (" + ent + " instanceof Entity _tpp && !level.isClientSide()) {",
+      "    AnimationAPI.pauseThirdPersonAnimation(_tpp);",
       "}",
     ];
   }
   if (node.opcode === "anim.thirdperson.resume") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _tpr && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.resumeThirdPersonAnimation(_tpr);",
+      "if (" + ent + " instanceof Entity _tpr && !level.isClientSide()) {",
+      "    AnimationAPI.resumeThirdPersonAnimation(_tpr);",
       "}",
     ];
   }
@@ -780,8 +805,8 @@ function compileActionNode(node, nodes, methodKey) {
     const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
     const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _hp && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.setFirstPersonHandPose(_hp,",
+      "if (" + ent + " instanceof Entity _hp && !level.isClientSide()) {",
+      "    AnimationAPI.setFirstPersonHandPose(_hp,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\");",
       "}",
@@ -790,30 +815,31 @@ function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.handpose.reset") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof net.minecraft.world.entity.Entity _hr && !level.isClientSide()) {",
-      "    net.ye6isu.yebisuRPG.animation.AnimationAPI.resetFirstPersonHandPose(_hr);",
+      "if (" + ent + " instanceof Entity _hr && !level.isClientSide()) {",
+      "    AnimationAPI.resetFirstPersonHandPose(_hr);",
       "}",
     ];
   }
   if (node.opcode === "attribute.modifier.add") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
-    const attrRef = attrRegistryRef(node.fields?.attrId);
+    const attrId = node.fields?.attrId;
     const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? (node.fields?.value ?? "0");
     const operation = node.fields?.operation || "flat";
+    const attrRef = attrRegistryRef(attrId);
     if (operation === "base_set") return [
-      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _abset) {`,
+      `if (${ent} instanceof LivingEntity _abset) {`,
       `    var _absi = _abset.getAttribute(${attrRef});`,
       `    if (_absi != null) _absi.setBaseValue((double)(${valueExpr}));`,
       `}`,
     ];
     if (operation === "base_add") return [
-      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _abadd) {`,
+      `if (${ent} instanceof LivingEntity _abadd) {`,
       `    var _abai = _abadd.getAttribute(${attrRef});`,
       `    if (_abai != null) _abai.setBaseValue(_abai.getBaseValue() + (double)(${valueExpr}));`,
       `}`,
     ];
     if (operation === "base_multiply") return [
-      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _abmul) {`,
+      `if (${ent} instanceof LivingEntity _abmul) {`,
       `    var _abmi = _abmul.getAttribute(${attrRef});`,
       `    if (_abmi != null) _abmi.setBaseValue(_abmi.getBaseValue() * (double)(${valueExpr}));`,
       `}`,
@@ -821,25 +847,37 @@ function compileActionNode(node, nodes, methodKey) {
     const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
     const op = operation === "multiply" ? "ADD_MULTIPLIED_TOTAL" : "ADD_VALUE";
     return [
-      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _amet) {`,
+      `if (${ent} instanceof LivingEntity _amet) {`,
       `    var _ai = _amet.getAttribute(${attrRef});`,
       `    if (_ai != null) {`,
-      `        var _amid = net.minecraft.resources.ResourceLocation.parse("yebisurpg:${modName}");`,
+      `        var _amid = ResourceLocation.parse("yebisurpg:${modName}");`,
       `        _ai.removeModifier(_amid);`,
-      `        _ai.addOrUpdateTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(`,
-      `            _amid, (double)(${valueExpr}), net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.${op}));`,
+      `        _ai.addOrUpdateTransientModifier(new AttributeModifier(`,
+      `            _amid, (double)(${valueExpr}), AttributeModifier.Operation.${op}));`,
       `    }`,
       `}`,
     ];
   }
   if (node.opcode === "attribute.modifier.remove") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
-    const attrRef = attrRegistryRef(node.fields?.attrId);
+    const attrId = node.fields?.attrId;
+    const attrRef = attrRegistryRef(attrId);
     const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
     return [
-      `if (${ent} instanceof net.minecraft.world.entity.LivingEntity _armet) {`,
+      `if (${ent} instanceof LivingEntity _armet) {`,
       `    var _ari = _armet.getAttribute(${attrRef});`,
-      `    if (_ari != null) _ari.removeModifier(net.minecraft.resources.ResourceLocation.parse("yebisurpg:${modName}"));`,
+      `    if (_ari != null) _ari.removeModifier(ResourceLocation.parse("yebisurpg:${modName}"));`,
+      `}`,
+    ];
+  }
+  if (node.opcode === "attribute.base.reset") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const attrId = node.fields?.attrId;
+    const attrRef = attrRegistryRef(attrId);
+    return [
+      `if (${ent} instanceof LivingEntity _abrst) {`,
+      `    var _abrsti = _abrst.getAttribute(${attrRef});`,
+      `    if (_abrsti != null) _abrsti.setBaseValue(_abrsti.getAttribute().getDefaultValue());`,
       `}`,
     ];
   }
@@ -851,8 +889,41 @@ function compileActionNode(node, nodes, methodKey) {
   }
   return ["// unknown: " + node.opcode];
 }
-// Module-level cache so CanvasNode can read mod attributes without prop drilling.
+// Module-level caches so CanvasNode can read shared data without prop drilling.
 let __modAttributesCache = [];
+let __variablesCache = [];
+// Extra scale attributes registered by this mod (yebisurpg:scale.*).
+const PEHKUI_SCALES = [
+  { id:"yebisurpg:scale.base",                    label:"Base Scale" },
+  { id:"yebisurpg:scale.width",                   label:"Width Scale" },
+  { id:"yebisurpg:scale.height",                  label:"Height Scale" },
+  { id:"yebisurpg:scale.eye_height",              label:"Eye Height Scale" },
+  { id:"yebisurpg:scale.hitbox_width",            label:"Hitbox Width" },
+  { id:"yebisurpg:scale.hitbox_height",           label:"Hitbox Height" },
+  { id:"yebisurpg:scale.model_width",             label:"Model Width" },
+  { id:"yebisurpg:scale.model_height",            label:"Model Height" },
+  { id:"yebisurpg:scale.third_person",            label:"Third-Person Distance" },
+  { id:"yebisurpg:scale.motion",                  label:"Motion Scale" },
+  { id:"yebisurpg:scale.falling",                 label:"Falling Speed Scale" },
+  { id:"yebisurpg:scale.step_height",             label:"Step Height Scale" },
+  { id:"yebisurpg:scale.view_bobbing",            label:"View Bobbing Scale" },
+  { id:"yebisurpg:scale.visibility",              label:"Visibility Scale" },
+  { id:"yebisurpg:scale.jump_height",             label:"Jump Height Scale" },
+  { id:"yebisurpg:scale.flight",                  label:"Flight Speed Scale" },
+  { id:"yebisurpg:scale.reach",                   label:"Reach Scale" },
+  { id:"yebisurpg:scale.block_reach",             label:"Block Reach Scale" },
+  { id:"yebisurpg:scale.entity_reach",            label:"Entity Reach Scale" },
+  { id:"yebisurpg:scale.mining_speed",            label:"Mining Speed Scale" },
+  { id:"yebisurpg:scale.attack_speed",            label:"Attack Speed Scale" },
+  { id:"yebisurpg:scale.knockback",               label:"Knockback Scale" },
+  { id:"yebisurpg:scale.attack",                  label:"Attack Scale" },
+  { id:"yebisurpg:scale.defense",                 label:"Defense Scale" },
+  { id:"yebisurpg:scale.health",                  label:"Health Scale" },
+  { id:"yebisurpg:scale.drops",                   label:"Drops Scale" },
+  { id:"yebisurpg:scale.held_item",               label:"Held Item Scale" },
+  { id:"yebisurpg:scale.projectiles",             label:"Projectile Scale" },
+  { id:"yebisurpg:scale.explosions",              label:"Explosion Scale" },
+];
 // Vanilla attributes available in the attribute blocks alongside mod-defined ones.
 const VANILLA_ATTRIBUTES = [
   // generic
@@ -903,6 +974,8 @@ const PALETTE_BLOCKS = [
   ], actions:[] },
   { category:"Numbers", data:[
     { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
+    { opcode:"number.math", label:"Math", linkType:LINK_NUMBER, hint:"Apply an operator to two numbers",
+      slotDefs:[{key:"a",accepts:LINK_NUMBER},{key:"b",accepts:LINK_NUMBER}] },
     { opcode:"entity.look_x", label:"Look Dir X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_y", label:"Look Dir Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
     { opcode:"entity.look_z", label:"Look Dir Z of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
@@ -920,6 +993,8 @@ const PALETTE_BLOCKS = [
   { category:"Effects", data:[], actions:[
     { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
       slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"duration",accepts:LINK_NUMBER},{key:"level",accepts:LINK_NUMBER}] },
+    { opcode:"entity.apply_motion", label:"Apply Motion", isAction:true, hint:"Add velocity to an entity (X/Y/Z). Set mode: add=impulse, set=override velocity.",
+      slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"x",accepts:LINK_NUMBER},{key:"y",accepts:LINK_NUMBER},{key:"z",accepts:LINK_NUMBER}] },
   ]},
   { category:"Animations", data:[], actions:[
     { opcode:"anim.firstperson.play", label:"Play First-Person Anim", isAction:true,
@@ -969,11 +1044,101 @@ const PALETTE_BLOCKS = [
   ]},
 ];
 function AttrDropdown({nodeId,value,onChange}){
-  const allAttrs=[...VANILLA_ATTRIBUTES,...__modAttributesCache.map(a=>({id:a.id,label:(a.titleText||a.id)+" (mod)"}))];
-  return<select value={value||""} onChange={e=>{e.stopPropagation();onChange(e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-    style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px",maxWidth:160}}>
-    {allAttrs.map(a=><option key={a.id} value={a.id}>{a.label}</option>)}
-  </select>;
+  const allAttrs=[...VANILLA_ATTRIBUTES,...PEHKUI_SCALES,...__modAttributesCache.map(a=>({id:a.id,label:(a.titleText||a.id)+" (mod)"}))];
+  const[open,setOpen]=useState(false);
+  const[query,setQuery]=useState("");
+  const[rect,setRect]=useState(null);
+  const anchorRef=useRef(null);
+  const inputRef=useRef(null);
+  const selected=allAttrs.find(a=>a.id===(value||""))||allAttrs[0];
+  const filtered=query.trim()===""?allAttrs:allAttrs.filter(a=>a.label.toLowerCase().includes(query.toLowerCase())||a.id.toLowerCase().includes(query.toLowerCase()));
+  const pick=(id)=>{onChange(id);setOpen(false);setQuery("");};
+  const openDropdown=(e)=>{
+    e.stopPropagation();
+    if(!open){
+      const r=anchorRef.current?.getBoundingClientRect();
+      if(r)setRect(r);
+      setTimeout(()=>inputRef.current&&inputRef.current.focus(),0);
+    }
+    setOpen(o=>!o);
+  };
+  useEffect(()=>{
+    if(!open)return;
+    const close=()=>setOpen(false);
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[open]);
+  const list=open&&rect?ReactDOM.createPortal(
+    <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
+      style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(200,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
+      <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
+        placeholder="Search…" style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
+      <div style={{overflowY:"auto",maxHeight:180}}>
+        {filtered.map(a=><div key={a.id} onMouseDown={e=>{e.stopPropagation();pick(a.id);}}
+          style={{padding:"5px 10px",fontSize:12,color:a.id===(value||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:a.id===(value||"")?"#2a2a2a":"transparent"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#2a2a2a"} onMouseLeave={e=>e.currentTarget.style.background=a.id===(value||"")?"#2a2a2a":"transparent"}>
+          {a.label}
+        </div>)}
+        {filtered.length===0&&<div style={{padding:"5px 10px",color:"#666",fontSize:12}}>No results</div>}
+      </div>
+    </div>,
+    document.body
+  ):null;
+  return<div ref={anchorRef} style={{position:"relative",display:"inline-block"}} onMouseDown={e=>e.stopPropagation()}>
+    <div onClick={openDropdown}
+      style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:12,fontFamily:"sans-serif",fontWeight:700,cursor:"pointer",padding:"0 22px 0 6px",display:"flex",alignItems:"center",minWidth:100,maxWidth:160,overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",position:"relative"}}>
+      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected?.label||"—"}</span>
+      <span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"#aaa"}}>▾</span>
+    </div>
+    {list}
+  </div>;
+}
+function VarDropdown({nodeId,varName,varType,onChange}){
+  const usable=(__variablesCache||[]).filter(v=>v.type!=="item");
+  const[open,setOpen]=useState(false);
+  const[query,setQuery]=useState("");
+  const[rect,setRect]=useState(null);
+  const anchorRef=useRef(null);
+  const inputRef=useRef(null);
+  const selected=usable.find(v=>v.name===(varName||""));
+  const filtered=query.trim()===""?usable:usable.filter(v=>(v.titleText||v.name).toLowerCase().includes(query.toLowerCase())||v.name.toLowerCase().includes(query.toLowerCase()));
+  const pick=(v)=>{onChange(v.name,v.type,v.default);setOpen(false);setQuery("");};
+  const openDropdown=(e)=>{
+    e.stopPropagation();
+    if(!open){const r=anchorRef.current?.getBoundingClientRect();if(r)setRect(r);setTimeout(()=>inputRef.current&&inputRef.current.focus(),0);}
+    setOpen(o=>!o);
+  };
+  useEffect(()=>{
+    if(!open)return;
+    const close=()=>setOpen(false);
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[open]);
+  const list=open&&rect?ReactDOM.createPortal(
+    <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
+      style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(160,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
+      <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
+        placeholder="Search…" style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
+      <div style={{overflowY:"auto",maxHeight:180}}>
+        {filtered.map(v=><div key={v.name} onMouseDown={e=>{e.stopPropagation();pick(v);}}
+          style={{padding:"5px 10px",fontSize:12,color:v.name===(varName||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:v.name===(varName||"")?"#2a2a2a":"transparent"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#2a2a2a"} onMouseLeave={e=>e.currentTarget.style.background=v.name===(varName||"")?"#2a2a2a":"transparent"}>
+          <span style={{color:"#aaa",fontSize:10,marginRight:5}}>[{v.type}]</span>{v.titleText||v.name}
+        </div>)}
+        {filtered.length===0&&<div style={{padding:"5px 10px",color:"#666",fontSize:12}}>{usable.length===0?"No variables defined":"No results"}</div>}
+      </div>
+    </div>,
+    document.body
+  ):null;
+  const label=selected?(selected.titleText||selected.name):"pick variable…";
+  return<div ref={anchorRef} style={{position:"relative",display:"inline-block"}} onMouseDown={e=>e.stopPropagation()}>
+    <div onClick={openDropdown}
+      style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:selected?"#fff":"#888",fontSize:12,fontFamily:"sans-serif",fontWeight:700,cursor:"pointer",padding:"0 22px 0 6px",display:"flex",alignItems:"center",minWidth:100,maxWidth:160,overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",position:"relative"}}>
+      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
+      <span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"#aaa"}}>▾</span>
+    </div>
+    {list}
+  </div>;
 }
 function PaletteBlock({b}){
   const bg=b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.linkType===LINK_TEXT?"#182a1e":b.isAction?"#1a2a20":"transparent";
@@ -1024,38 +1189,30 @@ function PaletteSidebar({palette}){
   </div>;
 }
 // ─── Dynamic "Variables" palette category ───────────────────────────────────
-// One Get + one Set block per declared EntityVar (see VariablesPage), so the
-// canvas palette always reflects whatever's in ycs_variables.json. Item-type
-// variables are declaration-only for now — there's no item-stack link type for
-// them to plug into other blocks yet, so they're excluded here.
+// Single generic Get + Set block with a VarDropdown inline picker.
+// Item-type variables excluded (no item-stack link type yet).
 function buildPalette(variables, modAttributes) {
   const result = [...PALETTE_BLOCKS];
 
-  // Variables category — one Get (data) + one Set (action) per declared var
-  const usable = (variables || []).filter(v => v.type !== "item");
-  if (usable.length) {
-    const dataBlocks = usable.map(v => {
-      const link = varTypeToLink(v.type);
-      const label = v.titleText || v.name;
-      return { opcode:"variable.get", label:`Get ${label}`, linkType:link,
-        hint:`Get ${v.type} variable "${v.name}" for [Entity]`,
-        varName:v.name, varType:v.type, varDefault:v.default,
-        slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] };
-    });
-    const actionBlocks = usable.map(v => {
-      const link = varTypeToLink(v.type);
-      const label = v.titleText || v.name;
-      return { opcode:"variable.set", label:`Set ${label}`, isAction:true,
-        hint:`Set ${v.type} variable "${v.name}" to [${link}] for [Entity]`,
-        varName:v.name, varType:v.type, varDefault:v.default,
-        slotDefs:[{key:"value", accepts:link, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] };
-    });
-    result.push({ category:"Variables", data:dataBlocks, actions:actionBlocks });
-  }
+  // Variables category — one generic Get (data) + one generic Set (action)
+  result.push({
+    category:"Variables",
+    data:[
+      { opcode:"variable.get", label:"Get Variable", linkType:LINK_NUMBER,
+        hint:"Get a declared variable for [Entity] — pick the variable inline on the canvas",
+        slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+    ],
+    actions:[
+      { opcode:"variable.set", label:"Set Variable", isAction:true,
+        hint:"Set a declared variable for [Entity] — pick the variable inline on the canvas",
+        slotDefs:[{key:"value", accepts:LINK_NUMBER, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+    ],
+  });
 
-  // Attributes category — Get (data) + Add/Remove Modifier (actions) for mod + vanilla attrs
+  // Attributes category — Get (data) + Add/Remove/Reset Modifier (actions)
   const allAttrs = [
     ...VANILLA_ATTRIBUTES,
+    ...PEHKUI_SCALES,
     ...(modAttributes || []).map(a => ({ id:a.id, label:a.titleText || a.id, mod:true })),
   ];
   if (allAttrs.length) {
@@ -1072,6 +1229,9 @@ function buildPalette(variables, modAttributes) {
           slotDefs:[{key:"value", accepts:LINK_NUMBER, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
         { opcode:"attribute.modifier.remove", label:"Remove Attr Modifier", isAction:true,
           hint:"Remove a named modifier from an attribute on [Entity]",
+          slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+        { opcode:"attribute.base.reset", label:"Reset Attr Base", isAction:true,
+          hint:"Reset an attribute's base value back to its default on [Entity]",
           slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
       ],
     });
@@ -1115,9 +1275,16 @@ function ycsSyncImports(code, enabledMethodKeys) {
   // Content-scan: add imports whenever specific generated patterns appear in the compiled code,
   // regardless of which method the block is used in. One check per block family.
 
-  // effect.apply — LivingEntity cast, MobEffectInstance/MobEffects
-  if (code.includes('MobEffectInstance') || code.includes('.addEffect(')) {
+  // entity casts — LivingEntity and Entity appear in most blocks
+  if (code.includes('instanceof LivingEntity') || code.includes('LivingEntity ')) {
     needed.add('net.minecraft.world.entity.LivingEntity');
+  }
+  if (code.includes('instanceof Entity') || code.includes('Entity ')) {
+    needed.add('net.minecraft.world.entity.Entity');
+  }
+
+  // effect.apply — MobEffectInstance/MobEffects
+  if (code.includes('MobEffectInstance') || code.includes('.addEffect(')) {
     needed.add('net.minecraft.world.effect.MobEffectInstance');
     needed.add('net.minecraft.world.effect.MobEffects');
   }
@@ -1140,6 +1307,32 @@ function ycsSyncImports(code, enabledMethodKeys) {
     needed.add('net.minecraft.world.entity.ai.attributes.AttributeModifier');
     needed.add('net.minecraft.resources.ResourceLocation');
   }
+
+  // mod attributes
+  if (code.includes('ModAttributes.')) {
+    needed.add('net.ye6isu.yebisuRPG.attribute.ModAttributes');
+  }
+
+  // use/interaction stubs
+  if (code.includes('InteractionResultHolder')) {
+    needed.add('net.minecraft.world.InteractionResultHolder');
+  }
+  if (code.includes('UseAnim')) {
+    needed.add('net.minecraft.world.item.UseAnim');
+  }
+  if (code.includes('FoodProperties')) {
+    needed.add('net.minecraft.world.food.FoodProperties');
+  }
+  if (code.includes('Screen.hasShiftDown')) {
+    needed.add('net.minecraft.client.gui.screens.Screen');
+  }
+  if (code.includes('ChatFormatting')) {
+    needed.add('net.minecraft.ChatFormatting');
+  }
+  if (code.includes('ResourceLocation')) {
+    needed.add('net.minecraft.resources.ResourceLocation');
+  }
+
 
   // 1. Remove the entire YCS import block if it exists
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');
@@ -1204,11 +1397,11 @@ function buildFeatureStub(featureKey, form, itemId) {
   const MODID_ = "yebisurpg";
   if (featureKey === 'useDuration') {
     const dur = form.useDuration || "72000";
-    return `    @Override\n    public int getUseDuration(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {\n        return ${dur};\n    }`;
+    return `    @Override\n    public int getUseDuration(ItemStack stack, LivingEntity entity) {\n        return ${dur};\n    }`;
   }
   if (featureKey === 'useAnimation') {
     const anim = form.useAnimation || "NONE";
-    return `    @Override\n    public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {\n        return net.minecraft.world.item.UseAnim.${anim};\n    }`;
+    return `    @Override\n    public UseAnim getUseAnimation(ItemStack stack) {\n        return UseAnim.${anim};\n    }`;
   }
   if (featureKey === 'food') {
     const n = form.foodNutrition || 2;
@@ -1217,12 +1410,12 @@ function buildFeatureStub(featureKey, form, itemId) {
     let fx = "";
     if (form.foodEffects?.length) {
       fx = form.foodEffects.map(e =>
-        `\n            .effect(new net.minecraft.world.effect.MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level) - 1)}), ${parseFloat(e.probability) || 1.0}f)`
+        `\n            .effect(new MobEffectInstance(${e.effect}, ${e.duration}, ${Math.max(0, parseInt(e.level) - 1)}), ${parseFloat(e.probability) || 1.0}f)`
       ).join("");
     }
     // NOTE: Item.Properties must also have .food() set for the game to start the eating process.
     // gItemCode() handles this by mirroring these values onto Properties when cls2 is set + isFood.
-    return `    @Override\n    public net.minecraft.world.food.FoodProperties getFoodProperties(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {\n        return new net.minecraft.world.food.FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }`;
+    return `    @Override\n    public FoodProperties getFoodProperties(ItemStack stack, LivingEntity entity) {\n        return new FoodProperties.Builder()\n            .nutrition(${n})\n            .saturationModifier(${s}f)${al}${fx}\n            .build();\n    }`;
   }
   if (featureKey === 'fuel') {
     const bt = form.burnTime || 1600;
@@ -1238,10 +1431,10 @@ function buildFeatureStub(featureKey, form, itemId) {
     let lines = [];
     if (n !== "null") lines.push(`        tooltipComponents.add(Component.translatable(${n}));`);
     if (h !== "null") {
-      lines.push(`        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {`);
+      lines.push(`        if (Screen.hasShiftDown()) {`);
       lines.push(`            tooltipComponents.add(Component.translatable(${h}));`);
       lines.push(`        } else {`);
-      lines.push(`            tooltipComponents.add(Component.translatable(${s}).withStyle(net.minecraft.ChatFormatting.YELLOW));`);
+      lines.push(`            tooltipComponents.add(Component.translatable(${s}).withStyle(ChatFormatting.YELLOW));`);
       lines.push(`        }`);
     }
     lines.push(`        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);`);
@@ -1254,6 +1447,7 @@ function ycsToggleMethod(code, methodKey, enable) {
   let result = enable ? ycsInjectMethod(code, methodKey) : ycsRemoveMethod(code, methodKey);
   if (methodKey === "continuousUse") {
     result = enable ? ycsInjectMethod(result, "releaseUsing") : ycsRemoveMethod(result, "releaseUsing");
+    if (!enable) result = ycsRemoveFeature(result, "useAnimation");
   }
   const enabledKeys = ycsGetEnabledMethods(result);
   return ycsSyncImports(result, enabledKeys);
@@ -2281,6 +2475,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const{variables}=useVariables();
   const{attributes:modAttributes}=useAttributes();
   __modAttributesCache = modAttributes || [];
+  __variablesCache = variables || [];
   const palette=useMemo(()=>buildPalette(variables,modAttributes),[variables,modAttributes]);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
   const[nodes,setNodes]=useState(init);
@@ -2383,9 +2578,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   const upd=fn=>setNodes(prev => recalcLayout(fn(prev)));
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
-    const isVarBlock=bd.opcode.startsWith("variable.get.")||bd.opcode.startsWith("variable.set.");
     upd(ns=>[...ns,{id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs:bd.slotDefs||[],
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:isVarBlock?{varName:bd.varName,varType:bd.varType,varDefault:bd.varDefault}:{},slots:{}}]);
+      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:{},slots:{}}]);
   };
   const del=id=>{
     if(id==="start")return;
@@ -2531,6 +2725,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
            const smx = e.clientX, smy = e.clientY;
            
            document.querySelectorAll('.slot-conn').forEach(el => {
+              if (el.dataset.nodeid === id) return; // skip own slots
               const rect = el.getBoundingClientRect();
               const sx = rect.left + rect.width/2;
               const sy = rect.top + rect.height/2;
@@ -2543,7 +2738,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
                const parent = nextNs.find(x => x.id === nodeId);
                const isLogicSlot = parent.opcode === "control.if" && sk.startsWith("condition");
                const def = parent?.slotDefs?.find(d => d.key === sk);
-               if ((def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
+               const varSetValueAccepts = (parent?.opcode === "variable.set" && sk === "value") ? varTypeToLink(parent?.fields?.varType || "int") : null;
+               if ((varSetValueAccepts && varSetValueAccepts === dragged.linkType) || (def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
                    nextNs = nextNs.map(x => x.id === parent.id ? {...x, slots: {...(x.slots||{}), [sk]: dragged.id}} : x);
                }
            }
@@ -2567,7 +2763,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
     if(!c2.includes(bm)&&c2.includes(st)){const d2=ITEM_METHODS.find(m=>m.key===methodKey);if(d2){c2=ycsRemoveMethod(c2,methodKey);c2=ycsInjectMethod(c2,methodKey);c2=ycsSyncImports(c2,ycsGetEnabledMethods(c2));}}
     const sn=nodes.find(n=>n.id==="start");
     const bl=sn?.nextId?compileChain(sn.nextId,nodes,methodKey):[];
-    const j2=await api("/items/custom-class/write",{className,code:ycsInjectCompiledBody(c2,methodKey,bl)});
+    const injected=ycsInjectCompiledBody(c2,methodKey,bl);
+    const j2=await api("/items/custom-class/write",{className,code:ycsSyncImports(injected,ycsGetEnabledMethods(injected))});
     setSaving(false);setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
     if(j2.ok)setTimeout(()=>{setSaveStatus(null);onBack();},700);
   };
@@ -2626,7 +2823,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
              return <CanvasNode key={node.id} node={node} nodes={nodes} methodKey={methodKey} inChain={ch.has(node.id)} selected={selected} onSelect={(id)=>setSelected(id)} onDragStart={handleDragStart}
                onDelete={(nid)=>del(nid)}
                onCopy={typeof duplicateNode!=="undefined"?duplicateNode:null}
-               onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?{...n,fields:{...n.fields,[f]:v}}:n))}
+               onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?f==="__linkType"?{...n,linkType:v}:{...n,fields:{...n.fields,[f]:v}}:n))}
                onDisconnectChain={(nid)=>upd(ns=>ns.map(n=>n.id===nid?{...n,nextId:null}:n))}
              />;
           })}
@@ -2665,6 +2862,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const lblStr = node.opcode==="entity.event"?"Event Entity"
        :node.opcode==="entity.target"?"Target Entity"
        :node.opcode==="number.literal"?null
+       :node.opcode==="number.math"?null
        :node.opcode==="text.literal"?null
        :node.opcode==="entity.look_x"?"Get Look Direction X of"
        :node.opcode==="entity.look_y"?"Get Look Direction Y of"
@@ -2675,10 +2873,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
        :node.opcode==="entity.is_crouching"?"Is Crouching?"
        :node.opcode==="logic.true"?"True"
        :node.opcode==="logic.false"?"False"
-       :node.opcode==="variable.get"?`Get ${node.fields?.varName||"?"} for`
+       :node.opcode==="variable.get"?null
        :node.opcode==="attribute.get"?null
        :node.opcode==="attribute.modifier.add"?null
        :node.opcode==="attribute.modifier.remove"?null
+       :node.opcode==="attribute.base.reset"?null
        :node.opcode;
 
   const valContent = (
@@ -2690,6 +2889,21 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
       {node.opcode==="text.literal"&&<input value={node.fields?.value??""} placeholder="text…" onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(80, ((node.fields?.value||"").length*8)+24),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:14,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
+      {node.opcode==="number.math"&&<>
+          <SlotConn sk="a" sc="rgba(0,0,0,0.3)" connId={node.slots?.a} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <select value={node.fields?.op||"+"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"op",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+            style={{height:30,background:"rgba(0,0,0,0.2)",border:"none",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px",minWidth:48,textAlign:"center"}}>
+            <option value="+">+</option>
+            <option value="-">−</option>
+            <option value="*">×</option>
+            <option value="/">÷</option>
+            <option value="%">%</option>
+            <option value="min">min</option>
+            <option value="max">max</option>
+            <option value="pow">pow</option>
+          </select>
+          <SlotConn sk="b" sc="rgba(0,0,0,0.3)" connId={node.slots?.b} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
 
       {isAttrGet&&<>
           <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
@@ -2702,7 +2916,12 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>of</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {!isAttrGet&&node.slotDefs?.map(def => (
+      {node.opcode==="variable.get"&&<>
+          <VarDropdown nodeId={node.id} varName={node.fields?.varName} varType={node.fields?.varType} onChange={(n,t,d)=>{if(onFieldChange){onFieldChange(node.id,"varName",n);onFieldChange(node.id,"varType",t);onFieldChange(node.id,"varDefault",d);onFieldChange(node.id,"__linkType",varTypeToLink(t));}}}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {!isAttrGet&&node.opcode!=="variable.get"&&node.opcode!=="number.math"&&node.slotDefs?.map(def => (
           <SlotConn key={def.key} sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       ))}
     </>
@@ -2731,9 +2950,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="anim.thirdperson.resume"?"Resume TP Anim on"
          :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
-         :node.opcode==="variable.set"?`Set ${node.fields?.varName||"?"} to`
+         :node.opcode==="variable.set"?"Set Variable"
+         :node.opcode==="entity.apply_motion"?"Apply Motion to"
          :node.opcode==="attribute.modifier.add"?"Add Attr Modifier"
          :node.opcode==="attribute.modifier.remove"?"Remove Attr Modifier"
+         :node.opcode==="attribute.base.reset"?"Reset Attr Base"
          :node.opcode}
       </span>
       {isIf&&<>
@@ -2748,6 +2969,20 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="duration" sc="rgba(0,0,0,0.3)" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Level</span>
           <SlotConn sk="level" sc="rgba(0,0,0,0.3)" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="entity.apply_motion"&&<>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>X</span>
+          <SlotConn sk="x" sc="rgba(0,0,0,0.3)" connId={node.slots?.x} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Y</span>
+          <SlotConn sk="y" sc="rgba(0,0,0,0.3)" connId={node.slots?.y} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Z</span>
+          <SlotConn sk="z" sc="rgba(0,0,0,0.3)" connId={node.slots?.z} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <select value={node.fields?.mode||"add"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"mode",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+            style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:12,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px"}}>
+            <option value="add">Add (impulse)</option>
+            <option value="set">Set (override)</option>
+          </select>
       </>}
       {isAnimPlay&&<>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -2797,6 +3032,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {node.opcode==="variable.set"&&<>
+          <VarDropdown nodeId={node.id} varName={node.fields?.varName} varType={node.fields?.varType} onChange={(n,t,d)=>{if(onFieldChange){onFieldChange(node.id,"varName",n);onFieldChange(node.id,"varType",t);onFieldChange(node.id,"varDefault",d);}}}/>
           <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -2822,6 +3058,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="modifier name"
             style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {node.opcode==="attribute.base.reset"&&<>
+          <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>on</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}
@@ -3000,6 +3241,7 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
     const next=checked?[...enabled,key]:enabled.filter(k=>k!==key);
     F("enabledMethods",next);
     if(!checked){const mb={...(form.methodBlocks||{})};delete mb[key];F("methodBlocks",mb);}
+    if(key==="continuousUse"&&!checked){F("hasUseAnimation",false);F("useAnimation","NONE");}
     setBusyKey(null);
   };
 
@@ -3138,7 +3380,9 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
         nCode = form.isFood ? ycsInjectFeature(nCode, "food", form, form.id) : ycsRemoveFeature(nCode, "food");
         nCode = form.isFuel ? ycsInjectFeature(nCode, "fuel", form, form.id) : ycsRemoveFeature(nCode, "fuel");
         nCode = form.hasTooltip ? ycsInjectFeature(nCode, "tooltip", form, form.id) : ycsRemoveFeature(nCode, "tooltip");
-        nCode = form.hasUseDuration ? ycsInjectFeature(nCode, "useDuration", form, form.id) : ycsRemoveFeature(nCode, "useDuration");
+        // useAnimation requires getUseDuration > 0 or vanilla uses the left-arm swing instead
+        const needsDuration = form.hasUseDuration || form.hasUseAnimation;
+        nCode = needsDuration ? ycsInjectFeature(nCode, "useDuration", form, form.id) : ycsRemoveFeature(nCode, "useDuration");
         nCode = form.hasUseAnimation ? ycsInjectFeature(nCode, "useAnimation", form, form.id) : ycsRemoveFeature(nCode, "useAnimation");
         if (nCode !== cc.code) {
           const cw = await api("/items/custom-class/write",{className:clsName,code:nCode});

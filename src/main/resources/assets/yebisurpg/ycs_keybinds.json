@@ -1,7 +1,7 @@
 [
   {
     "key": "test_bind",
-    "bindCode": "KEY_Z",
+    "bindCode": "KEY_Z+ALT",
     "category": "CATEGORY"
   }
 ]

@@ -77,7 +77,44 @@ The `If` block (`control.if`) simulates a classic programming "C-shape" containe
 
 ---
 
-## 7. Typography & Form Inputs
+## 7. Scroll Behavior — Canvas Zoom vs. Panel Scroll
+
+The canvas listens to `wheel` events to zoom. This conflicts with any scrollable element on top of the canvas (dropdowns, sidebars, overflow panels): scrolling inside them will also zoom the canvas underneath.
+
+**Fix pattern:** on any scrollable element that sits over the canvas, stop wheel event propagation so it never reaches the canvas zoom handler:
+```js
+onWheel={e => e.stopPropagation()}
+```
+Apply this to: the palette sidebar `<div>`, the `AttrDropdown` list container, any scrollable panel or popover rendered on the canvas layer. Without it, scrolling a dropdown will simultaneously zoom the canvas.
+
+---
+
+## 8. Dropdown Portaling — Escaping Block Stacking Contexts
+
+Canvas nodes have their own `z-index` stacking contexts. Any dropdown rendered with `position: absolute` inside a block will be clipped or buried under adjacent blocks regardless of its `z-index` value.
+
+**Fix pattern:** use `ReactDOM.createPortal` to render the dropdown list directly under `document.body`, positioned via `getBoundingClientRect` of the anchor element:
+
+```js
+const rect = anchorRef.current.getBoundingClientRect();
+ReactDOM.createPortal(
+  <div style={{ position:"fixed", top: rect.bottom+2, left: rect.left, zIndex: 99999 }}>
+    {/* list items */}
+  </div>,
+  document.body
+)
+```
+
+Key points:
+- Use `position: fixed` (not `absolute`) on the portaled list — it positions relative to the viewport, not a parent.
+- Capture `rect` at open time via `getBoundingClientRect()` on a stable `ref` attached to the trigger button.
+- Add a `document.addEventListener("mousedown", close)` effect to close the list when clicking anywhere outside.
+- Add `onMouseDown={e => e.stopPropagation()}` on the portaled list itself to prevent the close handler from firing when clicking inside the list.
+- `AttrDropdown` already uses this pattern — copy it when building new searchable dropdowns on the canvas.
+
+---
+
+## 9. Typography & Form Inputs
 - **Font**: Sans-serif, size `16px`, bold (`fontWeight: 700`).
 - **Text Inputs (e.g., Numbers)**:
   - Inside a floating block, input backgrounds are `rgba(0,0,0,0.3)`. Inside an inline block, they become `transparent` to avoid doubling the background-darkening effect.

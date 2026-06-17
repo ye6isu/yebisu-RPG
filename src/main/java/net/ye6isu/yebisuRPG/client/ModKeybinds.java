@@ -64,7 +64,7 @@ public final class ModKeybinds {
 
     //YCS_Mod_Keybinds_START
 
-    public static final KeyMapping TEST_BIND = bind("test_bind", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KeyModifier.NONE, CATEGORY);
+    public static final KeyMapping TEST_BIND = bind("test_bind", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KeyModifier.ALT, CATEGORY);
 
     //YCS_Mod_Keybinds_END
 

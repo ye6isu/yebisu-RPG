@@ -58,6 +58,75 @@
 					}
 				}
 			}
+		},
+		"tp2": {
+			"loop": "once",
+			"animation_length": 0.5,
+			"bones": {
+				"root": {
+					"rotation": {
+						"vector": [90, 0, 0]
+					}
+				},
+				"head": {
+					"rotation": {
+						"0": {
+							"vector": [-90, 0, 0]
+						},
+						"0.041667": {
+							"vector": [-90, 0, 0]
+						},
+						"0.5": {
+							"vector": [-90, 0, 0]
+						}
+					}
+				},
+				"right_arm": {
+					"rotation": {
+						"0": {
+							"vector": [0, 0, 115]
+						},
+						"0.041667": {
+							"vector": [0, 0, 115]
+						},
+						"0.5": {
+							"vector": [0, 0, 10],
+							"easing": "easeOutElastic",
+							"easingArgs": [0.2]
+						}
+					}
+				},
+				"left_arm": {
+					"rotation": {
+						"0": {
+							"vector": [0, 0, -115]
+						},
+						"0.041667": {
+							"vector": [0, 0, -115]
+						},
+						"0.5": {
+							"vector": [0, 0, -10],
+							"easing": "easeOutElastic",
+							"easingArgs": [0.2]
+						}
+					}
+				},
+				"left_leg": {
+					"position": {
+						"0": {
+							"vector": [0, 5, -5]
+						},
+						"0.041667": {
+							"vector": [0, 5, -5]
+						},
+						"0.5": {
+							"vector": [0, 0, 0],
+							"easing": "easeOutElastic",
+							"easingArgs": [0.2]
+						}
+					}
+				}
+			}
 		}
 	}
 }
