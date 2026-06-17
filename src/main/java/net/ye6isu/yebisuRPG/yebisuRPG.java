@@ -10,6 +10,7 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityAttributeModificationEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.ye6isu.yebisuRPG.attribute.AttributeRangeFix;
 import net.ye6isu.yebisuRPG.attribute.ModAttributes;
@@ -46,6 +47,7 @@ public class yebisuRPG {
 
         EntityVarCapability.register(modEventBus);
         ModAttributes.register(modEventBus);
+        modEventBus.addListener(this::onAttributeModification);
 
         YCSTabRegistry.register(modEventBus);
 
@@ -59,6 +61,42 @@ public class yebisuRPG {
         }
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+    }
+
+    private void onAttributeModification(EntityAttributeModificationEvent event) {
+        // Add all yebisurpg scale attributes to every LivingEntity type so they are
+        // always present and can be read/modified via attribute modifiers at runtime.
+        event.getTypes().forEach(type -> {
+            event.add(type, ModAttributes.SCALE_BASE);
+            event.add(type, ModAttributes.SCALE_WIDTH);
+            event.add(type, ModAttributes.SCALE_HEIGHT);
+            event.add(type, ModAttributes.SCALE_EYE_HEIGHT);
+            event.add(type, ModAttributes.SCALE_HITBOX_WIDTH);
+            event.add(type, ModAttributes.SCALE_HITBOX_HEIGHT);
+            event.add(type, ModAttributes.SCALE_MODEL_WIDTH);
+            event.add(type, ModAttributes.SCALE_MODEL_HEIGHT);
+            event.add(type, ModAttributes.SCALE_THIRD_PERSON);
+            event.add(type, ModAttributes.SCALE_MOTION);
+            event.add(type, ModAttributes.SCALE_FALLING);
+            event.add(type, ModAttributes.SCALE_STEP_HEIGHT);
+            event.add(type, ModAttributes.SCALE_VIEW_BOBBING);
+            event.add(type, ModAttributes.SCALE_VISIBILITY);
+            event.add(type, ModAttributes.SCALE_JUMP_HEIGHT);
+            event.add(type, ModAttributes.SCALE_FLIGHT);
+            event.add(type, ModAttributes.SCALE_REACH);
+            event.add(type, ModAttributes.SCALE_BLOCK_REACH);
+            event.add(type, ModAttributes.SCALE_ENTITY_REACH);
+            event.add(type, ModAttributes.SCALE_MINING_SPEED);
+            event.add(type, ModAttributes.SCALE_ATTACK_SPEED);
+            event.add(type, ModAttributes.SCALE_KNOCKBACK);
+            event.add(type, ModAttributes.SCALE_ATTACK);
+            event.add(type, ModAttributes.SCALE_DEFENSE);
+            event.add(type, ModAttributes.SCALE_HEALTH);
+            event.add(type, ModAttributes.SCALE_DROPS);
+            event.add(type, ModAttributes.SCALE_HELD_ITEM);
+            event.add(type, ModAttributes.SCALE_PROJECTILES);
+            event.add(type, ModAttributes.SCALE_EXPLOSIONS);
+        });
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

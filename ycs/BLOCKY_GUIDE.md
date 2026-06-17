@@ -65,13 +65,53 @@ The sidebar is rendered by `PaletteSidebar`. Each category is **collapsible** (c
 - Do **not** add it only to one method's `imports` array — that only covers that specific method, not all methods the block might be used in.
 - Do **not** use fully-qualified names in generated code as a workaround for missing imports — it makes the output harder to read. Fix the import instead.
 
+**Generated code uses short class names throughout — never FQNs.** Imports are injected automatically. Do not write `net.minecraft.world.entity.LivingEntity` in generated strings; write `LivingEntity` and let the content scan add the import.
+
+**Imports are fully dynamic** — `ycsSyncImports` rebuilds the entire import block on every save and every method/feature toggle. If a block is removed from the canvas or a method is disabled, its imports disappear automatically. Nothing is ever hardcoded into a file; the import set is always derived fresh from what's currently active.
+
+`ycsSyncImports` is called at the end of every code-writing path:
+- Blocky editor Save button → `ycsInjectCompiledBody` → `ycsSyncImports` → write to disk
+- Method enable/disable → `ycsSyncImports` → write
+- Feature (food/fuel/tooltip) toggle → `ycsSyncImports` → write
+
+**Rule:** any function that writes the final Java code to disk must call `ycsSyncImports` on the result before passing it to the API. Never write without syncing imports.
+
+**Modpack compatibility note** — this mod has no runtime dependencies, but players will use it in modpacks alongside other mods. When designing any block, feature, or system, assume that entities, effects, attributes, and items may come from mods we've never seen. Design for `ResourceLocation`-based lookups (registry IDs) rather than hardcoded `MobEffects.*` / `Attributes.*` constants wherever the feature is meant to be general. Vanilla constants are fine as defaults/suggestions, but never as the only path through the code.
+
+## Variable Blocks — Generic Picker
+
+The Variables palette has **one generic `Get Variable` (data) and one generic `Set Variable` (action)** — not one block per declared variable. Variable selection happens inline on the canvas via `VarDropdown`, a searchable portal combo (same pattern as `AttrDropdown`, see BLOCKY_EDITOR_GUIDE.md §8).
+
+When the user picks a variable in `VarDropdown`:
+- `fields.varName`, `fields.varType`, and `fields.varDefault` are updated.
+- `node.linkType` is also updated via the special `__linkType` field key (handled in `onFieldChange`) so the block's output type matches the variable.
+
+The codegen for `variable.get` and `variable.set` reads from `fields` — no baked-in values from the palette.
+
+**`__variablesCache`** is a module-level array updated alongside `__modAttributesCache` so `VarDropdown` can read the variable list without prop drilling.
+
+## Attribute Base Reset Block
+
+`attribute.base.reset` resets an attribute's base value to its registered default (`getDefaultValue()`). It renders an `AttrDropdown` + entity slot, identical to `attribute.modifier.remove`.
+
+Codegen:
+```java
+if (<ent> instanceof LivingEntity _abrst) {
+    var _abrsti = _abrst.getAttribute(<attrRef>);
+    if (_abrsti != null) _abrsti.setBaseValue(_abrsti.getAttribute().getDefaultValue());
+}
+```
+
 **Current content-scan triggers in `ycsSyncImports`:**
 
 | Detected pattern | Imports added |
 |---|---|
-| `MobEffectInstance` or `.addEffect(` | `LivingEntity`, `MobEffectInstance`, `MobEffects` |
+| `instanceof LivingEntity` or `LivingEntity ` | `LivingEntity` |
+| `instanceof Entity` or `Entity ` | `Entity` |
+| `MobEffectInstance` or `.addEffect(` | `MobEffectInstance`, `MobEffects` |
 | `AnimationAPI` or `AnimationCategory` | `AnimationAPI`, `AnimationCategory` |
 | `EntityVarCapability` or `EntityVar.` | `EntityVarCapability`, `EntityVar` |
 | `AttributeModifier` or `getAttributeValue` or `getAttributeBaseValue` | `Attributes`, `AttributeModifier`, `ResourceLocation` |
+| `ModAttributes.` | `ModAttributes` |
 
 When adding a new block, pick a distinctive string it emits and add a new scan entry here and in `ycsSyncImports`.
