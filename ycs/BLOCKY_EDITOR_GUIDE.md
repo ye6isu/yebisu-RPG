@@ -96,3 +96,11 @@ Since different Minecraft override methods provide different native parameter na
   - In `hurtEnemy`: `LivingEntity eventEntity = attacker;`
   - In `continuousUse`: `LivingEntity eventEntity = livingEntity;`
 - If the "Event Entity" link is removed or `eventEntity` is no longer referenced, this definition is automatically omitted, keeping the source code perfectly clean.
+
+### Import Injection (`ycsSyncImports`)
+Imports are written into a single `//YCS_Import_START` / `//YCS_Import_END` block at the top of the file. `ycsSyncImports` runs on every save and on method enable/disable. It rebuilds the import set from three sources:
+1. `YCS_BASE_IMPORTS` — always-on baseline (Item, ItemStack, Level, Player)
+2. The `imports` array of every enabled method in `ITEM_METHODS`
+3. A **content scan** of the compiled code — if specific generated patterns are present, their required imports are added. This is how blocks that can appear in any method get their imports without duplicating the list across every method entry.
+
+**Symptom when a block's import is missing:** the generated Java file compiles with "cannot find symbol" on the first save after dragging the block in. Fix: add a content-scan check for a distinctive string the block emits (see `BLOCKY_GUIDE.md` → Imports section for the pattern).
