@@ -60,9 +60,6 @@ src/generated/resources/.cache/
 repo/
 !**/src/**/repo/
 
-# BlockBench project files (source art, not needed in repo)
-**/*.bbmodel
-
 # Crash reports and logs that may end up in project root during dev
 crash-reports/
 logs/
@@ -76,11 +73,6 @@ local.properties
 secrets.properties
 
 # ============================================================
-# Decompiled Sources
-# ============================================================
-decompiled/
-
-# ============================================================
 # Custom
 # ============================================================
-Example Source Code/
+tools/Decompiled Source Code/

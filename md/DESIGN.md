@@ -178,7 +178,7 @@ sync/persistence system for free.
 - `AttributeRangeFix` (`attribute/` package) — Mixin-based raise of vanilla `RangedAttribute`
   ceilings (max_health, armor, armor_toughness, attack_damage, attack_knockback,
   movement_speed), native implementation (no AttributeFix dependency).
-- YCS (`ycs/` — the visual mod-creator app) — has a "Variables" tab that manages `EntityVar`
+- YCS (`tools/Yebisu Creator Studio/` — the visual mod-creator app) — has a "Variables" tab that manages `EntityVar`
   declarations visually, and the block-script canvas has Get/Set Variable blocks wired to
   whichever type the variable is. Useful for one-time-roll-style variables and prototyping;
   combat Attributes and elemental stack-counters are out of YCS's current scope and would need
