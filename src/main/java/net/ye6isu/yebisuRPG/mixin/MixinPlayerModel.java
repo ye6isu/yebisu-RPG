@@ -91,16 +91,10 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                 (playhead == null && poseAnimHead != null) ? engine.getThirdPersonPosePayload(entity.getId()) : null;
         int vanMask  = playhead != null ? playhead.vanillaMask()
                      : (tpPoseHead != null) ? tpPoseHead.vanillaMask() : 0;
-        int moveMask = playhead != null ? playhead.vanillaMoveMask()
-                     : (tpPoseHead != null) ? tpPoseHead.vanillaMoveMask() : 0;
-        boolean isMoving = entity.getDeltaMovement().horizontalDistanceSqr() > 0.0001;
 
-        boolean rArmVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_ARM,
-                AnimationPlayhead.MOVE_RARM_MOVING, AnimationPlayhead.MOVE_RARM_STILL, isMoving);
-        boolean lArmVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_LEFT_ARM,
-                AnimationPlayhead.MOVE_LARM_MOVING, AnimationPlayhead.MOVE_LARM_STILL, isMoving);
-
-        // Suppress arm swing if EITHER arm is animation-driven (attackTime is global).
+        // Bit set = disable animation (let vanilla). Suppress swing if either arm is anim-driven.
+        boolean rArmVan = (vanMask & AnimationPlayhead.VAN_RIGHT_ARM) != 0;
+        boolean lArmVan = (vanMask & AnimationPlayhead.VAN_LEFT_ARM) != 0;
         if (!rArmVan || !lArmVan) this.attackTime = 0f;
     }
 
@@ -129,7 +123,23 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                 ? engine.getThirdPersonPose(entityId)
                 : null;
 
-        if (playhead == null && blender == null && poseAnim == null) return;
+        if (playhead == null && blender == null && poseAnim == null) {
+            boolean prone = entity.isVisuallySwimming() || entity.isFallFlying();
+            if (prone && net.ye6isu.yebisuRPG.client.ModKeybinds.proneTiltOnly) {
+                // Tilt only — reset all limbs, arms straight forward (90° = -π/2 xRot).
+                this.head.resetPose();
+                this.body.resetPose();
+                this.rightArm.resetPose();
+                this.leftArm.resetPose();
+                this.rightArm.xRot = -(float)(Math.PI / 2);
+                this.leftArm.xRot  = -(float)(Math.PI / 2);
+                this.rightLeg.resetPose();
+                this.leftLeg.resetPose();
+                this.hat.copyFrom(this.head);
+            }
+            // Otherwise let vanilla animations play through unchanged.
+            return;
+        }
 
         float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
 
@@ -175,29 +185,62 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                      : (tpPose != null) ? tpPose.lookAtMask() : 0;
         int vanMask  = (playhead != null) ? playhead.vanillaMask()
                      : (tpPose != null) ? tpPose.vanillaMask() : 0;
-        int moveMask = (playhead != null) ? playhead.vanillaMoveMask()
-                     : (tpPose != null) ? tpPose.vanillaMoveMask() : 0;
-        // Use actual velocity for immediate response rather than smoothed limbSwingAmount.
-        boolean isMoving = entity.getDeltaMovement().horizontalDistanceSqr() > 0.0001;
-        boolean crouching = entity instanceof net.minecraft.client.player.AbstractClientPlayer cp && cp.isCrouching();
-        boolean crouchPose = crouching && vanActive(vanMask, moveMask, AnimationPlayhead.VAN_CROUCH,
-                AnimationPlayhead.MOVE_CROUCH_MOVING, AnimationPlayhead.MOVE_CROUCH_STILL, isMoving);
-        boolean sitting = entity.isPassenger();
-        boolean sittingPose = sitting && vanActive(vanMask, moveMask, AnimationPlayhead.VAN_SITTING,
-                AnimationPlayhead.MOVE_SITTING_MOVING, AnimationPlayhead.MOVE_SITTING_STILL, isMoving);
 
-        boolean headVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_HEAD,
-                AnimationPlayhead.MOVE_HEAD_MOVING,  AnimationPlayhead.MOVE_HEAD_STILL,  isMoving);
-        boolean torsoVan = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_TORSO,
-                AnimationPlayhead.MOVE_TORSO_MOVING, AnimationPlayhead.MOVE_TORSO_STILL, isMoving);
-        boolean rArmVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_ARM,
-                AnimationPlayhead.MOVE_RARM_MOVING,  AnimationPlayhead.MOVE_RARM_STILL,  isMoving);
-        boolean lArmVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_LEFT_ARM,
-                AnimationPlayhead.MOVE_LARM_MOVING,  AnimationPlayhead.MOVE_LARM_STILL,  isMoving);
-        boolean rLegVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_RIGHT_LEG,
-                AnimationPlayhead.MOVE_RLEG_MOVING,  AnimationPlayhead.MOVE_RLEG_STILL,  isMoving);
-        boolean lLegVan  = vanActive(vanMask, moveMask, AnimationPlayhead.VAN_LEFT_LEG,
-                AnimationPlayhead.MOVE_LLEG_MOVING,  AnimationPlayhead.MOVE_LLEG_STILL,  isMoving);
+
+        boolean crouching = entity instanceof net.minecraft.client.player.AbstractClientPlayer cp && cp.isCrouching();
+        // Bit set = disable crouch/sitting pose during this animation.
+        boolean crouchPose = crouching && (vanMask & AnimationPlayhead.VAN_CROUCH) == 0;
+        boolean sitting = entity.isPassenger();
+        boolean sittingPose = sitting && (vanMask & AnimationPlayhead.VAN_SITTING) == 0;
+
+        // Bit set = disable animation for that part (let vanilla through).
+        boolean headVan  = (vanMask & AnimationPlayhead.VAN_HEAD) != 0;
+        boolean torsoVan = (vanMask & AnimationPlayhead.VAN_TORSO) != 0;
+        boolean rArmVan  = (vanMask & AnimationPlayhead.VAN_RIGHT_ARM) != 0;
+        boolean lArmVan  = (vanMask & AnimationPlayhead.VAN_LEFT_ARM) != 0;
+        boolean rLegVan  = (vanMask & AnimationPlayhead.VAN_RIGHT_LEG) != 0;
+        boolean lLegVan  = (vanMask & AnimationPlayhead.VAN_LEFT_LEG) != 0;
+
+        // Snapshot vanilla pose deltas for crouch/sitting BEFORE any resetPose() calls.
+        // Vanilla rest positions: head.y=0, body.y=0, arms.y=2, legs.y=12, legs.z=0.
+        // Vanilla crouch constants (from HumanoidModel.setupAnim):
+        // body.xRot += 0.5, body.y += 3.2, head.y += (same as body), arms.y += 3.2, legs shift y+z.
+        // Use fixed values to avoid capturing walk-cycle rotations that cause jitter.
+        float cvHeadY  = 0f;
+        float cvBodyY  = 0f, cvBodyXR  = 0f;
+        float cvRArmY  = 0f;
+        float cvLArmY  = 0f;
+        float cvRLegY  = 0f, cvRLegZ = 0f;
+        float cvLLegY  = 0f, cvLLegZ = 0f;
+        float cvRLegXR  = 0f, cvRLegYR   = 0f, cvRLegZR   = 0f;
+        float cvLLegXR  = 0f, cvLLegYR   = 0f, cvLLegZR   = 0f;
+        float cvRArmXR  = 0f, cvLArmXR  = 0f;
+        if (crouchPose) {
+            // Static crouch offsets only — no walk-cycle rotations.
+            if (!headVan)  { cvHeadY = this.head.y; }
+            if (!torsoVan) { cvBodyY = this.body.y; cvBodyXR = 0.5f; }
+            if (!rArmVan)  { cvRArmY = this.rightArm.y - 2f; }
+            if (!lArmVan)  { cvLArmY = this.leftArm.y  - 2f; }
+            if (!rLegVan)  { cvRLegY = this.rightLeg.y - 12f; cvRLegZ = this.rightLeg.z; }
+            if (!lLegVan)  { cvLLegY = this.leftLeg.y  - 12f; cvLLegZ = this.leftLeg.z; }
+        }
+        if (sittingPose) {
+            if (!rArmVan)  { cvRArmXR = this.rightArm.xRot; }
+            if (!lArmVan)  { cvLArmXR = this.leftArm.xRot; }
+            if (!rLegVan)  { cvRLegXR = this.rightLeg.xRot; cvRLegYR = this.rightLeg.yRot; cvRLegZR = this.rightLeg.zRot; }
+            if (!lLegVan)  { cvLLegXR = this.leftLeg.xRot;  cvLLegYR = this.leftLeg.yRot;  cvLLegZR = this.leftLeg.zRot; }
+        }
+
+        boolean prone = entity.isVisuallySwimming() || entity.isFallFlying();
+        boolean disableProne = (vanMask & AnimationPlayhead.DISABLE_PRONE) != 0;
+        if (prone && disableProne) {
+            this.head.resetPose();
+            this.body.resetPose();
+            this.rightArm.resetPose();
+            this.leftArm.resetPose();
+            this.rightLeg.resetPose();
+            this.leftLeg.resetPose();
+        }
 
         float yawRad   = (float) Math.toRadians(netHeadYaw);
         float pitchRad = (float) Math.toRadians(headPitch);
@@ -208,32 +251,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         HandAnimationLoader.BonePose lArmP  = pose(anim, "left_arm");
         HandAnimationLoader.BonePose rLegP  = pose(anim, "right_leg");
         HandAnimationLoader.BonePose lLegP  = pose(anim, "left_leg");
-
-        // Snapshot vanilla pose deltas for crouch/sitting BEFORE resetPose() wipes them.
-        // We re-apply them after our animation via quaternion composition (for xRot lean)
-        // or direct addition (for y/z position shifts).
-        // Vanilla rest positions: head.y=0, body.y=0, arms.y=2, legs.y=12, legs.z=0.
-        float cvHeadY  = 0f, cvHeadXR  = 0f;
-        float cvBodyY  = 0f, cvBodyXR  = 0f;
-        float cvRArmY  = 0f, cvRArmXR  = 0f;
-        float cvLArmY  = 0f, cvLArmXR  = 0f;
-        float cvRLegY  = 0f, cvRLegXR  = 0f, cvRLegYR   = 0f, cvRLegZR   = 0f, cvRLegZ = 0f;
-        float cvLLegY  = 0f, cvLLegXR  = 0f, cvLLegYR   = 0f, cvLLegZR   = 0f, cvLLegZ = 0f;
-        if (crouchPose) {
-            if (!headVan)  { cvHeadY = this.head.y;            cvHeadXR = this.head.xRot; }
-            if (!torsoVan) { cvBodyY = this.body.y;            cvBodyXR = this.body.xRot; }
-            if (!rArmVan)  { cvRArmY = this.rightArm.y - 2f;  cvRArmXR = this.rightArm.xRot; }
-            if (!lArmVan)  { cvLArmY = this.leftArm.y  - 2f;  cvLArmXR = this.leftArm.xRot; }
-            if (!rLegVan)  { cvRLegY = this.rightLeg.y - 12f; cvRLegZ  = this.rightLeg.z; }
-            if (!lLegVan)  { cvLLegY = this.leftLeg.y  - 12f; cvLLegZ  = this.leftLeg.z; }
-        }
-        if (sittingPose) {
-            // Sitting (riding): arms pulled back (xRot delta), legs splayed (xRot/yRot/zRot).
-            if (!rArmVan)  { cvRArmXR = this.rightArm.xRot; }
-            if (!lArmVan)  { cvLArmXR = this.leftArm.xRot; }
-            if (!rLegVan)  { cvRLegXR = this.rightLeg.xRot; cvRLegYR = this.rightLeg.yRot; cvRLegZR = this.rightLeg.zRot; }
-            if (!lLegVan)  { cvLLegXR = this.leftLeg.xRot;  cvLLegYR = this.leftLeg.yRot;  cvLLegZR = this.leftLeg.zRot; }
-        }
 
         // Head yaw: when torso also has a yaw look-at, body.yRot already rotates the body
         // in world-space. head.yRot is body-relative, so pass 0 for head yaw in that case —
@@ -246,12 +263,28 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         if (!torsoVan) { this.body.resetPose();     applyBone(this.body,     torsoP, timeSecs, weight,
             (lookMask & AnimationPlayhead.LOOK_TORSO_YAW)   != 0 ? yawRad : 0f,
             (lookMask & AnimationPlayhead.LOOK_TORSO_PITCH) != 0 ? pitchRad : 0f, 1f); }
+        // Prone arm remapping: swimming/crawling only (not elytra for now).
+        // Arms get 90° forward offset + quaternion-composed look-at when any arm look-at is enabled.
+        boolean swimming = entity.isVisuallySwimming();
+        boolean elytra = entity.isFallFlying();
+        boolean proneArms = (swimming || elytra) && !disableProne
+                && ((lookMask & (AnimationPlayhead.LOOK_RARM_YAW | AnimationPlayhead.LOOK_RARM_PITCH
+                               | AnimationPlayhead.LOOK_LARM_YAW | AnimationPlayhead.LOOK_LARM_PITCH)) != 0);
+        // For swimming/elytra, suppress pitch in applyBone (body tilt handles it).
+        // For crawling, allow pitch since there's no body tilt.
+        boolean isCrawling = swimming && entity.onGround();
+        float rArmLookPitch = (lookMask & AnimationPlayhead.LOOK_RARM_PITCH) != 0
+                && (!proneArms || isCrawling) ? pitchRad : 0f;
+        float lArmLookPitch = (lookMask & AnimationPlayhead.LOOK_LARM_PITCH) != 0
+                && (!proneArms || isCrawling) ? pitchRad : 0f;
+        // Elytra uses same arm yaw logic as swimming — no roll compensation.
+        float rArmLookYaw = (lookMask & AnimationPlayhead.LOOK_RARM_YAW) != 0 ? yawRad : 0f;
+        float lArmLookYaw = (lookMask & AnimationPlayhead.LOOK_LARM_YAW) != 0 ? yawRad : 0f;
+
         if (!rArmVan)  { this.rightArm.resetPose(); applyBone(this.rightArm, rArmP,  timeSecs, weight,
-            (lookMask & AnimationPlayhead.LOOK_RARM_YAW)   != 0 ? yawRad : 0f,
-            (lookMask & AnimationPlayhead.LOOK_RARM_PITCH) != 0 ? pitchRad : 0f); }
+            rArmLookYaw, rArmLookPitch); }
         if (!lArmVan)  { this.leftArm.resetPose();  applyBone(this.leftArm,  lArmP,  timeSecs, weight,
-            (lookMask & AnimationPlayhead.LOOK_LARM_YAW)   != 0 ? yawRad : 0f,
-            (lookMask & AnimationPlayhead.LOOK_LARM_PITCH) != 0 ? pitchRad : 0f); }
+            lArmLookYaw, lArmLookPitch); }
         if (!rLegVan)  { this.rightLeg.resetPose(); applyBone(this.rightLeg, rLegP,  timeSecs, weight,
             (lookMask & AnimationPlayhead.LOOK_RLEG_YAW)   != 0 ? yawRad : 0f,
             (lookMask & AnimationPlayhead.LOOK_RLEG_PITCH) != 0 ? pitchRad : 0f); }
@@ -259,28 +292,57 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
             (lookMask & AnimationPlayhead.LOOK_LLEG_YAW)   != 0 ? yawRad : 0f,
             (lookMask & AnimationPlayhead.LOOK_LLEG_PITCH) != 0 ? pitchRad : 0f); }
 
-        // Re-apply vanilla pose deltas on top of our animation via quaternion composition.
-        if (crouchPose) {
-            if (!headVan)  { this.head.y = lerp(this.head.y, cvHeadY, weight); }
-            if (!torsoVan) {
-                this.body.y = lerp(this.body.y, cvBodyY, weight);
-                // Compose crouch lean (xRot) with animation rotation via quaternion so
-                // the yRot spins around the tilted spine axis rather than world-Y.
-                float[] q  = eulerToQuat(this.body.xRot, this.body.yRot, this.body.zRot);
-                float[] ql = eulerToQuat(cvBodyXR * weight, 0f, 0f);
-                float[] euler = quatToEuler(quatMul(ql, q));
-                this.body.xRot = euler[0]; this.body.yRot = euler[1]; this.body.zRot = euler[2];
+        // During prone (without Disable Prone), offset arms 90° forward as the base pose.
+        // Also rotate the position offset so animations track the new forward orientation:
+        // rest-pose Y (down arm) becomes Z (forward), rest-pose Z becomes -Y.
+        if (proneArms) {
+            // Compose the 90° forward offset with the existing rotation via quaternion
+            // so there's no roll artifact when the arm follows the camera yaw.
+            float[] qProne = eulerToQuat(-(float)(Math.PI / 2), 0f, 0f);
+            if (!rArmVan) {
+                float[] qCur = eulerToQuat(this.rightArm.xRot, this.rightArm.yRot, this.rightArm.zRot);
+                float[] qFinal = quatMul(qProne, qCur);
+                float[] euler = quatToEuler(qFinal);
+                this.rightArm.xRot = euler[0];
+                this.rightArm.yRot = euler[1];
+                this.rightArm.zRot = euler[2];
+                // Remap position Y/Z for the 90° X rotation.
+                float dY = this.rightArm.y - this.rightArm.getInitialPose().y;
+                float dZ = this.rightArm.z - this.rightArm.getInitialPose().z;
+                this.rightArm.y = this.rightArm.getInitialPose().y + dZ;
+                this.rightArm.z = this.rightArm.getInitialPose().z - dY;
             }
-            if (!rArmVan)  { this.rightArm.y   += cvRArmY * weight;
-                             this.rightArm.xRot += cvRArmXR * weight; }
-            if (!lArmVan)  { this.leftArm.y    += cvLArmY * weight;
-                             this.leftArm.xRot  += cvLArmXR * weight; }
-            if (!rLegVan)  { this.rightLeg.y   += cvRLegY * weight; this.rightLeg.z += cvRLegZ * weight; }
-            if (!lLegVan)  { this.leftLeg.y    += cvLLegY * weight; this.leftLeg.z  += cvLLegZ * weight; }
+            if (!lArmVan) {
+                float[] qCur = eulerToQuat(this.leftArm.xRot, this.leftArm.yRot, this.leftArm.zRot);
+                float[] qFinal = quatMul(qProne, qCur);
+                float[] euler = quatToEuler(qFinal);
+                this.leftArm.xRot = euler[0];
+                this.leftArm.yRot = euler[1];
+                this.leftArm.zRot = euler[2];
+                float dY = this.leftArm.y - this.leftArm.getInitialPose().y;
+                float dZ = this.leftArm.z - this.leftArm.getInitialPose().z;
+                this.leftArm.y = this.leftArm.getInitialPose().y + dZ;
+                this.leftArm.z = this.leftArm.getInitialPose().z - dY;
+            }
+        }
+
+        // Re-apply vanilla crouch position offsets + torso lean on top of animation.
+        // These are NOT scaled by animation weight — the player IS crouching regardless
+        // of whether an animation is blending in/out.
+        if (crouchPose) {
+            if (!headVan)  { this.head.y += cvHeadY; }
+            if (!torsoVan) {
+                this.body.y += cvBodyY;
+                composeRotation(this.body, cvBodyXR, 0f, 0f);
+            }
+            if (!rArmVan)  { this.rightArm.y += cvRArmY; }
+            if (!lArmVan)  { this.leftArm.y  += cvLArmY; }
+            if (!rLegVan)  { this.rightLeg.y += cvRLegY; this.rightLeg.z += cvRLegZ; }
+            if (!lLegVan)  { this.leftLeg.y  += cvLLegY; this.leftLeg.z  += cvLLegZ; }
         }
         if (sittingPose) {
-            if (!rArmVan)  { this.rightArm.xRot += cvRArmXR * weight; }
-            if (!lArmVan)  { this.leftArm.xRot  += cvLArmXR * weight; }
+            if (!rArmVan)  { composeRotation(this.rightArm, cvRArmXR * weight, 0f, 0f); }
+            if (!lArmVan)  { composeRotation(this.leftArm,  cvLArmXR * weight, 0f, 0f); }
             if (!rLegVan)  { composeRotation(this.rightLeg, cvRLegXR * weight, cvRLegYR * weight, cvRLegZR * weight); }
             if (!lLegVan)  { composeRotation(this.leftLeg,  cvLLegXR * weight, cvLLegYR * weight, cvLLegZR * weight); }
         }
@@ -315,27 +377,24 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
         this.hat.copyFrom(this.head);
 
-        // ElytraModel has no body part, so it can't inherit torso rotation via
-        // copyPropertiesTo like armor (HumanoidModel-based) does. Stash the torso's
-        // final rotation here so MixinElytraLayer can apply the same rotation to the
-        // PoseStack directly, keeping the elytra attached during torso look-at and crouch.
-        TorsoRotationHolder.X_ROT.set(this.body.xRot);
+        // Stash torso rotation for MixinElytraLayer.
+        // Subtract crouch lean when crouch is active (so elytra doesn't double-apply it).
+        // When Disable Crouch is set, also subtract it from vanilla-owned torso to
+        // force the elytra to normal (non-crouch) position.
+        float stashXRot = this.body.xRot;
+        boolean disableCrouch = (vanMask & AnimationPlayhead.VAN_CROUCH) != 0;
+        if (crouchPose && !torsoVan) {
+            stashXRot -= cvBodyXR;
+        } else if (crouching && disableCrouch && torsoVan) {
+            stashXRot -= 0.5f;
+        }
+        TorsoRotationHolder.X_ROT.set(stashXRot);
         TorsoRotationHolder.Y_ROT.set(this.body.yRot);
         TorsoRotationHolder.Z_ROT.set(this.body.zRot);
     }
 
-    /**
-     * Returns true if vanilla should own this part given the current move state.
-     * vanBit must be set, AND the relevant move bit(s) must permit the current state.
-     * If neither move bit is set the vanilla allowance is unconditional (both states).
-     */
-    private static boolean vanActive(int vanMask, int moveMask, int vanBit,
-                                     int movingBit, int stillBit, boolean isMoving) {
-        if ((vanMask & vanBit) == 0) return false;
-        int cond = moveMask & (movingBit | stillBit);
-        if (cond == 0) return true; // no condition set → always active
-        return isMoving ? (cond & movingBit) != 0 : (cond & stillBit) != 0;
-    }
+
+
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

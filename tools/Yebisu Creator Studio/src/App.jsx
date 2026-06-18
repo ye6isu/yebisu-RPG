@@ -3571,91 +3571,83 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {showSettings&&(isAnimTPPlay||isTPPoseSet)&&(()=>{
         const lookMask = node.fields?.lookAtMask||0;
         const vanMask  = node.fields?.vanillaMask||0;
-        const moveMask = node.fields?.vanillaMoveMask||0;
         const LookCB = ({bit})=>(
           <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"lookAtMask",(lookMask^bit));}}>
             <input type="checkbox" checked={!!(lookMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
           </label>
         );
-        const VanCB = ({bit,label})=>(
-          <label style={{display:"flex",alignItems:"center",gap:4,color:"#fff",fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"vanillaMask",(vanMask^bit));}}>
+        const VanCB = ({bit})=>(
+          <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"vanillaMask",(vanMask^bit));}}>
             <input type="checkbox" checked={!!(vanMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
-            {label}
           </label>
         );
-        const MoveCB = ({bit,label})=>(
-          <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:11,color:"#bbb"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"vanillaMoveMask",(moveMask^bit));}}>
-            <input type="checkbox" checked={!!(moveMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
-          </label>
-        );
-        // lookAtMask: 2 bits per part (yaw=base, pitch=base+1) — Head=0,Torso=2,RArm=4,LArm=6,RLeg=8,LLeg=10
+        // lookAtMask: Root Yaw=bit12, Root Pitch=bit13, RArm Yaw=bit4, RArm Pitch=bit5, etc.
         // vanillaMask: Head=1,Torso=2,RArm=4,LArm=8,RLeg=16,LLeg=32,Crouch=64,Prone=128,Sitting=256
-        // vanillaMoveMask: 2 bits per part (moving=base, still=base+1) — Head=0,Torso=2,RArm=4,LArm=6,RLeg=8,LLeg=10,Crouch=12,Prone=14,Sitting=16
+        const rootYawOn = !!(lookMask & (1<<12));
+        const rootPitchOn = !!(lookMask & (1<<13));
+        const rootActive = rootYawOn || rootPitchOn;
         const parts = [
-          {label:"Head",      lookBase:0,  vanBit:1,   moveBase:0},
-          {label:"Torso",     lookBase:2,  vanBit:2,   moveBase:2},
-          {label:"Right Arm", lookBase:4,  vanBit:4,   moveBase:4},
-          {label:"Left Arm",  lookBase:6,  vanBit:8,   moveBase:6},
-          {label:"Right Leg", lookBase:8,  vanBit:16,  moveBase:8},
-          {label:"Left Leg",  lookBase:10, vanBit:32,  moveBase:10},
+          {label:"Right Arm", lookBase:4,  vanBit:4},
+          {label:"Left Arm",  lookBase:6,  vanBit:8},
+          {label:"Right Leg", lookBase:8,  vanBit:16},
+          {label:"Left Leg",  lookBase:10, vanBit:32},
         ];
         const tdC = {textAlign:"center",padding:"1px 6px"};
         const hdC = {color:"#888",fontSize:11,padding:"0 6px",textAlign:"center"};
         return <div style={{position:"absolute",left:0,bottom:"100%",marginBottom:8,background:"#222",border:"2px solid #444",padding:"10px 14px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:8,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
-          <div style={{color:"#aaa",fontSize:12,fontWeight:700}}>Face Direction</div>
           <table style={{borderCollapse:"collapse",fontSize:12,color:"#ccc"}}>
             <thead><tr>
               <td style={{paddingRight:8,color:"#888",fontSize:11}}></td>
               <td style={hdC}>Yaw</td>
               <td style={hdC}>Pitch</td>
-              <td style={{...hdC,borderLeft:"1px solid #444"}}>Allow Vanilla</td>
-              <td style={hdC}>Moving</td>
-              <td style={hdC}>Still</td>
+              <td style={{...hdC,borderLeft:"1px solid #444"}}>Disable Anim</td>
             </tr></thead>
             <tbody>
-              {parts.map(({label,lookBase,vanBit,moveBase})=>{
-                const vanOn = !!(vanMask & vanBit);
-                return <tr key={label}>
-                  <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>{label}</td>
-                  <td style={tdC}><LookCB bit={1<<lookBase}/></td>
-                  <td style={tdC}><LookCB bit={1<<(lookBase+1)}/></td>
-                  <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={vanBit} label=""/></td>
-                  <td style={{...tdC,opacity:vanOn?1:0.3}}><MoveCB bit={1<<moveBase}/></td>
-                  <td style={{...tdC,opacity:vanOn?1:0.3}}><MoveCB bit={1<<(moveBase+1)}/></td>
-                </tr>;
-              })}
-              <tr>
-                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Root (Face Cam)</td>
+              <tr style={{borderBottom:"1px solid #333"}}>
+                <td style={{paddingRight:8,color:"#aaa",fontSize:12,fontWeight:700}}>Root (Face Cam)</td>
                 <td style={tdC}><LookCB bit={1<<12}/></td>
                 <td style={tdC}><LookCB bit={1<<13}/></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
-                <td style={tdC}></td>
-                <td style={tdC}></td>
+              </tr>
+              {parts.map(({label,lookBase,vanBit})=>(
+                <tr key={label}>
+                  <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>{label}</td>
+                  <td style={{...tdC,opacity:rootActive?0.35:1}}><LookCB bit={1<<lookBase}/></td>
+                  <td style={{...tdC,opacity:rootActive?0.35:1}}><LookCB bit={1<<(lookBase+1)}/></td>
+                  <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={vanBit}/></td>
+                </tr>
+              ))}
+              <tr style={{borderTop:"1px solid #333"}}>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Head</td>
+                <td style={tdC}></td><td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={1}/></td>
               </tr>
               <tr>
-                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Crouch</td>
-                <td style={tdC}></td>
-                <td style={tdC}></td>
-                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={64} label=""/></td>
-                <td style={{...tdC,opacity:!!(vanMask&64)?1:0.3}}><MoveCB bit={1<<12}/></td>
-                <td style={{...tdC,opacity:!!(vanMask&64)?1:0.3}}><MoveCB bit={1<<13}/></td>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Torso</td>
+                <td style={tdC}></td><td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={2}/></td>
+              </tr>
+              <tr style={{borderTop:"1px solid #333"}}>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Crouch</td>
+                <td style={tdC}></td><td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={64}/></td>
               </tr>
               <tr>
-                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Sitting</td>
-                <td style={tdC}></td>
-                <td style={tdC}></td>
-                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={256} label=""/></td>
-                <td style={{...tdC,opacity:!!(vanMask&256)?1:0.3}}><MoveCB bit={1<<16}/></td>
-                <td style={{...tdC,opacity:!!(vanMask&256)?1:0.3}}><MoveCB bit={1<<17}/></td>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Sitting</td>
+                <td style={tdC}></td><td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={256}/></td>
+              </tr>
+              <tr>
+                <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Prone</td>
+                <td style={tdC}></td><td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={128}/></td>
               </tr>
             </tbody>
           </table>
           <div style={{color:"#666",fontSize:10,lineHeight:1.4}}>
-            Vanilla: fully keeps vanilla motion for that part.<br/>
-            Crouch: uses crouched height (toggle, no walk anim).<br/>
-            Sitting: riding leg splay + arm pull-back.<br/>
-            Root Yaw/Pitch: root bone stays aimed at the camera on that axis, regardless of where the player looks.<br/>
-            Moving/Still: when neither checked, vanilla applies always.
+            Root: overrides per-part face direction — whole model faces camera.<br/>
+            Disable Anim: lets vanilla animation control that part.<br/>
+            Disable Crouch/Sitting/Prone: suppresses that vanilla pose during this animation.
           </div>
         </div>;
       })()}

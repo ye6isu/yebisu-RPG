@@ -1,5 +1,0 @@
-Soon...
-
-## License
-
-MIT
