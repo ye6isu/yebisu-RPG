@@ -54,6 +54,7 @@ public final class AnimationPlayhead {
     public static final int VAN_RIGHT_LEG = 1 << 4;
     public static final int VAN_LEFT_LEG  = 1 << 5;
     public static final int VAN_CROUCH    = 1 << 6;
+    public static final int DISABLE_PRONE = 1 << 7;
     public static final int VAN_SITTING   = 1 << 8;
 
     // vanillaMoveMask — 2 bits per part controlling when vanilla is active: bit0=while moving, bit1=while still

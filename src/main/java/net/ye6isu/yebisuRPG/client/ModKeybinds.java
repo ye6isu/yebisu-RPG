@@ -70,6 +70,9 @@ public final class ModKeybinds {
 
     // ---------------------------------------------------------------------------------
 
+    /** Toggles prone rendering: false = full vanilla (tilt + animation), true = tilt only (no limb animation). */
+    public static boolean proneTiltOnly = false;
+
     private ModKeybinds() {}
 
     /**

@@ -15,6 +15,7 @@ import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.animation.client.AnimationBlender;
 import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
+import net.ye6isu.yebisuRPG.animation.client.TorsoRotationHolder;
 import net.ye6isu.yebisuRPG.client.renderer.CompositeSkinManager;
 import net.ye6isu.yebisuRPG.client.renderer.FullbrightRenderType;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,6 +28,77 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
 
     public MixinPlayerRenderer() { super(null, null, 0); }
+
+    // How far down (in blocks) to shift the upright model during prone states
+    // (swimming, elytra, crawling). Tune this value to align with water surface.
+    // Positive = lower, negative = higher. 1 block = 1.0f.
+    private static final float PRONE_Y_OFFSET = -1.21f;
+
+    /**
+     * Cancels vanilla setupRotations (swim tilt, elytra tilt, sleep, death spin)
+     * and applies only the Y-axis body yaw so the player always renders upright.
+     * When a custom animation is active, falls through to let the RETURN injects
+     * handle root transforms.
+     */
+    @Inject(
+        method = "setupRotations(Lnet/minecraft/client/player/AbstractClientPlayer;Lcom/mojang/blaze3d/vertex/PoseStack;FFFF)V",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void yebisurpg$cancelProneRotation(
+            AbstractClientPlayer player,
+            PoseStack poseStack,
+            float ageInTicks,
+            float bodyYaw,
+            float partialTick,
+            float scale,
+            CallbackInfo ci) {
+
+        ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
+        int entityId = player.getId();
+        AnimationPlayhead playhead = engine.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+        AnimationBlender  blender  = engine.getBlender(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData tpPoseAnim =
+                (playhead == null) ? engine.getThirdPersonPose(entityId) : null;
+
+        if (playhead != null || blender != null || tpPoseAnim != null) {
+            // Custom animation active — if DISABLE_PRONE is set and prone, cancel tilt.
+            boolean prone = player.isVisuallySwimming() || player.isFallFlying();
+            int vanMask = 0;
+            if (playhead != null) vanMask = playhead.vanillaMask();
+            else if (tpPoseAnim != null) {
+                var tpPose = engine.getThirdPersonPosePayload(entityId);
+                if (tpPose != null) vanMask = tpPose.vanillaMask();
+            }
+            boolean disableProne = (vanMask & AnimationPlayhead.DISABLE_PRONE) != 0;
+            // When Disable Crouch is set, cancel vanilla's crouch PoseStack shift.
+            boolean disableCrouch = (vanMask & AnimationPlayhead.VAN_CROUCH) != 0;
+            if (player.isCrouching() && disableCrouch) {
+                poseStack.translate(0.0, 0.125, 0.0);
+            }
+            if (prone && disableProne) {
+                poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f - bodyYaw));
+                poseStack.translate(0.0, PRONE_Y_OFFSET, 0.0);
+                // Apply root follow-cam since the RETURN inject won't fire after cancel.
+                int lookMask = playhead != null ? playhead.lookAtMask() : 0;
+                boolean rootYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
+                boolean rootPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
+                if (rootYaw) {
+                    float lerpedYRot = Mth.lerp(partialTick, player.yRotO, player.getYRot());
+                    poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(bodyYaw - lerpedYRot));
+                }
+                if (rootPitch) {
+                    float lerpedXRot = Mth.lerp(partialTick, player.xRotO, player.getXRot());
+                    poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-lerpedXRot));
+                }
+                ci.cancel();
+            }
+            return;
+        }
+
+        // No custom animation — let vanilla setupRotations handle everything.
+    }
 
     /**
      * The JSON's "root" bone (the true parent of every other bone, distinct from
@@ -55,17 +127,13 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         boolean rootLookPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
         boolean rootLookYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
         if (rootLookPitch || rootLookYaw) {
-            // Vanilla already baked a yaw rotation derived from bodyYaw into the
-            // PoseStack before this RETURN inject runs. Cancel that out, then apply
-            // the camera's actual pitch/yaw (independently toggleable) so the whole
-            // model faces the camera regardless of where the player looks.
-            if (rootLookPitch) {
-                float lerpedXRot = Mth.lerp(partialTick, player.xRotO, player.getXRot());
-                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-lerpedXRot));
-            }
             if (rootLookYaw) {
                 float lerpedYRot = Mth.lerp(partialTick, player.yRotO, player.getYRot());
                 poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(bodyYaw - lerpedYRot));
+            }
+            if (rootLookPitch) {
+                float lerpedXRot = Mth.lerp(partialTick, player.xRotO, player.getXRot());
+                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-lerpedXRot));
             }
         }
 
@@ -95,7 +163,7 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
 
         if (rootRX != 0f || rootRY != 0f || rootRZ != 0f || rootPX != 0f || rootPY != 0f || rootPZ != 0f
                 || rootSX != 1f || rootSY != 1f || rootSZ != 1f) {
-            final float ROOT_PIVOT_Y = 16f / 16f;
+            final float ROOT_PIVOT_Y = 24f / 16f;
             poseStack.translate(0f, ROOT_PIVOT_Y, 0f);
             if (rootRZ != 0f) poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rootRZ));
             if (rootRY != 0f) poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-rootRY));
@@ -125,6 +193,7 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
         AnimationPlayhead playhead = engine.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
         AnimationBlender  blender  = engine.getBlender(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+
         if (playhead == null && blender == null) return;
 
         // Only cancel if the animation file actually loaded (same guard as bone apply).
@@ -136,20 +205,8 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
             if (anim == null && blender == null) return;
         }
 
-        // If VAN_CROUCH is set AND the move condition permits it, keep the shift.
-        if (playhead != null && (playhead.vanillaMask() & AnimationPlayhead.VAN_CROUCH) != 0) {
-            boolean isMoving = player.getDeltaMovement().horizontalDistanceSqr() > 0.0001;
-            int moveMask = playhead.vanillaMoveMask();
-            int cond = moveMask & (AnimationPlayhead.MOVE_CROUCH_MOVING | AnimationPlayhead.MOVE_CROUCH_STILL);
-            boolean crouchActive = cond == 0
-                    || (isMoving ? (cond & AnimationPlayhead.MOVE_CROUCH_MOVING) != 0
-                                 : (cond & AnimationPlayhead.MOVE_CROUCH_STILL)  != 0);
-            if (crouchActive) return;
-        }
-
-        // Vanilla sneaking translates Y by -0.125 (in entity/block space, before scale).
-        // We push back up by +0.125 to restore the standing Y origin.
-        poseStack.translate(0.0, 0.125, 0.0);
+        // Always keep vanilla's crouch PoseStack shift — our bone-level crouch deltas
+        // (body.y, arm.y, leg.y/z) stack on top of it, matching vanilla's visual.
     }
 
     @Inject(method = "renderRightHand", at = @At("TAIL"))
