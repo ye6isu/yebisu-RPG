@@ -7,21 +7,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Entity;
-import net.ye6isu.yebisuRPG.animation.AnimationAPI;
-import net.ye6isu.yebisuRPG.animation.AnimationCategory;
-import net.ye6isu.yebisuRPG.util.TickScheduler;
 import net.ye6isu.yebisuRPG.util.AoeShapes;
-import net.ye6isu.yebisuRPG.data.EntityVarCapability;
-import net.ye6isu.yebisuRPG.data.EntityVar;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.UseAnim;
-import net.minecraft.world.food.FoodProperties;
 //YCS_Import_END
 
 public class NorbitTheOrbitItem extends Item {
