@@ -64,15 +64,16 @@ public class ModBlocks {
     public static final DeferredBlock<TrapDoorBlock> CRATE_TRAPDOOR = registerBlock("crate_trapdoor",
             () -> new TrapDoorBlock(BlockSetType.IRON, BlockBehaviour.Properties.of().strength(2f).requiresCorrectToolForDrops().noOcclusion()));
 
-    //Blocks from creator
-    public static final DeferredBlock<Block> CAT_BLOCK = registerBlock("cat_block",
+    //Blocks from creator
+
+    //YCS_Mod_Blocks_START
+
+    public static final DeferredBlock<Block> YEBISU_CAT = registerBlock("yebisu_cat",
                     () -> new Block(BlockBehaviour.Properties.of()
                                 .strength(2f)
                                 .sound(SoundType.WOOD)));
 
-    //YCS_Mod_Blocks_START
-
-    //YCS_Mod_Blocks_END
+//YCS_Mod_Blocks_END
 
     private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
         DeferredBlock<T> toReturn = BLOCKS.register(name, block);

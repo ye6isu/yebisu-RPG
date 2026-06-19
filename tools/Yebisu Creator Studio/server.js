@@ -155,7 +155,7 @@ app.get('/api/items/read', (_req, res) => {
 // Generated once via RunData -> YCSVanillaItemDumpProvider (see that class for why
 // this is a static file rather than a live JVM query). Re-run RunData if the
 // target Minecraft version changes and the vanilla item list needs updating.
-const VANILLA_ITEMS_JSON = jp(MOD_ROOT, 'assets', MODID, 'ycs_vanilla_items.json')
+const VANILLA_ITEMS_JSON = jp(MOD_ROOT, 'assets', MODID, 'ycs', 'ycs_vanilla_items.json')
 app.get('/api/items/vanilla', (_req, res) => {
   try {
     const ids = JSON.parse(rf(VANILLA_ITEMS_JSON))
@@ -614,7 +614,7 @@ app.post('/api/items/custom-class/write', (req, res) => {
 })
 
 // ─── Creative tab — JSON-based via ycs_tabs.json ──────────────────────────────
-const TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_tabs.json'
+const TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_tabs.json'
 
 const STATIC_TAB_VALUE_TO_KEY = {
   'ModCreativeModeTabs.YEBISURPG_ITEMS_TAB': 'yebisurpg_items_tab',
@@ -686,6 +686,7 @@ app.post('/api/creativetab', (req, res) => {
     const tabs = readTabsJson()
     tabs[entryKey] = tabKey
     writeTabsJson(tabs)
+    if (readCustomTabs().some(t => t.iconRef && t.iconRef.startsWith('cycle:'))) regenerateCustomTabsBlock()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -705,7 +706,7 @@ app.post('/api/creativetab/remove', (req, res) => {
       const idM = new RegExp(`${cn}\\s*=\\s*ITEMS\\.register\\("([^"]+)"`).exec(isrc)
       if (idM) entryKey = idM[1]
     }
-    if (entryKey) { const tabs = readTabsJson(); delete tabs[entryKey]; writeTabsJson(tabs) }
+    if (entryKey) { const tabs = readTabsJson(); delete tabs[entryKey]; writeTabsJson(tabs); if (readCustomTabs().some(t => t.iconRef && t.iconRef.startsWith('cycle:'))) regenerateCustomTabsBlock() }
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -714,7 +715,7 @@ app.post('/api/creativetab/remove', (req, res) => {
 // Stored as an ordered list in CUSTOM_TABS_JSON; each tab is codegen'd into
 // ModCreativeModeTabs.java between the YCS_Mod_Creative_Tabs markers, in list order
 // (display order in-game follows withTabsBefore chaining built from this order).
-const CUSTOM_TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_custom_tabs.json'
+const CUSTOM_TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_custom_tabs.json'
 const CMT_FILE = jp(JAVA_ROOT,'item','ModCreativeModeTabs.java')
 
 function readCustomTabs() { try { return JSON.parse(rf(CUSTOM_TABS_JSON)) } catch { return [] } }
@@ -729,9 +730,34 @@ function iconRefToJava(iconRef) {
     const m = new RegExp(`(\\w+)\\s*=\\s*registerBlock\\("${id}"`).exec(bsrc)
     return m ? `new ItemStack(ModBlocks.${m[1]}.get())` : null
   }
+  if (kind === 'item') {
+    const isrc = rf(jp(JAVA_ROOT,'item','ModItems.java'))
+    const m = new RegExp(`(\\w+)\\s*=\\s*ITEMS\\.register\\("${id}"`).exec(isrc)
+    return m ? `new ItemStack(ModItems.${m[1]}.get())` : null
+  }
+  // legacy: no prefix, assume item
   const isrc = rf(jp(JAVA_ROOT,'item','ModItems.java'))
-  const m = new RegExp(`(\\w+)\\s*=\\s*ITEMS\\.register\\("${id}"`).exec(isrc)
+  const m = new RegExp(`(\\w+)\\s*=\\s*ITEMS\\.register\\("${iconRef}"`).exec(isrc)
   return m ? `new ItemStack(ModItems.${m[1]}.get())` : null
+}
+
+function tabItemStacks(tabKey) {
+  const tabs = readTabsJson()
+  const bsrc = rf(jp(JAVA_ROOT,'block','ModBlocks.java'))
+  const isrc = rf(jp(JAVA_ROOT,'item','ModItems.java'))
+  const stacks = []
+  for (const [entryId, tk] of Object.entries(tabs)) {
+    if (tk !== tabKey) continue
+    if (entryId.startsWith('block:')) {
+      const bid = entryId.slice(6)
+      const m = new RegExp(`(\\w+)\\s*=\\s*registerBlock\\("${bid}"`).exec(bsrc)
+      if (m) stacks.push(`new ItemStack(ModBlocks.${m[1]}.get())`)
+    } else {
+      const m = new RegExp(`(\\w+)\\s*=\\s*ITEMS\\.register\\("${entryId}"`).exec(isrc)
+      if (m) stacks.push(`new ItemStack(ModItems.${m[1]}.get())`)
+    }
+  }
+  return stacks
 }
 
 function regenerateCustomTabsBlock() {
@@ -739,9 +765,17 @@ function regenerateCustomTabsBlock() {
   const lines = []
   for (let i = 0; i < list.length; i++) {
     const t = list[i]
-    const iconJava = iconRefToJava(t.iconRef) || 'new ItemStack(net.minecraft.world.item.Items.BARRIER)'
+    let iconLambda
+    if (t.iconRef && t.iconRef.startsWith('cycle:')) {
+      const stacks = tabItemStacks(t.key)
+      const first = stacks.length > 0 ? stacks[0] : 'new ItemStack(net.minecraft.world.item.Items.BARRIER)'
+      iconLambda = `() -> ${first}`
+    } else {
+      const iconJava = iconRefToJava(t.iconRef) || 'new ItemStack(net.minecraft.world.item.Items.BARRIER)'
+      iconLambda = `() -> ${iconJava}`
+    }
     lines.push(`    public static final Supplier<CreativeModeTab> ${t.key.toUpperCase()} = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("${t.key}", () -> CreativeModeTab.builder()`)
-    lines.push(`            .icon(() -> ${iconJava})`)
+    lines.push(`            .icon(${iconLambda})`)
     if (i > 0) lines.push(`            .withTabsBefore(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"${list[i-1].key}"))`)
     lines.push(`            .title(Component.translatable("creativetab.${MODID}.${t.key}"))`)
     lines.push(`            .build());`)
@@ -829,7 +863,7 @@ app.post('/api/creativetabs/reorder-items', (req, res) => {
 // bindCode formats: "NONE" (no default — InputConstants.UNKNOWN), "KEY_<glfw name>"
 // (keyboard, e.g. "KEY_K" -> GLFW.GLFW_KEY_K), "MOUSE_<n>" (mouse button, e.g.
 // "MOUSE_0" -> GLFW.GLFW_MOUSE_BUTTON_0).
-const KEYBINDS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_keybinds.json'
+const KEYBINDS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_keybinds.json'
 const KEYBINDS_FILE = jp(JAVA_ROOT,'client','ModKeybinds.java')
 
 function readKeybinds() { try { return JSON.parse(rf(KEYBINDS_JSON)) } catch { return [] } }
@@ -911,7 +945,7 @@ app.post('/api/keybinds/save', (req, res) => {
 // display name, and a kind (gui|hud) — what the interface actually renders
 // is intentionally left unimplemented until that design is decided, the
 // same deferral pattern used for keybind actions (see YCS_GUIDELINES.md).
-const INTERFACES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_interfaces.json'
+const INTERFACES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_interfaces.json'
 
 function readInterfaces() { try { return JSON.parse(rf(INTERFACES_JSON)) } catch { return [] } }
 function writeInterfaces(list) { wf(INTERFACES_JSON, JSON.stringify(list, null, 2)) }
@@ -956,7 +990,7 @@ app.post('/api/interfaces/save', (req, res) => {
 // not yet generate the vars.define(...) call-sites in Java; where/when each
 // var actually gets defined on an entity is intentionally left unimplemented
 // until that design is decided (see YCS_GUIDELINES.md).
-const VARIABLES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_variables.json'
+const VARIABLES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_variables.json'
 
 function readVariables() { try { return JSON.parse(rf(VARIABLES_JSON)) } catch { return [] } }
 function writeVariables(list) { wf(VARIABLES_JSON, JSON.stringify(list, null, 2)) }
@@ -997,7 +1031,7 @@ app.post('/api/variables/save', (req, res) => {
 // Server writes DeferredHolder declarations between //YCS_Attributes_START and //YCS_Attributes_END
 // in ModAttributes.java.
 
-const ATTRIBUTES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_attributes.json'
+const ATTRIBUTES_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_attributes.json'
 const MOD_ATTRIBUTES_JAVA = jp(JAVA_ROOT, 'attribute', 'ModAttributes.java')
 
 function readAttributes() { try { return JSON.parse(rf(ATTRIBUTES_JSON)) } catch { return [] } }
@@ -1051,39 +1085,71 @@ app.post('/api/attributes/save', (req, res) => {
 // Server writes Holder declarations between //YCS_Effects_START and //YCS_Effects_END
 // in ModEffects.java.
 
-const EFFECTS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs_effects.json'
+const EFFECTS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_effects.json'
 const MOD_EFFECTS_JAVA = jp(JAVA_ROOT, 'effect', 'ModEffects.java')
 const EFFECT_TEXTURE_DIR = jp(MOD_ROOT, 'assets', MODID, 'textures', 'mob_effect')
 
 function readEffects() { try { return JSON.parse(rf(EFFECTS_JSON)) } catch { return [] } }
 function writeEffects(list) { wf(EFFECTS_JSON, JSON.stringify(list, null, 2)) }
 
+function effectClassName(id) {
+  return id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') + 'Effect'
+}
+
 function writeEffectsJava(list) {
   let src = rf(MOD_EFFECTS_JAVA)
+  const needsCustomImport = list.some(e => e.enabledMethods?.length)
   const lines = list.map(e => {
     const cat = e.category || 'NEUTRAL'
     const colorHex = e.color ? `0x${parseInt(e.color, 10).toString(16)}` : '0xffffff'
+    if (e.enabledMethods?.length) {
+      const cls = effectClassName(e.id)
+      return `    public static final Holder<MobEffect> ${e.constName} =\n` +
+             `        MOB_EFFECTS.register("${e.id}", () -> new ${cls}(MobEffectCategory.${cat}, ${colorHex}));\n`
+    }
     return `    public static final Holder<MobEffect> ${e.constName} =\n` +
-           `        MOB_EFFECTS.register("${e.id}", () -> new MobEffect(MobEffectCategory.${cat}, ${colorHex}));\n`
+           `        MOB_EFFECTS.register("${e.id}", () -> new MobEffect(MobEffectCategory.${cat}, ${colorHex}) {});\n`
   })
   src = src.replace(
     /(\/\/YCS_Effects_START\n)[\s\S]*?(\/\/YCS_Effects_END)/,
     `$1${lines.join('\n')}    $2`
   )
+  // Manage imports for custom effect classes
+  const customImportMarker = '//YCS_Effects_Import_START'
+  const customImportEnd = '//YCS_Effects_Import_END'
+  if (src.includes(customImportMarker)) {
+    src = src.replace(
+      new RegExp(`${customImportMarker}[\\s\\S]*?${customImportEnd}\\n?`),
+      needsCustomImport
+        ? `${customImportMarker}\n${list.filter(e=>e.enabledMethods?.length).map(e=>`import net.ye6isu.yebisuRPG.effect.custom.${effectClassName(e.id)};`).join('\n')}\n${customImportEnd}\n`
+        : ''
+    )
+  } else if (needsCustomImport) {
+    const importBlock = `${customImportMarker}\n${list.filter(e=>e.enabledMethods?.length).map(e=>`import net.ye6isu.yebisuRPG.effect.custom.${effectClassName(e.id)};`).join('\n')}\n${customImportEnd}\n`
+    src = src.replace(/(import [^;]+;\n)(\n*public class)/, `$1\n${importBlock}\n$2`)
+  }
   wf(MOD_EFFECTS_JAVA, src)
   markDirty()
 }
 
-function writeEffectTexture(id, dataUrl) {
+function writeEffectTexture(id, dataUrl, isAnimated, frametime) {
   if (!dataUrl) return
   if (!fs.existsSync(EFFECT_TEXTURE_DIR)) fs.mkdirSync(EFFECT_TEXTURE_DIR, { recursive: true })
   const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '')
   fs.writeFileSync(jp(EFFECT_TEXTURE_DIR, `${id}.png`), Buffer.from(base64, 'base64'))
+  const mcmetaPath = jp(EFFECT_TEXTURE_DIR, `${id}.png.mcmeta`)
+  if (isAnimated) {
+    fs.writeFileSync(mcmetaPath, JSON.stringify({ animation: { frametime: frametime || 4 } }, null, 2))
+  } else if (fs.existsSync(mcmetaPath)) {
+    fs.unlinkSync(mcmetaPath)
+  }
 }
 
 function deleteEffectTexture(id) {
   const p = jp(EFFECT_TEXTURE_DIR, `${id}.png`)
   if (fs.existsSync(p)) fs.unlinkSync(p)
+  const m = p + '.mcmeta'
+  if (fs.existsSync(m)) fs.unlinkSync(m)
 }
 
 app.get('/api/effects/list', (_req, res) => {
@@ -1102,18 +1168,36 @@ app.post('/api/effects/save', (req, res) => {
       if (!['BENEFICIAL','HARMFUL','NEUTRAL'].includes(e.category))
         return res.json({ ok:false, reason:`invalid category: ${e.category}` })
     }
-    // Detect deleted effects and clean up textures
+    // Detect deleted effects and clean up textures + custom classes
     const old = readEffects()
     const newIds = new Set(effects.map(e => e.id))
-    for (const o of old) { if (!newIds.has(o.id)) deleteEffectTexture(o.id) }
-    // Write textures for effects that have them
-    for (const e of effects) {
-      if (e.hasTexture && e.textureDataUrl) {
-        writeEffectTexture(e.id, e.textureDataUrl)
-        delete e.textureDataUrl // don't persist base64 in JSON
-        e.hasTexture = true
+    for (const o of old) {
+      if (!newIds.has(o.id)) {
+        deleteEffectTexture(o.id)
+        // Delete custom effect class if it exists
+        const cls = o.id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') + 'Effect'
+        const clsFile = jp(EFFECT_CLASS_DIR, `${cls}.java`)
+        if (fs.existsSync(clsFile)) fs.unlinkSync(clsFile)
       }
     }
+    // Strip textureDataUrl from JSON (texture files written by client via /api/texture)
+    // Clean up stale mcmeta when animated→static
+    for (const e of effects) {
+      delete e.textureDataUrl
+      if (e.hasTexture && !e.textureAnimated) {
+        const mcmeta = jp(EFFECT_TEXTURE_DIR, `${e.id}.png.mcmeta`)
+        if (fs.existsSync(mcmeta)) { fs.unlinkSync(mcmeta); triggerIdeaReload(mcmeta) }
+      }
+    }
+    // Update lang entries for effects
+    const lang = rl()
+    // Remove old effect lang entries
+    for (const o of old) { delete lang[`effect.${MODID}.${o.id}`] }
+    // Add current effect lang entries
+    for (const e of effects) {
+      if (e.titleText) lang[`effect.${MODID}.${e.id}`] = e.titleText
+    }
+    wl(sortLang(lang))
     writeEffects(effects)
     writeEffectsJava(effects)
     res.json({ ok:true })
@@ -1124,6 +1208,42 @@ app.get('/api/textures/mob_effect/:name', (req, res) => {
   const p = jp(EFFECT_TEXTURE_DIR, req.params.name)
   if (fs.existsSync(p)) res.sendFile(p)
   else res.status(404).end()
+})
+
+// ─── Effect Custom Classes ────────────────────────────────────────────────────
+const EFFECT_CLASS_DIR = jp(JAVA_ROOT, 'effect', 'custom')
+const EFFECT_PKG = 'net.ye6isu.yebisuRPG.effect.custom'
+
+app.post('/api/effects/custom-class', (req, res) => {
+  try {
+    const { className } = req.body
+    if (!fs.existsSync(EFFECT_CLASS_DIR)) fs.mkdirSync(EFFECT_CLASS_DIR, { recursive: true })
+    const file = jp(EFFECT_CLASS_DIR, `${className}.java`)
+    if (fs.existsSync(file)) return res.json({ ok: true, existed: true })
+    const content = `package ${EFFECT_PKG};\n\nimport net.minecraft.world.effect.MobEffectCategory;\nimport net.minecraft.world.entity.LivingEntity;\n\npublic class ${className} extends YCSEffect {\n    public ${className}(MobEffectCategory category, int color) {\n        super(category, color);\n    }\n}\n`
+    wf(file, content)
+    res.json({ ok: true, existed: false })
+  } catch (e) { res.json({ ok: false, reason: e.message }) }
+})
+
+app.post('/api/effects/custom-class/read', (req, res) => {
+  try {
+    const { className } = req.body
+    const file = jp(EFFECT_CLASS_DIR, `${className}.java`)
+    if (!fs.existsSync(file)) return res.json({ ok: false, reason: 'not found' })
+    res.json({ ok: true, code: rf(file) })
+  } catch (e) { res.json({ ok: false, reason: e.message }) }
+})
+
+app.post('/api/effects/custom-class/write', (req, res) => {
+  try {
+    const { className, code } = req.body
+    if (!className || typeof code !== 'string') return res.json({ ok: false, reason: 'missing className or code' })
+    const file = jp(EFFECT_CLASS_DIR, `${className}.java`)
+    if (!fs.existsSync(file)) return res.json({ ok: false, reason: 'file not found — create it first' })
+    wf(file, code)
+    res.json({ ok: true })
+  } catch (e) { res.json({ ok: false, reason: e.message }) }
 })
 
 // ─── Tags ──────────────────────────────────────────────────────────────────────

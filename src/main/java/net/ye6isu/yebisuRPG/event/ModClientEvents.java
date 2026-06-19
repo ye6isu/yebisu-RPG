@@ -40,6 +40,8 @@ public class ModClientEvents {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        net.ye6isu.yebisuRPG.item.TabIconCycler.init();
+        net.ye6isu.yebisuRPG.item.TabIconCycler.onClientTick();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
         while (ModKeybinds.OPEN_HAND_DEBUG.consumeClick()) {

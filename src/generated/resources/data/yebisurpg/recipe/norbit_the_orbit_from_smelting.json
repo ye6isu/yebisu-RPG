@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:smelting",
+  "category": "misc",
+  "cookingtime": 200,
+  "experience": 0.7,
+  "ingredient": {
+    "item": "yebisurpg:plank"
+  },
+  "result": {
+    "count": 1,
+    "id": "yebisurpg:norbit_the_orbit"
+  }
+}

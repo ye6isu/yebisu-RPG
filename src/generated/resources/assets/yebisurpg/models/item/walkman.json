@@ -1,5 +1,5 @@
 {
-  "parent": "yebisurpg:item/walkman_frame0",
+  "parent": "minecraft:item/generated",
   "overrides": [
     {
       "model": "yebisurpg:item/walkman_frame1",
@@ -7,5 +7,8 @@
         "minecraft:custom_model_data": 1.0
       }
     }
-  ]
+  ],
+  "textures": {
+    "layer0": "yebisurpg:item/walkman"
+  }
 }

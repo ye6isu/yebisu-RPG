@@ -14,7 +14,7 @@ import java.util.Map;
 
 public final class YCSTabRegistry {
 
-    private static final Map<String, ResourceLocation> TAB_LOCATIONS = Map.of(
+    private static final Map<String, ResourceLocation> STATIC_TAB_LOCATIONS = Map.of(
         "yebisurpg_items_tab",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_items_tab"),
         "yebisurpg_blocks_tab", ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_blocks_tab"),
         "combat",               ResourceLocation.fromNamespaceAndPath("minecraft", "combat"),
@@ -26,6 +26,28 @@ public final class YCSTabRegistry {
         "natural_blocks",       ResourceLocation.fromNamespaceAndPath("minecraft", "natural_blocks")
     );
 
+    private static Map<String, ResourceLocation> buildTabLocations() {
+        Map<String, ResourceLocation> map = new LinkedHashMap<>(STATIC_TAB_LOCATIONS);
+        try (var stream = YCSTabRegistry.class.getResourceAsStream("/assets/yebisurpg/ycs/ycs_custom_tabs.json")) {
+            if (stream != null) {
+                String json = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                Type listType = new TypeToken<java.util.List<java.util.Map<String, String>>>(){}.getType();
+                java.util.List<java.util.Map<String, String>> tabs = new Gson().fromJson(json, listType);
+                if (tabs != null) {
+                    for (var tab : tabs) {
+                        String key = tab.get("key");
+                        if (key != null && !map.containsKey(key)) {
+                            map.put(key, ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, key));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[YCSTabRegistry] Error loading custom tabs: " + e.getMessage());
+        }
+        return map;
+    }
+
     private YCSTabRegistry() {}
 
     public static void register(IEventBus modBus) {
@@ -34,15 +56,14 @@ public final class YCSTabRegistry {
 
     private static void onBuildTabContents(BuildCreativeModeTabContentsEvent event) {
         Map<String, String> assignments = loadJson();
+        Map<String, ResourceLocation> tabLocations = buildTabLocations();
         ResourceLocation currentTab = event.getTabKey().location();
-
-        System.out.println("[YCSTabRegistry] Building tab: " + currentTab + " | assignments: " + assignments.size());
 
         for (Map.Entry<String, String> entry : assignments.entrySet()) {
             String entryId = entry.getKey();
             String tabKey  = entry.getValue();
 
-            ResourceLocation targetTab = TAB_LOCATIONS.get(tabKey);
+            ResourceLocation targetTab = tabLocations.get(tabKey);
             if (targetTab == null || !targetTab.equals(currentTab)) continue;
 
             if (entryId.startsWith("block:")) {
@@ -67,7 +88,7 @@ public final class YCSTabRegistry {
     }
 
     private static Map<String, String> loadJson() {
-        try (var stream = YCSTabRegistry.class.getResourceAsStream("/assets/yebisurpg/ycs_tabs.json")) {
+        try (var stream = YCSTabRegistry.class.getResourceAsStream("/assets/yebisurpg/ycs/ycs_tabs.json")) {
             if (stream == null) {
                 System.out.println("[YCSTabRegistry] ycs_tabs.json not found in jar");
                 return Map.of();

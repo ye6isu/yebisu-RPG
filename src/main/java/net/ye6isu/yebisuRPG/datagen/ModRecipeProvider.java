@@ -34,10 +34,6 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
                 .unlockedBy("has_ye6isu", has(ModItems.YE6ISU))
                 .save(recipeOutput);
 
-        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ModItems.YE6ISU.get(), 9)
-                .requires(ModBlocks.YE6ISU_BLOCK)
-                .unlockedBy("has_ye6isu_block", has(ModBlocks.YE6ISU_BLOCK))
-                .save(recipeOutput);
 
         //Shaped recipe
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CRATE_BLOCK.get())
@@ -73,40 +69,21 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
         trapdoorBuilder(ModBlocks.CRATE_TRAPDOOR.get(), Ingredient.of(ModItems.PLANK.get())).group("CRATE")
                 .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
 
-        //Furnace recipe
-        //smelting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 200, "ye6isu");
-
-        //Blasting recipe
-        //blasting(recipeOutput, YE6ISU_SMELTABLES, RecipeCategory.MISC, ModItems.YE6ISU.get(), 0.25f, 100, "ye6isu");
-
         //YCS_Mod_Recipe_Provider_START
 
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.NORBIT_THE_ORBIT.get(), 1)
+                .pattern(" A ")
+                .pattern("A A")
+                .pattern(" A ")
+                .define('A', net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("minecraft:diamond")))
+                .unlockedBy("has_diamond", has(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("minecraft:diamond"))))
+                .save(recipeOutput);
+        
+        SimpleCookingRecipeBuilder.smelting(Ingredient.of(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("yebisurpg:plank"))), RecipeCategory.MISC, ModItems.NORBIT_THE_ORBIT.get(), 0.7f, 200)
+                .unlockedBy("has_plank", has(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("yebisurpg:plank"))))
+                .save(recipeOutput, ResourceLocation.fromNamespaceAndPath("yebisurpg", "norbit_the_orbit_from_smelting"));
+
         //YCS_Mod_Recipe_Provider_END
-    }
 
-    protected static void smelting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
-        basicCooking(recipeOutput, RecipeSerializer.SMELTING_RECIPE, SmeltingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_smelting");
     }
-
-    protected static void blasting(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
-        basicCooking(recipeOutput, RecipeSerializer.BLASTING_RECIPE, BlastingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_blasting");
-    }
-
-    protected static void smoking(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
-        basicCooking(recipeOutput, RecipeSerializer.SMOKING_RECIPE, SmokingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_smoking");
-    }
-
-    protected static void campfire(RecipeOutput recipeOutput, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup) {
-        basicCooking(recipeOutput, RecipeSerializer.CAMPFIRE_COOKING_RECIPE, CampfireCookingRecipe::new, pIngredients, pCategory, pResult, pExperience, pCookingTime, pGroup, "_from_campfire");
-    }
-
-    protected static <T extends AbstractCookingRecipe> void basicCooking(RecipeOutput recipeOutput, RecipeSerializer<T> pCookingSerializer, AbstractCookingRecipe.Factory<T> factory, List<ItemLike> pIngredients, RecipeCategory pCategory, ItemLike pResult, float pExperience, int pCookingTime, String pGroup, String pRecipeName) {
-        for(ItemLike itemlike : pIngredients) {
-            SimpleCookingRecipeBuilder.generic(Ingredient.of(itemlike), pCategory, pResult, pExperience, pCookingTime, pCookingSerializer, factory)
-                    .group(pGroup)
-                    .unlockedBy(getHasName(itemlike), has(itemlike))
-                    .save(recipeOutput, yebisuRPG.MODID + ":" + getItemName(pResult) + pRecipeName + "_" + getItemName(itemlike));
-        }
-    }
-
 }

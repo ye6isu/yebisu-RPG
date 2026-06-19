@@ -8,12 +8,16 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
+
+
 public class ModEffects {
 
     public static final DeferredRegister<MobEffect> MOB_EFFECTS =
         DeferredRegister.create(BuiltInRegistries.MOB_EFFECT, yebisuRPG.MODID);
 
     //YCS_Effects_START
+    public static final Holder<MobEffect> TEST_EFFECT =
+        MOB_EFFECTS.register("test_effect", () -> new MobEffect(MobEffectCategory.NEUTRAL, 0x535050) {});
     //YCS_Effects_END
 
     private ModEffects() {}

@@ -27,7 +27,7 @@ class ErrorBoundary extends React.Component {
 
 const MODID="yebisurpg", BASE="http://localhost:3001/api";
 const FONT_URL=`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;400;500;700;800&display=swap');`;
-const G_CSS=`*{box-sizing:border-box;margin:0;padding:0;}html,body,#root{height:100%;overflow:hidden;}body{background:#161616;color:#f0f0ec;font-family:'JetBrains Mono',monospace;font-size:13px;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#1a1a1a;}::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:3px;}input[type=number]::-webkit-inner-spin-button{opacity:1;}button:focus{outline:none;}select{appearance:none;-webkit-appearance:none;}select option{background:#212121;color:#f0f0ec;}*{-webkit-user-select:none;user-select:none;}input,textarea,select{-webkit-user-select:text!important;user-select:text!important;}`;
+const G_CSS=`*{box-sizing:border-box;margin:0;padding:0;}html,body,#root{height:100%;overflow:hidden;}body{background:#161616;color:#f0f0ec;font-family:'JetBrains Mono',monospace;font-size:13px;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#1a1a1a;}::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:3px;}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}input[type=number]{-moz-appearance:textfield;}button:focus{outline:none;}select{appearance:none;-webkit-appearance:none;}select option{background:#212121;color:#f0f0ec;}*{-webkit-user-select:none;user-select:none;}input,textarea,select{-webkit-user-select:text!important;user-select:text!important;}`;
 const TAB_W=116,TAB_H=28;
 const TIERS=["Wood","Stone","Iron","Diamond","Netherite","YE6ISU"];
 const TIER_MAP={Wood:"Tiers.WOOD",Stone:"Tiers.STONE",Iron:"Tiers.IRON",Diamond:"Tiers.DIAMOND",Netherite:"Tiers.NETHERITE",YE6ISU:"ModToolTiers.YE6ISU"};
@@ -95,11 +95,11 @@ function useLS(k,i){const[v,sv]=useState(()=>{try{const s=localStorage.getItem(k
 async function api(ep,body){try{const r=await fetch(`${BASE}${ep}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});return await r.json();}catch{return{ok:false,reason:"offline"};}}
 
 const Lbl=({children,c})=><span style={{...SI.lbl,color:c||C.dim}}>{children}</span>;
-function Btn({children,onClick,v="d",sm,dis,style:extStyle={}}){const vs={d:{bg:"#222226",c:C.text},p:{bg:C.accent,c:"#06080e"},dan:{bg:"#200e0e",c:"#ff7777"},g:{bg:"transparent",c:C.dim,b:`1px solid ${C.inpB}`}};const vv=vs[v]||vs.d;return<button disabled={dis} onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:5,padding:sm?"3px 10px":"7px 16px",fontSize:sm?11:13,border:vv.b||"none",borderRadius:4,cursor:dis?"not-allowed":"pointer",fontFamily:"'JetBrains Mono',monospace",fontWeight:500,opacity:dis?0.35:1,background:vv.bg,color:vv.c,whiteSpace:"nowrap",...extStyle}}>{children}</button>;}
-function Inp({label,value,onChange,placeholder,type="text",style={}}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<input type={type} value={value??""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{...SI.inp,...style}}/></div>;}
+function Btn({children,onClick,v="d",sm,dis,style:extStyle={}}){const vs={d:{bg:"#222226",c:C.text,b:"1px solid #222226"},p:{bg:C.accent,c:"#06080e",b:`1px solid ${C.accent}`},dan:{bg:"#200e0e",c:"#ff7777",b:"1px solid #200e0e"},g:{bg:"transparent",c:C.dim,b:`1px solid ${C.inpB}`}};const vv=vs[v]||vs.d;return<button disabled={dis} onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:5,padding:sm?"3px 10px":"7px 16px",fontSize:sm?11:13,border:vv.b||"none",borderRadius:4,cursor:dis?"not-allowed":"pointer",fontFamily:"'JetBrains Mono',monospace",fontWeight:500,opacity:dis?0.35:1,background:vv.bg,color:vv.c,whiteSpace:"nowrap",...extStyle}}>{children}</button>;}
+function Inp({label,value,onChange,type="text",style={}}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<input type={type} value={value??""} onChange={e=>onChange(e.target.value)} style={{...SI.inp,...style}}/></div>;}
 function Sel({label,value,onChange,options,disabled=false}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<div style={{position:"relative"}}><select value={value} onChange={e=>onChange(e.target.value)} disabled={disabled} style={{...SI.inp,paddingRight:28,cursor:disabled?"default":"pointer",opacity:disabled?0.5:1}}>{options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select><span style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:C.dim,fontSize:10}}>▾</span></div></div>;}
 function Chk({label,checked,onChange}){return<label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><div onClick={()=>onChange(!checked)} style={{width:14,height:14,border:`1px solid ${checked?C.accent:C.inpB}`,borderRadius:3,background:checked?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{checked&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}</div><span style={{fontSize:13,color:"#b0b0aa"}}>{label}</span></label>;}
-function Txta({label,value,onChange,placeholder,rows=3}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<textarea value={value??""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...SI.inp,resize:"vertical"}}/></div>;}
+function Txta({label,value,onChange,rows=3}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<textarea value={value??""} onChange={e=>onChange(e.target.value)} rows={rows} style={{...SI.inp,resize:"vertical"}}/></div>;}
 function Sect({title,children,open:init=true,accent}){const[o,setO]=useState(init);return<div style={{border:`1px solid ${C.inpB}`,borderRadius:C.r,overflow:"hidden"}}><div onClick={()=>setO(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#191919",cursor:"pointer"}}><span style={{fontSize:12,color:accent||C.accent,fontWeight:500}}>{title}</span><span style={{color:C.faint,fontSize:10}}>{o?"▲":"▼"}</span></div>{o&&<div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:9,background:"#141414"}}>{children}</div>}</div>;}
 function Sbar({messages}){if(!messages?.length)return null;return<div style={{display:"flex",flexDirection:"column",gap:3}}>{messages.map((m,i)=><div key={i} style={{padding:"4px 9px",borderRadius:3,fontSize:11,fontFamily:"monospace",background:m.ok?"#091a09":"#1a0909",color:m.ok?"#5acc5a":"#cc5a5a",borderLeft:`2px solid ${m.ok?"#2a6a2a":"#6a2a2a"}`}}>{m.ok?"✓":"✗"} {m.label}: {m.msg}</div>)}</div>;}
 function CopyB({code,title}){const[c,setC]=useState(false);return<div style={{background:"#0a0a0c",border:`1px solid ${C.inpB}`,borderRadius:4,overflow:"hidden"}}><div style={{display:"flex",justifyContent:"space-between",padding:"4px 9px",borderBottom:`1px solid ${C.inpB}`,background:"#141416"}}><span style={{fontSize:10,color:C.dim}}>{title}</span><Btn sm v="g" onClick={()=>{navigator.clipboard.writeText(code);setC(true);setTimeout(()=>setC(false),1200);}}>{c?"✓":"copy"}</Btn></div><pre style={{padding:"9px 11px",overflowX:"auto",fontSize:11,lineHeight:1.7,color:"#a8a8a0",whiteSpace:"pre"}}>{code}</pre></div>;}
@@ -107,7 +107,7 @@ function Pill({children,onClick,color="#1a2438"}){return<span onClick={onClick} 
 function Dot({color,title,onClick,disabled}){return<div title={title} onClick={disabled?undefined:onClick} style={{width:13,height:13,borderRadius:"50%",background:color,cursor:disabled?"default":"pointer",flexShrink:0,opacity:disabled?0.3:1}} onMouseEnter={e=>{if(!disabled)e.currentTarget.style.opacity="0.6";}} onMouseLeave={e=>{e.currentTarget.style.opacity=disabled?"0.3":"1";}}/>;}
 function valId(id){if(!id)return"required";if(!/^[a-z0-9_]+$/.test(id))return"a-z 0-9 _ only";return null;}
 function IdField({label,value,onChange,disabled=false}){const err=valId(value);return<div style={{display:"flex",flexDirection:"column",gap:4}}><Lbl>{label||"ID"}</Lbl><input value={value} onChange={e=>onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} disabled={disabled} style={{...SI.inp,border:`1px solid ${value&&err?"#6a2a2a":C.inpB}`,opacity:disabled?0.5:1}}/>{value&&err&&<span style={{fontSize:10,color:"#cc6a6a"}}>{err}</span>}</div>;}
-function ConstField({form,F}){return<div style={{display:"flex",flexDirection:"column",gap:4}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>Const name</Lbl><Chk label="custom" checked={!!form.customConstName} onChange={v=>F("customConstName",v)}/></div><input value={form.customConstName?form.constName:(form.id||"").toUpperCase()} onChange={e=>F("constName",e.target.value)} disabled={!form.customConstName} style={{...SI.inp,color:form.customConstName?C.text:C.faint,opacity:form.customConstName?1:0.6}}/></div>;}
+function ConstField({form,F}){if(!form.customConstName)return null;return<div style={{display:"flex",flexDirection:"column",gap:4}}><Lbl>Const name</Lbl><input value={form.constName} onChange={e=>F("constName",e.target.value)} style={{...SI.inp}}/></div>;}
 
 function AImg({url,size=52,anim=false,frames=1,ticks=4}){
   const[f,setF]=useState(0);
@@ -133,7 +133,7 @@ function TexSel({label,textures,value,onChange}){
           <span style={{color:C.dim,flexShrink:0}}>▾</span>
         </div>
         {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:240,display:"flex",flexDirection:"column"}}>
-          <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+          <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
           <div style={{overflowY:"auto",flex:1}}>
             <div onClick={()=>{onChange("");setOpen(false);}} style={{padding:"6px 9px",cursor:"pointer",color:C.faint,fontSize:12,borderBottom:"1px solid #181818"}}>(none)</div>
             {filt.map(t=><div key={t.id} onClick={()=>{onChange(t.id);setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value===t.id?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
@@ -166,8 +166,7 @@ function EffectSel({ value, onChange, label }) {
         onChange={e => { setSrch(e.target.value); onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
-        placeholder="e.g. MobEffects.REGENERATION"
-        style={{...SI.inp, width:"100%"}}
+               style={{...SI.inp, width:"100%"}}
       />
       {open && <div style={{position:"absolute", top:"calc(100% + 2px)", left:0, right:0, zIndex:400, background:"#1c1c1c", border:`1px solid ${C.pb}`, borderRadius:4, maxHeight:200, overflowY:"auto"}}>
         {filt.map(e => <div key={e} onMouseDown={() => { onChange(e); setSrch(e); setOpen(false); }} style={{padding:"6px 10px", cursor:"pointer", borderBottom:"1px solid #181818", fontSize:12, color:C.text}}>{e}</div>)}
@@ -185,21 +184,39 @@ function useRun(){
 }
 
 function gTTKeys(id,f){const ks=[];if(f.hasTooltip&&f.tooltipNormal)ks.push({key:`tooltip.${MODID}.${id}.normal`,value:f.tooltipNormal});if(f.hasTooltip&&f.hasHiddenTooltip){if(!f.useDefaultShiftHint&&f.tooltipShiftHint)ks.push({key:`tooltip.${MODID}.${id}.shift_hint`,value:f.tooltipShiftHint});if(f.tooltipHidden)ks.push({key:`tooltip.${MODID}.${id}.hidden`,value:f.tooltipHidden});}return ks;}
+const SMELTING_DEFAULTS={smelting:{method:"smelting",time:200},smoking:{method:"smoking",time:100},blasting:{method:"blasting",time:100},campfire:{method:"campfireCooking",time:600}};
 function gRecipe(id,form,isBlock=false){
-  if(!form.hasRecipe||!form.recipe)return null;
-  const r=form.recipe,CN=form.customConstName?form.constName:(form.id||"").toUpperCase();
+  const parts=[];
+  const CN=form.customConstName?form.constName:(form.id||"").toUpperCase();
   const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;
   const getIng=(item)=>item.startsWith("#")?`net.minecraft.tags.ItemTags.create(ResourceLocation.parse("${item.slice(1)}"))`:`net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("${item}"))`;
-  const firstItem=Object.values(r.keys||{})[0]||"minecraft:air";
-  const itemPath=firstItem.split(":")[1]||firstItem.replace("#","");
-  const unlockName=`has_${itemPath.replace(/[^a-z0-9_]/g,"")}`;
-  if(r.type==="shaped"){
-    const pl=r.pattern.map(row=>`        .pattern("${row}")`).join("\n");
-    const dl=Object.entries(r.keys||{}).map(([ch,item])=>`        .define('${ch}', ${getIng(item)})`).join("\n");
-    return`ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${pl}\n${dl}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`;
+  if(form.hasRecipe&&form.recipe){
+    const r=form.recipe;
+    const firstItem=Object.values(r.keys||{})[0]||"minecraft:air";
+    const itemPath=firstItem.split(":")[1]||firstItem.replace("#","");
+    const unlockName=`has_${itemPath.replace(/[^a-z0-9_]/g,"")}`;
+    if(r.type==="shaped"){
+      const pl=r.pattern.map(row=>`        .pattern("${row}")`).join("\n");
+      const dl=Object.entries(r.keys||{}).map(([ch,item])=>`        .define('${ch}', ${getIng(item)})`).join("\n");
+      parts.push(`ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${pl}\n${dl}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`);
+    }else{
+      const il=(r.pattern||[]).join("").split("").filter(c=>c!==" ").map(ch=>`        .requires(${getIng((r.keys||{})[ch]||"minecraft:air")})`).join("\n");
+      parts.push(`ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${il}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`);
+    }
   }
-  const il=Object.values(r.keys||{}).map(item=>`        .requires(${getIng(item)})`).join("\n");
-  return`ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ${ref}, ${r.result||1})\n${il}\n        .unlockedBy("${unlockName}", has(${getIng(firstItem)}))\n        .save(recipeOutput);`;
+  if(form.smeltingRecipes?.length){
+    for(const sr of form.smeltingRecipes){
+      const def=SMELTING_DEFAULTS[sr.type];if(!def||!sr.ingredient)continue;
+      const ing=getIng(sr.ingredient);
+      const ingPath=(sr.ingredient.startsWith("#")?sr.ingredient.slice(1):sr.ingredient).split(":").pop()||"item";
+      const unlock=`has_${ingPath.replace(/[^a-z0-9_]/g,"")}`;
+      const exp=parseFloat(sr.experience)||0.1;
+      const time=parseInt(sr.cookingTime)||def.time;
+      const suffix=sr.type==="campfire"?"campfire_cooking":sr.type;
+      parts.push(`SimpleCookingRecipeBuilder.${def.method}(Ingredient.of(${ing}), RecipeCategory.MISC, ${ref}, ${exp}f, ${time})\n        .unlockedBy("${unlock}", has(${ing}))\n        .save(recipeOutput, ResourceLocation.fromNamespaceAndPath("yebisurpg", "${id}_from_${suffix}"));`);
+    }
+  }
+  return parts.length?parts.join("\n\n"):null;
 }
 function gTagCode(id,form,isBlock=false){if(!form.tags?.length)return[];const CN=form.customConstName?form.constName:(form.id||"").toUpperCase();const ref=isBlock?`ModBlocks.${CN}.get()`:`ModItems.${CN}.get()`;return form.tags.map(tag=>{const[ns,path]=tag.includes(":")?tag.split(":"):[MODID,tag];return`tag(TagKey.create(Registries.${isBlock?"BLOCK":"ITEM"}, ResourceLocation.fromNamespaceAndPath("${ns}", "${path}"))).add(${ref});`;});}
 function idToClassName(id){return id.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join("")+"Item";}
@@ -517,6 +534,7 @@ function resolveEntityVar(opcode, methodKey) {
     if (methodKey === "continuousUse" || methodKey === "finishUsingItem" || methodKey === "releaseUsing") return "livingEntity";
     if (methodKey === "inventoryTick") return "entity";
     if (methodKey === "hurtEnemy") return "attacker";
+    if (methodKey === "onEffectStarted" || methodKey === "onEffectTick" || methodKey === "onEffectEnd") return "livingEntity";
     return "player";
   }
   if (opcode === "entity.target") {
@@ -867,13 +885,14 @@ function compileActionNode(node, nodes, methodKey) {
     const lookAtMask = node.fields?.lookAtMask || 0;
     const vanillaMask = node.fields?.vanillaMask || 0;
     const vanillaMoveMask = node.fields?.vanillaMoveMask || 0;
+    const fpViewMask = node.fields?.fpViewMask || 0;
     return [
       "if (" + ent + " instanceof Entity _tpa && !level.isClientSide()) {",
       "    AnimationAPI.triggerAnimation(_tpa,",
       "        AnimationCategory.ENTITY_THIRD_PERSON,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
-      "        " + speedArg + ", " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ");",
+      "        " + speedArg + ", " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ", " + fpViewMask + ");",
       "}",
     ];
   }
@@ -932,12 +951,13 @@ function compileActionNode(node, nodes, methodKey) {
     const vanillaMoveMask = node.fields?.vanillaMoveMask || 0;
     const allowActionsMask = node.fields?.allowActionsMask || 0;
     const keepPosScaleMask = node.fields?.keepPosScaleMask || 0;
+    const fpViewMask2 = node.fields?.fpViewMask || 0;
     return [
       "if (" + ent + " instanceof Entity _tps && !level.isClientSide()) {",
       "    AnimationAPI.setThirdPersonPose(_tps,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
-      "        " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ", " + allowActionsMask + ", " + keepPosScaleMask + ");",
+      "        " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ", " + allowActionsMask + ", " + keepPosScaleMask + ", " + fpViewMask2 + ");",
       "}",
     ];
   }
@@ -1150,8 +1170,8 @@ const PALETTE_BLOCKS = [
     { opcode:"aoe.each.line", label:"For Each in Line", isAction:true, hint:"Run actions for each entity in line",
       slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"width",accepts:LINK_NUMBER,label:"width"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
   ]},
-  { category:"Animations", data:[], actions:[
-    { opcode:"anim.firstperson.play", label:"Play First-Person Anim", isAction:true,
+  { category:"Anim — First Person", data:[], actions:[
+    { opcode:"anim.firstperson.play", label:"Play Anim", isAction:true,
       hint:"Play FP Anim [Text] for [Entity] with playback speed [Number] from file [Text]",
       slotDefs:[
         {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
@@ -1159,16 +1179,28 @@ const PALETTE_BLOCKS = [
         {key:"playbackSpeed", accepts:LINK_NUMBER, label:"playback speed"},
         {key:"filePath",      accepts:LINK_TEXT,   label:"from file"},
       ] },
-    { opcode:"anim.firstperson.stop", label:"Stop First-Person Anim", isAction:true,
+    { opcode:"anim.firstperson.stop", label:"Stop Anim", isAction:true,
       hint:"Stop any playing first-person animation on an entity",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.firstperson.pause", label:"Pause First-Person Anim", isAction:true,
+    { opcode:"anim.firstperson.pause", label:"Pause Anim", isAction:true,
       hint:"Freeze the playing first-person animation on an entity at its current position",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.firstperson.resume", label:"Resume First-Person Anim", isAction:true,
+    { opcode:"anim.firstperson.resume", label:"Resume Anim", isAction:true,
       hint:"Resume a paused first-person animation; if expired while paused, stops it",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.thirdperson.play", label:"Play Third-Person Anim", isAction:true,
+    { opcode:"anim.handpose.set", label:"Set Hand Pose", isAction:true,
+      hint:"Set FP hand pose to [Text] for [Entity] from [Text]",
+      slotDefs:[
+        {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
+        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
+        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
+      ] },
+    { opcode:"anim.handpose.reset", label:"Reset Hand Pose", isAction:true,
+      hint:"Reset FP hand pose for [Entity] to vanilla default",
+      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
+  ]},
+  { category:"Anim — Third Person", data:[], actions:[
+    { opcode:"anim.thirdperson.play", label:"Play Anim", isAction:true,
       hint:"Play TP Anim [Text] for [Entity] with playback speed [Number] from file [Text]",
       slotDefs:[
         {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
@@ -1176,33 +1208,23 @@ const PALETTE_BLOCKS = [
         {key:"playbackSpeed", accepts:LINK_NUMBER, label:"playback speed"},
         {key:"filePath",      accepts:LINK_TEXT,   label:"from file"},
       ] },
-    { opcode:"anim.thirdperson.stop", label:"Stop Third-Person Anim", isAction:true,
+    { opcode:"anim.thirdperson.stop", label:"Stop Anim", isAction:true,
       hint:"Stop any playing third-person animation on an entity",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.thirdperson.pause", label:"Pause Third-Person Anim", isAction:true,
+    { opcode:"anim.thirdperson.pause", label:"Pause Anim", isAction:true,
       hint:"Freeze the playing third-person animation on an entity at its current position",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.thirdperson.resume", label:"Resume Third-Person Anim", isAction:true,
+    { opcode:"anim.thirdperson.resume", label:"Resume Anim", isAction:true,
       hint:"Resume a paused third-person animation; if expired while paused, stops it",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.handpose.set", label:"Set FP Hand Pose", isAction:true,
-      hint:"Set FP hand pose to [Text] for [Entity] from [Text]",
-      slotDefs:[
-        {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
-        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
-        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
-      ] },
-    { opcode:"anim.handpose.reset", label:"Reset FP Hand Pose", isAction:true,
-      hint:"Reset FP hand pose for [Entity] to vanilla default",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.tppose.set", label:"Set TP Pose", isAction:true,
+    { opcode:"anim.tppose.set", label:"Set Pose", isAction:true,
       hint:"Set TP pose to [Text] for [Entity] from [Text]",
       slotDefs:[
         {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
         {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
         {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
       ] },
-    { opcode:"anim.tppose.reset", label:"Reset TP Pose", isAction:true,
+    { opcode:"anim.tppose.reset", label:"Reset Pose", isAction:true,
       hint:"Reset TP pose for [Entity] to vanilla default",
       slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
   ]},
@@ -1236,7 +1258,7 @@ function AttrDropdown({nodeId,value,onChange}){
     <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
       style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(200,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
       <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
-        placeholder="Search…" style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
+        style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
       <div style={{overflowY:"auto",maxHeight:180}}>
         {filtered.map(a=><div key={a.id} onMouseDown={e=>{e.stopPropagation();pick(a.id);}}
           style={{padding:"5px 10px",fontSize:12,color:a.id===(value||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:a.id===(value||"")?"#2a2a2a":"transparent"}}
@@ -1287,7 +1309,7 @@ function EffectDropdown({nodeId,value,onChange}){
     <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
       style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(200,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
       <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
-        placeholder="Search…" style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
+        style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
       <div style={{overflowY:"auto",maxHeight:180}} onWheel={e=>e.stopPropagation()}>
         {filtered.map(a=><div key={a.id} onMouseDown={e=>{e.stopPropagation();pick(a.id);}}
           style={{padding:"5px 10px",fontSize:12,color:a.id===(value||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:a.id===(value||"")?"#2a2a2a":"transparent"}}
@@ -1333,7 +1355,7 @@ function VarDropdown({nodeId,varName,varType,onChange}){
     <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
       style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(160,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
       <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
-        placeholder="Search…" style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
+        style={{background:"#111",border:"none",borderBottom:"1px solid #333",color:"#fff",fontSize:12,fontFamily:"monospace",padding:"5px 8px",outline:"none"}}/>
       <div style={{overflowY:"auto",maxHeight:180}}>
         {filtered.map(v=><div key={v.name} onMouseDown={e=>{e.stopPropagation();pick(v);}}
           style={{padding:"5px 10px",fontSize:12,color:v.name===(varName||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:v.name===(varName||"")?"#2a2a2a":"transparent"}}
@@ -1456,8 +1478,8 @@ function buildPalette(variables, modAttributes) {
 }
 
 // ─── Visual Scripting: Code Engine ────────────────────────────────────────────
-function ycsInjectMethod(code, methodKey) {
-  const def = ITEM_METHODS.find(m => m.key === methodKey);
+function ycsInjectMethod(code, methodKey, methodList) {
+  const def = (methodList||ITEM_METHODS).find(m => m.key === methodKey);
   if (!def) return code;
   if (code.includes(`//YCS:${methodKey}:start`)) return code; // already present
   const block = `\n    //YCS:${methodKey}:start\n${def.stub}\n    //YCS:${methodKey}:end\n`;
@@ -1471,8 +1493,8 @@ function ycsRemoveMethod(code, methodKey) {
   ).replace(/\n{3,}/g, '\n\n');
 }
 
-function ycsGetEnabledMethods(code) {
-  return ITEM_METHODS.filter(m => code.includes(`//YCS:${m.key}:start`)).map(m => m.key);
+function ycsGetEnabledMethods(code, methodList) {
+  return (methodList||ITEM_METHODS).filter(m => code.includes(`//YCS:${m.key}:start`)).map(m => m.key);
 }
 
 function ycsSyncImports(code, enabledMethodKeys) {
@@ -1683,6 +1705,64 @@ function ycsToggleMethod(code, methodKey, enable) {
   return ycsSyncImports(result, enabledKeys);
 }
 
+function ycsToggleEffectMethod(code, methodKey, enable) {
+  let result = enable ? ycsInjectMethod(code, methodKey, EFFECT_METHODS) : ycsRemoveMethod(code, methodKey);
+  const enabledKeys = ycsGetEnabledMethods(result, EFFECT_METHODS);
+  return ycsEffectSyncImports(result, enabledKeys);
+}
+
+function ycsEffectSyncImports(code, enabledMethodKeys) {
+  const needed = new Set([
+    'net.minecraft.world.effect.MobEffectCategory',
+    'net.minecraft.world.entity.LivingEntity',
+  ]);
+  if (code.includes('MobEffectInstance') || code.includes('.addEffect(')) {
+    needed.add('net.minecraft.world.effect.MobEffectInstance');
+    needed.add('net.minecraft.world.effect.MobEffects');
+  }
+  if (code.includes('ModEffects.')) {
+    needed.add('net.ye6isu.yebisuRPG.effect.ModEffects');
+  }
+  if (code.includes('AnimationAPI') || code.includes('AnimationCategory')) {
+    needed.add('net.ye6isu.yebisuRPG.animation.AnimationAPI');
+    needed.add('net.ye6isu.yebisuRPG.animation.AnimationCategory');
+  }
+  if (code.includes('TickScheduler')) {
+    needed.add('net.ye6isu.yebisuRPG.util.TickScheduler');
+  }
+  if (code.includes('AoeShapes')) {
+    needed.add('net.ye6isu.yebisuRPG.util.AoeShapes');
+  }
+  if (code.includes('EntityVarCapability') || code.includes('EntityVar.')) {
+    needed.add('net.ye6isu.yebisuRPG.data.EntityVarCapability');
+    needed.add('net.ye6isu.yebisuRPG.data.EntityVar');
+  }
+  if (code.includes('AttributeModifier') || code.includes('getAttributeValue') || code.includes('getAttributeBaseValue')) {
+    needed.add('net.minecraft.world.entity.ai.attributes.Attributes');
+    needed.add('net.minecraft.world.entity.ai.attributes.AttributeModifier');
+    needed.add('net.minecraft.resources.ResourceLocation');
+  }
+  if (code.includes('ModAttributes.')) {
+    needed.add('net.ye6isu.yebisuRPG.attribute.ModAttributes');
+  }
+  if (code.includes('ResourceLocation')) {
+    needed.add('net.minecraft.resources.ResourceLocation');
+  }
+
+  let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');
+  for (const imp of needed) {
+    const escaped = imp.replace(/\./g, '\\.');
+    result = result.replace(new RegExp(`^import ${escaped};\\n?`, 'm'), '');
+  }
+  result = result.replace(/\n{3,}/g, '\n\n');
+  if (!needed.size) return result;
+  const importBlock =
+    `//YCS_Import_START\n` +
+    [...needed].map(imp => `import ${imp};`).join('\n') +
+    `\n//YCS_Import_END`;
+  return result.replace(/(^package [^;]+;)/m, `$1\n\n${importBlock}`);
+}
+
 function ycsInjectCompiledBody(code, methodKey, bodyLines) {
   const bodyMarker = `//YCS:${methodKey}:body`;
   if (!code.includes(bodyMarker)) return code;
@@ -1712,8 +1792,10 @@ function TexProv({initial,children}){const[form,setForm]=useState(initial?{...TE
 // (persisted via /creativetabs/reorder-items into ycs_tabs.json).
 function tabIconPreview(tab,allItems,allBlocks,textures){
   if(!tab.iconRef)return null;
-  const[kind,id]=tab.iconRef.split(":");
-  if(kind==="vanilla")return null; // no local texture data available for vanilla items
+  if(tab.iconRef.startsWith("cycle:"))return"cycle";
+  const[kind,...rest]=tab.iconRef.split(":");
+  const id=rest.join(":");
+  if(kind==="vanilla")return null;
   const pool=kind==="block"?allBlocks:allItems;
   const e=pool.find(x=>x.id===id);
   if(!e)return null;
@@ -1721,53 +1803,118 @@ function tabIconPreview(tab,allItems,allBlocks,textures){
   return t?.dataUrl||e.textureDataUrl||null;
 }
 function IconPicker({label,value,onChange,allItems,allBlocks,textures}){
+  const[mode,setMode]=useState(value&&value.startsWith("tex:")?"texture":"item");
   const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
   const vanillaItems=useVanillaItems();
   const pool=useMemo(()=>[...allItems.map(x=>({...x,kind:"item"})),...allBlocks.map(x=>({...x,kind:"block"})),...vanillaItems.map(x=>({...x,kind:"vanilla"}))],[allItems,allBlocks,vanillaItems]);
   const filt=useMemo(()=>{const q=srch.toLowerCase();return pool.filter(x=>!q||x.id.includes(q)||(x.displayName||"").toLowerCase().includes(q));},[pool,srch]);
   const sel=pool.find(x=>`${x.kind}:${x.id}`===value);
   const prevUrl=sel?(textures.find(tx=>tx.id===sel.textureId)?.dataUrl||sel.textureDataUrl):null;
+  const texVal=value&&value.startsWith("tex:")?value.slice(4):"";
+  const selTex=texVal?textures.find(t=>t.id===texVal):null;
   return<div style={{display:"flex",flexDirection:"column",gap:4}}>
-    {label&&<Lbl>{label}</Lbl>}
-    <div style={{position:"relative"}}>
-      <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"6px 9px"}}>
-        <AImg url={prevUrl} size={22}/>
-        <span style={{flex:1,color:sel?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?(sel.displayName||sel.id):"(choose icon)"}</span>
-        <span style={{color:C.dim}}>▾</span>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      {label?<Lbl>{label}</Lbl>:<span/>}
+      <div style={{display:"flex",gap:4}}>
+        <span onClick={()=>setMode("item")} style={{fontSize:10,color:mode==="item"?C.accent:C.faint,cursor:"pointer",fontWeight:mode==="item"?600:400}}>Item</span>
+        <span style={{fontSize:10,color:C.dim}}>|</span>
+        <span onClick={()=>setMode("texture")} style={{fontSize:10,color:mode==="texture"?C.accent:C.faint,cursor:"pointer",fontWeight:mode==="texture"?600:400}}>Texture</span>
       </div>
-      {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:260,display:"flex",flexDirection:"column"}}>
-        <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
-        <div style={{overflowY:"auto",flex:1}}>
-          {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;return<div key={`${x.kind}:${x.id}`} onClick={()=>{onChange(`${x.kind}:${x.id}`);setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value===`${x.kind}:${x.id}`?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
-            <AImg url={u} size={20}/>
-            <div><div style={{fontSize:12,color:C.text}}>{x.displayName||x.id}</div><div style={{fontSize:10,color:C.dim}}>{x.kind}:{x.id}</div></div>
-          </div>;})}
-          {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
-        </div>
-      </div>}
     </div>
+    {mode==="texture"
+      ?<TexSel textures={textures} value={texVal} onChange={v=>onChange(v?`tex:${v}`:"")}/>
+      :<div style={{position:"relative"}}>
+        <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"6px 9px"}}>
+          <AImg url={prevUrl} size={22}/>
+          <span style={{flex:1,color:sel?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?(sel.displayName||sel.id):"(choose item)"}</span>
+          <span style={{color:C.dim}}>▾</span>
+        </div>
+        {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:260,display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+          <div style={{overflowY:"auto",flex:1}}>
+            {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;return<div key={`${x.kind}:${x.id}`} onClick={()=>{onChange(`${x.kind}:${x.id}`);setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value===`${x.kind}:${x.id}`?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
+              <AImg url={u} size={20}/>
+              <div><div style={{fontSize:12,color:C.text}}>{x.displayName||x.id}</div><div style={{fontSize:10,color:C.dim}}>{x.kind}:{x.id}</div></div>
+            </div>;})}
+            {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
+          </div>
+        </div>}
+      </div>}
   </div>;
 }
-function TabEditor({tab,allItems,allBlocks,textures,onSave,onCancel,onDelete}){
+function TabIconPanel({value,onChange,allItems,allBlocks,textures}){
+  const isCycle=value&&value.startsWith("cycle:");
+  const[mode,setMode]=useState(isCycle?"cycle":"item");
+  const[interval,setInterval_]=useState(isCycle?parseInt(value.split(":")[1])||2000:2000);
+  const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
+  const vanillaItems=useVanillaItems();
+  const pool=useMemo(()=>[...allItems.map(x=>({...x,kind:"item"})),...allBlocks.map(x=>({...x,kind:"block"})),...vanillaItems.map(x=>({...x,kind:"vanilla"}))],[allItems,allBlocks,vanillaItems]);
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return pool.filter(x=>!q||x.id.includes(q)||(x.displayName||"").toLowerCase().includes(q));},[pool,srch]);
+  const sel=!isCycle?pool.find(x=>`${x.kind}:${x.id}`===value):null;
+  const prevUrl=sel?(textures.find(tx=>tx.id===sel.textureId)?.dataUrl||sel.textureDataUrl):null;
+  return<div style={{display:"flex",flexDirection:"column",gap:8,flex:1}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{fontSize:14,fontWeight:500}}>Choose Icon</div>
+      <div style={{display:"flex",gap:4}}>
+        <span onClick={()=>{setMode("item");if(value?.startsWith("cycle:"))onChange("");}} style={{fontSize:10,color:mode==="item"?C.accent:C.faint,cursor:"pointer",fontWeight:mode==="item"?600:400}}>Item</span>
+        <span style={{fontSize:10,color:C.dim}}>|</span>
+        <span onClick={()=>{setMode("cycle");onChange(`cycle:${interval}`);}} style={{fontSize:10,color:mode==="cycle"?C.accent:C.faint,cursor:"pointer",fontWeight:mode==="cycle"?600:400}}>Cycle</span>
+      </div>
+    </div>
+    {mode==="cycle"
+      ?<div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{fontSize:12,color:C.dim}}>Cycles through all items in this tab as the icon, in random order.</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <Lbl>Interval (ms)</Lbl>
+          <input type="number" value={interval} onChange={e=>{const v=Math.max(500,parseInt(e.target.value)||2000);setInterval_(v);onChange(`cycle:${v}`);}} style={{...SI.inp,width:80,padding:"4px 8px",fontSize:12}}/>
+        </div>
+      </div>
+      :<div style={{display:"flex",flexDirection:"column",gap:6,flex:1,minHeight:0}}>
+        {sel&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#192a19",border:"1px solid #2a5a2a",borderRadius:4}}>
+          <AImg url={prevUrl} size={20}/>
+          <span style={{fontSize:12,color:C.text}}>{sel.displayName||sel.id}</span>
+          <span onClick={()=>onChange("")} style={{marginLeft:"auto",fontSize:10,color:"#cc6a6a",cursor:"pointer"}}>✕</span>
+        </div>}
+        <input value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,fontSize:11}}/>
+        <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:1,border:`1px solid ${C.inpB}`,borderRadius:4,padding:3}}>
+          {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;const isSel=value===`${x.kind}:${x.id}`;
+            return<div key={`${x.kind}:${x.id}`} onClick={()=>{onChange(`${x.kind}:${x.id}`);}}
+              style={{display:"flex",alignItems:"center",gap:7,padding:"4px 6px",cursor:"pointer",borderRadius:3,background:isSel?"#192a19":"transparent",border:`1px solid ${isSel?"#2a5a2a":"transparent"}`}}>
+              <AImg url={u} size={18}/>
+              <span style={{fontSize:11,fontFamily:"monospace",color:isSel?"#5acc5a":C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{x.displayName||x.id}</span>
+              <span style={{fontSize:9,color:C.faint,whiteSpace:"nowrap"}}>{x.kind}</span>
+            </div>;})}
+          {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:11}}>no results</div>}
+        </div>
+      </div>}
+  </div>;
+}
+function TabEditor({tab,allItems,allBlocks,textures,onSave,onCancel,onDelete,iconRef,setIconRef,showIconPanel,setShowIconPanel}){
   const[name,setName]=useState(tab?.titleText||"");
-  const[iconRef,setIconRef]=useState(tab?.iconRef||"");
   const[key,setKey]=useState(tab?.key||"");
   const isNew=!tab;
   const keyErr=isNew?(key&&!/^[a-z][a-z0-9_]*$/.test(key)?"a-z 0-9 _ only, must start with a letter":null):null;
-  return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
-    <div style={{fontSize:13,color:C.accent,fontWeight:600}}>{isNew?"New Creative Tab":"Edit Creative Tab"}</div>
+  const canSave=name.trim()&&(!isNew||key.trim()&&!keyErr);
+  const iconUrl=tabIconPreview({iconRef},allItems,allBlocks,textures);
+  return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,display:"flex",flexDirection:"column",padding:"16px 16px 100px",gap:12,overflowY:"auto"}}>
+    <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Creative Tab":"Edit Creative Tab"}</div>
+    <Inp label="Display Name" value={name} onChange={setName}/>
     {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Tab key (internal id)</Lbl>
+      <Lbl>Key</Lbl>
       <input value={key} onChange={e=>setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${key&&keyErr?"#6a2a2a":C.inpB}`}}/>
       {key&&keyErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{keyErr}</span>}
     </div>}
-    <Inp label="Display name" value={name} onChange={setName}/>
-    <IconPicker label="Icon" value={iconRef} onChange={setIconRef} allItems={allItems} allBlocks={allBlocks} textures={textures}/>
-    <div style={{display:"flex",gap:8,marginTop:8}}>
-      <Btn v="p" dis={!name.trim()||(isNew&&(!key.trim()||!!keyErr))} onClick={()=>onSave({key:isNew?key:tab.key,titleText:name.trim(),iconRef})}>Save</Btn>
-      <Btn v="g" onClick={onCancel}>Cancel</Btn>
-      {!isNew&&<Btn v="dan" onClick={()=>onDelete(tab.key)} style={{marginLeft:"auto"}}>Delete tab</Btn>}
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Icon</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          {iconUrl==="cycle"?<span style={{fontSize:16,width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}>↻</span>:iconUrl?<AImg url={iconUrl} size={20}/>:<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+          <span style={{fontSize:13,color:iconRef?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{iconRef?.startsWith("cycle:")?"cycle items":iconRef||"none"}</span>
+        </div>
+        <Btn sm v={showIconPanel?"p":"g"} onClick={()=>setShowIconPanel(v=>!v)} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+      </div>
     </div>
+    <FormActions onCancel={onCancel} onSave={()=>onSave({key:isNew?key:tab.key,titleText:name.trim(),iconRef})} canSave={!!canSave} onDelete={!isNew?()=>onDelete(tab.key):undefined}/>
   </div>;
 }
 function TabItemReorder({tabValue,allItems,allBlocks,textures,onReordered}){
@@ -1799,17 +1946,13 @@ function TabItemReorder({tabValue,allItems,allBlocks,textures,onReordered}){
       </div>;})}
   </div>;
 }
-function TabsPage({allItems,allBlocks,textures,reloadMod,onEditingChange,newTrigger,editing,setEditing,viewing,setViewing}){
+function TabsPage({allItems,allBlocks,textures,reloadMod,onEditingChange,newTrigger,editing,setEditing}){
   const{customTabs,options,reload}=useCreativeTabs();
-  useEffect(()=>{onEditingChange&&onEditingChange(!!editing||!!viewing);},[editing,viewing,onEditingChange]);
+  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
   const prevTrigger=useRef(newTrigger);
   useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing("new");}},[newTrigger]);
-  const builtins=options.filter(o=>o.value&&!o.vanilla&&!o.custom);
-  const vanillaList=options.filter(o=>o.vanilla);
   const customList=options.filter(o=>o.custom);
   const saveTab=async(t)=>{
-    const next=customTabs.filter(c=>c.key!==t.key).concat([{key:t.key,iconRef:t.iconRef}]);
-    // preserve order: if editing existing, keep its position; if new, append
     const ordered=customTabs.some(c=>c.key===t.key)?customTabs.map(c=>c.key===t.key?{key:t.key,iconRef:t.iconRef}:c):[...customTabs,{key:t.key,iconRef:t.iconRef}];
     await api("/creativetabs/save",{tabs:ordered.map(c=>({key:c.key,iconRef:c.iconRef,titleText:c.key===t.key?t.titleText:(options.find(o=>o.key===c.key)?.label||c.key)}))});
     setEditing(null);reload();reloadMod();
@@ -1827,53 +1970,49 @@ function TabsPage({allItems,allBlocks,textures,reloadMod,onEditingChange,newTrig
   };
   const[dragTabIdx,setDragTabIdx]=useState(null);
 
+  const[iconRef,setIconRef]=useState("");
+  const[showIconPanel,setShowIconPanel]=useState(false);
+  useEffect(()=>{if(editing&&editing!=="new")setIconRef(editing.iconRef||"");else setIconRef("");setShowIconPanel(false);},[editing]);
+
   if(editing){
     const target=editing==="new"?null:editing;
     return<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
-      <TabEditor tab={target} allItems={allItems} allBlocks={allBlocks} textures={textures} onSave={saveTab} onCancel={()=>setEditing(null)} onDelete={deleteTab}/>
-      {target&&<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,padding:16,overflowY:"auto"}}>
-        <div style={{fontSize:13,color:C.accent,fontWeight:600,marginBottom:10}}>Item order in this tab</div>
-        <TabItemReorder tabValue={`ModCreativeModeTabs.${target.key.toUpperCase()}`} allItems={allItems} allBlocks={allBlocks} textures={textures} onReordered={reloadMod}/>
-      </div>}
-    </div>;
-  }
-
-  if(viewing){
-    return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,padding:16,overflowY:"auto",display:"flex",flexDirection:"column",gap:12}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <Btn sm v="g" onClick={()=>setViewing(null)}>← Back</Btn>
-        <div style={{fontSize:13,color:C.accent,fontWeight:600}}>{viewing.label} — drag to reorder</div>
+      <TabEditor tab={target} allItems={allItems} allBlocks={allBlocks} textures={textures} onSave={saveTab} onCancel={()=>setEditing(null)} onDelete={deleteTab} iconRef={iconRef} setIconRef={setIconRef} showIconPanel={showIconPanel} setShowIconPanel={setShowIconPanel}/>
+      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,padding:16,overflowY:"auto",display:"flex",flexDirection:"column"}}>
+        {showIconPanel
+          ?<TabIconPanel value={iconRef} onChange={setIconRef} allItems={allItems} allBlocks={allBlocks} textures={textures}/>
+          :target
+            ?<>
+              <div style={{fontSize:14,fontWeight:500,marginBottom:10}}>Item order in this tab</div>
+              <TabItemReorder tabValue={`ModCreativeModeTabs.${target.key.toUpperCase()}`} allItems={allItems} allBlocks={allBlocks} textures={textures} onReordered={reloadMod}/>
+            </>
+            :<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>use set on the left to pick an icon</div>}
       </div>
-      <TabItemReorder tabValue={viewing.value} allItems={allItems} allBlocks={allBlocks} textures={textures} onReordered={reloadMod}/>
     </div>;
   }
 
-  const Section=({title,list,editable,dragReorder,clickToView})=><div style={{marginBottom:18}}>
-    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>{title}</div>
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>CUSTOM TABS</div>
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-      {list.map((o,i)=>{
+      {customList.map((o,i)=>{
         const tabObj=customTabs.find(c=>c.key===o.key);
         const icon=tabObj?tabIconPreview(tabObj,allItems,allBlocks,textures):null;
         return<div key={o.value}
-          draggable={!!dragReorder}
-          onDragStart={()=>dragReorder&&setDragTabIdx(i)}
-          onDragOver={e=>dragReorder&&e.preventDefault()}
-          onDrop={()=>dragReorder&&moveCustomTab(dragTabIdx,i)}
-          onClick={()=>clickToView&&setViewing(o)}
-          style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:dragReorder?"grab":(clickToView?"pointer":"default")}}>
-          {dragReorder&&<span style={{color:C.faint,fontSize:11}}>⠿</span>}
-          {icon?<AImg url={icon} size={24}/>:<div style={{width:24,height:24}}/>}
+          draggable
+          onDragStart={()=>setDragTabIdx(i)}
+          onDragOver={e=>e.preventDefault()}
+          onDrop={()=>moveCustomTab(dragTabIdx,i)}
+          onClick={()=>setEditing(tabObj?{...tabObj,titleText:o.label}:null)}
+          style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",height:40,background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"pointer",position:"relative"}}
+          onMouseEnter={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="flex";}}
+          onMouseLeave={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="none";}}>
+          <div data-del onClick={ev=>{ev.stopPropagation();deleteTab(o.key);}} style={{display:"none",position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5,alignItems:"center",justifyContent:"center"}}/>
+          {icon==="cycle"?<span style={{fontSize:14,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center"}}>↻</span>:icon?<AImg url={icon} size={24}/>:<div style={{width:24,height:24}}/>}
           <span style={{fontSize:13,color:C.text,flex:1}}>{o.label}</span>
-          {editable&&<Btn sm v="g" onClick={e=>{e.stopPropagation();setEditing(tabObj?{...tabObj,titleText:o.label}:null);}}>Edit</Btn>}
         </div>;
       })}
+      {!customList.length&&<div style={{color:C.faint,fontSize:12,padding:8}}>No custom tabs yet</div>}
     </div>
-  </div>;
-
-  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
-    <Section title="MOD TABS (built-in) — click to view & reorder items" list={builtins} editable={false} clickToView={true}/>
-    <Section title="MOD TABS (custom — drag to reorder tabs, click row to view items, Edit to manage)" list={customList} editable={true} dragReorder={true} clickToView={true}/>
-    <Section title="VANILLA TABS" list={vanillaList} editable={false}/>
   </div>;
 }
 
@@ -1969,7 +2108,7 @@ function CategoryPicker({value,categories,onChange}){
   if(customMode)return<div style={{display:"flex",flexDirection:"column",gap:4}}>
     <Lbl>Category</Lbl>
     <div style={{display:"flex",gap:8}}>
-      <input value={value} onChange={e=>onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g,""))} placeholder="key.categories.my_mod" style={SI.inp}/>
+      <input value={value} onChange={e=>onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g,""))} style={SI.inp}/>
       <Btn sm v="g" onClick={()=>{setCustomMode(false);onChange("CATEGORY");}}>Cancel</Btn>
     </div>
   </div>;
@@ -1981,24 +2120,21 @@ function CategoryPicker({value,categories,onChange}){
 function KeybindEditor({bind,name,setName,keyId,setKeyId,bindCode,setBindCode,category,setCategory,categories,onSave,onCancel,onDelete}){
   const isNew=!bind;
   const keyErr=isNew?(keyId&&!/^[a-z][a-z0-9_]*$/.test(keyId)?"a-z 0-9 _ only, must start with a letter":null):null;
-  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+  const canSave=name.trim()&&(!isNew||keyId.trim()&&!keyErr);
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 16px 100px",gap:12,overflowY:"auto"}}>
     <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Keybind":"Edit Keybind"}</div>
+    <Inp label="Display Name" value={name} onChange={setName}/>
     {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Key id (internal id)</Lbl>
+      <Lbl>Key</Lbl>
       <input value={keyId} onChange={e=>setKeyId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${keyId&&keyErr?"#6a2a2a":C.inpB}`}}/>
       {keyId&&keyErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{keyErr}</span>}
     </div>}
-    <Inp label="Display name" value={name} onChange={setName}/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Default binding</Lbl>
       <RecordKeyButton value={bindCode} onChange={setBindCode}/>
     </div>
     <CategoryPicker value={category} categories={categories} onChange={setCategory}/>
-    <div style={{display:"flex",gap:8,marginTop:8}}>
-      <Btn v="p" dis={!name.trim()||(isNew&&(!keyId.trim()||!!keyErr))} onClick={()=>onSave({key:isNew?keyId:bind.key,titleText:name.trim(),bindCode,category:category||"CATEGORY"})}>Save</Btn>
-      <Btn v="g" onClick={onCancel}>Cancel</Btn>
-      {!isNew&&<Btn v="dan" onClick={()=>onDelete(bind.key)} style={{marginLeft:"auto"}}>Delete</Btn>}
-    </div>
+    <FormActions onCancel={onCancel} onSave={()=>onSave({key:isNew?keyId:bind.key,titleText:name.trim(),bindCode,category:category||"CATEGORY"})} canSave={!!canSave} onDelete={!isNew?()=>onDelete(bind.key):undefined}/>
   </div>;
 }
 function KeybindPreviewPanel({name,keyId,bindCode,category}){
@@ -2050,7 +2186,7 @@ function KeybindsPage({reloadMod,onEditingChange,newTrigger,editing,setEditing})
   }
 
   return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
-    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>KEYBINDS (drag to reorder, click to edit)</div>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>KEYBINDS</div>
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       {keybinds.map((k,i)=><div key={k.key}
         draggable
@@ -2058,8 +2194,10 @@ function KeybindsPage({reloadMod,onEditingChange,newTrigger,editing,setEditing})
         onDragOver={e=>e.preventDefault()}
         onDrop={()=>{moveBind(dragIdx,i);setDragIdx(null);}}
         onClick={()=>setEditing(k)}
-        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
-        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",height:40,background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"pointer",position:"relative"}}
+        onMouseEnter={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="flex";}}
+        onMouseLeave={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="none";}}>
+        <div data-del onClick={ev=>{ev.stopPropagation();deleteBind(k.key);}} style={{display:"none",position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5,alignItems:"center",justifyContent:"center"}}/>
         <span style={{fontSize:13,color:C.text,flex:1}}>{k.titleText||k.key}</span>
         <Pill color="#1a2438">{bindCodeLabel(k.bindCode)}</Pill>
       </div>)}
@@ -2081,23 +2219,20 @@ function useInterfaces(){
 function InterfaceEditor({iface,name,setName,ifaceId,setIfaceId,kind,setKind,onSave,onCancel,onDelete}){
   const isNew=!iface;
   const idErr=isNew?(ifaceId&&!/^[a-z][a-z0-9_]*$/.test(ifaceId)?"a-z 0-9 _ only, must start with a letter":null):null;
-  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
+  const canSave=name.trim()&&(!isNew||ifaceId.trim()&&!idErr);
+  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 16px 100px",gap:12,overflowY:"auto"}}>
     <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Interface":"Edit Interface"}</div>
+    <Inp label="Display Name" value={name} onChange={setName}/>
     {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Interface id (internal id)</Lbl>
+      <Lbl>ID</Lbl>
       <input value={ifaceId} onChange={e=>setIfaceId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${ifaceId&&idErr?"#6a2a2a":C.inpB}`}}/>
       {ifaceId&&idErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{idErr}</span>}
     </div>}
-    <Inp label="Display name" value={name} onChange={setName}/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Kind</Lbl>
       <Sel value={kind} onChange={setKind} options={[{value:"gui",label:"GUI (screen)"},{value:"hud",label:"HUD (overlay)"}]}/>
     </div>
-    <div style={{display:"flex",gap:8,marginTop:8}}>
-      <Btn v="p" dis={!name.trim()||(isNew&&(!ifaceId.trim()||!!idErr))} onClick={()=>onSave({id:isNew?ifaceId:iface.id,titleText:name.trim(),kind})}>Save</Btn>
-      <Btn v="g" onClick={onCancel}>Cancel</Btn>
-      {!isNew&&<Btn v="dan" onClick={()=>onDelete(iface.id)} style={{marginLeft:"auto"}}>Delete</Btn>}
-    </div>
+    <FormActions onCancel={onCancel} onSave={()=>onSave({id:isNew?ifaceId:iface.id,titleText:name.trim(),kind})} canSave={!!canSave} onDelete={!isNew?()=>onDelete(iface.id):undefined}/>
   </div>;
 }
 function InterfacePreviewPanel({name,ifaceId,kind}){
@@ -2148,7 +2283,7 @@ function InterfacesPage({onEditingChange,newTrigger,editing,setEditing}){
   }
 
   return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
-    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>INTERFACES (drag to reorder, click to edit)</div>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>INTERFACES</div>
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       {interfaces.map((i,idx)=><div key={i.id}
         draggable
@@ -2156,8 +2291,10 @@ function InterfacesPage({onEditingChange,newTrigger,editing,setEditing}){
         onDragOver={e=>e.preventDefault()}
         onDrop={()=>{moveIface(dragIdx,idx);setDragIdx(null);}}
         onClick={()=>setEditing(i)}
-        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
-        <span style={{color:C.faint,fontSize:11}}>⠿</span>
+        style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",height:40,background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"pointer",position:"relative"}}
+        onMouseEnter={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="flex";}}
+        onMouseLeave={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="none";}}>
+        <div data-del onClick={ev=>{ev.stopPropagation();deleteIface(i.id);}} style={{display:"none",position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5,alignItems:"center",justifyContent:"center"}}/>
         <span style={{fontSize:13,color:C.text,flex:1}}>{i.titleText||i.id}</span>
         <Pill color="#1a2438">{i.kind==="hud"?"HUD":"GUI"}</Pill>
       </div>)}
@@ -2209,7 +2346,7 @@ function ItemStackPicker({label,value,onChange,allItems,textures}){
           <span style={{color:C.dim}}>▾</span>
         </div>
         {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:260,display:"flex",flexDirection:"column"}}>
-          <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search…" style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+          <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
           <div style={{overflowY:"auto",flex:1}}>
             {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;return<div key={x.id} onClick={()=>{onChange({...value,itemId:x.id});setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value?.itemId===x.id?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
               <AImg url={u} size={20}/>
@@ -2223,290 +2360,357 @@ function ItemStackPicker({label,value,onChange,allItems,textures}){
     </div>
   </div>;
 }
-function VariableDefaultField({type,value,onChange,allItems,textures}){
-  if(type==="bool")return<div style={{display:"flex",flexDirection:"column",gap:4}}><Lbl>Default value</Lbl><Chk label="true" checked={!!value} onChange={onChange}/></div>;
-  if(type==="string")return<Inp label="Default value" value={value??""} onChange={onChange}/>;
-  if(type==="item")return<ItemStackPicker label="Default item stack" value={value} onChange={onChange} allItems={allItems} textures={textures}/>;
-  return<Inp label="Default value" value={value??0} onChange={v=>onChange(type==="float"?parseFloat(v)||0:parseInt(v)||0)} type="number"/>;
-}
-function VariableEditor({variable,name,setName,varName,setVarName,type,setType,defVal,setDefVal,dropOnDeath,setDropOnDeath,allItems,textures,onSave,onCancel,onDelete}){
-  const isNew=!variable;
-  const nameErr=isNew?(varName&&!/^[a-z][a-z0-9_]*$/.test(varName)?"a-z 0-9 _ only, must start with a letter":null):null;
-  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
-    <div style={{fontSize:14,fontWeight:500}}>{isNew?"New Variable":"Edit Variable"}</div>
-    {isNew&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Variable name (internal key)</Lbl>
-      <input value={varName} onChange={e=>setVarName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...SI.inp,border:`1px solid ${varName&&nameErr?"#6a2a2a":C.inpB}`}}/>
-      {varName&&nameErr&&<span style={{fontSize:10,color:"#cc6a6a"}}>{nameErr}</span>}
-    </div>}
-    <Inp label="Display name" value={name} onChange={setName}/>
-    <Sel label="Type" value={type} onChange={v=>{setType(v);setDefVal(defaultForType(v));}} options={VAR_TYPES} disabled={!isNew}/>
-    <VariableDefaultField type={type} value={defVal} onChange={setDefVal} allItems={allItems} textures={textures}/>
-    {type==="item"&&<Chk label="Drop on death" checked={!!dropOnDeath} onChange={setDropOnDeath}/>}
-    <div style={{display:"flex",gap:8,marginTop:8}}>
-      <Btn v="p" dis={!name.trim()||(isNew&&(!varName.trim()||!!nameErr))} onClick={()=>onSave({name:isNew?varName:variable.name,titleText:name.trim(),type,default:defVal,dropOnDeath})}>Save</Btn>
-      <Btn v="g" onClick={onCancel}>Cancel</Btn>
-      {!isNew&&<Btn v="dan" onClick={()=>onDelete(variable.name)} style={{marginLeft:"auto"}}>Delete</Btn>}
-    </div>
-  </div>;
-}
-function VariablePreviewPanel({name,varName,type,defVal,dropOnDeath,allItems,textures}){
-  const vanillaItems=useVanillaItems();
-  const selItem=type==="item"?[...allItems,...vanillaItems].find(x=>x.id===defVal?.itemId):null;
-  const selItemUrl=selItem?(textures.find(tx=>tx.id===selItem.textureId)?.dataUrl||selItem.textureDataUrl):null;
-  return<div style={{flex:1,display:"flex",flexDirection:"column",padding:16,gap:12,overflowY:"auto"}}>
-    <Lbl>Preview</Lbl>
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 11px",borderRadius:5,background:C.card,border:`1px solid ${C.inpB}`}}>
-      <span style={{fontSize:13,color:C.text}}>{name||varName||"(unnamed)"}</span>
-      <Pill color={C.inp}>{VAR_TYPES.find(t=>t.value===type)?.label||type}</Pill>
-    </div>
-    {type==="item"&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",borderRadius:5,background:C.card,border:`1px solid ${C.inpB}`}}>
-      <AImg url={selItemUrl} size={22}/>
-      <span style={{fontSize:12,color:selItem?C.text:C.faint}}>{selItem?(selItem.displayName||selItem.id):"(no item selected)"} {defVal?.count>1?`x${defVal.count}`:""}</span>
-    </div>}
-    <div style={{fontSize:11,color:C.faint,fontFamily:"monospace"}}>vars.{type==="bool"?"getBool":type==="string"?"getString":type==="item"?"getItem":type==="float"?"getFloat":"getInt"}("{varName||"…"}")</div>
-    {type==="item"&&dropOnDeath&&<div style={{fontSize:11,color:C.faint}}>Drops on entity death.</div>}
-    <div style={{fontSize:11,color:C.faint,marginTop:8}}>Declaration only — where/when this variable gets attached to an entity (<code>vars.define(...)</code>) is not wired up yet.</div>
-  </div>;
-}
+
 function VariablesPage({onEditingChange,newTrigger,editing,setEditing,allItems,textures}){
   const{variables,reload}=useVariables();
-  const[dragIdx,setDragIdx]=useState(null);
-  const[name,setName]=useState("");
-  const[varName,setVarName]=useState("");
-  const[type,setType]=useState("int");
-  const[defVal,setDefVal]=useState(0);
-  const[dropOnDeath,setDropOnDeath]=useState(false);
-  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
-  const prevTrigger=useRef(newTrigger);
-  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing("new");}},[newTrigger]);
-  useEffect(()=>{
-    if(!editing)return;
-    const target=editing==="new"?null:editing;
-    setName(target?.titleText||"");setVarName(target?.name||"");setType(target?.type||"int");setDefVal(target?.default??defaultForType(target?.type||"int"));setDropOnDeath(!!target?.dropOnDeath);
-  },[editing]);
+  const[local,setLocal]=useState([]);
+  const[dirty,setDirty]=useState(false);
+  useEffect(()=>{setLocal(variables.map(v=>({...v})));setDirty(false);},[variables]);
+  useEffect(()=>{onEditingChange&&onEditingChange(true);},[onEditingChange]);
 
-  const persist=async(list)=>{await api("/variables/save",{variables:list});reload();};
-  const saveVar=async(v)=>{
-    const exists=variables.some(x=>x.name===v.name);
-    const next=exists?variables.map(x=>x.name===v.name?v:x):[...variables,v];
-    await persist(next);setEditing(null);
-  };
-  const deleteVar=async(name)=>{await persist(variables.filter(x=>x.name!==name));setEditing(null);};
-  const moveVar=async(from,to)=>{if(from===to)return;const arr=[...variables];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
+  const upd=(idx,field,val)=>{setLocal(l=>{const n=[...l];n[idx]={...n[idx],[field]:val};return n;});setDirty(true);};
+  const addVar=(type)=>{const base=type==="bool"?"new_bool":type==="string"?"new_string":type==="item"?"new_item":type==="float"?"new_float":"new_int";let name=base,i=1;while(local.some(v=>v.name===name))name=`${base}_${i++}`;setLocal(l=>[...l,{name,titleText:"",type,default:defaultForType(type),dropOnDeath:false}]);setDirty(true);};
+  const del=(idx)=>{setLocal(l=>l.filter((_,i)=>i!==idx));setDirty(true);};
+  const saveRef=useRef(null);
+  useEffect(()=>{if(!dirty)return;clearTimeout(saveRef.current);saveRef.current=setTimeout(async()=>{await api("/variables/save",{variables:local});setDirty(false);},800);return()=>clearTimeout(saveRef.current);},[dirty,local]);
 
-  if(editing){
-    const target=editing==="new"?null:editing;
-    return<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
-      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-        <VariableEditor variable={target} name={name} setName={setName} varName={varName} setVarName={setVarName} type={type} setType={setType} defVal={defVal} setDefVal={setDefVal} dropOnDeath={dropOnDeath} setDropOnDeath={setDropOnDeath} allItems={allItems} textures={textures} onSave={saveVar} onCancel={()=>setEditing(null)} onDelete={deleteVar}/>
-      </div>
-      <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-        <VariablePreviewPanel name={name} varName={varName} type={type} defVal={defVal} dropOnDeath={dropOnDeath} allItems={allItems} textures={textures}/>
-      </div>
-    </div>;
-  }
+  const RS={background:C.card,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,height:40,position:"relative"};
+  const IS={...SI.inp,padding:"4px 8px",fontSize:12};
+  const[hov,setHov]=useState(null);
 
-  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
-    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>VARIABLES (drag to reorder, click to edit)</div>
-    <div style={{display:"flex",flexDirection:"column",gap:6}}>
-      {variables.map((v,idx)=><div key={v.name}
-        draggable
-        onDragStart={()=>setDragIdx(idx)}
-        onDragOver={e=>e.preventDefault()}
-        onDrop={()=>{moveVar(dragIdx,idx);setDragIdx(null);}}
-        onClick={()=>setEditing(v)}
-        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
-        <span style={{color:C.faint,fontSize:11}}>⠿</span>
-        <span style={{fontSize:13,color:C.text,flex:1}}>{v.titleText||v.name}</span>
-        <Pill color={C.inp}>{VAR_TYPES.find(t=>t.value===v.type)?.label||v.type}</Pill>
-      </div>)}
-      {!variables.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No variables yet.</div>}
-    </div>
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto",display:"flex",flexDirection:"column",gap:24}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>Variables</div>
+    {VAR_TYPES.map(vt=>{
+      const vars=local.map((v,i)=>({...v,_idx:i})).filter(v=>v.type===vt.value);
+      return<div key={vt.value} style={{display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{fontSize:11,color:C.dim,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>{vt.label}</div>
+        {vars.map(v=><div key={v._idx} style={RS} onMouseEnter={()=>setHov(v._idx)} onMouseLeave={()=>setHov(null)}>
+          {hov===v._idx&&<div onClick={()=>del(v._idx)} style={{position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5}}/>}
+          <Lbl c={C.faint}>Name</Lbl>
+          <input value={v.titleText||""} onChange={e=>upd(v._idx,"titleText",e.target.value)} style={{...IS,flex:1}}/>
+          <Lbl c={C.faint}>ID</Lbl>
+          <input value={v.name} onChange={e=>upd(v._idx,"name",e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...IS,flex:1}}/>
+          <Lbl c={C.faint}>Default</Lbl>
+          {vt.value==="bool"
+            ?<select value={v.default?"true":"false"} onChange={e=>upd(v._idx,"default",e.target.value==="true")} style={{...IS,width:70}}><option value="true">true</option><option value="false">false</option></select>
+            :vt.value==="string"
+              ?<input value={v.default??""} onChange={e=>upd(v._idx,"default",e.target.value)} style={{...IS,flex:1}}/>
+              :vt.value==="item"
+                ?<input value={v.default?.itemId||""} onChange={e=>upd(v._idx,"default",{...v.default,itemId:e.target.value})} style={{...IS,flex:1}}/>
+                :<input type="number" value={v.default??0} onChange={e=>upd(v._idx,"default",vt.value==="float"?parseFloat(e.target.value)||0:parseInt(e.target.value)||0)} style={{...IS,width:80}}/>}
+        </div>)}
+        <Btn sm v="g" onClick={()=>addVar(vt.value)} style={{alignSelf:"flex-start",marginTop:2}}>+ {vt.label}</Btn>
+      </div>;
+    })}
   </div>;
 }
 const ATTR_SENTINEL="new";
 const ATTR_DEFAULT={id:"",constName:"",titleText:"",min:0,base:0,max:100,syncToClient:true};
 function autoConstName(id){return id.toUpperCase();}
-function AttributeEditor({attribute,id,setId,constName,setConstName,customConst,setCustomConst,titleText,setTitleText,min,setMin,base,setBase,max,setMax,syncToClient,setSyncToClient,onSave,onCancel,onDelete}){
-  const isNew=!attribute;
-  const idErr=id&&!/^[a-z][a-z0-9_]*$/.test(id)?"lowercase letters, digits, underscores only":null;
-  const cnErr=constName&&!/^[A-Z][A-Z0-9_]*$/.test(constName)?"UPPER_SNAKE_CASE only":null;
-  const rangeErr=(parseFloat(min)>parseFloat(base)||parseFloat(base)>parseFloat(max))?"must satisfy min ≤ base ≤ max":null;
-  const canSave=id&&constName&&!idErr&&!cnErr&&!rangeErr;
-  return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:16}}>
-    <div style={{fontSize:14,fontWeight:500,color:C.text}}>{isNew?"New Attribute":"Edit Attribute"}</div>
-    <Inp label="Display Name" value={titleText} onChange={v=>setTitleText(v)} placeholder="e.g. Stamina Max"/>
-    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>ID (registry key)</Lbl>{idErr&&<span style={{fontSize:11,color:"#ff7777"}}>{idErr}</span>}</div>
-      <input value={id} onChange={e=>{const v=e.target.value;setId(v);if(!customConst)setConstName(autoConstName(v));}} style={{...SI.inp}} placeholder="e.g. stamina_max"/>
-    </div>
-    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:6}}><Lbl>Const Name</Lbl><Chk label="custom" checked={customConst} onChange={v=>setCustomConst(v)}/></div>{cnErr&&<span style={{fontSize:11,color:"#ff7777"}}>{cnErr}</span>}</div>
-      <input value={customConst?constName:autoConstName(id)} onChange={e=>setConstName(e.target.value)} disabled={!customConst} style={{...SI.inp,color:customConst?C.text:C.faint,opacity:customConst?1:0.6}}/>
-    </div>
-    <div style={{display:"flex",gap:10}}>
-      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><Lbl>Min</Lbl><input type="number" value={min} onChange={e=>setMin(e.target.value)} style={{...SI.inp}}/></div>
-      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><Lbl>Base (default)</Lbl><input type="number" value={base} onChange={e=>setBase(e.target.value)} style={{...SI.inp}}/></div>
-      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><Lbl>Max</Lbl><input type="number" value={max} onChange={e=>setMax(e.target.value)} style={{...SI.inp}}/></div>
-    </div>
-    {rangeErr&&<span style={{fontSize:11,color:"#ff7777"}}>{rangeErr}</span>}
-    <Chk label="Sync to client (needed for HUD/client-side reads)" checked={syncToClient} onChange={v=>setSyncToClient(v)}/>
-    <div style={{display:"flex",gap:8,marginTop:8}}>
-      <Btn v="p" dis={!canSave} onClick={()=>onSave({id,constName:customConst?constName:autoConstName(id),titleText,min:parseFloat(min),base:parseFloat(base),max:parseFloat(max),syncToClient})}>Save</Btn>
-      <Btn v="g" onClick={onCancel}>Cancel</Btn>
-      {!isNew&&<Btn v="dan" style={{marginLeft:"auto"}} onClick={()=>onDelete(attribute.id)}>Delete</Btn>}
-    </div>
-  </div>;
-}
 function AttributesPage({onEditingChange,newTrigger,editing,setEditing}){
   const{attributes,reload}=useAttributes();
-  const[dragIdx,setDragIdx]=useState(null);
-  const[id,setId]=useState("");
-  const[constName,setConstName]=useState("");
-  const[customConst,setCustomConst]=useState(false);
-  const[titleText,setTitleText]=useState("");
-  const[min,setMin]=useState(0);
-  const[base,setBase]=useState(0);
-  const[max,setMax]=useState(100);
-  const[syncToClient,setSyncToClient]=useState(true);
-  useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
-  const prevTrigger=useRef(newTrigger);
-  useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing(ATTR_SENTINEL);}},[newTrigger]);
-  useEffect(()=>{
-    if(!editing)return;
-    const t=editing===ATTR_SENTINEL?null:editing;
-    setId(t?.id||"");setConstName(t?.constName||"");setCustomConst(false);setTitleText(t?.titleText||"");
-    setMin(t?.min??0);setBase(t?.base??0);setMax(t?.max??100);setSyncToClient(t?.syncToClient??true);
-  },[editing]);
-  const persist=async(list)=>{const r=await api("/attributes/save",{attributes:list});if(r.ok)reload();return r;};
-  const saveAttr=async(v)=>{
-    const exists=attributes.some(x=>x.id===v.id);
-    const next=exists?attributes.map(x=>x.id===v.id?v:x):[...attributes,v];
-    const r=await persist(next);if(r.ok)setEditing(null);
-  };
-  const deleteAttr=async(attrId)=>{await persist(attributes.filter(x=>x.id!==attrId));setEditing(null);};
-  const moveAttr=async(from,to)=>{if(from===to)return;const arr=[...attributes];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
-  if(editing){
-    const target=editing===ATTR_SENTINEL?null:editing;
-    return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-      <div style={{flex:1,overflowY:"auto"}}>
-        <AttributeEditor attribute={target} id={id} setId={setId} constName={constName} setConstName={setConstName} customConst={customConst} setCustomConst={setCustomConst} titleText={titleText} setTitleText={setTitleText} min={min} setMin={setMin} base={base} setBase={setBase} max={max} setMax={setMax} syncToClient={syncToClient} setSyncToClient={setSyncToClient} onSave={saveAttr} onCancel={()=>setEditing(null)} onDelete={deleteAttr}/>
-      </div>
-    </div>;
-  }
-  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
-    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>ATTRIBUTES (drag to reorder, click to edit)</div>
-    <div style={{display:"flex",flexDirection:"column",gap:6}}>
-      {attributes.map((a,idx)=><div key={a.id}
-        draggable
-        onDragStart={()=>setDragIdx(idx)}
-        onDragOver={e=>e.preventDefault()}
-        onDrop={()=>{moveAttr(dragIdx,idx);setDragIdx(null);}}
-        onClick={()=>setEditing(a)}
-        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
-        <span style={{color:C.faint,fontSize:11}}>⠿</span>
-        <span style={{fontSize:13,color:C.text,flex:1}}>{a.titleText||a.id}</span>
-        <Pill color={C.inp} style={{fontSize:10}}>{a.min} / {a.base} / {a.max}</Pill>
-        {a.syncToClient&&<Pill color="#1a2438">synced</Pill>}
+  const[local,setLocal]=useState([]);
+  const[dirty,setDirty]=useState(false);
+  useEffect(()=>{setLocal(prev=>{if(prev.length&&dirty)return prev;return attributes.map(a=>({...a,customConst:a.constName!==a.id.toUpperCase()}));});setDirty(false);},[attributes]);
+  useEffect(()=>{onEditingChange&&onEditingChange(true);},[onEditingChange]);
+
+  const upd=(idx,field,val)=>{setLocal(l=>{const n=[...l];n[idx]={...n[idx],[field]:val};if(field==="id"&&!n[idx].customConst)n[idx].constName=val.toUpperCase();return n;});setDirty(true);};
+  const addAttr=()=>{let id="new_attr",i=1;while(local.some(a=>a.id===id))id=`new_attr_${i++}`;setLocal(l=>[...l,{id,constName:id.toUpperCase(),titleText:"",min:0,base:0,max:100,syncToClient:true,customConst:false}]);setDirty(true);};
+  const del=(idx)=>{setLocal(l=>l.filter((_,i)=>i!==idx));setDirty(true);};
+  const saveRef=useRef(null);
+  useEffect(()=>{if(!dirty)return;clearTimeout(saveRef.current);saveRef.current=setTimeout(async()=>{const list=local.map(a=>({id:a.id,constName:a.customConst?a.constName:a.id.toUpperCase(),titleText:a.titleText,min:parseFloat(a.min)||0,base:parseFloat(a.base)||0,max:parseFloat(a.max)||100,syncToClient:!!a.syncToClient}));await api("/attributes/save",{attributes:list});setDirty(false);},800);return()=>clearTimeout(saveRef.current);},[dirty,local]);
+
+  const RS={background:C.card,border:`1px solid ${C.inpB}`,borderRadius:4,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",height:40,position:"relative"};
+  const IS={...SI.inp,padding:"4px 8px",fontSize:12};
+  const[hov,setHov]=useState(null);
+
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto",display:"flex",flexDirection:"column",gap:10}}>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>Attributes</div>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      {local.map((a,idx)=><div key={idx} style={RS} onMouseEnter={()=>setHov(idx)} onMouseLeave={()=>setHov(null)}>
+        {hov===idx&&<div onClick={()=>del(idx)} style={{position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5}}/>}
+        <Lbl c={C.faint}>Name</Lbl>
+        <input value={a.titleText||""} onChange={e=>upd(idx,"titleText",e.target.value)} style={{...IS,flex:2,minWidth:80}}/>
+        <Lbl c={C.faint}>ID</Lbl>
+        <input value={a.id} onChange={e=>upd(idx,"id",e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} style={{...IS,flex:2,minWidth:80}}/>
+        <Chk label="Const" checked={!!a.customConst} onChange={v=>upd(idx,"customConst",v)}/>
+        {a.customConst&&<input value={a.constName} onChange={e=>upd(idx,"constName",e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,""))} style={{...IS,width:100}}/>}
+        <Lbl c={C.faint}>Min</Lbl>
+        <input type="number" value={a.min} onChange={e=>upd(idx,"min",e.target.value)} style={{...IS,width:60}}/>
+        <Lbl c={C.faint}>Base</Lbl>
+        <input type="number" value={a.base} onChange={e=>upd(idx,"base",e.target.value)} style={{...IS,width:60}}/>
+        <Lbl c={C.faint}>Max</Lbl>
+        <input type="number" value={a.max} onChange={e=>upd(idx,"max",e.target.value)} style={{...IS,width:60}}/>
+        <Chk label="Sync" checked={!!a.syncToClient} onChange={v=>upd(idx,"syncToClient",v)}/>
       </div>)}
-      {!attributes.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No attributes yet.</div>}
+      {!local.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No attributes yet.</div>}
+      <Btn sm v="g" onClick={addAttr} style={{alignSelf:"flex-start",marginTop:4}}>+ Attribute</Btn>
     </div>
   </div>;
 }
 const EFFECT_SENTINEL="new";
 const EFFECT_CATEGORIES=[{value:"BENEFICIAL",label:"Beneficial"},{value:"HARMFUL",label:"Harmful"},{value:"NEUTRAL",label:"Neutral"}];
-function EffectEditor({effect,id,setId,constName,setConstName,customConst,setCustomConst,titleText,setTitleText,category,setCategory,color,setColor,hasTexture,setHasTexture,textureDataUrl,setTextureDataUrl,onSave,onCancel,onDelete}){
-  const isNew=!effect;
-  const idErr=id&&!/^[a-z][a-z0-9_]*$/.test(id)?"lowercase letters, digits, underscores only":null;
-  const cnErr=constName&&!/^[A-Z][A-Z0-9_]*$/.test(constName)?"UPPER_SNAKE_CASE only":null;
-  const canSave=id&&constName&&!idErr&&!cnErr&&category;
-  const fRef=useRef();
-  const onTexFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setTextureDataUrl(ev.target.result);setHasTexture(true);};r.readAsDataURL(f);};
-  return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:16}}>
-    <div style={{fontSize:14,fontWeight:500,color:C.text}}>{isNew?"New Effect":"Edit Effect"}</div>
-    <Inp label="Display Name" value={titleText} onChange={v=>setTitleText(v)} placeholder="e.g. Slimey"/>
+const EFFECT_METHODS=[
+  {key:"onEffectStarted",label:"On Start",sig:"onEffectStarted(LivingEntity, int amplifier)",
+   stub:`    @Override\n    public void onEffectStarted(LivingEntity livingEntity, int amplifier) {\n        //YCS:onEffectStarted:body\n    }`},
+  {key:"onEffectTick",label:"On Tick",sig:"applyEffectTick(LivingEntity, int amplifier)",
+   stub:`    @Override\n    public boolean applyEffectTick(LivingEntity livingEntity, int amplifier) {\n        //YCS:onEffectTick:body\n        return true;\n    }\n\n    @Override\n    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {\n        return true;\n    }`},
+  {key:"onEffectEnd",label:"On End (removed/expired)",sig:"onEffectRemoved(LivingEntity livingEntity, int amplifier)",
+   stub:`    public void onEffectRemoved(LivingEntity livingEntity, int amplifier) {\n        //YCS:onEffectEnd:body\n    }`},
+];
+function effectClassName(eid){
+  return eid.split('_').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join('')+'Effect';
+}
+const EFFECT_DEF={id:"",constName:"",customConstName:false,titleText:"",category:"BENEFICIAL",color:0,hasTexture:false,textureId:"",enabledMethods:[],methodBlocks:{}};
+function EffectProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...EFFECT_DEF,...initial}:EFFECT_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
+
+function EffectLeft({textures,initial,isEdit,onSave,onCancel,onDelete,effects,reload,activePanel,setActivePanel,showCons,consoleH,hideActions}){
+  const{form,F}=useContext(FormCtx);
+  const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
+  const idErr=form.id&&!/^[a-z][a-z0-9_]*$/.test(form.id)?"lowercase letters, digits, underscores only":null;
+  const cnErr=form.constName&&!/^[A-Z][A-Z0-9_]*$/.test(form.constName)?"UPPER_SNAKE_CASE only":null;
+  const CN=form.customConstName?form.constName:autoConstName(form.id);
+  const canSave=form.id&&CN&&!idErr&&!cnErr&&form.category;
+  const texId=(form.textureId||"").startsWith("__direct__")?null:form.textureId;
+  const selTex=texId?(textures||[]).find(t=>t.id===texId):null;
+  const dUrl=(form.textureId||"").startsWith("__direct__")?form.textureId.split("__name__")[0].replace("__direct__",""):null;
+  const enabled=form.enabledMethods||[];
+
+  const save=async()=>{
+    if(!canSave)return;setSaving(true);setStatus([]);const msgs=[];
+    // Write texture
+    if(form.hasTexture||form.textureId){
+      if(dUrl){
+        const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:dUrl,folder:"mob_effect"});
+        msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
+      } else if(selTex?.dataUrl){
+        const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"mob_effect"});
+        msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
+        if(selTex.isAnimated){
+          const jm=await api("/texture/mcmeta",{filename:`${form.id}.png`,frametime:selTex.ticksPerFrame||4,folder:"mob_effect"});
+          msgs.push({ok:jm.ok,label:"mcmeta",msg:jm.ok?"ok":jm.reason});
+        }
+      }
+    }
+    const v={id:form.id,constName:CN,titleText:form.titleText,category:form.category,color:parseInt(form.color)||0,
+      hasTexture:!!(form.textureId),textureId:form.textureId||undefined,
+      textureAnimated:!!selTex?.isAnimated,textureFrametime:selTex?.ticksPerFrame||4,
+      enabledMethods:form.enabledMethods||[],methodBlocks:form.methodBlocks||{}};
+    const exists=effects.some(x=>x.id===v.id);
+    const next=exists?effects.map(x=>x.id===v.id?v:x):[...effects,v];
+    const r=await api("/effects/save",{effects:next});
+    msgs.push({ok:r.ok,label:"effects",msg:r.ok?"ok":r.reason});
+    if(r.ok)reload();
+    setStatus(msgs);setSaving(false);
+    if(msgs.every(m=>m.ok))onSave({...v,savedAt:Date.now()},initial?.id);
+  };
+
+  return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
+    <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Effect":"New Effect"}</span></div>
+    <Inp label="Display Name" value={form.titleText} onChange={v=>{F("titleText",v);if(!isEdit&&!form.id){const auto=v.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");F("id",auto);F("constName",auto.toUpperCase());}}}/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>ID (registry key)</Lbl>{idErr&&<span style={{fontSize:11,color:"#ff7777"}}>{idErr}</span>}</div>
-      <input value={id} onChange={e=>{const v=e.target.value;setId(v);if(!customConst)setConstName(autoConstName(v));}} style={{...SI.inp}} placeholder="e.g. slimey"/>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:4}}><Lbl>ID</Lbl>{idErr&&<span style={{fontSize:11,color:"#ff7777"}}>{idErr}</span>}</div><Chk label="Custom const" checked={!!form.customConstName} onChange={v=>F("customConstName",v)}/></div>
+      <input value={form.id} onChange={e=>{const v=e.target.value;F("id",v);if(!form.customConstName)F("constName",autoConstName(v));}} style={{...SI.inp}}/>
     </div>
+    {form.customConstName&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><Lbl>Const Name</Lbl>{cnErr&&<span style={{fontSize:11,color:"#ff7777"}}>{cnErr}</span>}</div>
+      <input value={form.constName} onChange={e=>F("constName",e.target.value)} style={{...SI.inp}}/>
+    </div>}
+    <Sel label="Category" value={form.category} onChange={v=>F("category",v)} options={EFFECT_CATEGORIES}/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:6}}><Lbl>Const Name</Lbl><Chk label="custom" checked={customConst} onChange={v=>setCustomConst(v)}/></div>{cnErr&&<span style={{fontSize:11,color:"#ff7777"}}>{cnErr}</span>}</div>
-      <input value={customConst?constName:autoConstName(id)} onChange={e=>setConstName(e.target.value)} disabled={!customConst} style={{...SI.inp,color:customConst?C.text:C.faint,opacity:customConst?1:0.6}}/>
-    </div>
-    <Sel label="Category" value={category} onChange={v=>setCategory(v)} options={EFFECT_CATEGORIES}/>
-    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Color (decimal)</Lbl>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <input type="number" value={color} onChange={e=>setColor(e.target.value)} style={{...SI.inp,flex:1}} placeholder="e.g. 3402751"/>
-        <div style={{width:28,height:28,borderRadius:4,border:"1px solid #333",background:`#${(parseInt(color)||0).toString(16).padStart(6,"0")}`}}/>
+      <Lbl>Color</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          <div style={{width:20,height:20,borderRadius:3,border:"1px solid #333",background:`#${(parseInt(form.color)||0).toString(16).padStart(6,"0")}`,flexShrink:0}}/>
+          <span style={{fontSize:13,color:C.text,fontFamily:"monospace"}}>#{(parseInt(form.color)||0).toString(16).padStart(6,"0")}</span>
+        </div>
+        <Btn sm v={activePanel==="color"?"p":"g"} onClick={()=>setActivePanel(p=>p==="color"?null:"color")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
       </div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Effect Texture (18×18 PNG)</Lbl>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <Btn sm v="g" onClick={()=>fRef.current?.click()}>Choose file</Btn>
-        {(hasTexture||textureDataUrl)&&<div style={{width:28,height:28,borderRadius:4,border:"1px solid #333",overflow:"hidden"}}><img src={textureDataUrl||""} style={{width:"100%",height:"100%",imageRendering:"pixelated"}} alt=""/></div>}
-        {hasTexture&&<Btn sm v="dan" onClick={()=>{setHasTexture(false);setTextureDataUrl("");}}>Remove</Btn>}
+      <Lbl>Texture</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          {(selTex||dUrl)
+            ?<AImg url={selTex?.dataUrl||dUrl} size={20} anim={selTex?.isAnimated} frames={selTex?.frames||1} ticks={selTex?.ticksPerFrame||4}/>
+            :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+          <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
+        </div>
+        <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
       </div>
-      <input ref={fRef} type="file" accept="image/png" style={{display:"none"}} onChange={onTexFile}/>
     </div>
-    <div style={{display:"flex",gap:8,marginTop:8}}>
-      <Btn v="p" dis={!canSave} onClick={()=>onSave({id,constName:customConst?constName:autoConstName(id),titleText,category,color:parseInt(color)||0,hasTexture:!!hasTexture,textureDataUrl:textureDataUrl||undefined})}>Save</Btn>
-      <Btn v="g" onClick={onCancel}>Cancel</Btn>
-      {!isNew&&<Btn v="dan" style={{marginLeft:"auto"}} onClick={()=>onDelete(effect.id)}>Delete</Btn>}
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Methods{enabled.length>0&&<span style={{color:C.accent,marginLeft:5}}>{enabled.length}</span>}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:enabled.length?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{enabled.length?enabled.map(k=>EFFECT_METHODS.find(m=>m.key===k)?.label||k).join(", "):"none added"}</span>
+        <Btn sm v={activePanel==="methods"?"p":"g"} onClick={()=>setActivePanel(p=>p==="methods"?null:"methods")} dis={!form.id} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>
+    <Sbar messages={status}/>
+    {!hideActions&&<FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!canSave} showCons={showCons} consoleH={consoleH} onDelete={isEdit?()=>onDelete(initial.id):undefined}/>}
+  </div>;
+}
+
+function EffectColorPanel(){
+  const{form,F}=useContext(FormCtx);
+  const hex=(parseInt(form.color)||0).toString(16).padStart(6,"0");
+  const rv=parseInt(hex.slice(0,2),16),gv=parseInt(hex.slice(2,4),16),bv=parseInt(hex.slice(4,6),16);
+  const canvasRef=useRef(null);
+  const hueRef=useRef(null);
+  const[hue,setHue]=useState(()=>{const[h]=rgbToHsl(rv,gv,bv);return h;});
+  const dragging=useRef(false);
+  const hueDragging=useRef(false);
+  function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;if(mx===mn)return[0,0,l];const d=mx-mn,s=l>0.5?d/(2-mx-mn):d/(mx+mn);let h=0;if(mx===r)h=((g-b)/d+(g<b?6:0))/6;else if(mx===g)h=((b-r)/d+2)/6;else h=((r-g)/d+4)/6;return[h,s,l];}
+  function hslToRgb(h,s,l){if(s===0)return[Math.round(l*255),Math.round(l*255),Math.round(l*255)];const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;return[Math.round(hue2rgb(p,q,h+1/3)*255),Math.round(hue2rgb(p,q,h)*255),Math.round(hue2rgb(p,q,h-1/3)*255)];}
+  const drawSV=useCallback(()=>{const cv=canvasRef.current;if(!cv)return;const ctx=cv.getContext("2d"),w=cv.width,h=cv.height;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const s=x/w,v=1-y/h;const[r,g,b]=hslToRgb(hue,s,v*0.5+s*v*0.5);ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(x,y,1,1);}
+  },[hue]);
+  useEffect(()=>{drawSV();},[drawSV]);
+  const pickFromCanvas=(e)=>{const cv=canvasRef.current;if(!cv)return;const rect=cv.getBoundingClientRect();const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const y=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));const s=x,v=1-y;const[r,g,b]=hslToRgb(hue,s,v*0.5+s*v*0.5);F("color",(r<<16)|(g<<8)|b);};
+  const pickHue=(e)=>{const el=hueRef.current;if(!el)return;const rect=el.getBoundingClientRect();const h=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));setHue(h);const[,,l]=rgbToHsl(rv,gv,bv);const[hs]=rgbToHsl(rv,gv,bv);const[r,g,b]=hslToRgb(h,1,0.5);F("color",(r<<16)|(g<<8)|b);};
+  useEffect(()=>{
+    const mu=()=>{dragging.current=false;hueDragging.current=false;};
+    const mm=(e)=>{if(dragging.current)pickFromCanvas(e);if(hueDragging.current)pickHue(e);};
+    window.addEventListener("mouseup",mu);window.addEventListener("mousemove",mm);
+    return()=>{window.removeEventListener("mouseup",mu);window.removeEventListener("mousemove",mm);};
+  });
+  return<div style={{padding:"20px",display:"flex",flexDirection:"column",gap:14,flex:1}}>
+    <Lbl>Effect Color</Lbl>
+    <canvas ref={canvasRef} width={200} height={150} style={{width:"100%",height:150,borderRadius:6,border:`1px solid ${C.inpB}`,cursor:"crosshair",imageRendering:"pixelated"}} onMouseDown={e=>{dragging.current=true;pickFromCanvas(e);}}/>
+    <div ref={hueRef} style={{width:"100%",height:18,borderRadius:4,border:`1px solid ${C.inpB}`,cursor:"crosshair",background:"linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)"}} onMouseDown={e=>{hueDragging.current=true;pickHue(e);}}/>
+    <div style={{width:"100%",height:32,borderRadius:6,border:`1px solid ${C.inpB}`,background:`#${hex}`,boxShadow:`0 0 16px rgba(${rv},${gv},${bv},0.25)`}}/>
+    <div style={{display:"flex",alignItems:"center",gap:4}}>
+      <input value={hex} onChange={e=>{const v=e.target.value.replace(/[^0-9a-fA-F]/g,"").slice(0,6);F("color",parseInt(v||"0",16));const[h]=rgbToHsl(...[0,2,4].map(i=>parseInt(v.slice(i,i+2)||"0",16)));setHue(h);}} style={{...SI.inp,flex:1,fontFamily:"monospace",fontSize:13,textAlign:"center",letterSpacing:1}} maxLength={6}/>
+      <input type="number" min={0} max={255} value={rv} onChange={e=>{const nr=Math.max(0,Math.min(255,parseInt(e.target.value)||0));F("color",(nr<<16)|(gv<<8)|bv);const[h]=rgbToHsl(nr,gv,bv);setHue(h);}} style={{...SI.inp,width:46,fontFamily:"monospace",fontSize:12,textAlign:"center",flexShrink:0}}/>
+      <input type="number" min={0} max={255} value={gv} onChange={e=>{const ng=Math.max(0,Math.min(255,parseInt(e.target.value)||0));F("color",(rv<<16)|(ng<<8)|bv);const[h]=rgbToHsl(rv,ng,bv);setHue(h);}} style={{...SI.inp,width:46,fontFamily:"monospace",fontSize:12,textAlign:"center",flexShrink:0}}/>
+      <input type="number" min={0} max={255} value={bv} onChange={e=>{const nb=Math.max(0,Math.min(255,parseInt(e.target.value)||0));F("color",(rv<<16)|(gv<<8)|nb);const[h]=rgbToHsl(rv,gv,nb);setHue(h);}} style={{...SI.inp,width:46,fontFamily:"monospace",fontSize:12,textAlign:"center",flexShrink:0}}/>
     </div>
   </div>;
 }
-function EffectsPage({onEditingChange,newTrigger,editing,setEditing}){
+
+function EffectMethodListPanel({onEnterEditor}){
+  const{form,F}=useContext(FormCtx);
+  const[busyKey,setBusyKey]=useState(null);
+  const enabled=form.enabledMethods||[];
+  const toggle=async(key,checked)=>{
+    if(!form.id)return;
+    setBusyKey(key);
+    const cls=effectClassName(form.id);
+    await api("/effects/custom-class",{className:cls});
+    const j=await api("/effects/custom-class/read",{className:cls});
+    if(j.ok){
+      const updated=ycsToggleEffectMethod(j.code,key,checked);
+      await api("/effects/custom-class/write",{className:cls,code:updated});
+    }
+    const next=checked?[...enabled,key]:enabled.filter(k=>k!==key);
+    F("enabledMethods",next);
+    if(!checked){const mb={...(form.methodBlocks||{})};delete mb[key];F("methodBlocks",mb);}
+    setBusyKey(null);
+  };
+  return<div style={{padding:"14px",display:"flex",flexDirection:"column",gap:7}}>
+    <Lbl>Effect Methods</Lbl>
+    {EFFECT_METHODS.map(m=>{
+      const isOn=enabled.includes(m.key);
+      const busy=busyKey===m.key;
+      const hasBlocks=((form.methodBlocks||{})[m.key]||[]).length>0;
+      return<div key={m.key} style={{
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"9px 11px",borderRadius:5,
+        background:isOn?"#1a2438":C.card,
+        border:`1px solid ${isOn?"#2a3f5a":C.inpB}`,
+        opacity:busy?0.6:1,transition:"all .15s"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
+          <div onClick={()=>!busy&&form.id&&toggle(m.key,!isOn)} style={{
+            width:14,height:14,border:`1px solid ${isOn?C.accent:C.inpB}`,borderRadius:3,
+            background:isOn?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",
+            cursor:busy||!form.id?"not-allowed":"pointer",flexShrink:0}}>
+            {isOn&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+          </div>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:13,color:isOn?C.text:C.dim,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+              {m.label}
+              {hasBlocks&&<span style={{fontSize:10,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
+            </div>
+            <div style={{fontSize:11,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>
+          </div>
+        </div>
+        {isOn&&<Btn sm v="p" onClick={()=>onEnterEditor(m.key)} style={{marginLeft:8,flexShrink:0}}>Edit</Btn>}
+      </div>;
+    })}
+  </div>;
+}
+
+function EffectFullEditor({rightView,setRightView}){
+  const{form,F}=useContext(FormCtx);
+  return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <VisualEditorPanel
+      methodKey={rightView.editingMethod}
+      form={form}
+      F={F}
+      className={effectClassName(form.id||"effect")}
+      onBack={()=>setRightView({mode:"methodList",editingMethod:null})}
+      isEffect/>
+  </div>;
+}
+
+function EffectRight({textures,activePanel,setActivePanel,rightView,setRightView}){
+  const{form,F}=useContext(FormCtx);
+  if(!activePanel){
+    return<div style={{display:"flex",height:"100%",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12,flexDirection:"column",gap:8}}>
+      <span style={{fontSize:28,color:"#252525"}}>→</span>
+      <span>use edit or set on the left</span>
+    </div>;
+  }
+  return<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+    <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      {activePanel==="methods"&&<EffectMethodListPanel
+              onEnterEditor={key=>setRightView({mode:"visualEditor",editingMethod:key})}/>}
+      {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey="textureId" label="Effect Texture"/>}
+      {activePanel==="color"&&<EffectColorPanel/>}
+    </div>
+  </div>;
+}
+
+function EffectsPage({onEditingChange,newTrigger,editing,setEditing,textures,showCons,consoleH}){
   const{effects,reload}=useEffects();
   const[dragIdx,setDragIdx]=useState(null);
-  const[id,setId]=useState("");
-  const[constName,setConstName]=useState("");
-  const[customConst,setCustomConst]=useState(false);
-  const[titleText,setTitleText]=useState("");
-  const[category,setCategory]=useState("BENEFICIAL");
-  const[color,setColor]=useState(0);
-  const[hasTexture,setHasTexture]=useState(false);
-  const[textureDataUrl,setTextureDataUrl]=useState("");
+  const[activePanel,setActivePanel]=useState(null);
+  const[rightView,setRightView]=useState({mode:"methodList",editingMethod:null});
   useEffect(()=>{onEditingChange&&onEditingChange(!!editing);},[editing,onEditingChange]);
   const prevTrigger=useRef(newTrigger);
   useEffect(()=>{if(newTrigger!==prevTrigger.current){prevTrigger.current=newTrigger;setEditing(EFFECT_SENTINEL);}},[newTrigger]);
-  useEffect(()=>{
-    if(!editing)return;
-    const t=editing===EFFECT_SENTINEL?null:editing;
-    setId(t?.id||"");setConstName(t?.constName||"");setCustomConst(false);setTitleText(t?.titleText||"");
-    setCategory(t?.category||"BENEFICIAL");setColor(t?.color??0);setHasTexture(t?.hasTexture||false);setTextureDataUrl(t?.textureDataUrl||"");
-  },[editing]);
+  useEffect(()=>{setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});},[editing]);
   const persist=async(list)=>{const r=await api("/effects/save",{effects:list});if(r.ok)reload();return r;};
-  const saveEffect=async(v)=>{
-    const exists=effects.some(x=>x.id===v.id);
-    const next=exists?effects.map(x=>x.id===v.id?v:x):[...effects,v];
-    const r=await persist(next);if(r.ok)setEditing(null);
-  };
   const deleteEffect=async(eid)=>{await persist(effects.filter(x=>x.id!==eid));setEditing(null);};
   const moveEffect=async(from,to)=>{if(from===to)return;const arr=[...effects];const[m]=arr.splice(from,1);arr.splice(to,0,m);await persist(arr);};
   const catColor=c=>c==="BENEFICIAL"?"#1e3020":c==="HARMFUL"?"#301e1e":"#1e1e30";
   if(editing){
     const target=editing===EFFECT_SENTINEL?null:editing;
-    return<div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-      <div style={{flex:1,overflowY:"auto"}}>
-        <EffectEditor effect={target} id={id} setId={setId} constName={constName} setConstName={setConstName} customConst={customConst} setCustomConst={setCustomConst} titleText={titleText} setTitleText={setTitleText} category={category} setCategory={setCategory} color={color} setColor={setColor} hasTexture={hasTexture} setHasTexture={setHasTexture} textureDataUrl={textureDataUrl} setTextureDataUrl={setTextureDataUrl} onSave={saveEffect} onCancel={()=>setEditing(null)} onDelete={deleteEffect}/>
-      </div>
-    </div>;
+    const inVisualEditor=activePanel==="methods"&&rightView?.mode==="visualEditor";
+    return<EffectProv initial={target} onFormChange={()=>{}}>
+      {inVisualEditor
+        ?<EffectFullEditor rightView={rightView} setRightView={setRightView}/>
+        :<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}>
+          <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            <div style={{flex:1,overflowY:"auto"}}>
+              <EffectLeft textures={textures} initial={target} isEdit={!!target} onSave={()=>setEditing(null)} onCancel={()=>{setEditing(null);setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});}} onDelete={deleteEffect} effects={effects} reload={reload} activePanel={activePanel} setActivePanel={setActivePanel} showCons={showCons} consoleH={consoleH}/>
+            </div>
+          </div>
+          <div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            <EffectRight textures={textures} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/>
+          </div>
+        </div>}
+    </EffectProv>;
   }
   return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
-    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>EFFECTS (drag to reorder, click to edit)</div>
+    <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>EFFECTS</div>
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       {effects.map((e,idx)=><div key={e.id}
-        draggable
-        onDragStart={()=>setDragIdx(idx)}
-        onDragOver={ev=>ev.preventDefault()}
-        onDrop={()=>{moveEffect(dragIdx,idx);setDragIdx(null);}}
         onClick={()=>setEditing(e)}
-        style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"grab"}}>
-        <span style={{color:C.faint,fontSize:11}}>⠿</span>
-        {e.hasTexture&&<div style={{width:20,height:20,borderRadius:3,overflow:"hidden",flexShrink:0}}><img src={`${BASE}/textures/mob_effect/${e.id}.png`} style={{width:"100%",height:"100%",imageRendering:"pixelated"}} alt="" onError={ev=>ev.currentTarget.style.display="none"}/></div>}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",height:40,background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"pointer",position:"relative"}}
+        onMouseEnter={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="flex";}}
+        onMouseLeave={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="none";}}>
+        <div data-del onClick={ev=>{ev.stopPropagation();deleteEffect(e.id);}} style={{display:"none",position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5,alignItems:"center",justifyContent:"center"}}/>
+        {e.hasTexture&&(()=>{const tx=e.textureId&&textures?.find(t=>t.id===e.textureId);return tx?<AImg url={tx.dataUrl} size={20} anim={tx.isAnimated} frames={tx.frames||1} ticks={tx.ticksPerFrame||4}/>:<div style={{width:20,height:20,borderRadius:3,overflow:"hidden",flexShrink:0}}><img src={`${BASE}/textures/mob_effect/${e.id}.png`} style={{width:"100%",height:"100%",imageRendering:"pixelated"}} alt="" onError={ev=>ev.currentTarget.style.display="none"}/></div>;})()}
         <span style={{fontSize:13,color:C.text,flex:1}}>{e.titleText||e.id}</span>
         <Pill color={catColor(e.category)}>{(e.category||"NEUTRAL").toLowerCase()}</Pill>
         <div style={{width:14,height:14,borderRadius:3,border:"1px solid #333",background:`#${(e.color||0).toString(16).padStart(6,"0")}`,flexShrink:0}}/>
@@ -2530,10 +2734,10 @@ function CardGrid({entries,onDelete,onOpen,emptyLabel}){
       {entries.map(e=>{const isH=hov===e.id;return<div key={e.id} onClick={()=>onOpen(e)} onMouseEnter={()=>setHov(e.id)} onMouseLeave={()=>setHov(null)}
         style={{width:200,height:267,background:C.card,border:`1px solid ${isH?"#3a3a3a":"#1e1e1e"}`,borderRadius:C.r,cursor:"pointer",display:"flex",flexDirection:"column",flexShrink:0,position:"relative"}}>
         {isH&&<div onClick={ev=>{ev.stopPropagation();onDelete(e.id);}} style={{position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5}}/>}
-        <div style={{margin:10,flex:1,background:C.prev,borderRadius:4,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          {e.previewDataUrl?<AImg url={e.previewDataUrl} size={160} anim={e.isAnimated} frames={e.frames||1} ticks={e.ticksPerFrame||4}/>:<div/>}
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+          {e.previewDataUrl?<AImg url={e.previewDataUrl} size={180} anim={e.isAnimated} frames={e.frames||1} ticks={e.ticksPerFrame||4}/>:<div/>}
         </div>
-        <div style={{padding:"0 10px 10px"}}>
+        <div style={{padding:"6px 10px 8px",background:C.card}}>
           <div style={{fontWeight:500,fontSize:13,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.displayName||e.id}</div>
           <div style={{fontWeight:200,fontSize:11,color:C.dim,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginTop:2}}>{e.id}</div>
         </div>
@@ -2543,11 +2747,11 @@ function CardGrid({entries,onDelete,onOpen,emptyLabel}){
   </div>;
 }
 
-function FormActions({onCancel,onSave,saving,canSave,consoleH=0,showCons=false,onCode}){
+function FormActions({onCancel,onSave,saving,canSave,consoleH=0,showCons=false,onDelete}){
   const bottom=showCons?consoleH+5+30:30;
   const SQ={width:52,height:52,borderRadius:C.r,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:18,cursor:"pointer",flexShrink:0,fontFamily:"'JetBrains Mono',monospace"};
   return<div style={{position:"fixed",bottom,right:30,display:"flex",gap:10,zIndex:200,transition:"bottom .15s"}}>
-    {onCode&&<button onClick={onCode} style={{...SQ,background:"#2a2a2e",border:`1px solid ${C.inpB}`,color:C.dim}}>⌨</button>}
+    {onDelete&&<button onClick={onDelete} style={{...SQ,background:"#3a1a1a",border:"1px solid #5a2a2a",color:"#cc5a5a"}}>🗑</button>}
     <button onClick={onCancel} style={{...SQ,background:"#2a2a2e",border:`1px solid ${C.inpB}`,color:C.dim}}>✕</button>
     <button onClick={onSave} disabled={saving||!canSave} style={{...SQ,background:saving||!canSave?"#2a2a2e":C.accent,border:"none",color:saving||!canSave?C.faint:"#06080e",opacity:saving||!canSave?0.35:1,cursor:saving||!canSave?"not-allowed":"pointer"}}>↓</button>
   </div>;
@@ -2582,7 +2786,7 @@ function TexLeft({initial,onSave,onCancel}){
   };
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:16}}>
     <div style={{fontSize:14,fontWeight:500,color:C.text}}>{initial?"Edit Texture":"Add Texture"}</div>
-    <Inp label="Texture Name" value={form.label} onChange={v=>F("label",v)} placeholder="Enter name…"/>
+    <Inp label="Texture Name" value={form.label} onChange={v=>F("label",v)}/>
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       <Lbl>Texture File</Lbl>
       <div onClick={()=>mRef.current.click()} style={{height:42,background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:form.dataUrl?"#5acc5a":C.dim,fontSize:12,gap:8}}>
@@ -2627,8 +2831,9 @@ function TexRight(){
 // Unified ingredient picker: searches mod items/blocks, the full vanilla item
 // registry, and every tag in COMMON_TAGS as one flat, icon-backed, sorted list.
 // Replaces the old split list+toggle-hidden-tags-panel UI.
-function IngredientPicker({value,onChange,modItems,modBlocks,vanillaItems,textures}){
+function IngredientPicker({value,onChange,modItems,modBlocks,vanillaItems,textures,filter}){
   const[srch,setSrch]=useState("");
+  const q_ext=typeof filter==="string";
   const entries=useMemo(()=>{
     const tagE=TAG_GROUPS.map(g=>({ref:`#${g.tag}`,label:g.label,sub:g.tag,isTag:true}));
     const modE=[...modItems.map(x=>({...x,kind:"item"})),...modBlocks.map(x=>({...x,kind:"block"}))]
@@ -2637,12 +2842,12 @@ function IngredientPicker({value,onChange,modItems,modBlocks,vanillaItems,textur
     return[...tagE,...modE,...vanE];
   },[modItems,modBlocks,vanillaItems]);
   const filt=useMemo(()=>{
-    const q=srch.toLowerCase().trim();
+    const q=(q_ext?filter:srch).toLowerCase().trim();
     if(!q)return entries;
     return entries.filter(e=>e.label.toLowerCase().includes(q)||e.sub.toLowerCase().includes(q));
-  },[entries,srch]);
+  },[entries,srch,filter,q_ext]);
   return<div style={{display:"flex",flexDirection:"column",gap:6,minHeight:0}}>
-    <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search items, blocks, #tags…" style={{...SI.inp,fontSize:12}}/>
+    {!q_ext&&<input value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,fontSize:12}}/>}
     <div style={{maxHeight:240,overflowY:"auto",display:"flex",flexDirection:"column",gap:1,border:`1px solid ${C.inpB}`,borderRadius:4,padding:3}}>
       {filt.slice(0,200).map(e=>{
         const u=e.tex?(textures.find(tx=>tx.id===e.tex.textureId)?.dataUrl||e.tex.textureDataUrl):null;
@@ -2660,9 +2865,10 @@ function IngredientPicker({value,onChange,modItems,modBlocks,vanillaItems,textur
     </div>
   </div>;
 }
-function RecipePanel({modItems=[],modBlocks=[],textures=[]}){
+function CraftingPanel({modItems=[],modBlocks=[],textures=[]}){
   const{form,F}=useContext(FormCtx);
   const[sel,setSel]=useState("");
+  const[srch,setSrch]=useState("");
   const vanillaItems=useVanillaItems();
   const recipe=form.recipe||{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1};
   const setR=upd=>F("recipe",{...recipe,...upd});
@@ -2670,23 +2876,78 @@ function RecipePanel({modItems=[],modBlocks=[],textures=[]}){
   const setCell=(i,item)=>{const row=Math.floor(i/3),col=i%3;const pat=recipe.pattern.map(r=>[...r]);const keys={...recipe.keys};if(!item||item==="minecraft:air"){pat[row][col]=" ";const used=new Set(pat.flat().filter(c=>c!==" "));for(const k of Object.keys(keys))if(!used.has(k))delete keys[k];}else{const ex=Object.entries(keys).find(([,v])=>v===item)?.[0];const used=new Set(pat.flat().filter(c=>c!==" "));let ch=ex;if(!ch){ch="ABCDEFGHIJKLMNOPQRSTUVWXYZ#@$%&".split("").find(c=>!used.has(c))||"?";keys[ch]=item;}pat[row][col]=ch;}setR({pattern:pat.map(r=>r.join("")),keys});};
   const itemFor=ref=>{if(!ref||ref.startsWith("#"))return null;if(ref.startsWith(`${MODID}:`)){const id=ref.slice(MODID.length+1);return modItems.find(x=>x.id===id)||modBlocks.find(x=>x.id===id)||null;}return vanillaItems.find(x=>x.id===ref)||null;};
   const dN=item=>{if(!item)return"";if(item.startsWith("#"))return TAG_GROUPS.find(g=>`#${g.tag}`===item)?.label||item;const it=itemFor(item);return it?.displayName||item.split(":")[1]||item;};
-  return<div style={{flex:1,padding:"14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:10}}>
-    <div style={{display:"flex",gap:4}}><Sel label="" value={recipe.type||"shaped"} onChange={v=>setR({type:v})} options={["shaped","shapeless"]}/><Inp label="" value={recipe.result||1} onChange={v=>setR({result:parseInt(v)||1})} type="number" style={{width:56}}/></div>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,52px)",gap:3}}>
-      {cells.map((item,i)=>{
-        const e=!item||item==="minecraft:air";const iT=item&&item.startsWith("#");
-        const it=itemFor(item);const u=it?(textures.find(tx=>tx.id===it.textureId)?.dataUrl||it.textureDataUrl):null;
-        return<div key={i} title={item?dN(item):""} onClick={()=>{if(sel)setCell(i,sel);}} onDragOver={ev=>ev.preventDefault()} onDrop={ev=>{ev.preventDefault();setCell(i,ev.dataTransfer.getData("item"));}} style={{width:52,height:52,background:e?"#141414":iT?"#1a1a2e":"#192a19",border:`1px solid ${e?C.inpB:iT?"#2a2a5a":"#2a5a2a"}`,borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sel?"crosshair":"default",position:"relative",overflow:"hidden",gap:2}}>
-          {!e&&<>
-            {iT?<span style={{fontSize:14,color:"#8888ff"}}>#</span>:<AImg url={u} size={28}/>}
-            <div style={{fontSize:8,color:iT?"#8888ff":"#aaa",textAlign:"center",padding:"0 2px",lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{dN(item)}</div>
-            <span onClick={ev=>{ev.stopPropagation();setCell(i,null);}} style={{position:"absolute",top:1,right:2,fontSize:8,cursor:"pointer",color:"#cc6a6a"}}>✕</span>
-          </>}
-          {e&&<span style={{color:"#222",fontSize:18}}>+</span>}
-        </div>;})}
+  const dis=!form.hasRecipe;
+  return<div style={{display:"flex",flexDirection:"column",gap:10,opacity:dis?0.35:1,pointerEvents:dis?"none":"auto"}}>
+    <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+      <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:4}}>
+        <input value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,fontSize:11}}/>
+        <IngredientPicker value={sel} onChange={setSel} modItems={modItems} modBlocks={modBlocks} vanillaItems={vanillaItems} textures={textures} filter={srch}/>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,52px)",gap:3}}>
+          {cells.map((item,i)=>{
+            const e=!item||item==="minecraft:air";const iT=item&&item.startsWith("#");
+            const it=itemFor(item);const u=it?(textures.find(tx=>tx.id===it.textureId)?.dataUrl||it.textureDataUrl):null;
+            return<div key={i} title={item?dN(item):""} onClick={()=>{if(sel)setCell(i,sel);}} onDragOver={ev=>ev.preventDefault()} onDrop={ev=>{ev.preventDefault();setCell(i,ev.dataTransfer.getData("item"));}} style={{width:52,height:52,background:e?"#141414":iT?"#1a1a2e":"#192a19",border:`1px solid ${e?C.inpB:iT?"#2a2a5a":"#2a5a2a"}`,borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sel?"crosshair":"default",position:"relative",overflow:"hidden",gap:2}}>
+              {!e&&<>
+                {iT?<span style={{fontSize:14,color:"#8888ff"}}>#</span>:<AImg url={u} size={28}/>}
+                <div style={{fontSize:8,color:iT?"#8888ff":"#aaa",textAlign:"center",padding:"0 2px",lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{dN(item)}</div>
+                <span onClick={ev=>{ev.stopPropagation();setCell(i,null);}} style={{position:"absolute",top:1,right:2,fontSize:8,cursor:"pointer",color:"#cc6a6a"}}>✕</span>
+              </>}
+              {e&&<span style={{color:"#222",fontSize:18}}>+</span>}
+            </div>;})}
+        </div>
+        {sel&&<div style={{display:"flex",alignItems:"center",gap:6,fontSize:10,color:"#5acc5a"}}><span>placing →</span>{itemFor(sel)&&<AImg url={textures.find(tx=>tx.id===itemFor(sel).textureId)?.dataUrl||itemFor(sel).textureDataUrl} size={14}/>}<span>{dN(sel)}</span></div>}
+        <div style={{display:"flex",gap:4,alignItems:"center"}}><Sel label="" value={recipe.type||"shaped"} onChange={v=>setR({type:v})} options={["shaped","shapeless"]}/><Inp label="" value={recipe.result||1} onChange={v=>setR({result:parseInt(v)||1})} type="number" style={{width:56}}/></div>
+      </div>
     </div>
-    {sel&&<div style={{display:"flex",alignItems:"center",gap:6,fontSize:10,color:"#5acc5a"}}><span>placing →</span>{itemFor(sel)&&<AImg url={textures.find(tx=>tx.id===itemFor(sel).textureId)?.dataUrl||itemFor(sel).textureDataUrl} size={14}/>}<span>{dN(sel)}</span></div>}
-    <IngredientPicker value={sel} onChange={setSel} modItems={modItems} modBlocks={modBlocks} vanillaItems={vanillaItems} textures={textures}/>
+  </div>;
+}
+const SMELT_TYPES=[{key:"smelting",label:"Smelting",defTime:200},{key:"smoking",label:"Smoking",defTime:100},{key:"blasting",label:"Blasting",defTime:100},{key:"campfire",label:"Campfire",defTime:600}];
+function SmeltingSection({modItems=[],modBlocks=[],textures=[]}){
+  const{form,F}=useContext(FormCtx);
+  const vanillaItems=useVanillaItems();
+  const recipes=form.smeltingRecipes||[];
+  const isFood=!!form.isFood;
+  const available=isFood?SMELT_TYPES.filter(t=>t.key!=="blasting"):SMELT_TYPES;
+  const has=key=>recipes.some(r=>r.type===key);
+  const get=key=>recipes.find(r=>r.type===key)||{type:key,ingredient:"",experience:isFood?0.1:0.7,cookingTime:SMELT_TYPES.find(t=>t.key===key)?.defTime||200};
+  const toggle=key=>{if(has(key))F("smeltingRecipes",recipes.filter(r=>r.type!==key));else F("smeltingRecipes",[...recipes,get(key)]);};
+  const upd=(key,field,val)=>{F("smeltingRecipes",recipes.map(r=>r.type===key?{...r,[field]:val}:r));};
+  const[pickFor,setPickFor]=useState(null);
+  const[sel,setSel]=useState("");
+  return<div style={{display:"flex",flexDirection:"column",gap:6}}>
+    {available.map(t=>{const on=has(t.key),sr=get(t.key);
+      return<div key={t.key} style={{display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <Chk label={t.label} checked={on} onChange={()=>toggle(t.key)}/>
+          {on&&<>
+            <div style={{display:"flex",alignItems:"center",gap:4,flex:1,minWidth:0}}>
+              <div onClick={()=>{if(pickFor===t.key){setPickFor(null);setSel("");}else{setPickFor(t.key);setSel(sr.ingredient||"");}}} style={{...SI.inp,padding:"4px 8px",fontSize:11,cursor:"pointer",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:sr.ingredient?C.text:C.faint,border:`1px solid ${pickFor===t.key?C.accent:C.inpB}`}}>{sr.ingredient||"input"}</div>
+              <input type="number" value={sr.cookingTime} onChange={e=>upd(t.key,"cookingTime",e.target.value)} style={{...SI.inp,width:56,padding:"4px 6px",fontSize:11,textAlign:"center"}}/>
+              <input type="number" value={sr.experience} onChange={e=>upd(t.key,"experience",e.target.value)} style={{...SI.inp,width:50,padding:"4px 6px",fontSize:11,textAlign:"center"}}/>
+            </div>
+          </>}
+        </div>
+        {on&&pickFor===t.key&&<div style={{maxHeight:180,overflow:"hidden",marginLeft:20}}>
+          <IngredientPicker value={sel} onChange={v=>{setSel(v);upd(t.key,"ingredient",v);}} modItems={modItems} modBlocks={modBlocks} vanillaItems={vanillaItems} textures={textures}/>
+        </div>}
+      </div>;})}
+    {available.some(t=>has(t.key))&&<div style={{display:"flex",gap:16,marginLeft:20}}>
+      <Lbl c={C.faint}>input</Lbl><Lbl c={C.faint}>time</Lbl><Lbl c={C.faint}>xp</Lbl>
+    </div>}
+  </div>;
+}
+function RecipePanelWrapper({modItems,modBlocks,textures}){
+  const{form,F}=useContext(FormCtx);
+  return<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+    <div style={{flex:1,padding:"14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      <Chk label="Crafting" checked={!!form.hasRecipe} onChange={v=>F("hasRecipe",v)}/>
+      {form.hasRecipe&&<CraftingPanel modItems={modItems} modBlocks={modBlocks} textures={textures}/>}
+      <div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:10}}>
+        <SmeltingSection modItems={modItems} modBlocks={modBlocks} textures={textures}/>
+      </div>
+    </div>
   </div>;
 }
 
@@ -2704,12 +2965,31 @@ function TagsPanel(){
   const isCustom=q&&!allTags.some(t=>t.toLowerCase()===q);
   const addCustom=()=>{if(q&&isCustom){toggle(q);setSrch("");}};
   return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>
-    <Lbl>Tags — search or add custom</Lbl>
+    <div style={{border:`1px solid ${C.inpB}`,borderRadius:4,padding:"8px 10px",background:"#141414",minHeight:32,display:"flex",flexWrap:"wrap",gap:3,alignItems:"center"}}>
+      {tags.length?tags.map(t=><Pill key={t} onClick={()=>toggle(t)} color="#192a19"><span style={{color:"#5acc5a",fontSize:10,fontFamily:"monospace"}}>{t} ✕</span></Pill>):<span style={{color:C.faint,fontSize:11}}>no tags enabled</span>}
+    </div>
     <div style={{display:"flex",gap:6}}>
-      <input value={srch} onChange={e=>setSrch(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCustom();}} placeholder="search or type custom tag..." style={{...SI.inp,fontSize:11,flex:1}}/>
+      <input value={srch} onChange={e=>setSrch(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCustom();}} style={{...SI.inp,fontSize:11,flex:1}}/>
       {isCustom&&<Btn sm v="p" onClick={addCustom}>add</Btn>}
     </div>
     <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:4}}>{visTags.map(t=><div key={t} onClick={()=>toggle(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}{tags.includes(t)&&<span style={{marginLeft:3,opacity:.6}}>✕</span>}</div>)}</div>
+  </div>;
+}
+function VariantsPanel({textures}){
+  const{form,F}=useContext(FormCtx);
+  const VARIANTS=[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]];
+  return<div style={{padding:"14px",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:10}}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{VARIANTS.map(([k,l])=><Chk key={k} label={l} checked={!!form[k]} onChange={v=>F(k,v)}/>)}</div>
+    {form.createDoor&&<div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8,display:"flex",flexDirection:"column",gap:6}}>
+      <Lbl>Door Textures</Lbl>
+      <TexSel textures={textures} value={form.textureDoorTopId||""} onChange={v=>F("textureDoorTopId",v)} label="Top"/>
+      <TexSel textures={textures} value={form.textureDoorBottomId||""} onChange={v=>F("textureDoorBottomId",v)} label="Bottom"/>
+      <TexSel textures={textures} value={form.textureDoorItemId||""} onChange={v=>F("textureDoorItemId",v)} label="Item"/>
+    </div>}
+    {form.createTrapdoor&&<div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8,display:"flex",flexDirection:"column",gap:6}}>
+      <Lbl>Trapdoor Texture</Lbl>
+      <TexSel textures={textures} value={form.textureTrapdoorId||""} onChange={v=>F("textureTrapdoorId",v)}/>
+    </div>}
   </div>;
 }
 
@@ -2730,15 +3010,6 @@ function TooltipPanel(){
   </div>;
 }
 
-function RecipePanelWrapper({modItems,modBlocks,textures}){
-  const{form,F}=useContext(FormCtx);
-  return<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-    <div style={{padding:"10px 14px",borderBottom:"1px solid #1a1a1a",flexShrink:0}}>
-      <Chk label="Add custom recipe?" checked={!!form.hasRecipe} onChange={v=>F("hasRecipe",v)}/>
-    </div>
-    {form.hasRecipe?<RecipePanel modItems={modItems} modBlocks={modBlocks} textures={textures}/>:<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:C.faint,fontSize:12}}>enable above to edit</div>}
-  </div>;
-}
 
 function CodePanel({textures,isBlock=false}){
   const{form}=useContext(FormCtx);
@@ -2766,7 +3037,7 @@ function TexturePickerPanel({textures,fkey="textureId",label="Texture"}){
   };
   return<div style={{flex:1,padding:"12px 14px",overflowY:"auto",display:"flex",flexDirection:"column",gap:9}}>
     <Lbl>{label}</Lbl>
-    <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="search bank…" style={{...SI.inp,fontSize:11}}/>
+    <input value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,fontSize:11}}/>
     <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
       <div onClick={()=>fRef.current.click()} style={{width:90,height:100,background:C.card,border:`1px dashed ${C.inpB}`,borderRadius:C.r,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",gap:4,flexShrink:0}}>
         <span style={{fontSize:20,color:C.dim}}>+</span>
@@ -2804,11 +3075,11 @@ function CustomClassPanel(){
 
 // ─── Visual Scripting UI ──────────────────────────────────────────────────────
 
-function VisualEditorPanel({methodKey,form,F,onBack,className}){
-  return <ErrorBoundary><VisualEditorPanelInner methodKey={methodKey} form={form} F={F} onBack={onBack} className={className}/></ErrorBoundary>;
+function VisualEditorPanel({methodKey,form,F,onBack,className,isEffect}){
+  return <ErrorBoundary><VisualEditorPanelInner methodKey={methodKey} form={form} F={F} onBack={onBack} className={className} isEffect={isEffect}/></ErrorBoundary>;
 }
-function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
-  const def=ITEM_METHODS.find(m=>m.key===methodKey);
+function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
+  const def=ITEM_METHODS.find(m=>m.key===methodKey)||EFFECT_METHODS.find(m=>m.key===methodKey);
   const{variables}=useVariables();
   const{attributes:modAttributes}=useAttributes();
   const{effects:modEffects}=useEffects();
@@ -2816,7 +3087,12 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   __modEffectsCache = modEffects || [];
   __variablesCache = variables || [];
   const palette=useMemo(()=>buildPalette(variables,modAttributes),[variables,modAttributes]);
-  const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[{id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null}];};
+  const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[
+    {id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null},
+    {id:"_init_num",opcode:"number.literal",x:60,y:180,fields:{value:"0"},slots:{},nextId:null,linkType:"number"},
+    {id:"_init_txt",opcode:"text.literal",x:200,y:180,fields:{value:""},slots:{},nextId:null,linkType:"text"},
+    {id:"_init_ent",opcode:"entity.event",x:340,y:180,fields:{},slots:{},nextId:null,linkType:"entity"},
+  ];};
   const[nodes,setNodes]=useState(init);
   const[selected,setSelected]=useState(null);
   const selRef=useRef(null);
@@ -3110,15 +3386,20 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className}){
   };
   const save=async()=>{
     setSaving(true);setSaveStatus(null);
-    const j=await api("/items/custom-class/read",{className});
+    const readEndpoint=isEffect?"/effects/custom-class/read":"/items/custom-class/read";
+    const writeEndpoint=isEffect?"/effects/custom-class/write":"/items/custom-class/write";
+    const j=await api(readEndpoint,{className});
     if(!j.ok){setSaving(false);setSaveStatus({ok:false,msg:j.reason});return;}
     let c2=j.code;
     const bm="//YCS:"+methodKey+":body",st="//YCS:"+methodKey+":start";
-    if(!c2.includes(bm)&&c2.includes(st)){const d2=ITEM_METHODS.find(m=>m.key===methodKey);if(d2){c2=ycsRemoveMethod(c2,methodKey);c2=ycsInjectMethod(c2,methodKey);c2=ycsSyncImports(c2,ycsGetEnabledMethods(c2));}}
+    const methodList=isEffect?EFFECT_METHODS:ITEM_METHODS;
+    const syncFn=isEffect?ycsEffectSyncImports:ycsSyncImports;
+    const getEnabled=(c)=>ycsGetEnabledMethods(c,methodList);
+    if(!c2.includes(bm)&&c2.includes(st)){const d2=methodList.find(m=>m.key===methodKey);if(d2){c2=ycsRemoveMethod(c2,methodKey);c2=ycsInjectMethod(c2,methodKey,methodList);c2=syncFn(c2,getEnabled(c2));}}
     const sn=nodes.find(n=>n.id==="start");
     const bl=sn?.nextId?compileChain(sn.nextId,nodes,methodKey):[];
     const injected=ycsInjectCompiledBody(c2,methodKey,bl);
-    const j2=await api("/items/custom-class/write",{className,code:ycsSyncImports(injected,ycsGetEnabledMethods(injected))});
+    const j2=await api(writeEndpoint,{className,code:syncFn(injected,getEnabled(injected))});
     setSaving(false);setSaveStatus({ok:j2.ok,msg:j2.ok?"saved":"error: "+(j2.reason||"?")});
     if(j2.ok)setTimeout(()=>{setSaveStatus(null);onBack();},700);
   };
@@ -3255,7 +3536,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       </span>}
       {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
-      {node.opcode==="text.literal"&&<input value={node.fields?.value??""} placeholder="text…" onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+      {node.opcode==="text.literal"&&<input value={node.fields?.value??""} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(80, ((node.fields?.value||"").length*8)+24),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:14,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
       {node.opcode==="number.math"&&<>
           <SlotConn sk="a" sc="rgba(0,0,0,0.3)" connId={node.slots?.a} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -3484,16 +3765,14 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
             <option value="base_add">Add to Base</option>
             <option value="base_multiply">Multiply Base</option>
           </select>
-          {!["base_set","base_add","base_multiply"].includes(node.fields?.operation)&&<input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="modifier name"
-            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>}
+          {!["base_set","base_add","base_multiply"].includes(node.fields?.operation)&&<input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()}            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>}
           <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>on</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {isAttrModRemove&&<>
           <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
-          <input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()} placeholder="modifier name"
-            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>
+          <input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()}            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
@@ -3693,10 +3972,26 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               </tr>
             </tbody>
           </table>
-          <label style={{display:"flex",alignItems:"center",gap:6,color:"#ccc",fontSize:12,cursor:"pointer",marginTop:4}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showInFirstPerson",!node.fields?.showInFirstPerson);}}>
-            <input type="checkbox" checked={!!node.fields?.showInFirstPerson} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
-            Show in First Person
-          </label>
+          {(()=>{
+            const fpMask = node.fields?.fpViewMask||0;
+            const FpCB = ({bit,label})=>(
+              <label style={{display:"flex",alignItems:"center",gap:5,color:"#ccc",fontSize:12,cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"fpViewMask",(fpMask^bit));}}>
+                <input type="checkbox" checked={!!(fpMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+                {label}
+              </label>
+            );
+            return <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:4,borderTop:"1px solid #333",paddingTop:6}}>
+              <div style={{color:"#888",fontSize:11,fontWeight:600}}>Show in First Person</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                <FpCB bit={4} label="R.Arm"/>
+                <FpCB bit={8} label="L.Arm"/>
+                <FpCB bit={16} label="R.Leg"/>
+                <FpCB bit={32} label="L.Leg"/>
+                <FpCB bit={1} label="Head"/>
+                <FpCB bit={2} label="Torso"/>
+              </div>
+            </div>;
+          })()}
         </div>;
       })()}
     </div>
@@ -3736,7 +4031,7 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
   };
 
   return<div style={{padding:"14px",display:"flex",flexDirection:"column",gap:7}}>
-    <Lbl>Override Methods</Lbl>
+    <Lbl>Methods</Lbl>
     {ITEM_METHODS.filter(m=>!m.hidden).map(m=>{
       const isOn=enabled.includes(m.key);
       const busy=busyKey===m.key;
@@ -3814,12 +4109,12 @@ function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,acti
       {activePanel==="tags"&&<TagsPanel/>}
       {activePanel==="tooltip"&&<TooltipPanel/>}
       {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks} textures={textures}/>}
-      {activePanel==="code"&&<CodePanel textures={textures} isBlock={isBlock}/>}
+      {activePanel==="variants"&&<VariantsPanel textures={textures}/>}
     </div>
   </div>;
 }
 
-function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,consoleH,activePanel,setActivePanel,rightView,setRightView}){
+function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[],showCons,consoleH,activePanel,setActivePanel,rightView,setRightView}){
   const{form,F}=useContext(FormCtx);
   const{options:creativeTabOptions}=useCreativeTabs();
   const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
@@ -3852,13 +4147,13 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       const j4=await api("/items/model",{line:code.modelLine,constName:code.CN,id:form.id});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}
-      if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      if(gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
     }else{
       const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine,fpReg:code.fpReg,isAnimated:code.tex?.isAnimated||false});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
       await wtItem();
       for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}
-      if(form.hasRecipe&&gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      if(gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
       else{const jr=await api("/recipes/delete",{constName:initial.constName||initial.id?.toUpperCase()});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:false});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:false});}
     }
@@ -3892,11 +4187,12 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
 
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Item":"New Item"}</span></div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-      <IdField label="Item ID" value={form.id} onChange={v=>{F("id",v);if(!isEdit){F("constName",v.toUpperCase());F("displayName",v.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" "));}}}/>
-      <ConstField form={form} F={F}/>
+    <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)}/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:4}}><Lbl>ID</Lbl>{valId(form.id)&&form.id&&<span style={{fontSize:11,color:"#ff7777"}}>{valId(form.id)}</span>}</div><Chk label="Custom const" checked={!!form.customConstName} onChange={v=>F("customConstName",v)}/></div>
+      <input value={form.id} onChange={e=>{const v=e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"");F("id",v);if(!isEdit){F("constName",v.toUpperCase());F("displayName",v.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" "));}if(!form.customConstName)F("constName",v.toUpperCase());}} style={{...SI.inp}}/>
     </div>
-    <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Mother Flame"/>
+    <ConstField form={form} F={F}/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Texture</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
@@ -3906,9 +4202,8 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
             :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
           <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
         </div>
-        <Btn sm v="g" onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+        <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
       </div>
-      {selTex?.isAnimated&&<span style={{fontSize:10,color:C.accent}}>animated — mcmeta auto-written</span>}
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
     <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
@@ -3947,7 +4242,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
         </div>}
 
     <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:12}}>
-      <Lbl>Override Methods</Lbl>
+      <Lbl>Methods</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
         <span style={{fontSize:13,color:form.customItemClass?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{form.customItemClass ? `${form.customItemClass}.java` : "none added"}</span>
         <Btn sm v={activePanel==="customclass"?"p":"g"} onClick={async()=>{
@@ -3963,7 +4258,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       </div>
     </div>
     <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
-    {!form.isTool&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}} placeholder="64"/>}
+    {!form.isTool&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}}/>}
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       <Chk label="Set Use Duration" checked={!!form.hasUseDuration} onChange={v=>F("hasUseDuration",v)}/>
       {form.hasUseDuration&&<Inp label="Duration (ticks)" value={form.useDuration||"72000"} onChange={v=>F("useDuration",v)} type="number"/>}
@@ -3981,22 +4276,33 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],showCons,
       </div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Tooltip{form.hasTooltip&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <Lbl>Tooltip</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
         <span style={{fontSize:13,color:form.hasTooltip?C.text:C.faint}}>{form.hasTooltip?form.tooltipNormal||"(set)":"disabled"}</span>
         <Btn sm v={activePanel==="tooltip"?"p":"g"} onClick={()=>setActivePanel(p=>p==="tooltip"?null:"tooltip")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
       </div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Recipe{form.hasRecipe&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <Lbl>Recipe</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
-        <span style={{fontSize:13,color:form.hasRecipe?C.text:C.faint}}>{form.hasRecipe?`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`:"disabled"}</span>
+        <span style={{fontSize:13,color:(form.hasRecipe||form.smeltingRecipes?.length)?C.text:C.faint}}>{(()=>{const p=[];if(form.hasRecipe)p.push(`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`);const sc=form.smeltingRecipes?.length||0;if(sc)p.push(`${sc} smelting`);return p.length?p.join(" + "):"disabled";})()}</span>
         <Btn sm v={activePanel==="recipe"?"p":"g"} onClick={()=>setActivePanel(p=>p==="recipe"?null:"recipe")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
       </div>
     </div>
-    {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{tags.map(t=><Pill key={t} onClick={()=>F("tags",tags.filter(x=>x!==t))}>{t} ✕</Pill>)}</div>}
     <Sbar messages={status}/>
-    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} showCons={showCons} consoleH={consoleH} onCode={()=>setActivePanel(p=>p==="code"?null:"code")}/>
+    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} showCons={showCons} consoleH={consoleH} onDelete={onDelete}/>
+  </div>;
+}
+
+function ItemFullEditor({rightView,setRightView,setActivePanel}){
+  const{form,F}=useContext(FormCtx);
+  return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <VisualEditorPanel
+      methodKey={rightView.editingMethod}
+      form={form}
+      F={F}
+      className={form.customItemClass||idToClassName(form.id||"item")}
+      onBack={()=>{setRightView({mode:"methodList",editingMethod:null});setActivePanel("customclass");}}/>
   </div>;
 }
 
@@ -4005,7 +4311,7 @@ function ItemRight({textures,modItems=[],activePanel,setActivePanel,rightView,se
   return<RightPaneShell modItems={modItems} textures={textures} isBlock={false} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView} itemForm={form} itemF={F}/>;
 }
 
-function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlocks=[],showCons,consoleH,activePanel,setActivePanel,setHighlightFaceKey}){
+function BlockLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[],modBlocks=[],showCons,consoleH,activePanel,setActivePanel,setHighlightFaceKey}){
   const{form,F}=useContext(FormCtx);
   const{options:creativeTabOptions}=useCreativeTabs();
   const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
@@ -4042,14 +4348,14 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
       msgs.push({ok:j2.ok,label:`ModBlocks(${entries.length})`,msg:j2.ok?"ok":j2.reason});
       if(j2.results)j2.results.forEach(r=>msgs.push({ok:r.ok,label:r.constName,msg:r.ok?"ok":r.reason}));
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:true});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:true});}
-      if(form.hasRecipe&&gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      if(gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
       else{const jr=await api("/recipes/delete",{constName:CN});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
     }else{
       const j=await api("/blocks/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,entries,newConstName:CN,newId:form.id,langKey:entries[0].langKey,langVal:entries[0].langVal,creativeTab:form.creativeTab});
       msgs.push({ok:j.ok,label:`ModBlocks(${entries.length}) update`,msg:j.ok?"ok":j.reason});
       if(j.results)j.results.forEach(r=>msgs.push({ok:r.ok,label:r.constName,msg:r.ok?"ok":r.reason}));
       if(form.tags?.length){const jt=await api("/tags/set",{id:form.id,constName:CN,tags:form.tags,isBlock:true});msgs.push({ok:jt.ok,label:"tags",msg:jt.ok?`${jt.added||0} ok`:jt.reason});}else{await api("/tags/delete",{constName:CN,isBlock:true});}
-      if(form.hasRecipe&&gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
+      if(gRecipe(form.id,form,true)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form,true)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
       else{const jr=await api("/recipes/delete",{constName:CN});msgs.push({ok:jr.ok,label:"recipe del",msg:jr.ok?"ok":jr.reason});}
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModBlocks.${CN}`,blockId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
@@ -4072,18 +4378,19 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
           }
           <span style={{fontSize:13,color:t||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?t.label:dUrl?"(direct)":"none selected"}</span>
         </div>
-        <Btn sm v="g" onClick={()=>setFace(fkey)} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+        <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setFace(fkey)} style={{marginLeft:8,flexShrink:0}}>set</Btn>
       </div>
     </div>;
   };
   const dropType=orient==="simple"?(form.dropType||"Self"):"Self";
   return<div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:13}}>
-    <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Block":"New Block"}</span>{isEdit&&<Pill color="#1a2438">editing</Pill>}</div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-      <IdField label="Block ID" value={form.id} onChange={v=>{F("id",v);if(!isEdit){F("constName",v.toUpperCase());F("displayName",v.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" "));}}}/>
-      <ConstField form={form} F={F}/>
+    <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:500}}>{isEdit?"Edit Block":"New Block"}</span></div>
+    <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)}/>
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:4}}><Lbl>ID</Lbl>{valId(form.id)&&form.id&&<span style={{fontSize:11,color:"#ff7777"}}>{valId(form.id)}</span>}</div><Chk label="Custom const" checked={!!form.customConstName} onChange={v=>F("customConstName",v)}/></div>
+      <input value={form.id} onChange={e=>{const v=e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"");F("id",v);if(!isEdit){F("constName",v.toUpperCase());F("displayName",v.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" "));}if(!form.customConstName)F("constName",v.toUpperCase());}} style={{...SI.inp}}/>
     </div>
-    <Inp label="Display Name" value={form.displayName} onChange={v=>F("displayName",v)} placeholder="Obsidian Bricks"/>
+    <ConstField form={form} F={F}/>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       <Lbl>Block Orientation</Lbl>
       <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{[{v:"simple",l:"Simple"},{v:"pillar",l:"Rotated Pillar"},{v:"directional",l:"Directional"}].map(o=><label key={o.v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><div onClick={()=>F("orientationType",o.v)} style={{width:13,height:13,borderRadius:"50%",border:`2px solid ${orient===o.v?C.accent:C.inpB}`,background:orient===o.v?C.accent:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:"#a0a09a"}}>{o.l}</span></label>)}</div>
@@ -4091,8 +4398,8 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
         <Lbl>Drop</Lbl>
         <Sel value={dropType} onChange={v=>F("dropType",v)} options={["Self","Ore","Custom"]} disabled={orient!=="simple"}/>
         {(dropType==="Ore"||dropType==="Custom")&&<div style={{display:"grid",gridTemplateColumns:dropType==="Ore"?"1fr 100px":"1fr",gap:10,marginTop:4}}>
-          <Inp label="Drop Item/Block (ResourceLocation)" value={form.dropItem} onChange={v=>F("dropItem",v)} placeholder="yebisurpg:shika"/>
-          {dropType==="Ore"&&<Inp label="XP (e.g. 1-3)" value={form.dropXp} onChange={v=>F("dropXp",v)} placeholder="1-3"/>}
+          <Inp label="Drop Item/Block (ResourceLocation)" value={form.dropItem} onChange={v=>F("dropItem",v)}/>
+          {dropType==="Ore"&&<Inp label="XP (e.g. 1-3)" value={form.dropXp} onChange={v=>F("dropXp",v)}/>}
         </div>}
       </div>
       {orient==="simple"&&<TexRow label="All Faces" fkey="textureId"/>}
@@ -4112,17 +4419,13 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/><Sel label="Sound" value={form.soundType} onChange={v=>F("soundType",v)} options={SOUND_TYPES}/></div>
-    {orient==="simple"&&<Sect title={<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",margin:"-4px 0"}}><input type="checkbox" checked={!!form.showVariants} onChange={e=>F("showVariants",e.target.checked)} style={{cursor:"pointer",margin:0}}/><span style={{fontSize:13,fontWeight:500,color:C.text}}>Add Variants</span></label>}>
-      {form.showVariants&&<div style={{marginTop:8}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].map(([k,l])=><Chk key={k} label={l} checked={!!form[k]} onChange={v=>F(k,v)}/>)}</div>
-        {form.createDoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`,display:"flex",flexDirection:"column",gap:2}}>
-          <TexRow label="Door Top" fkey="textureDoorTopId"/>
-          <TexRow label="Door Bottom" fkey="textureDoorBottomId"/>
-          <TexRow label="Door Item" fkey="textureDoorItemId"/>
-        </div>}
-        {form.createTrapdoor&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.inpB}`}}><TexRow label="Trapdoor" fkey="textureTrapdoorId"/></div>}
-      </div>}
-    </Sect>}
+    {orient==="simple"&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Variants{(()=>{const vc=[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].filter(([k])=>form[k]).length;return vc>0?<span style={{color:C.accent,marginLeft:5}}>{vc}</span>:null;})()}</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:(()=>{const v=[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].filter(([k])=>form[k]);return v.length?C.text:C.faint;})()}}>{(()=>{const v=[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].filter(([k])=>form[k]).map(([,l])=>l);return v.length?v.join(", "):"none";})()}</span>
+        <Btn sm v={activePanel==="variants"?"p":"g"} onClick={()=>setActivePanel(p=>p==="variants"?null:"variants")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
+      </div>
+    </div>}
     <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:4}}>
       <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
@@ -4131,22 +4434,21 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,modItems=[],modBlock
       </div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Tooltip{form.hasTooltip&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <Lbl>Tooltip</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
         <span style={{fontSize:13,color:form.hasTooltip?C.text:C.faint}}>{form.hasTooltip?form.tooltipNormal||"(set)":"disabled"}</span>
         <Btn sm v={activePanel==="tooltip"?"p":"g"} onClick={()=>setActivePanel(p=>p==="tooltip"?null:"tooltip")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
       </div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <Lbl>Recipe{form.hasRecipe&&<span style={{color:"#5acc5a",marginLeft:5}}>on</span>}</Lbl>
+      <Lbl>Recipe</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
-        <span style={{fontSize:13,color:form.hasRecipe?C.text:C.faint}}>{form.hasRecipe?`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`:"disabled"}</span>
+        <span style={{fontSize:13,color:(form.hasRecipe||form.smeltingRecipes?.length)?C.text:C.faint}}>{(()=>{const p=[];if(form.hasRecipe)p.push(`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`);const sc=form.smeltingRecipes?.length||0;if(sc)p.push(`${sc} smelting`);return p.length?p.join(" + "):"disabled";})()}</span>
         <Btn sm v={activePanel==="recipe"?"p":"g"} onClick={()=>setActivePanel(p=>p==="recipe"?null:"recipe")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
       </div>
     </div>
-    {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{tags.map(t=><Pill key={t} onClick={()=>F("tags",tags.filter(x=>x!==t))}>{t} ✕</Pill>)}</div>}
     <Sbar messages={status}/>
-    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} showCons={showCons} consoleH={consoleH} onCode={()=>setActivePanel(p=>p==="code"?null:"code")}/>
+    <FormActions onCancel={onCancel} onSave={save} saving={saving} canSave={!!form.id.trim()&&!valId(form.id)} showCons={showCons} consoleH={consoleH} onDelete={onDelete}/>
   </div>;
 }
 
@@ -4155,7 +4457,7 @@ function BlockRight({textures,modItems=[],modBlocks=[],activePanel,setActivePane
 }
 
 export default function App(){
-  const[tab,setTab]=useState("textures");
+  const[tab,setTab]=useLS("ycs_active_tab","textures");
   const[textures,setTextures]=useLS("ycs_textures",[]);
   const[items,setItems]=useLS("ycs_items",[]);
   const[blocks,setBlocks]=useLS("ycs_blocks",[]);
@@ -4173,7 +4475,6 @@ export default function App(){
   const[tabsPageEditing,setTabsPageEditing]=useState(false);
   const[tabsPageNewTrigger,setTabsPageNewTrigger]=useState(0);
   const[tabsEditingTarget,setTabsEditingTarget]=useState(null); // null | "new" | {key,...}
-  const[tabsViewingTarget,setTabsViewingTarget]=useState(null); // null | option
   const[keybindsPageEditing,setKeybindsPageEditing]=useState(false);
   const[keybindsPageNewTrigger,setKeybindsPageNewTrigger]=useState(0);
   const[keybindsEditingTarget,setKeybindsEditingTarget]=useState(null); // null | "new" | {key,...}
@@ -4192,7 +4493,7 @@ export default function App(){
   const{rs,running,run}=useRun();
   const isElectron=typeof window!=="undefined"&&window.ycsNative?.isElectron;
   const native=typeof window!=="undefined"?window.ycsNative:null;
-  const isRunning=rs.state!=="idle";
+  const isRunning=rs.state.startsWith("running");
 
   useEffect(()=>{fetch(`${BASE}/health`).then(r=>r.json()).then(()=>setBackOk(true)).catch(()=>setBackOk(false));},[]);
   useEffect(()=>{setActivePanel(null);setHighlightFaceKey("textureId");},[!!texEd,!!itemEd,!!blockEd,texEd?.target?.id,itemEd?.target?.id,blockEd?.target?.id]);
@@ -4220,8 +4521,8 @@ export default function App(){
     });
   },[modBlocks]);
   const texEntries=useMemo(()=>textures.map(t=>({...t,displayName:t.label,previewDataUrl:t.dataUrl})),[textures]);
-  const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allItems,textures]);
-  const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl};}), [allBlocks,textures]);
+  const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl,isAnimated:t?.isAnimated,frames:t?.frames,ticksPerFrame:t?.ticksPerFrame};}), [allItems,textures]);
+  const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl,isAnimated:t?.isAnimated,frames:t?.frames,ticksPerFrame:t?.ticksPerFrame};}), [allBlocks,textures]);
   const delTex=id=>setTextures(arr=>arr.filter(x=>x.id!==id));
   const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});if(item.customItemClass)await api("/items/custom-class/delete",{className:item.customItemClass});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const delBlock=async id=>{const b=allBlocks.find(x=>x.id===id);if(!b)return;await api("/blocks/delete",{id,constName:b.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"block"});setBlocks(arr=>arr.filter(x=>x.id!==id));reloadMod();};
@@ -4282,7 +4583,13 @@ export default function App(){
         setItemEd(null);savedEdState.current.items=null;
         setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});
       };
-      return<ItemProv initial={init} formOverride={itemEd.liveForm||null} onFormChange={f=>setItemEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={cancelItem} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/></div></div></ItemProv>;}
+      const deleteItemFromEditor=init?async()=>{await delItem(init.id);setItemEd(null);savedEdState.current.items=null;setActivePanel(null);setRightView({mode:"methodList",editingMethod:null});}:undefined;
+      const inItemVisualEditor=activePanel==="customclass"&&rightView?.mode==="visualEditor";
+      return<ItemProv initial={init} formOverride={itemEd.liveForm||null} onFormChange={f=>setItemEd(e=>({...e,liveForm:f}))}>
+        {inItemVisualEditor
+          ?<ItemFullEditor rightView={rightView} setRightView={setRightView} setActivePanel={setActivePanel}/>
+          :<div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><ItemLeft textures={textures} initial={init} isEdit={!!init} onSave={saveItem} onCancel={cancelItem} onDelete={deleteItemFromEditor} modItems={allItems} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><ItemRight textures={textures} modItems={allItems} activePanel={activePanel} setActivePanel={setActivePanel} rightView={rightView} setRightView={setRightView}/></div></div>}
+      </ItemProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={itemEntries} emptyLabel="No items yet." onDelete={delItem} onOpen={e=>setItemEd({target:e})}/></div>;
     }
     if(tab==="blocks"){
@@ -4298,11 +4605,12 @@ export default function App(){
         setBlockEd(null);savedEdState.current.blocks=null;
         setActivePanel(null);
       };
-      return<BlockProv initial={init} formOverride={blockEd.liveForm||null} onFormChange={f=>setBlockEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={cancelBlock} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
+      const deleteBlockFromEditor=init?async()=>{await delBlock(init.id);setBlockEd(null);savedEdState.current.blocks=null;setActivePanel(null);}:undefined;
+      return<BlockProv initial={init} formOverride={blockEd.liveForm||null} onFormChange={f=>setBlockEd(e=>({...e,liveForm:f}))}><div style={{display:"flex",gap:5,flex:1,overflow:"hidden",minHeight:0}}><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><div style={{flex:1,overflowY:"auto"}}><BlockLeft textures={textures} initial={init} isEdit={!!init} onSave={saveBlock} onCancel={cancelBlock} onDelete={deleteBlockFromEditor} modItems={allItems} modBlocks={allBlocks} showCons={showCons} consoleH={consH} activePanel={activePanel} setActivePanel={setActivePanel} setHighlightFaceKey={setHighlightFaceKey}/></div></div><div style={{flex:1,background:C.panel,border:`1px solid ${C.pb}`,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column"}}><BlockRight textures={textures} modItems={allItems} modBlocks={allBlocks} activePanel={activePanel} setActivePanel={setActivePanel} highlightFaceKey={highlightFaceKey}/></div></div></BlockProv>;}
       return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0}}><CardGrid entries={blockEntries} emptyLabel="No blocks yet." onDelete={delBlock} onOpen={e=>setBlockEd({target:e})}/></div>;
     }
     if(tab==="tabs"){
-      return<TabsPage allItems={allItems} allBlocks={allBlocks} textures={textures} reloadMod={reloadMod} onEditingChange={setTabsPageEditing} newTrigger={tabsPageNewTrigger} editing={tabsEditingTarget} setEditing={setTabsEditingTarget} viewing={tabsViewingTarget} setViewing={setTabsViewingTarget}/>;
+      return<TabsPage allItems={allItems} allBlocks={allBlocks} textures={textures} reloadMod={reloadMod} onEditingChange={setTabsPageEditing} newTrigger={tabsPageNewTrigger} editing={tabsEditingTarget} setEditing={setTabsEditingTarget}/>;
     }
     if(tab==="keybinds"){
       return<KeybindsPage reloadMod={reloadMod} onEditingChange={setKeybindsPageEditing} newTrigger={keybindsPageNewTrigger} editing={keybindsEditingTarget} setEditing={setKeybindsEditingTarget}/>;
@@ -4317,7 +4625,7 @@ export default function App(){
       return<AttributesPage onEditingChange={setAttributesPageEditing} newTrigger={attributesPageNewTrigger} editing={attributesEditingTarget} setEditing={setAttributesEditingTarget}/>;
     }
     if(tab==="effects"){
-      return<EffectsPage onEditingChange={setEffectsPageEditing} newTrigger={effectsPageNewTrigger} editing={effectsEditingTarget} setEditing={setEffectsEditingTarget}/>;
+      return<EffectsPage onEditingChange={setEffectsPageEditing} newTrigger={effectsPageNewTrigger} editing={effectsEditingTarget} setEditing={setEffectsEditingTarget} textures={textures} showCons={showCons} consoleH={consH}/>;
     }
     return null;
   };
@@ -4354,7 +4662,6 @@ export default function App(){
         {/* Gradle dots — vertically centered in tab bar row, right-aligned with window buttons */}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingRight:13,WebkitAppRegion:"no-drag",flexShrink:0}}>
           <Dot color={showCons?"#e4e5e9":"#3a3a3c"} title={showCons?"Hide console":"Show console"} onClick={()=>setShowCons(v=>!v)}/>
-          <Dot color="#3a3a3c" title="Refresh YCS" onClick={async()=>{await fetch(`${BASE}/refresh`,{method:"POST"});reloadMod();}} />
           <Dot color={isRunning||running?"#555":"#e4e5e9"} title="RunData" disabled={isRunning||running} onClick={()=>run("/run/data")}/>
           <Dot color={isRunning||running?"#555":"#e4e5e9"} title={rs.dirty?"RunData then RunClient":"RunClient"} disabled={isRunning||running} onClick={()=>run("/run/client")}/>
         </div>

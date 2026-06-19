@@ -9,6 +9,8 @@ import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.ye6isu.yebisuRPG.animation.AnimationAPI;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 //YCS_Import_END
 
 public class PlankItem extends Item {
