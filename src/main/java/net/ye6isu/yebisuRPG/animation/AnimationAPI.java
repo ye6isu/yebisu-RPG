@@ -309,12 +309,20 @@ public final class AnimationAPI {
     public static void setThirdPersonPose(Entity entity, String animName, String filePath,
                                            int lookAtMask, int vanillaMask, int vanillaMoveMask,
                                            boolean allowVanillaActions, boolean keepPosScale) {
+        int actMask = allowVanillaActions ? 0x3F : 0;
+        int keepMask = keepPosScale ? 0x3F : 0;
+        setThirdPersonPose(entity, animName, filePath, lookAtMask, vanillaMask, vanillaMoveMask, actMask, keepMask);
+    }
+
+    public static void setThirdPersonPose(Entity entity, String animName, String filePath,
+                                           int lookAtMask, int vanillaMask, int vanillaMoveMask,
+                                           int allowActionsMask, int keepPosScaleMask) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] setThirdPersonPose called client-side for entity={}; ignoring.", entity.getId());
             return;
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload.set(
-                entity.getId(), animName, filePath, lookAtMask, vanillaMask, vanillaMoveMask, allowVanillaActions, keepPosScale);
+                entity.getId(), animName, filePath, lookAtMask, vanillaMask, vanillaMoveMask, allowActionsMask, keepPosScaleMask);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 

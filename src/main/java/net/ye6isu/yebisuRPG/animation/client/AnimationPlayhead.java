@@ -76,6 +76,7 @@ public final class AnimationPlayhead {
     public static final int MOVE_CROUCH_STILL   = 1 << 13;
     public static final int MOVE_SITTING_MOVING = 1 << 16;
     public static final int MOVE_SITTING_STILL  = 1 << 17;
+    public static final int SHOW_IN_FIRST_PERSON = 1 << 18;
 
     private final int entityId;
     private final AnimationCategory category;
@@ -212,6 +213,7 @@ public final class AnimationPlayhead {
     public boolean           isDone()          { return state == State.DONE;    }
     public boolean           looksAt(int bit)  { return (lookAtMask & bit) != 0; }
     public boolean           allowsVanilla(int bit){ return (vanillaMask & bit) != 0; }
+    public boolean           showInFirstPerson()  { return (vanillaMoveMask & SHOW_IN_FIRST_PERSON) != 0; }
 
     public float getBlendInWeight(float partialTick) {
         long elapsedMs = System.currentTimeMillis() - createdMs;

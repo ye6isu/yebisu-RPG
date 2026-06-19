@@ -1,0 +1,42 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"testf": {
+			"loop": true,
+			"animation_length": 1,
+			"bones": {
+				"left_arm": {
+					"scale": {
+						"0": {
+							"vector": [0, 0, 0]
+						},
+						"1": {
+							"vector": [0, 0, 0]
+						}
+					}
+				},
+				"right_arm": {
+					"position": {
+						"0": {
+							"vector": [3, 1, 0]
+						},
+						"1": {
+							"vector": [3, 1, 0]
+						},
+						"0.5": {
+							"vector": [3, 1.2, 0]
+						}
+					},
+					"rotation": {
+						"0": {
+							"vector": [-95.5487, 3.965, 52.3944]
+						},
+						"1": {
+							"vector": [-95.5487, 3.965, 52.3944]
+						}
+					}
+				}
+			}
+		}
+	}
+}
