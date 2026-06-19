@@ -92,13 +92,10 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload tpPoseHead =
                 (playhead == null && poseAnimHead != null) ? engine.getThirdPersonPosePayload(entity.getId()) : null;
 
-        // Allow Vanilla Actions: when the pose has this flag and the entity is performing
-        // a vanilla action, skip (or partially skip) the pose override.
-        if (playhead == null && tpPoseHead != null && tpPoseHead.allowVanillaActions()
+        // Allow Vanilla Actions: when any part has this flag and the entity is performing
+        // a vanilla action, let vanilla run (don't zero attackTime).
+        if (playhead == null && tpPoseHead != null && tpPoseHead.hasAnyAllowActions()
                 && isPerformingVanillaAction(entity)) {
-            // keepPosScale: don't suppress swing — let vanilla rotation play through
-            if (!tpPoseHead.keepPosScale()) return;
-            // With keepPosScale, let vanilla swing happen (don't zero attackTime)
             return;
         }
 
@@ -140,20 +137,21 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                 ? engine.getThirdPersonPose(entityId)
                 : null;
 
-        // Allow Vanilla Actions: when the pose has this flag and the entity is performing
-        // a vanilla action, either fully yield or keep position/scale only.
-        boolean poseYielding = false;
-        boolean posePosScaleOnly = false;
+        // Per-part Allow Vanilla Actions / Keep Pos/Scale masks.
+        int allowActMask = 0;
+        int keepPSMask = 0;
+        boolean performingAction = false;
         if (playhead == null && poseAnim != null) {
             var tpPoseCheck = engine.getThirdPersonPosePayload(entityId);
-            if (tpPoseCheck != null && tpPoseCheck.allowVanillaActions() && isPerformingVanillaAction(entity)) {
-                if (tpPoseCheck.keepPosScale()) {
-                    posePosScaleOnly = true;
-                } else {
-                    poseYielding = true;
-                }
+            if (tpPoseCheck != null && isPerformingVanillaAction(entity)) {
+                allowActMask = tpPoseCheck.allowActionsMask();
+                keepPSMask = tpPoseCheck.keepPosScaleMask();
+                performingAction = allowActMask != 0;
             }
         }
+        // If ALL 6 parts yield to vanilla (allowAct set, keepPS not set), fully yield.
+        boolean poseYielding = performingAction && (allowActMask & ~keepPSMask & 0x3F) == (0x3F)
+                && (keepPSMask & 0x3F) == 0;
 
         if ((playhead == null && blender == null && poseAnim == null) || poseYielding) {
             boolean prone = entity.isVisuallySwimming() || entity.isFallFlying();
@@ -287,17 +285,23 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         HandAnimationLoader.BonePose rLegP  = pose(anim, "right_leg");
         HandAnimationLoader.BonePose lLegP  = pose(anim, "left_leg");
 
-        // Keep Pos/Scale mode: apply pose as base (with face-cam), then add vanilla
-        // action rotation deltas on top at each bone's posed pivot.
-        if (posePosScaleOnly && anim != null) {
+        // Per-part Allow Actions + Keep Pos/Scale handling during vanilla actions.
+        // Parts with keepPS: apply pose then add vanilla delta.
+        // Parts with allowAct but no keepPS: skip pose, let vanilla through.
+        // Parts without allowAct: apply pose normally (handled in main path below).
+        if (performingAction && (keepPSMask & 0x3F) != 0 && anim != null) {
             net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload tpPoseAdditive =
                     engine.getThirdPersonPosePayload(entityId);
             int addLookMask = tpPoseAdditive != null ? tpPoseAdditive.lookAtMask() : 0;
             float yawRad2   = (float) Math.toRadians(netHeadYaw);
             float pitchRad2 = (float) Math.toRadians(headPitch);
 
-            // Save vanilla bone deltas from rest (rotation + position).
+            // Part bit mapping: Head=1,Torso=2,RArm=4,LArm=8,RLeg=16,LLeg=32
+            int[] partBits = { 1, 2, 4, 8, 16, 32 };
             ModelPart[] bones = { this.head, this.body, this.rightArm, this.leftArm, this.rightLeg, this.leftLeg };
+            HandAnimationLoader.BonePose[] bps = { headP, torsoP, rArmP, lArmP, rLegP, lLegP };
+
+            // Save vanilla bone deltas from rest.
             float[][] vanRot = new float[6][3];
             float[][] vanPos = new float[6][3];
             for (int i = 0; i < 6; i++) {
@@ -309,37 +313,83 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                 vanPos[i][2] = bones[i].z - bones[i].getInitialPose().z;
             }
 
-            // Apply pose as base with face-cam look-at.
-            HandAnimationLoader.BonePose[] bps = { headP, torsoP, rArmP, lArmP, rLegP, lLegP };
+            boolean kpsSwimming = entity.isVisuallySwimming();
+            boolean kpsElytra = entity.isFallFlying();
+            boolean kpsCrawling = kpsSwimming && entity.onGround();
+
             int[] yawBits  = { AnimationPlayhead.LOOK_HEAD_YAW,  AnimationPlayhead.LOOK_TORSO_YAW,
                                AnimationPlayhead.LOOK_RARM_YAW,  AnimationPlayhead.LOOK_LARM_YAW,
                                AnimationPlayhead.LOOK_RLEG_YAW,  AnimationPlayhead.LOOK_LLEG_YAW };
             int[] pitchBits = { AnimationPlayhead.LOOK_HEAD_PITCH, AnimationPlayhead.LOOK_TORSO_PITCH,
                                 AnimationPlayhead.LOOK_RARM_PITCH, AnimationPlayhead.LOOK_LARM_PITCH,
                                 AnimationPlayhead.LOOK_RLEG_PITCH, AnimationPlayhead.LOOK_LLEG_PITCH };
+
             for (int i = 0; i < 6; i++) {
+                boolean partKeep = (keepPSMask & partBits[i]) != 0;
+                boolean partAct  = (allowActMask & partBits[i]) != 0;
+                if (!partKeep) continue; // handled below (either vanilla-through or normal pose)
+
+                // Apply pose with face-cam look-at.
                 bones[i].resetPose();
-                float lYaw   = (addLookMask & yawBits[i])   != 0 ? yawRad2   : 0f;
-                float lPitch = (addLookMask & pitchBits[i]) != 0 ? pitchRad2 : 0f;
+                boolean isProneArm = (i == 2 || i == 3) && (kpsSwimming || kpsElytra) && !disableProne
+                        && (addLookMask & (yawBits[i] | pitchBits[i])) != 0;
+                float lYaw   = (addLookMask & yawBits[i])   != 0 ? yawRad2 : 0f;
+                float lPitch = (addLookMask & pitchBits[i]) != 0
+                        && (!isProneArm || kpsCrawling) ? pitchRad2 : 0f;
                 float ySign = (i == 1) ? 1f : -1f;
                 applyBone(bones[i], bps[i], timeSecs, weight, lYaw, lPitch, ySign);
-            }
 
-            // Add vanilla deltas (rotation + position) on top of the posed bones.
-            for (int i = 0; i < 6; i++) {
-                bones[i].xRot += vanRot[i][0];
-                bones[i].yRot += vanRot[i][1];
-                bones[i].zRot += vanRot[i][2];
+                // Prone arm 90° forward offset.
+                if (isProneArm) {
+                    float[] qProne = eulerToQuat(-(float)(Math.PI / 2), 0f, 0f);
+                    float[] qCur = eulerToQuat(bones[i].xRot, bones[i].yRot, bones[i].zRot);
+                    float[] qFinal = quatMul(qProne, qCur);
+                    float[] euler = quatToEuler(qFinal);
+                    bones[i].xRot = euler[0];
+                    bones[i].yRot = euler[1];
+                    bones[i].zRot = euler[2];
+                    float dY = bones[i].y - bones[i].getInitialPose().y;
+                    float dZ = bones[i].z - bones[i].getInitialPose().z;
+                    bones[i].y = bones[i].getInitialPose().y + dZ;
+                    bones[i].z = bones[i].getInitialPose().z - dY;
+                }
+
+                // Add vanilla action deltas.
+                bones[i].xRot += isProneArm ? vanRot[i][0] : vanRot[i][0];
+                bones[i].yRot += isProneArm ? -vanRot[i][1] : vanRot[i][1];
+                bones[i].zRot += isProneArm ? -vanRot[i][2] : vanRot[i][2];
                 bones[i].x += vanPos[i][0];
                 bones[i].y += vanPos[i][1];
                 bones[i].z += vanPos[i][2];
             }
 
+            // Parts with allowAct but no keepPS: already have vanilla values, leave them.
+            // Parts without allowAct: fall through to normal pose path below.
+            // Parts with keepPS: already handled above — mark them so the normal path skips them.
+            // We use a thread-local to communicate which parts were handled.
+            // For simplicity, just copy hat and handle the remaining parts in the normal path.
             this.hat.copyFrom(this.head);
-            // Reset elytra stash — vanilla handles elytra during actions.
             TorsoRotationHolder.X_ROT.set(0f);
             TorsoRotationHolder.Y_ROT.set(0f);
             TorsoRotationHolder.Z_ROT.set(0f);
+
+            // For parts without keepPS that have allowAct: they keep vanilla values (no pose).
+            // For parts without allowAct: they need normal pose applied — but we can't easily
+            // fall through to the main path for just some parts. Apply them here.
+            for (int i = 0; i < 6; i++) {
+                boolean partKeep = (keepPSMask & partBits[i]) != 0;
+                boolean partAct  = (allowActMask & partBits[i]) != 0;
+                if (partKeep) continue; // already done
+                if (partAct) continue;  // vanilla handles it
+                // No allowAct, no keepPS — apply pose normally for this part.
+                bones[i].resetPose();
+                float lYaw   = (addLookMask & yawBits[i])   != 0 ? yawRad2 : 0f;
+                float lPitch = (addLookMask & pitchBits[i]) != 0 ? pitchRad2 : 0f;
+                float ySign = (i == 1) ? 1f : -1f;
+                applyBone(bones[i], bps[i], timeSecs, weight, lYaw, lPitch, ySign);
+            }
+
+            this.hat.copyFrom(this.head);
             return;
         }
 
