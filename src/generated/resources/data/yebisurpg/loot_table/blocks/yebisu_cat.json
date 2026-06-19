@@ -11,11 +11,11 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "yebisurpg:cat_block"
+          "name": "yebisurpg:yebisu_cat"
         }
       ],
       "rolls": 1.0
     }
   ],
-  "random_sequence": "yebisurpg:blocks/cat_block"
+  "random_sequence": "yebisurpg:blocks/yebisu_cat"
 }

@@ -1,0 +1,15 @@
+[
+  {
+    "id": "test_effect",
+    "constName": "TEST_EFFECT",
+    "titleText": "test",
+    "category": "NEUTRAL",
+    "color": 5460048,
+    "hasTexture": true,
+    "textureId": "orb",
+    "textureAnimated": true,
+    "textureFrametime": 2,
+    "enabledMethods": [],
+    "methodBlocks": {}
+  }
+]

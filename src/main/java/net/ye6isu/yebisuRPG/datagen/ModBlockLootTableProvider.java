@@ -40,10 +40,11 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
         add(ModBlocks.YE6ISU_ORE.get(),
                 block -> createOreDrop(ModBlocks.YE6ISU_ORE.get(), ModItems.YE6ISU.get()));
 
-        //Same Block drop from creator
-        dropSelf(ModBlocks.CAT_BLOCK.get());
+        //Same Block drop from creator;
 
         //YCS_Mod_Block_Loot_START
+
+        dropSelf(ModBlocks.YEBISU_CAT.get());
 
         //YCS_Mod_Block_Loot_END
     }

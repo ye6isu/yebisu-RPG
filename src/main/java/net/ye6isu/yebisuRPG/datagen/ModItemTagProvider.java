@@ -24,22 +24,6 @@ public class ModItemTagProvider extends ItemTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider provider) {
 
-        tag(ItemTags.SWORDS)
-                .add(ModItems.YE6ISU_SWORD.get());
-
-        tag(ItemTags.PICKAXES)
-                .add(ModItems.YE6ISU_PICKAXE.get());
-
-        tag(ItemTags.SHOVELS)
-                .add(ModItems.YE6ISU_SHOVEL.get());
-
-        tag(ItemTags.AXES)
-                .add(ModItems.YE6ISU_AXE.get())
-                .add(ModItems.YE6ISU_SWORD.get());
-
-        tag(ItemTags.HOES)
-                .add(ModItems.YE6ISU_HOE.get());
-
         this.tag(ItemTags.TRIMMABLE_ARMOR)
                 .add(ModItems.PLANK_HELMET.get())
                 .add(ModItems.PLANK_CHESTPLATE.get())

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "yebisurpg:item/texture2"
+    "layer0": "yebisurpg:item/ye6isu"
   }
 }

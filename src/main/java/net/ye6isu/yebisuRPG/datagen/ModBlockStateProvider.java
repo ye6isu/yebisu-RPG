@@ -41,9 +41,10 @@ public class ModBlockStateProvider extends BlockStateProvider {
         trapdoorBlockWithRenderType(ModBlocks.CRATE_TRAPDOOR.get(), modLoc("block/crate_trapdoor"), true, "cutout");
 
         //Block from creator
-        blockWithItem(ModBlocks.CAT_BLOCK);
 
         //YCS_Mod_Block_State_START
+
+        blockWithItem(ModBlocks.YEBISU_CAT);
 
         //YCS_Mod_Block_State_END
     }

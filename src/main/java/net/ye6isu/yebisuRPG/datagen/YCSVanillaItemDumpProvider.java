@@ -40,7 +40,7 @@ public class YCSVanillaItemDumpProvider implements DataProvider {
                 "System property 'yebisurpg.sourceResources' is not set. " +
                 "Make sure it is defined in the 'data' run config in build.gradle.");
         }
-        Path target = Path.of(sourceResourcesProp, "assets", "yebisurpg", "ycs_vanilla_items.json");
+        Path target = Path.of(sourceResourcesProp, "assets", "yebisurpg", "ycs", "ycs_vanilla_items.json");
         String json = new GsonBuilder().setPrettyPrinting().create().toJson(ids);
         return DataProvider.saveStable(cache, com.google.gson.JsonParser.parseString(json), target);
     }

@@ -28,9 +28,9 @@ public class ModCreativeModeTabs {
 
     //YCS_Mod_Creative_Tabs_START
 
-    public static final Supplier<CreativeModeTab> TEST_TAB = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("test_tab", () -> CreativeModeTab.builder()
-            .icon(() -> new ItemStack(ModItems.PLANK.get()))
-            .title(Component.translatable("creativetab.yebisurpg.test_tab"))
+    public static final Supplier<CreativeModeTab> YEBISURPG_TAB = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("yebisurpg_tab", () -> CreativeModeTab.builder()
+            .icon(() -> new ItemStack(ModBlocks.CRATE_BLOCK.get()))
+            .title(Component.translatable("creativetab.yebisurpg.yebisurpg_tab"))
             .build());
 
     //YCS_Mod_Creative_Tabs_END

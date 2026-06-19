@@ -34,12 +34,9 @@ public class ModBlockTagProvider extends BlockTagsProvider {
         tag(BlockTags.BUTTONS).add(ModBlocks.CRATE_BUTTON.get());
         tag(BlockTags.PRESSURE_PLATES).add(ModBlocks.CRATE_PRESSURE_PLATE.get());
 
-        tag(ModTags.Blocks.NEEDS_YE6ISU_TOOL)
-                .addTag(BlockTags.NEEDS_IRON_TOOL);
 
-        tag(ModTags.Blocks.INCORRECT_FOR_YE6ISU_TOOL)
-                .addTag(BlockTags.INCORRECT_FOR_IRON_TOOL)
-                .remove(ModTags.Blocks.NEEDS_YE6ISU_TOOL);
+
+
 
         //YCS_Mod_Block_Tags_START
 
