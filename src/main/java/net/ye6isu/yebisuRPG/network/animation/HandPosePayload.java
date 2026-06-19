@@ -7,21 +7,29 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.ye6isu.yebisuRPG.network.BasePayload;
 
-/**
- * S2C payload that sets or clears a persistent first-person hand pose for an entity.
- *
- * <p>When set, the renderer uses this pose whenever no animation is actively playing
- * (playhead is null or finished). When cleared, vanilla default pose is restored.</p>
- *
- * @param entityId  entity.getId()
- * @param animName  animation key inside the JSON, or empty string to clear
- * @param filePath  resource path of the JSON file, or empty string for default
- */
 public record HandPosePayload(
         int entityId,
         String animName,
-        String filePath
+        String filePath,
+        boolean allowVanillaActions,
+        boolean keepPosScale
 ) implements BasePayload {
+
+    private static final int FLAG_ALLOW_ACTIONS = 1;
+    private static final int FLAG_KEEP_POS_SCALE = 2;
+
+    private int flags() {
+        int f = 0;
+        if (allowVanillaActions) f |= FLAG_ALLOW_ACTIONS;
+        if (keepPosScale) f |= FLAG_KEEP_POS_SCALE;
+        return f;
+    }
+
+    private static HandPosePayload fromFields(int entityId, String animName, String filePath, int flags) {
+        return new HandPosePayload(entityId, animName, filePath,
+                (flags & FLAG_ALLOW_ACTIONS) != 0,
+                (flags & FLAG_KEEP_POS_SCALE) != 0);
+    }
 
     public static final CustomPacketPayload.Type<HandPosePayload> TYPE =
             new CustomPacketPayload.Type<>(
@@ -32,7 +40,8 @@ public record HandPosePayload(
                     ByteBufCodecs.VAR_INT,          HandPosePayload::entityId,
                     ByteBufCodecs.stringUtf8(64),   HandPosePayload::animName,
                     ByteBufCodecs.stringUtf8(256),  HandPosePayload::filePath,
-                    HandPosePayload::new);
+                    ByteBufCodecs.VAR_INT,          HandPosePayload::flags,
+                    HandPosePayload::fromFields);
 
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
@@ -42,10 +51,27 @@ public record HandPosePayload(
     public static HandPosePayload set(int entityId, String animName, String filePath) {
         return new HandPosePayload(entityId,
                 animName != null ? animName : "",
-                filePath != null ? filePath : "");
+                filePath != null ? filePath : "",
+                false, false);
+    }
+
+    public static HandPosePayload set(int entityId, String animName, String filePath,
+                                       boolean allowVanillaActions) {
+        return new HandPosePayload(entityId,
+                animName != null ? animName : "",
+                filePath != null ? filePath : "",
+                allowVanillaActions, false);
+    }
+
+    public static HandPosePayload set(int entityId, String animName, String filePath,
+                                       boolean allowVanillaActions, boolean keepPosScale) {
+        return new HandPosePayload(entityId,
+                animName != null ? animName : "",
+                filePath != null ? filePath : "",
+                allowVanillaActions, keepPosScale);
     }
 
     public static HandPosePayload clear(int entityId) {
-        return new HandPosePayload(entityId, "", "");
+        return new HandPosePayload(entityId, "", "", false, false);
     }
 }

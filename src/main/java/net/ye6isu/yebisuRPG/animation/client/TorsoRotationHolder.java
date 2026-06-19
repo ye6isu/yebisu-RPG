@@ -15,4 +15,6 @@ public final class TorsoRotationHolder {
     public static final ThreadLocal<Float> X_ROT = ThreadLocal.withInitial(() -> 0f);
     public static final ThreadLocal<Float> Y_ROT = ThreadLocal.withInitial(() -> 0f);
     public static final ThreadLocal<Float> Z_ROT = ThreadLocal.withInitial(() -> 0f);
+
+    public static final ThreadLocal<Boolean> RENDERING_FP_HAND = ThreadLocal.withInitial(() -> false);
 }

@@ -32,12 +32,11 @@ public class NorbitTheOrbitItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                if (player instanceof Entity _tpa && !level.isClientSide()) {
-            AnimationAPI.triggerAnimation(_tpa,
-                AnimationCategory.ENTITY_THIRD_PERSON,
+                if (player instanceof Entity _tps && !level.isClientSide()) {
+            AnimationAPI.setThirdPersonPose(_tps,
                 "test",
                 "yebisurpg:animations/player.animation.json",
-                1f, 48, 0, 4096);
+                48, 59, 0, true, true);
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

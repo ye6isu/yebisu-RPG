@@ -61,6 +61,15 @@ public abstract class MixinItemInHandRenderer {
                 ? ClientAnimationEngine.INSTANCE.getHandPose(entityId)
                 : null;
 
+        // Allow Vanilla Actions: when the hand pose has this flag and the player is
+        // using an item or swinging, skip the pose so vanilla hand animations play.
+        // (keepPosScale not supported for FP — the renderer fully takes over with ci.cancel)
+        if (playhead == null && handPoseAnim != null) {
+            var hpPayload = ClientAnimationEngine.INSTANCE.getHandPosePayload(entityId);
+            if (hpPayload != null && hpPayload.allowVanillaActions()
+                    && (player.isUsingItem() || player.swinging)) return;
+        }
+
         if (playhead == null && handPoseAnim == null && !HandDebugState.debugMode) return;
 
         String animId = playhead != null ? playhead.animId() : null;

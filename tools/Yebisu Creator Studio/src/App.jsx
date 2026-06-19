@@ -905,11 +905,13 @@ function compileActionNode(node, nodes, methodKey) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
     const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
+    const allowActions = !!node.fields?.allowVanillaActions;
+    const keepPosScale = !!node.fields?.keepPosScale;
     return [
       "if (" + ent + " instanceof Entity _hp && !level.isClientSide()) {",
       "    AnimationAPI.setFirstPersonHandPose(_hp,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
-      "        \"" + filePath.replace(/"/g, '\\"') + "\");",
+      "        \"" + filePath.replace(/"/g, '\\"') + "\", " + allowActions + ", " + keepPosScale + ");",
       "}",
     ];
   }
@@ -928,12 +930,14 @@ function compileActionNode(node, nodes, methodKey) {
     const lookAtMask = node.fields?.lookAtMask || 0;
     const vanillaMask = node.fields?.vanillaMask || 0;
     const vanillaMoveMask = node.fields?.vanillaMoveMask || 0;
+    const allowActions = !!node.fields?.allowVanillaActions;
+    const keepPosScale = !!node.fields?.keepPosScale;
     return [
       "if (" + ent + " instanceof Entity _tps && !level.isClientSide()) {",
       "    AnimationAPI.setThirdPersonPose(_tps,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
-      "        " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ");",
+      "        " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ", " + allowActions + ", " + keepPosScale + ");",
       "}",
     ];
   }
@@ -3405,6 +3409,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"allowVanillaActions",!node.fields?.allowVanillaActions);}}><input type="checkbox" checked={!!node.fields?.allowVanillaActions} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Allow Actions</label>
+          {!!node.fields?.allowVanillaActions&&<label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"keepPosScale",!node.fields?.keepPosScale);}}><input type="checkbox" checked={!!node.fields?.keepPosScale} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Keep Pos/Scale</label>}
       </>}
       {isHandPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -3576,6 +3582,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
             <input type="checkbox" checked={!!(lookMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
           </label>
         );
+        const AnimCB = ({bit})=>(
+          <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"vanillaMask",(vanMask^bit));}}>
+            <input type="checkbox" checked={!!(vanMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+          </label>
+        );
         const VanCB = ({bit})=>(
           <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"vanillaMask",(vanMask^bit));}}>
             <input type="checkbox" checked={!!(vanMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
@@ -3600,7 +3611,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               <td style={{paddingRight:8,color:"#888",fontSize:11}}></td>
               <td style={hdC}>Yaw</td>
               <td style={hdC}>Pitch</td>
-              <td style={{...hdC,borderLeft:"1px solid #444"}}>Disable Anim</td>
+              <td style={{...hdC,borderLeft:"1px solid #444"}}>Animation</td>
             </tr></thead>
             <tbody>
               <tr style={{borderBottom:"1px solid #333"}}>
@@ -3614,18 +3625,18 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                   <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>{label}</td>
                   <td style={{...tdC,opacity:rootActive?0.35:1}}><LookCB bit={1<<lookBase}/></td>
                   <td style={{...tdC,opacity:rootActive?0.35:1}}><LookCB bit={1<<(lookBase+1)}/></td>
-                  <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={vanBit}/></td>
+                  <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={vanBit}/></td>
                 </tr>
               ))}
               <tr style={{borderTop:"1px solid #333"}}>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Head</td>
                 <td style={tdC}></td><td style={tdC}></td>
-                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={1}/></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={1}/></td>
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Torso</td>
                 <td style={tdC}></td><td style={tdC}></td>
-                <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={2}/></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={2}/></td>
               </tr>
               <tr style={{borderTop:"1px solid #333"}}>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Crouch</td>
@@ -3644,11 +3655,16 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               </tr>
             </tbody>
           </table>
-          <div style={{color:"#666",fontSize:10,lineHeight:1.4}}>
-            Root: overrides per-part face direction — whole model faces camera.<br/>
-            Disable Anim: lets vanilla animation control that part.<br/>
-            Disable Crouch/Sitting/Prone: suppresses that vanilla pose during this animation.
-          </div>
+          {isTPPoseSet&&<>
+            <label style={{display:"flex",alignItems:"center",gap:6,color:"#ccc",fontSize:12,cursor:"pointer",marginTop:4}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"allowVanillaActions",!node.fields?.allowVanillaActions);}}>
+              <input type="checkbox" checked={!!node.fields?.allowVanillaActions} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+              Allow Vanilla Actions
+            </label>
+            <label style={{display:"flex",alignItems:"center",gap:6,color:node.fields?.allowVanillaActions?"#ccc":"#666",fontSize:12,cursor:node.fields?.allowVanillaActions?"pointer":"default",marginTop:2,marginLeft:16}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(node.fields?.allowVanillaActions)onFieldChange&&onFieldChange(node.id,"keepPosScale",!node.fields?.keepPosScale);}}>
+              <input type="checkbox" checked={!!node.fields?.keepPosScale} disabled={!node.fields?.allowVanillaActions} onChange={()=>{}} style={{cursor:node.fields?.allowVanillaActions?"pointer":"default",margin:0}}/>
+              Keep Pos/Scale
+            </label>
+          </>}
         </div>;
       })()}
     </div>

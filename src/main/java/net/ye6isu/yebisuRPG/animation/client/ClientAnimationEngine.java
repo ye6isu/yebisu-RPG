@@ -343,6 +343,10 @@ public final class ClientAnimationEngine {
                 : HandAnimationLoader.INSTANCE.get(pose.animName());
     }
 
+    public HandPosePayload getHandPosePayload(int entityId) {
+        return handPoses.get(entityId);
+    }
+
     public void setThirdPersonPose(ThirdPersonPosePayload payload) {
         if (payload.isClear()) {
             thirdPersonPoses.remove(payload.entityId());
