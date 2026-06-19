@@ -46,6 +46,7 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
     protected MixinPlayerModel(ModelPart root) { super(root); }
 
+
     @Inject(
         method = "setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V",
         at = @At("HEAD")
@@ -56,6 +57,7 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
             CallbackInfo ci) {
 
         if (!(entity instanceof net.minecraft.client.player.AbstractClientPlayer)) return;
+        if (TorsoRotationHolder.RENDERING_FP_HAND.get()) return;
 
         // Reset so a player with no active third-person anim doesn't inherit a stale
         // torso rotation from whichever entity rendered last on this thread.
@@ -89,6 +91,17 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
         net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload tpPoseHead =
                 (playhead == null && poseAnimHead != null) ? engine.getThirdPersonPosePayload(entity.getId()) : null;
+
+        // Allow Vanilla Actions: when the pose has this flag and the entity is performing
+        // a vanilla action, skip (or partially skip) the pose override.
+        if (playhead == null && tpPoseHead != null && tpPoseHead.allowVanillaActions()
+                && isPerformingVanillaAction(entity)) {
+            // keepPosScale: don't suppress swing — let vanilla rotation play through
+            if (!tpPoseHead.keepPosScale()) return;
+            // With keepPosScale, let vanilla swing happen (don't zero attackTime)
+            return;
+        }
+
         int vanMask  = playhead != null ? playhead.vanillaMask()
                      : (tpPoseHead != null) ? tpPoseHead.vanillaMask() : 0;
 
@@ -113,6 +126,10 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
         if (!(entity instanceof net.minecraft.client.player.AbstractClientPlayer)) return;
 
+        // Skip TP pose when rendering first-person hands (renderRightHand/renderLeftHand
+        // calls setupAnim on the same PlayerModel — the TP pose would corrupt FP arms).
+        if (TorsoRotationHolder.RENDERING_FP_HAND.get()) return;
+
         int entityId = entity.getId();
         ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
 
@@ -123,10 +140,24 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                 ? engine.getThirdPersonPose(entityId)
                 : null;
 
-        if (playhead == null && blender == null && poseAnim == null) {
+        // Allow Vanilla Actions: when the pose has this flag and the entity is performing
+        // a vanilla action, either fully yield or keep position/scale only.
+        boolean poseYielding = false;
+        boolean posePosScaleOnly = false;
+        if (playhead == null && poseAnim != null) {
+            var tpPoseCheck = engine.getThirdPersonPosePayload(entityId);
+            if (tpPoseCheck != null && tpPoseCheck.allowVanillaActions() && isPerformingVanillaAction(entity)) {
+                if (tpPoseCheck.keepPosScale()) {
+                    posePosScaleOnly = true;
+                } else {
+                    poseYielding = true;
+                }
+            }
+        }
+
+        if ((playhead == null && blender == null && poseAnim == null) || poseYielding) {
             boolean prone = entity.isVisuallySwimming() || entity.isFallFlying();
             if (prone && net.ye6isu.yebisuRPG.client.ModKeybinds.proneTiltOnly) {
-                // Tilt only — reset all limbs, arms straight forward (90° = -π/2 xRot).
                 this.head.resetPose();
                 this.body.resetPose();
                 this.rightArm.resetPose();
@@ -137,7 +168,10 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
                 this.leftLeg.resetPose();
                 this.hat.copyFrom(this.head);
             }
-            // Otherwise let vanilla animations play through unchanged.
+            // Reset elytra stash so stale values from a previous frame don't persist.
+            TorsoRotationHolder.X_ROT.set(0f);
+            TorsoRotationHolder.Y_ROT.set(0f);
+            TorsoRotationHolder.Z_ROT.set(0f);
             return;
         }
 
@@ -188,8 +222,11 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
 
         boolean crouching = entity instanceof net.minecraft.client.player.AbstractClientPlayer cp && cp.isCrouching();
-        // Bit set = disable crouch/sitting pose during this animation.
-        boolean crouchPose = crouching && (vanMask & AnimationPlayhead.VAN_CROUCH) == 0;
+        boolean prone = entity.isVisuallySwimming() || entity.isFallFlying();
+        boolean disableProne = (vanMask & AnimationPlayhead.DISABLE_PRONE) != 0;
+        // Suppress crouch pose when prone + Disable Prone (player renders upright, crouch lean makes no sense).
+        boolean crouchPose = crouching && (vanMask & AnimationPlayhead.VAN_CROUCH) == 0
+                && !(prone && disableProne);
         boolean sitting = entity.isPassenger();
         boolean sittingPose = sitting && (vanMask & AnimationPlayhead.VAN_SITTING) == 0;
 
@@ -231,8 +268,6 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
             if (!lLegVan)  { cvLLegXR = this.leftLeg.xRot;  cvLLegYR = this.leftLeg.yRot;  cvLLegZR = this.leftLeg.zRot; }
         }
 
-        boolean prone = entity.isVisuallySwimming() || entity.isFallFlying();
-        boolean disableProne = (vanMask & AnimationPlayhead.DISABLE_PRONE) != 0;
         if (prone && disableProne) {
             this.head.resetPose();
             this.body.resetPose();
@@ -251,6 +286,62 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         HandAnimationLoader.BonePose lArmP  = pose(anim, "left_arm");
         HandAnimationLoader.BonePose rLegP  = pose(anim, "right_leg");
         HandAnimationLoader.BonePose lLegP  = pose(anim, "left_leg");
+
+        // Keep Pos/Scale mode: apply pose as base (with face-cam), then add vanilla
+        // action rotation deltas on top at each bone's posed pivot.
+        if (posePosScaleOnly && anim != null) {
+            net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload tpPoseAdditive =
+                    engine.getThirdPersonPosePayload(entityId);
+            int addLookMask = tpPoseAdditive != null ? tpPoseAdditive.lookAtMask() : 0;
+            float yawRad2   = (float) Math.toRadians(netHeadYaw);
+            float pitchRad2 = (float) Math.toRadians(headPitch);
+
+            // Save vanilla bone deltas from rest (rotation + position).
+            ModelPart[] bones = { this.head, this.body, this.rightArm, this.leftArm, this.rightLeg, this.leftLeg };
+            float[][] vanRot = new float[6][3];
+            float[][] vanPos = new float[6][3];
+            for (int i = 0; i < 6; i++) {
+                vanRot[i][0] = bones[i].xRot - bones[i].getInitialPose().xRot;
+                vanRot[i][1] = bones[i].yRot - bones[i].getInitialPose().yRot;
+                vanRot[i][2] = bones[i].zRot - bones[i].getInitialPose().zRot;
+                vanPos[i][0] = bones[i].x - bones[i].getInitialPose().x;
+                vanPos[i][1] = bones[i].y - bones[i].getInitialPose().y;
+                vanPos[i][2] = bones[i].z - bones[i].getInitialPose().z;
+            }
+
+            // Apply pose as base with face-cam look-at.
+            HandAnimationLoader.BonePose[] bps = { headP, torsoP, rArmP, lArmP, rLegP, lLegP };
+            int[] yawBits  = { AnimationPlayhead.LOOK_HEAD_YAW,  AnimationPlayhead.LOOK_TORSO_YAW,
+                               AnimationPlayhead.LOOK_RARM_YAW,  AnimationPlayhead.LOOK_LARM_YAW,
+                               AnimationPlayhead.LOOK_RLEG_YAW,  AnimationPlayhead.LOOK_LLEG_YAW };
+            int[] pitchBits = { AnimationPlayhead.LOOK_HEAD_PITCH, AnimationPlayhead.LOOK_TORSO_PITCH,
+                                AnimationPlayhead.LOOK_RARM_PITCH, AnimationPlayhead.LOOK_LARM_PITCH,
+                                AnimationPlayhead.LOOK_RLEG_PITCH, AnimationPlayhead.LOOK_LLEG_PITCH };
+            for (int i = 0; i < 6; i++) {
+                bones[i].resetPose();
+                float lYaw   = (addLookMask & yawBits[i])   != 0 ? yawRad2   : 0f;
+                float lPitch = (addLookMask & pitchBits[i]) != 0 ? pitchRad2 : 0f;
+                float ySign = (i == 1) ? 1f : -1f;
+                applyBone(bones[i], bps[i], timeSecs, weight, lYaw, lPitch, ySign);
+            }
+
+            // Add vanilla deltas (rotation + position) on top of the posed bones.
+            for (int i = 0; i < 6; i++) {
+                bones[i].xRot += vanRot[i][0];
+                bones[i].yRot += vanRot[i][1];
+                bones[i].zRot += vanRot[i][2];
+                bones[i].x += vanPos[i][0];
+                bones[i].y += vanPos[i][1];
+                bones[i].z += vanPos[i][2];
+            }
+
+            this.hat.copyFrom(this.head);
+            // Reset elytra stash — vanilla handles elytra during actions.
+            TorsoRotationHolder.X_ROT.set(0f);
+            TorsoRotationHolder.Y_ROT.set(0f);
+            TorsoRotationHolder.Z_ROT.set(0f);
+            return;
+        }
 
         // Head yaw: when torso also has a yaw look-at, body.yRot already rotates the body
         // in world-space. head.yRot is body-relative, so pass 0 for head yaw in that case —
@@ -347,11 +438,16 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
             if (!lLegVan)  { composeRotation(this.leftLeg,  cvLLegXR * weight, cvLLegYR * weight, cvLLegZR * weight); }
         }
 
-        // When vanilla owns legs but pose condition is not met, vanilla already wrote
-        // the crouch z/y shifts — undo them so legs sit at normal standing position.
-        if (crouching && !crouchPose) {
-            if (rLegVan) { this.rightLeg.y = 12f; this.rightLeg.z = 0f; }
-            if (lLegVan) { this.leftLeg.y  = 12f; this.leftLeg.z  = 0f; }
+        // When Disable Crouch is active, undo vanilla crouch modifications on
+        // vanilla-owned parts that weren't reset by our animation pipeline.
+        // Skip when prone+disableProne since the bulk resetPose already wiped crouch values.
+        if (crouching && !crouchPose && !(prone && disableProne)) {
+            if (torsoVan) { this.body.xRot -= 0.5f; this.body.y = 0f; }
+            if (headVan)  { this.head.y = 0f; }
+            if (rArmVan)  { this.rightArm.y = 2f; }
+            if (lArmVan)  { this.leftArm.y  = 2f; }
+            if (rLegVan)  { this.rightLeg.y = 12f; this.rightLeg.z = 0f; }
+            if (lLegVan)  { this.leftLeg.y  = 12f; this.leftLeg.z  = 0f; }
         }
 
         // When the torso has a yaw look-at rotation, rotate only the shoulder rest pivot
@@ -378,19 +474,17 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         this.hat.copyFrom(this.head);
 
         // Stash torso rotation for MixinElytraLayer.
-        // Subtract crouch lean when crouch is active (so elytra doesn't double-apply it).
-        // When Disable Crouch is set, also subtract it from vanilla-owned torso to
-        // force the elytra to normal (non-crouch) position.
-        float stashXRot = this.body.xRot;
-        boolean disableCrouch = (vanMask & AnimationPlayhead.VAN_CROUCH) != 0;
-        if (crouchPose && !torsoVan) {
-            stashXRot -= cvBodyXR;
-        } else if (crouching && disableCrouch && torsoVan) {
-            stashXRot -= 0.5f;
+        // During crouch (without Disable Crouch), zero the stash so the elytra
+        // matches vanilla's crouch behavior (no extra rotation from the animation).
+        if (crouchPose) {
+            TorsoRotationHolder.X_ROT.set(0f);
+            TorsoRotationHolder.Y_ROT.set(0f);
+            TorsoRotationHolder.Z_ROT.set(0f);
+        } else {
+            TorsoRotationHolder.X_ROT.set(this.body.xRot);
+            TorsoRotationHolder.Y_ROT.set(this.body.yRot);
+            TorsoRotationHolder.Z_ROT.set(this.body.zRot);
         }
-        TorsoRotationHolder.X_ROT.set(stashXRot);
-        TorsoRotationHolder.Y_ROT.set(this.body.yRot);
-        TorsoRotationHolder.Z_ROT.set(this.body.zRot);
     }
 
 
@@ -537,4 +631,9 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
     private static float lerp(float a, float b, float t) {
         return a + (b - a) * t;
     }
+
+    private static boolean isPerformingVanillaAction(LivingEntity entity) {
+        return entity.isUsingItem() || entity.swinging;
+    }
+
 }

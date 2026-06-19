@@ -63,7 +63,6 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
                 (playhead == null) ? engine.getThirdPersonPose(entityId) : null;
 
         if (playhead != null || blender != null || tpPoseAnim != null) {
-            // Custom animation active — if DISABLE_PRONE is set and prone, cancel tilt.
             boolean prone = player.isVisuallySwimming() || player.isFallFlying();
             int vanMask = 0;
             if (playhead != null) vanMask = playhead.vanillaMask();
@@ -72,15 +71,13 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
                 if (tpPose != null) vanMask = tpPose.vanillaMask();
             }
             boolean disableProne = (vanMask & AnimationPlayhead.DISABLE_PRONE) != 0;
-            // When Disable Crouch is set, cancel vanilla's crouch PoseStack shift.
             boolean disableCrouch = (vanMask & AnimationPlayhead.VAN_CROUCH) != 0;
-            if (player.isCrouching() && disableCrouch) {
+            if (player.isCrouching() && (disableCrouch || (prone && disableProne))) {
                 poseStack.translate(0.0, 0.125, 0.0);
             }
             if (prone && disableProne) {
                 poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f - bodyYaw));
                 poseStack.translate(0.0, PRONE_Y_OFFSET, 0.0);
-                // Apply root follow-cam since the RETURN inject won't fire after cancel.
                 int lookMask = playhead != null ? playhead.lookAtMask() : 0;
                 boolean rootYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
                 boolean rootPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
@@ -124,8 +121,14 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         AnimationPlayhead playhead = engine.getPlayhead(player.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
 
         int lookMask = playhead != null ? playhead.lookAtMask() : 0;
+        int vanMask  = playhead != null ? playhead.vanillaMask() : 0;
         boolean rootLookPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
         boolean rootLookYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
+        // When swimming/flying without Disable Prone, vanilla already tilts the body
+        // to match pitch — skip Root Pitch to avoid double-rotation.
+        boolean prone = player.isVisuallySwimming() || player.isFallFlying();
+        boolean disableProne = (vanMask & AnimationPlayhead.DISABLE_PRONE) != 0;
+        if (prone && !disableProne) rootLookPitch = false;
         if (rootLookPitch || rootLookYaw) {
             if (rootLookYaw) {
                 float lerpedYRot = Mth.lerp(partialTick, player.yRotO, player.getYRot());
@@ -209,10 +212,23 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         // (body.y, arm.y, leg.y/z) stack on top of it, matching vanilla's visual.
     }
 
+    @Inject(method = "renderRightHand", at = @At("HEAD"))
+    private void yebisurpg$fpHandFlagRight(PoseStack poseStack, MultiBufferSource buffer,
+            int combinedLight, AbstractClientPlayer player, CallbackInfo ci) {
+        TorsoRotationHolder.RENDERING_FP_HAND.set(true);
+    }
+
+    @Inject(method = "renderLeftHand", at = @At("HEAD"))
+    private void yebisurpg$fpHandFlagLeft(PoseStack poseStack, MultiBufferSource buffer,
+            int combinedLight, AbstractClientPlayer player, CallbackInfo ci) {
+        TorsoRotationHolder.RENDERING_FP_HAND.set(true);
+    }
+
     @Inject(method = "renderRightHand", at = @At("TAIL"))
     private void yebisurpg$emissiveRightHand(
             PoseStack poseStack, MultiBufferSource buffer,
             int combinedLight, AbstractClientPlayer player, CallbackInfo ci) {
+        TorsoRotationHolder.RENDERING_FP_HAND.set(false);
         ResourceLocation emissiveLoc =
             CompositeSkinManager.INSTANCE.getEmissiveLocation(player.getUUID());
         if (emissiveLoc == null || FullbrightRenderType.shader == null) return;
@@ -229,6 +245,7 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
     private void yebisurpg$emissiveLeftHand(
             PoseStack poseStack, MultiBufferSource buffer,
             int combinedLight, AbstractClientPlayer player, CallbackInfo ci) {
+        TorsoRotationHolder.RENDERING_FP_HAND.set(false);
         ResourceLocation emissiveLoc =
             CompositeSkinManager.INSTANCE.getEmissiveLocation(player.getUUID());
         if (emissiveLoc == null || FullbrightRenderType.shader == null) return;
@@ -365,5 +382,31 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
         if (rx != 0f) poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(rx));
         if (ry != 0f) poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(ry));
         if (rz != 0f) poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rz));
+    }
+
+    private static void applyRootBone(PoseStack poseStack,
+                                       net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim,
+                                       float timeSecs) {
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.BonePose root = anim.bone("root");
+        float rootRX = root.rotation().evalX(timeSecs);
+        float rootRY = root.rotation().evalY(timeSecs);
+        float rootRZ = root.rotation().evalZ(timeSecs);
+        float rootPX = root.position().evalX(timeSecs) / 16f;
+        float rootPY = root.position().evalY(timeSecs) / 16f;
+        float rootPZ = root.position().evalZ(timeSecs) / 16f;
+        float rootSX = root.scale().evalX(timeSecs);
+        float rootSY = root.scale().evalY(timeSecs);
+        float rootSZ = root.scale().evalZ(timeSecs);
+        if (rootRX != 0f || rootRY != 0f || rootRZ != 0f || rootPX != 0f || rootPY != 0f || rootPZ != 0f
+                || rootSX != 1f || rootSY != 1f || rootSZ != 1f) {
+            final float ROOT_PIVOT_Y = 24f / 16f;
+            poseStack.translate(0f, ROOT_PIVOT_Y, 0f);
+            if (rootRZ != 0f) poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rootRZ));
+            if (rootRY != 0f) poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-rootRY));
+            if (rootRX != 0f) poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-rootRX));
+            if (rootSX != 1f || rootSY != 1f || rootSZ != 1f) poseStack.scale(rootSX, rootSY, rootSZ);
+            poseStack.translate(0f, -ROOT_PIVOT_Y, 0f);
+            poseStack.translate(-rootPX, rootPY, rootPZ);
+        }
     }
 }

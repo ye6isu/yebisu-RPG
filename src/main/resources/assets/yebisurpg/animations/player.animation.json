@@ -19,15 +19,8 @@
 						"0": {
 							"vector": [0, 0, 0]
 						},
-						"1": {
-							"vector": [-90, 0, 0]
-						},
 						"0.5": {
 							"vector": [-90, 0, 0],
-							"easing": "easeOutElastic"
-						},
-						"1.5": {
-							"vector": [-90, 0, 90],
 							"easing": "easeOutElastic"
 						}
 					}
@@ -41,7 +34,7 @@
 							"vector": [-170, 0, 0],
 							"easing": "easeOutExpo"
 						},
-						"1.416667": {
+						"1.41667": {
 							"vector": [-90, 0, 0],
 							"easing": "easeInExpo"
 						}
