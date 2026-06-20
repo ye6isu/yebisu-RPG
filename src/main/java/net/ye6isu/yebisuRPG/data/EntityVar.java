@@ -29,6 +29,7 @@ public final class EntityVar {
     // Value storage — only one is non-null at a time
     private int       intVal;
     private float     floatVal;
+    private double    doubleVal;
     private boolean   boolVal;
     private String    stringVal = "";
     private ItemStack itemVal   = ItemStack.EMPTY;
@@ -44,6 +45,9 @@ public final class EntityVar {
     }
     public static EntityVar ofFloat(float value) {
         var v = new EntityVar(EntityVarType.FLOAT, false); v.floatVal = value; return v;
+    }
+    public static EntityVar ofDouble(double value) {
+        var v = new EntityVar(EntityVarType.DOUBLE, false); v.doubleVal = value; return v;
     }
     public static EntityVar ofBool(boolean value) {
         var v = new EntityVar(EntityVarType.BOOL, false); v.boolVal = value; return v;
@@ -72,6 +76,7 @@ public final class EntityVar {
 
     public int       getInt()    { return intVal; }
     public float     getFloat()  { return floatVal; }
+    public double    getDouble() { return doubleVal; }
     public boolean   getBool()   { return boolVal; }
     public String    getString() { return stringVal; }
     public ItemStack getItem()   { return itemVal; }
@@ -82,6 +87,7 @@ public final class EntityVar {
 
     public void setInt(int v)         { if (intVal   != v)           { intVal   = v;       dirty = true; } }
     public void setFloat(float v)     { if (floatVal != v)           { floatVal = v;       dirty = true; } }
+    public void setDouble(double v)   { if (doubleVal != v)          { doubleVal = v;     dirty = true; } }
     public void setBool(boolean v)    { if (boolVal  != v)           { boolVal  = v;       dirty = true; } }
     public void setString(String v)   { if (!stringVal.equals(v))    { stringVal = v;      dirty = true; } }
     public void setItem(ItemStack v)  {
@@ -102,6 +108,7 @@ public final class EntityVar {
         switch (type) {
             case INT        -> tag.putInt("v",     intVal);
             case FLOAT      -> tag.putFloat("v",   floatVal);
+            case DOUBLE     -> tag.putDouble("v",  doubleVal);
             case BOOL       -> tag.putBoolean("v", boolVal);
             case STRING     -> tag.putString("v",  stringVal);
             case ITEM_STACK -> tag.put("v",        (net.minecraft.nbt.Tag) itemVal.save(registries));
@@ -117,6 +124,7 @@ public final class EntityVar {
         switch (type) {
             case INT        -> v.intVal    = tag.getInt("v");
             case FLOAT      -> v.floatVal  = tag.getFloat("v");
+            case DOUBLE     -> v.doubleVal = tag.getDouble("v");
             case BOOL       -> v.boolVal   = tag.getBoolean("v");
             case STRING     -> v.stringVal = tag.getString("v");
             case ITEM_STACK -> v.itemVal   = ItemStack.parseOptional(registries,

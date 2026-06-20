@@ -154,6 +154,12 @@ export function ycsSyncImports(code, enabledMethodKeys) {
   if (code.includes('ResourceLocation')) {
     needed.add('net.minecraft.resources.ResourceLocation');
   }
+  if (code.includes('Component.literal')) {
+    needed.add('net.minecraft.network.chat.Component');
+  }
+  if (code.includes('ModDataComponents.')) {
+    needed.add('net.ye6isu.yebisuRPG.component.ModDataComponents');
+  }
 
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');
   result = result.replace(/\/\/YCS:import:[^\n]+\n?import [^;]+;\n?/g, '');
@@ -300,6 +306,12 @@ export function ycsEffectSyncImports(code, enabledMethodKeys) {
   }
   if (code.includes('ResourceLocation')) {
     needed.add('net.minecraft.resources.ResourceLocation');
+  }
+  if (code.includes('Component.literal')) {
+    needed.add('net.minecraft.network.chat.Component');
+  }
+  if (code.includes('ModDataComponents.')) {
+    needed.add('net.ye6isu.yebisuRPG.component.ModDataComponents');
   }
 
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');

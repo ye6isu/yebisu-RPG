@@ -1,15 +1,1 @@
-[
-  {
-    "id": "test_effect",
-    "constName": "TEST_EFFECT",
-    "titleText": "Test Effect",
-    "category": "NEUTRAL",
-    "color": 11101798,
-    "hasTexture": true,
-    "textureId": "export",
-    "textureAnimated": true,
-    "textureFrametime": 1,
-    "enabledMethods": [],
-    "methodBlocks": {}
-  }
-]
+[]

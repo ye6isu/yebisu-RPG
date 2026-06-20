@@ -37,5 +37,5 @@ export function tagLabel(tag){
 export const TAG_GROUPS=COMMON_TAGS.map(tag=>({tag,label:tagLabel(tag)}));
 export const SMELTING_DEFAULTS={smelting:{method:"smelting",time:200},smoking:{method:"smoking",time:100},blasting:{method:"blasting",time:100},campfire:{method:"campfireCooking",time:600}};
 export const SMELT_TYPES=[{key:"smelting",label:"Smelting",defTime:200},{key:"smoking",label:"Smoking",defTime:100},{key:"blasting",label:"Blasting",defTime:100},{key:"campfire",label:"Campfire",defTime:600}];
-export const VAR_TYPES=[{value:"int",label:"Int"},{value:"float",label:"Float"},{value:"bool",label:"Bool"},{value:"string",label:"String"},{value:"item",label:"Item Stack"}];
+export const VAR_TYPES=[{value:"double",label:"Number"},{value:"bool",label:"Bool"},{value:"string",label:"String"},{value:"item",label:"Item Stack"}];
 export function defaultForType(type){return type==="bool"?false:type==="string"?"":type==="item"?{itemId:null,count:1}:0;}

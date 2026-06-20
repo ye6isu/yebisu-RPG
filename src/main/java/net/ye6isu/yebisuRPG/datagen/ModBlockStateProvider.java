@@ -20,7 +20,6 @@ public class ModBlockStateProvider extends BlockStateProvider {
         //Normal Blockss
         blockWithItem(ModBlocks.YE6ISU_BLOCK);
         blockWithItem(ModBlocks.CRATE_BLOCK);
-        blockWithItem(ModBlocks.YE6ISU_ORE);
 
         //Non-Block Blocks
         blockItem(ModBlocks.CRATE_STAIRS);
@@ -40,11 +39,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
         doorBlockWithRenderType(ModBlocks.CRATE_DOOR.get(), modLoc("block/crate_door_bottom"), modLoc("block/crate_door_top"), "cutout");
         trapdoorBlockWithRenderType(ModBlocks.CRATE_TRAPDOOR.get(), modLoc("block/crate_trapdoor"), true, "cutout");
 
-        //Block from creator
-
         //YCS_Mod_Block_State_START
-
-        blockWithItem(ModBlocks.TEST_BLOCK);
 
         //YCS_Mod_Block_State_END
     }

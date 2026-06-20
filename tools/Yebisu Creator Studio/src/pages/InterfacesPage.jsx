@@ -80,7 +80,6 @@ export default function InterfacesPage({ onEditingChange, newTrigger, editing, s
   }
 
   return <div style={{ flex: 1, background: C.panel, borderRadius: C.r, overflow: "hidden", padding: "20px 20px 90px", overflowY: "auto" }}>
-    <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>INTERFACES</div>
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {interfaces.map((i, idx) => <div key={i.id}
         draggable

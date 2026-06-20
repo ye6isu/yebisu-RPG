@@ -14,13 +14,14 @@ package net.ye6isu.yebisuRPG.data;
  * </ul>
  */
 public enum EntityVarType {
-    INT, FLOAT, BOOL, STRING, ITEM_STACK;
+    INT, FLOAT, BOOL, STRING, ITEM_STACK, DOUBLE;
 
     public static final byte ID_INT        = 0;
     public static final byte ID_FLOAT      = 1;
     public static final byte ID_BOOL       = 2;
     public static final byte ID_STRING     = 3;
     public static final byte ID_ITEM_STACK = 4;
+    public static final byte ID_DOUBLE     = 5;
 
     public byte wireId() {
         return switch (this) {
@@ -29,6 +30,7 @@ public enum EntityVarType {
             case BOOL       -> ID_BOOL;
             case STRING     -> ID_STRING;
             case ITEM_STACK -> ID_ITEM_STACK;
+            case DOUBLE     -> ID_DOUBLE;
         };
     }
 
@@ -38,6 +40,7 @@ public enum EntityVarType {
             case ID_BOOL       -> BOOL;
             case ID_STRING     -> STRING;
             case ID_ITEM_STACK -> ITEM_STACK;
+            case ID_DOUBLE     -> DOUBLE;
             default            -> INT;
         };
     }

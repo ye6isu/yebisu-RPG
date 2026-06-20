@@ -100,13 +100,13 @@ export function BlockLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modI
     <ConstField form={form} F={F}/>
     <Sel label="Block Orientation" value={orient} onChange={v=>F("orientationType",v)} options={[{value:"simple",label:"Simple"},{value:"pillar",label:"Pillar"},{value:"directional",label:"Directional"}]}/>
     {orient==="simple"&&<TexRow label="Texture" fkey="textureId"/>}
-    {orient==="pillar"&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
-      <div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8}}><TexRow label="Top" fkey="textureTopId"/></div>
+    {orient==="pillar"&&<div style={{display:"flex",flexDirection:"column",gap:2,paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}>
+      <TexRow label="Top" fkey="textureTopId"/>
       <TexRow label="Side" fkey="textureSideId"/>
       <TexRow label="Bottom" fkey="textureBottomId"/>
     </div>}
-    {orient==="directional"&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
-      <div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8}}><TexRow label="Top" fkey="textureTopId"/></div>
+    {orient==="directional"&&<div style={{display:"flex",flexDirection:"column",gap:2,paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}>
+      <TexRow label="Top" fkey="textureTopId"/>
       <TexRow label="Bottom" fkey="textureBottomId"/>
       <TexRow label="Front" fkey="textureFrontId"/>
       <TexRow label="Back" fkey="textureBackId"/>

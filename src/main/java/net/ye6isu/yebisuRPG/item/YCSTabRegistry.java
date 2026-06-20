@@ -15,8 +15,6 @@ import java.util.Map;
 public final class YCSTabRegistry {
 
     private static final Map<String, ResourceLocation> STATIC_TAB_LOCATIONS = Map.of(
-        "yebisurpg_items_tab",  ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_items_tab"),
-        "yebisurpg_blocks_tab", ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "yebisurpg_blocks_tab"),
         "combat",               ResourceLocation.fromNamespaceAndPath("minecraft", "combat"),
         "tools_and_utilities",  ResourceLocation.fromNamespaceAndPath("minecraft", "tools_and_utilities"),
         "food_and_drinks",      ResourceLocation.fromNamespaceAndPath("minecraft", "food_and_drinks"),
