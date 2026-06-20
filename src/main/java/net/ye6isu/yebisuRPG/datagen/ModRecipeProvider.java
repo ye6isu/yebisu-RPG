@@ -71,18 +71,6 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 
         //YCS_Mod_Recipe_Provider_START
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.NORBIT_THE_ORBIT.get(), 1)
-                .pattern(" A ")
-                .pattern("A A")
-                .pattern(" A ")
-                .define('A', net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("minecraft:diamond")))
-                .unlockedBy("has_diamond", has(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("minecraft:diamond"))))
-                .save(recipeOutput);
-        
-        SimpleCookingRecipeBuilder.smelting(Ingredient.of(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("yebisurpg:plank"))), RecipeCategory.MISC, ModItems.NORBIT_THE_ORBIT.get(), 0.7f, 200)
-                .unlockedBy("has_plank", has(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("yebisurpg:plank"))))
-                .save(recipeOutput, ResourceLocation.fromNamespaceAndPath("yebisurpg", "norbit_the_orbit_from_smelting"));
-
         //YCS_Mod_Recipe_Provider_END
 
     }

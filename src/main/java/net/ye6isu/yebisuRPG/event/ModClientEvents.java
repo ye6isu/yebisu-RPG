@@ -47,9 +47,6 @@ public class ModClientEvents {
         while (ModKeybinds.OPEN_HAND_DEBUG.consumeClick()) {
             mc.setScreen(new HandDebugScreen());
         }
-        while (ModKeybinds.TEST_BIND.consumeClick()) {
-            ModKeybinds.proneTiltOnly = !ModKeybinds.proneTiltOnly;
-        }
     }
 
     @SubscribeEvent

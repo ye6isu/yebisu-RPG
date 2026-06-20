@@ -221,3 +221,77 @@ When you disable a method override:
 | `resources/data/.../tags/` | Tag JSON files |
 
 For any new feature/file category not already in this table, YCS does not assume a path or create a new file on its own — it asks the project owner whether an existing file/class can house it before creating anything new.
+
+---
+
+## UI Component Standards
+
+### Module Structure
+YCS is split into modules under `tools/Yebisu Creator Studio/src/`:
+- `constants.js` / `theme.js` / `context.js` / `api.js` — foundation
+- `components/ui.jsx` — shared primitives (Lbl, Btn, Inp, Sel, Chk, SearchSel, AImg, FormActions, etc.)
+- `components/` — shared complex components (TexSel, ItemPicker, CardGrid, EditRow, IngredientPicker, VisualEditor)
+- `panels/` — right-pane panels (Recipe, Tags, Tooltip, Variants, TexturePicker, Code, CustomClass, RightPaneShell)
+- `pages/` — one file per tab (Textures, Items, Blocks, Tabs, Keybinds, Interfaces, Variables, Attributes, Effects)
+- `codegen/` — Java code generation (items, blocks, ycs method injection, visual scripting)
+
+### List Views
+- **Items, Blocks**: Use `CardGrid` (200×267px cards with texture preview, name, and ID).
+- **Effects**: Use `CardGrid` with same dimensions. Card layout: texture preview (180px), name + color swatch (right-aligned) on first line, ID + category pill (right-aligned) on second line.
+- **Keybinds, Tabs**: Use row layout (height 40px, card background, border-radius 6).
+- **Variables, Attributes**: Use row layout with inline editing.
+
+### Field Row Pattern (EditRow)
+For fields that open a right-side panel (Texture, Methods, Tags, Tooltip, Recipe, Variants):
+- Use `EditRow` component or the same pattern: label left, summary text, button right.
+- Button text: **"set"** when nothing is configured, **"edit"** when something is configured.
+- Summary shows current state (e.g. tag count, recipe types, tooltip text, method count).
+
+### Texture Fields
+- **Texture tab** (TexturesPage): File upload fields use `FileField` pattern — `[Preview] [Filename] [replace (if set)] [set/remove]`. Consistent height and layout for Texture File, Shape File, and Emissive File.
+- **Item/Block editors**: Texture field opens the Texture right panel. Button says "set"/"edit". No inline remove — the panel handles selection.
+- **Door/Trapdoor** (VariantsPanel): Uses `VariantTexRow` — same field appearance with inline dropdown picker, remove/set buttons.
+
+### Searchable Dropdowns (SearchSel)
+- `SearchSel` is the unified searchable dropdown component.
+- Default mode: strict pick from list (used for Sounds, block orientation, etc.).
+- `freeform={true}`: text input with autocomplete suggestions, allows custom values (used for food status effects).
+
+### Item Pickers (ItemPicker)
+- `ItemPicker` is the unified item selection component.
+- `showCount={true}` (default): shows count field alongside item selector.
+- `allowEmpty={true}`: adds "(empty)" option at top of list.
+- Used for: effect item stacks, variable defaults, recipe drop items.
+
+### Block Drop
+- Drop type options: "Self" (drops itself) or "Custom" (drops a different item).
+- Custom shows: searchable item picker (freeform), Fortune checkbox, XP field (only when Fortune checked).
+- Fortune = uses `DropExperienceBlock` + `createOreDrop()` (gives XP + Fortune enchantment bonus).
+- No Fortune = uses `createSingleItemTableWithSilkTouch()` (Silk Touch only, no Fortune).
+
+### Holding Mode Labels
+- "Default" (value: "none") — flat item rendering
+- "Handheld" (value: "handheld") — tool/handheld rendering
+
+### Recipe Summary (Left Pane)
+- Shows comma-separated names of what's checked: "Crafting", "Smelting", "Smoking", "Blasting", "Campfire".
+- No inline details (type, count, XP) — those are in the right panel.
+
+### Tooltip Lang Cleanup
+- When tooltip is unchecked during edit, the lang entries (`tooltip.MODID.id.normal`, `.shift_hint`, `.hidden`) are deleted via `/api/lang/delete` with `{keys: [...]}`.
+
+### Visual Block Editor
+- When a block is dropped, its slots are auto-populated with default data blocks:
+  - Entity slots → "Event Entity" block
+  - Number slots → "Number" literal block (value: 1)
+  - Text slots → "Text" literal block (value: "")
+- The user can then swap these defaults for different blocks if needed.
+- No placeholder text shown on empty canvas.
+
+### Creative Tabs
+- Built-in tabs (yebisu RPG Items/Blocks) were removed. Only custom tabs (via Tabs editor) and vanilla tabs remain.
+- Category labels in keybinds: "yebisu RPG" (no "(this mod)" suffix).
+
+### Keybind Mouse Buttons
+- Dropdown includes Mouse 1-5. Labels: "Mouse 1", "Mouse 2", "Mouse 3", "Mouse 4", "Mouse 5".
+- Browser button remapping: left=Mouse 1, right=Mouse 2, middle=Mouse 3 (browser gives 0=left, 1=middle, 2=right; we remap {0→0, 1→2, 2→1}).

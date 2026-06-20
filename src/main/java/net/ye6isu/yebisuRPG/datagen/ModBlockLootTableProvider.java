@@ -44,7 +44,9 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 
         //YCS_Mod_Block_Loot_START
 
-        dropSelf(ModBlocks.YEBISU_CAT.get());
+;
+
+        dropSelf(ModBlocks.TEST_BLOCK.get());
 
         //YCS_Mod_Block_Loot_END
     }

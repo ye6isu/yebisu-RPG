@@ -1343,12 +1343,13 @@
   "yebisurpg:crate_trapdoor",
   "yebisurpg:crate_wall",
   "yebisurpg:joe_spawn_egg",
-  "yebisurpg:norbit_the_orbit",
   "yebisurpg:plank",
   "yebisurpg:plank_boots",
   "yebisurpg:plank_chestplate",
   "yebisurpg:plank_helmet",
   "yebisurpg:plank_leggings",
+  "yebisurpg:test_block",
+  "yebisurpg:test_item",
   "yebisurpg:walkman",
   "yebisurpg:ye6isu",
   "yebisurpg:ye6isu_axe",
@@ -1357,6 +1358,5 @@
   "yebisurpg:ye6isu_ore",
   "yebisurpg:ye6isu_pickaxe",
   "yebisurpg:ye6isu_shovel",
-  "yebisurpg:ye6isu_sword",
-  "yebisurpg:yebisu_cat"
+  "yebisurpg:ye6isu_sword"
 ]

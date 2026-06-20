@@ -44,7 +44,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
 
         //YCS_Mod_Block_State_START
 
-        blockWithItem(ModBlocks.YEBISU_CAT);
+        blockWithItem(ModBlocks.TEST_BLOCK);
 
         //YCS_Mod_Block_State_END
     }

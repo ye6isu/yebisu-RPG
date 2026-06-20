@@ -49,9 +49,6 @@ public final class ModAttributes {
     public static final DeferredHolder<Attribute, Attribute> SCALE_EXPLOSIONS       = reg("scale.explosions",       "Scale (Explosions)",            0.0, Double.MAX_VALUE,  1.0);
 
     //YCS_Attributes_START
-    public static final DeferredHolder<Attribute, Attribute> NEW_ATTR =
-        ATTRIBUTES.register("new_attr", () -> new RangedAttribute(
-            "yebisurpg:new_attr", 0D, 0D, 100D).setSyncable(true));
     //YCS_Attributes_END
 
     private static DeferredHolder<Attribute, Attribute> reg(String path, String descKey, double min, double max, double def) {
