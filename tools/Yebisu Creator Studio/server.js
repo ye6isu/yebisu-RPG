@@ -617,8 +617,6 @@ app.post('/api/items/custom-class/write', (req, res) => {
 const TABS_JSON = 'D:/Projects/Mods/yebisu-RPG/src/main/resources/assets/yebisurpg/ycs/ycs_tabs.json'
 
 const STATIC_TAB_VALUE_TO_KEY = {
-  'ModCreativeModeTabs.YEBISURPG_ITEMS_TAB': 'yebisurpg_items_tab',
-  'ModCreativeModeTabs.YEBISURPG_BLOCK_TAB': 'yebisurpg_blocks_tab',
   'vanilla:combat':              'combat',
   'vanilla:tools_and_utilities': 'tools_and_utilities',
   'vanilla:food_and_drinks':     'food_and_drinks',
