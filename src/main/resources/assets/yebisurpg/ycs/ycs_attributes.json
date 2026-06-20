@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "new_attr",
+    "constName": "NEW_ATTR",
+    "titleText": "",
+    "min": 0,
+    "base": 0,
+    "max": 100,
+    "syncToClient": true
+  }
+]

@@ -33,7 +33,7 @@ const TIERS=["Wood","Stone","Iron","Diamond","Netherite","YE6ISU"];
 const TIER_MAP={Wood:"Tiers.WOOD",Stone:"Tiers.STONE",Iron:"Tiers.IRON",Diamond:"Tiers.DIAMOND",Netherite:"Tiers.NETHERITE",YE6ISU:"ModToolTiers.YE6ISU"};
 const TOOL_TYPES=["Sword","Pickaxe","Axe","Shovel","Hoe"];
 const SOUND_TYPES=["STONE","WOOD","METAL","GRASS","SAND","GRAVEL","GLASS","CLOTH","SNOW","LANTERN","CHAIN","COPPER","DEEPSLATE","TUFF","CALCITE"];
-const BUILTIN_CREATIVE_TABS=[{value:"",label:"(none)",vanilla:false},{value:"ModCreativeModeTabs.YEBISURPG_ITEMS_TAB",label:"yebisu RPG Items",vanilla:false},{value:"ModCreativeModeTabs.YEBISURPG_BLOCK_TAB",label:"yebisu RPG Blocks",vanilla:false},{value:"vanilla:combat",label:"Combat",vanilla:true},{value:"vanilla:tools_and_utilities",label:"Tools & Utilities",vanilla:true},{value:"vanilla:food_and_drinks",label:"Food & Drinks",vanilla:true},{value:"vanilla:ingredients",label:"Ingredients",vanilla:true},{value:"vanilla:building_blocks",label:"Building Blocks",vanilla:true},{value:"vanilla:redstone",label:"Redstone",vanilla:true},{value:"vanilla:natural_blocks",label:"Natural Blocks",vanilla:true}];
+const BUILTIN_CREATIVE_TABS=[{value:"",label:"(none)",vanilla:false},{value:"vanilla:combat",label:"Combat",vanilla:true},{value:"vanilla:tools_and_utilities",label:"Tools & Utilities",vanilla:true},{value:"vanilla:food_and_drinks",label:"Food & Drinks",vanilla:true},{value:"vanilla:ingredients",label:"Ingredients",vanilla:true},{value:"vanilla:building_blocks",label:"Building Blocks",vanilla:true},{value:"vanilla:redstone",label:"Redstone",vanilla:true},{value:"vanilla:natural_blocks",label:"Natural Blocks",vanilla:true}];
 // Custom tabs (added via the Tabs editor) are merged in at runtime — see useCreativeTabs().
 function useVanillaItems(){
   const[vanillaItems,setVanillaItems]=useState([]);
@@ -99,6 +99,27 @@ function Btn({children,onClick,v="d",sm,dis,style:extStyle={}}){const vs={d:{bg:
 function Inp({label,value,onChange,type="text",style={}}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<input type={type} value={value??""} onChange={e=>onChange(e.target.value)} style={{...SI.inp,...style}}/></div>;}
 function Sel({label,value,onChange,options,disabled=false}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<div style={{position:"relative"}}><select value={value} onChange={e=>onChange(e.target.value)} disabled={disabled} style={{...SI.inp,paddingRight:28,cursor:disabled?"default":"pointer",opacity:disabled?0.5:1}}>{options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select><span style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:C.dim,fontSize:10}}>▾</span></div></div>;}
 function Chk({label,checked,onChange}){return<label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><div onClick={()=>onChange(!checked)} style={{width:14,height:14,border:`1px solid ${checked?C.accent:C.inpB}`,borderRadius:3,background:checked?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{checked&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}</div><span style={{fontSize:13,color:"#b0b0aa"}}>{label}</span></label>;}
+function SearchSel({label,value,onChange,options}){
+  const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
+  const sel=options.find(o=>(o.value??o)===value);
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return options.filter(o=>{const l=(o.label??o).toLowerCase(),v=(o.value??o).toLowerCase();return!q||l.includes(q)||v.includes(q);});},[options,srch]);
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    {label&&<Lbl>{label}</Lbl>}
+    <div style={{position:"relative"}}>
+      <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"7px 10px"}}>
+        <span style={{color:sel?C.text:C.faint}}>{sel?(sel.label??sel):"(none)"}</span>
+        <span style={{color:C.dim,fontSize:10}}>▾</span>
+      </div>
+      {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:240,display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+        <div style={{overflowY:"auto",flex:1}}>
+          {filt.map(o=>{const v=o.value??o,l=o.label??o;return<div key={v} onClick={()=>{onChange(v);setOpen(false);setSrch("");}} style={{padding:"6px 9px",cursor:"pointer",fontSize:12,color:C.text,background:value===v?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>{l}</div>;})}
+          {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
+        </div>
+      </div>}
+    </div>
+  </div>;
+}
 function Txta({label,value,onChange,rows=3}){return<div style={{display:"flex",flexDirection:"column",gap:4}}>{label&&<Lbl>{label}</Lbl>}<textarea value={value??""} onChange={e=>onChange(e.target.value)} rows={rows} style={{...SI.inp,resize:"vertical"}}/></div>;}
 function Sect({title,children,open:init=true,accent}){const[o,setO]=useState(init);return<div style={{border:`1px solid ${C.inpB}`,borderRadius:C.r,overflow:"hidden"}}><div onClick={()=>setO(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#191919",cursor:"pointer"}}><span style={{fontSize:12,color:accent||C.accent,fontWeight:500}}>{title}</span><span style={{color:C.faint,fontSize:10}}>{o?"▲":"▼"}</span></div>{o&&<div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:9,background:"#141414"}}>{children}</div>}</div>;}
 function Sbar({messages}){if(!messages?.length)return null;return<div style={{display:"flex",flexDirection:"column",gap:3}}>{messages.map((m,i)=><div key={i} style={{padding:"4px 9px",borderRadius:3,fontSize:11,fontFamily:"monospace",background:m.ok?"#091a09":"#1a0909",color:m.ok?"#5acc5a":"#cc5a5a",borderLeft:`2px solid ${m.ok?"#2a6a2a":"#6a2a2a"}`}}>{m.ok?"✓":"✗"} {m.label}: {m.msg}</div>)}</div>;}
@@ -2034,7 +2055,7 @@ const KEY_OPTIONS=(()=>{
   for(let i=0;i<=9;i++)opts.push({value:"KEY_"+i,label:String(i)});
   for(let i=1;i<=25;i++)opts.push({value:"KEY_F"+i,label:"F"+i});
   Object.values(CODE_TO_GLFW_KEY).forEach(name=>{if(!opts.some(o=>o.value==="KEY_"+name))opts.push({value:"KEY_"+name,label:name.replace(/_/g," ")});});
-  opts.push({value:"MOUSE_2",label:"Mouse 3 (middle)"},{value:"MOUSE_3",label:"Mouse 4"},{value:"MOUSE_4",label:"Mouse 5"});
+  opts.push({value:"MOUSE_0",label:"Mouse 1"},{value:"MOUSE_1",label:"Mouse 2"},{value:"MOUSE_2",label:"Mouse 3"},{value:"MOUSE_3",label:"Mouse 4"},{value:"MOUSE_4",label:"Mouse 5"});
   return opts;
 })();
 function splitBindCode(code){
@@ -2072,7 +2093,8 @@ function RecordKeyButton({value,onChange}){
       if(MODIFIER_CODES.has(e.code))return;
       e.preventDefault();const code=domEventToBindCode(e);if(code){onChange(code);setRecording(false);}
     };
-    const onMouse=e=>{e.preventDefault();const m=e.ctrlKey?"CTRL":e.altKey?"ALT":e.shiftKey?"SHIFT":"NONE";onChange(joinBindCode("MOUSE_"+e.button,m));setRecording(false);};
+    const MOUSE_REMAP={0:0,1:2,2:1};
+    const onMouse=e=>{e.preventDefault();const m=e.ctrlKey?"CTRL":e.altKey?"ALT":e.shiftKey?"SHIFT":"NONE";onChange(joinBindCode("MOUSE_"+(MOUSE_REMAP[e.button]??e.button),m));setRecording(false);};
     window.addEventListener("keydown",onKey,true);
     window.addEventListener("mousedown",onMouse,true);
     return()=>{window.removeEventListener("keydown",onKey,true);window.removeEventListener("mousedown",onMouse,true);};
@@ -2091,20 +2113,20 @@ function RecordKeyButton({value,onChange}){
 }
 function useKeybinds(){
   const[keybinds,setKeybinds]=useState([]);
-  const[categories,setCategories]=useState({own:"CATEGORY",ownLabel:"yebisu RPG (this mod)",vanilla:[],custom:[]});
+  const[categories,setCategories]=useState({own:"CATEGORY",ownLabel:"yebisu RPG",vanilla:[],custom:[]});
   const reload=useCallback(()=>{fetch(`${BASE}/keybinds/list`).then(r=>r.json()).then(j=>{if(j.ok){setKeybinds(j.keybinds||[]);if(j.categories)setCategories(j.categories);}}).catch(()=>{});},[]);
   useEffect(()=>{reload();},[reload]);
   return{keybinds,categories,reload};
 }
 function categoryLabel(cat){
-  if(!cat||cat==="CATEGORY")return"yebisu RPG (this mod)";
+  if(!cat||cat==="CATEGORY")return"yebisu RPG";
   return cat.startsWith("key.categories.")?cat.slice("key.categories.".length).replace(/^./,c=>c.toUpperCase()):cat;
 }
 function CategoryPicker({value,categories,onChange}){
   const known=["CATEGORY",...categories.vanilla,...categories.custom];
   const isCustom=value&&!known.includes(value);
   const[customMode,setCustomMode]=useState(isCustom);
-  const options=[{value:"CATEGORY",label:"yebisu RPG (this mod)"},...categories.vanilla.map(c=>({value:c,label:categoryLabel(c)})),...categories.custom.map(c=>({value:c,label:c})),{value:"__custom__",label:"+ New custom category…"}];
+  const options=[{value:"CATEGORY",label:"yebisu RPG"},...categories.vanilla.map(c=>({value:c,label:categoryLabel(c)})),...categories.custom.map(c=>({value:c,label:c})),{value:"__custom__",label:"+ New custom category…"}];
   if(customMode)return<div style={{display:"flex",flexDirection:"column",gap:4}}>
     <Lbl>Category</Lbl>
     <div style={{display:"flex",gap:8}}>
@@ -2361,6 +2383,32 @@ function ItemStackPicker({label,value,onChange,allItems,textures}){
   </div>;
 }
 
+function VarItemPicker({value,onChange,allItems,textures}){
+  const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");
+  const vanillaItems=useVanillaItems();
+  const pool=useMemo(()=>[...allItems,...vanillaItems],[allItems,vanillaItems]);
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return pool.filter(x=>!q||x.id.includes(q)||(x.displayName||"").toLowerCase().includes(q));},[pool,srch]);
+  const sel=pool.find(x=>x.id===value?.itemId);
+  const prevUrl=sel?(textures.find(tx=>tx.id===sel.textureId)?.dataUrl||sel.textureDataUrl):null;
+  return<div style={{position:"relative"}}>
+    <div onClick={()=>setOpen(v=>!v)} style={{...SI.inp,display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"4px 8px",fontSize:12,height:33}}>
+      {sel&&<AImg url={prevUrl} size={18}/>}
+      <span style={{flex:1,color:sel?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?(sel.displayName||sel.id):"(empty)"}</span>
+      <span style={{color:C.dim}}>▾</span>
+    </div>
+    {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:220,display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+      <div style={{overflowY:"auto",flex:1}}>
+        <div onClick={()=>{onChange({...value,itemId:null});setOpen(false);}} style={{padding:"6px 9px",cursor:"pointer",color:C.faint,fontSize:12,borderBottom:"1px solid #181818"}}>(empty)</div>
+        {filt.slice(0,200).map(x=>{const u=textures.find(tx=>tx.id===x.textureId)?.dataUrl||x.textureDataUrl;return<div key={x.id} onClick={()=>{onChange({...value,itemId:x.id});setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value?.itemId===x.id?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
+          <AImg url={u} size={18}/>
+          <div><div style={{fontSize:12,color:C.text}}>{x.displayName||x.id}</div><div style={{fontSize:10,color:C.dim}}>{x.id}</div></div>
+        </div>;})}
+        {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
+      </div>
+    </div>}
+  </div>;
+}
 function VariablesPage({onEditingChange,newTrigger,editing,setEditing,allItems,textures}){
   const{variables,reload}=useVariables();
   const[local,setLocal]=useState([]);
@@ -2396,7 +2444,7 @@ function VariablesPage({onEditingChange,newTrigger,editing,setEditing,allItems,t
             :vt.value==="string"
               ?<input value={v.default??""} onChange={e=>upd(v._idx,"default",e.target.value)} style={{...IS,flex:1}}/>
               :vt.value==="item"
-                ?<input value={v.default?.itemId||""} onChange={e=>upd(v._idx,"default",{...v.default,itemId:e.target.value})} style={{...IS,flex:1}}/>
+                ?<div style={{flex:1}}><VarItemPicker value={v.default} onChange={val=>upd(v._idx,"default",val)} allItems={allItems} textures={textures}/></div>
                 :<input type="number" value={v.default??0} onChange={e=>upd(v._idx,"default",vt.value==="float"?parseFloat(e.target.value)||0:parseInt(e.target.value)||0)} style={{...IS,width:80}}/>}
         </div>)}
         <Btn sm v="g" onClick={()=>addVar(vt.value)} style={{alignSelf:"flex-start",marginTop:2}}>+ {vt.label}</Btn>
@@ -2536,7 +2584,10 @@ function EffectLeft({textures,initial,isEdit,onSave,onCancel,onDelete,effects,re
             :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
           <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
         </div>
-        <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+        <div style={{display:"flex",gap:4,flexShrink:0,marginLeft:8}}>
+          {(selTex||dUrl)&&<Btn sm v="g" onClick={()=>F("textureId","")}>remove</Btn>}
+          <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")}>{(selTex||dUrl)?"replace":"set"}</Btn>
+        </div>
       </div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -2703,26 +2754,30 @@ function EffectsPage({onEditingChange,newTrigger,editing,setEditing,textures,sho
   }
   return<div style={{flex:1,background:C.panel,borderRadius:C.r,overflow:"hidden",padding:"20px 20px 90px",overflowY:"auto"}}>
     <div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:8,letterSpacing:0.5}}>EFFECTS</div>
-    <div style={{display:"flex",flexDirection:"column",gap:6}}>
-      {effects.map((e,idx)=><div key={e.id}
+    <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
+      {effects.map((e,idx)=>{const tx=e.hasTexture&&e.textureId&&textures?.find(t=>t.id===e.textureId);const prevUrl=tx?tx.dataUrl:`${BASE}/textures/mob_effect/${e.id}.png`;return<div key={e.id}
         onClick={()=>setEditing(e)}
-        style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",height:40,background:C.card,border:`1px solid ${C.inpB}`,borderRadius:6,cursor:"pointer",position:"relative"}}
-        onMouseEnter={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="flex";}}
-        onMouseLeave={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="none";}}>
+        style={{width:200,height:267,background:C.card,border:`1px solid ${C.inpB}`,borderRadius:C.r,cursor:"pointer",display:"flex",flexDirection:"column",flexShrink:0,position:"relative"}}
+        onMouseEnter={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="flex";ev.currentTarget.style.borderColor="#3a3a3a";}}
+        onMouseLeave={ev=>{const d=ev.currentTarget.querySelector("[data-del]");if(d)d.style.display="none";ev.currentTarget.style.borderColor=C.inpB;}}>
         <div data-del onClick={ev=>{ev.stopPropagation();deleteEffect(e.id);}} style={{display:"none",position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#ff5f57",cursor:"pointer",zIndex:5,alignItems:"center",justifyContent:"center"}}/>
-        {e.hasTexture&&(()=>{const tx=e.textureId&&textures?.find(t=>t.id===e.textureId);return tx?<AImg url={tx.dataUrl} size={20} anim={tx.isAnimated} frames={tx.frames||1} ticks={tx.ticksPerFrame||4}/>:<div style={{width:20,height:20,borderRadius:3,overflow:"hidden",flexShrink:0}}><img src={`${BASE}/textures/mob_effect/${e.id}.png`} style={{width:"100%",height:"100%",imageRendering:"pixelated"}} alt="" onError={ev=>ev.currentTarget.style.display="none"}/></div>;})()}
-        <span style={{fontSize:13,color:C.text,flex:1}}>{e.titleText||e.id}</span>
-        <Pill color={catColor(e.category)}>{(e.category||"NEUTRAL").toLowerCase()}</Pill>
-        <div style={{width:14,height:14,borderRadius:3,border:"1px solid #333",background:`#${(e.color||0).toString(16).padStart(6,"0")}`,flexShrink:0}}/>
-      </div>)}
-      {!effects.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No effects yet.</div>}
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+          {e.hasTexture?<AImg url={prevUrl} size={80} anim={tx?.isAnimated} frames={tx?.frames||1} ticks={tx?.ticksPerFrame||4}/>:<div style={{width:80,height:80,borderRadius:8,background:`#${(e.color||0).toString(16).padStart(6,"0")}33`,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:32,height:32,borderRadius:6,background:`#${(e.color||0).toString(16).padStart(6,"0")}`}}/></div>}
+        </div>
+        <div style={{padding:"6px 10px 8px",background:C.card}}>
+          <div style={{fontWeight:500,fontSize:13,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.titleText||e.id}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
+            <Pill color={catColor(e.category)}>{(e.category||"NEUTRAL").toLowerCase()}</Pill>
+            <div style={{width:12,height:12,borderRadius:3,border:"1px solid #333",background:`#${(e.color||0).toString(16).padStart(6,"0")}`,flexShrink:0}}/>
+          </div>
+        </div>
+      </div>;})}
     </div>
+    {!effects.length&&<div style={{color:C.faint,fontSize:12,padding:"8px 2px"}}>No effects yet.</div>}
   </div>;
 }
 function TAB_VALUE_TO_KEY_CLIENT(value){
   if(value.startsWith("vanilla:"))return value.replace("vanilla:","");
-  if(value==="ModCreativeModeTabs.YEBISURPG_ITEMS_TAB")return"yebisurpg_items_tab";
-  if(value==="ModCreativeModeTabs.YEBISURPG_BLOCK_TAB")return"yebisurpg_blocks_tab";
   const m=/^ModCreativeModeTabs\.(\w+)$/.exec(value);
   return m?m[1].toLowerCase():value;
 }
@@ -2925,7 +2980,7 @@ function SmeltingSection({modItems=[],modBlocks=[],textures=[]}){
             <div style={{display:"flex",alignItems:"center",gap:4,flex:1,minWidth:0}}>
               <div onClick={()=>{if(pickFor===t.key){setPickFor(null);setSel("");}else{setPickFor(t.key);setSel(sr.ingredient||"");}}} style={{...SI.inp,padding:"4px 8px",fontSize:11,cursor:"pointer",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:sr.ingredient?C.text:C.faint,border:`1px solid ${pickFor===t.key?C.accent:C.inpB}`}}>{sr.ingredient||"input"}</div>
               <input type="number" value={sr.cookingTime} onChange={e=>upd(t.key,"cookingTime",e.target.value)} style={{...SI.inp,width:56,padding:"4px 6px",fontSize:11,textAlign:"center"}}/>
-              <input type="number" value={sr.experience} onChange={e=>upd(t.key,"experience",e.target.value)} style={{...SI.inp,width:50,padding:"4px 6px",fontSize:11,textAlign:"center"}}/>
+              <input type="number" value={sr.experience} onChange={e=>upd(t.key,"experience",e.target.value)} style={{...SI.inp,width:56,padding:"4px 6px",fontSize:11,textAlign:"center"}}/>
             </div>
           </>}
         </div>
@@ -2933,9 +2988,6 @@ function SmeltingSection({modItems=[],modBlocks=[],textures=[]}){
           <IngredientPicker value={sel} onChange={v=>{setSel(v);upd(t.key,"ingredient",v);}} modItems={modItems} modBlocks={modBlocks} vanillaItems={vanillaItems} textures={textures}/>
         </div>}
       </div>;})}
-    {available.some(t=>has(t.key))&&<div style={{display:"flex",gap:16,marginLeft:20}}>
-      <Lbl c={C.faint}>input</Lbl><Lbl c={C.faint}>time</Lbl><Lbl c={C.faint}>xp</Lbl>
-    </div>}
   </div>;
 }
 function RecipePanelWrapper({modItems,modBlocks,textures}){
@@ -2975,6 +3027,42 @@ function TagsPanel(){
     <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:4}}>{visTags.map(t=><div key={t} onClick={()=>toggle(t)} style={{fontSize:10,fontFamily:"monospace",padding:"2px 5px",borderRadius:3,cursor:"pointer",background:tags.includes(t)?"#192a19":"#141414",color:tags.includes(t)?"#5acc5a":C.dim,border:`1px solid ${tags.includes(t)?"#2a5a2a":"#1a1a1a"}`}}>{t}{tags.includes(t)&&<span style={{marginLeft:3,opacity:.6}}>✕</span>}</div>)}</div>
   </div>;
 }
+function VariantTexRow({textures,value,onChange,label}){
+  const t=textures.find(x=>x.id===value);
+  const dUrl=(value||"").startsWith("__direct__")?value.split("__name__")[0].replace("__direct__",""):null;
+  const hasVal=!!(t||dUrl);
+  const[open,setOpen]=useState(false);const[srch,setSrch]=useState("");const fRef=useRef();
+  const filt=useMemo(()=>{const q=srch.toLowerCase();return textures.filter(x=>!q||x.label.toLowerCase().includes(q)||x.id.toLowerCase().includes(q));},[textures,srch]);
+  const onFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>onChange("__direct__"+ev.target.result+"__name__"+f.name);r.readAsDataURL(f);};
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    {label&&<Lbl>{label}</Lbl>}
+    <div style={{position:"relative"}}>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          {hasVal?<AImg url={t?.dataUrl||dUrl} size={20}/>:<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+          <span style={{fontSize:13,color:hasVal?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?t.label:dUrl?"(direct)":"none selected"}</span>
+        </div>
+        <div style={{display:"flex",gap:4,flexShrink:0,marginLeft:8}}>
+          {hasVal&&<Btn sm v="g" onClick={()=>onChange("")}>remove</Btn>}
+          <Btn sm v="g" onClick={()=>setOpen(v=>!v)}>{hasVal?"replace":"set"}</Btn>
+        </div>
+      </div>
+      {open&&<div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,zIndex:400,background:"#1c1c1c",border:`1px solid ${C.pb}`,borderRadius:4,boxShadow:"0 8px 30px rgba(0,0,0,.8)",maxHeight:240,display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"4px 6px",borderBottom:`1px solid ${C.inpB}`}}><input autoFocus value={srch} onChange={e=>setSrch(e.target.value)} style={{...SI.inp,padding:"3px 7px",fontSize:12}}/></div>
+        <div style={{overflowY:"auto",flex:1}}>
+          <div onClick={()=>{onChange("");setOpen(false);}} style={{padding:"6px 9px",cursor:"pointer",color:C.faint,fontSize:12,borderBottom:"1px solid #181818"}}>(none)</div>
+          {filt.map(x=><div key={x.id} onClick={()=>{onChange(x.id);setOpen(false);setSrch("");}} style={{padding:"4px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:value===x.id?"#1a2438":"transparent",borderBottom:"1px solid #181818"}}>
+            <AImg url={x.dataUrl} size={20}/>
+            <div><div style={{fontSize:12,color:C.text}}>{x.label}</div><div style={{fontSize:10,color:C.dim}}>{x.id}</div></div>
+          </div>)}
+          {!filt.length&&<div style={{padding:"9px",color:C.faint,fontSize:12}}>no results</div>}
+        </div>
+        <div onClick={()=>{setOpen(false);fRef.current.click();}} style={{padding:"6px 9px",borderTop:`1px solid ${C.inpB}`,cursor:"pointer",color:C.dim,fontSize:12}}>from PC…</div>
+      </div>}
+    </div>
+    <input ref={fRef} type="file" accept="image/png" style={{display:"none"}} onChange={onFile}/>
+  </div>;
+}
 function VariantsPanel({textures}){
   const{form,F}=useContext(FormCtx);
   const VARIANTS=[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]];
@@ -2982,13 +3070,13 @@ function VariantsPanel({textures}){
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{VARIANTS.map(([k,l])=><Chk key={k} label={l} checked={!!form[k]} onChange={v=>F(k,v)}/>)}</div>
     {form.createDoor&&<div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8,display:"flex",flexDirection:"column",gap:6}}>
       <Lbl>Door Textures</Lbl>
-      <TexSel textures={textures} value={form.textureDoorTopId||""} onChange={v=>F("textureDoorTopId",v)} label="Top"/>
-      <TexSel textures={textures} value={form.textureDoorBottomId||""} onChange={v=>F("textureDoorBottomId",v)} label="Bottom"/>
-      <TexSel textures={textures} value={form.textureDoorItemId||""} onChange={v=>F("textureDoorItemId",v)} label="Item"/>
+      <VariantTexRow textures={textures} value={form.textureDoorTopId||""} onChange={v=>F("textureDoorTopId",v)} label="Top"/>
+      <VariantTexRow textures={textures} value={form.textureDoorBottomId||""} onChange={v=>F("textureDoorBottomId",v)} label="Bottom"/>
+      <VariantTexRow textures={textures} value={form.textureDoorItemId||""} onChange={v=>F("textureDoorItemId",v)} label="Item"/>
     </div>}
     {form.createTrapdoor&&<div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8,display:"flex",flexDirection:"column",gap:6}}>
       <Lbl>Trapdoor Texture</Lbl>
-      <TexSel textures={textures} value={form.textureTrapdoorId||""} onChange={v=>F("textureTrapdoorId",v)}/>
+      <VariantTexRow textures={textures} value={form.textureTrapdoorId||""} onChange={v=>F("textureTrapdoorId",v)} label="Texture"/>
     </div>}
   </div>;
 }
@@ -4202,7 +4290,10 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[],
             :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
           <span style={{fontSize:13,color:selTex||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selTex?selTex.label:dUrl?"(direct)":"none selected"}</span>
         </div>
-        <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+        <div style={{display:"flex",gap:4,flexShrink:0,marginLeft:8}}>
+          {(selTex||dUrl)&&<Btn sm v="g" onClick={()=>F("textureId","")}>remove</Btn>}
+          <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")}>{(selTex||dUrl)?"replace":"set"}</Btn>
+        </div>
       </div>
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
@@ -4257,7 +4348,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[],
     </div>
       </div>
     </div>
-    <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default (flat)"},{value:"handheld",label:"Tool / handheld"}]}/>
+    <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default"},{value:"handheld",label:"Handheld"}]}/>
     {!form.isTool&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}}/>}
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       <Chk label="Set Use Duration" checked={!!form.hasUseDuration} onChange={v=>F("hasUseDuration",v)}/>
@@ -4285,7 +4376,7 @@ function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[],
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Recipe</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
-        <span style={{fontSize:13,color:(form.hasRecipe||form.smeltingRecipes?.length)?C.text:C.faint}}>{(()=>{const p=[];if(form.hasRecipe)p.push(`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`);const sc=form.smeltingRecipes?.length||0;if(sc)p.push(`${sc} smelting`);return p.length?p.join(" + "):"disabled";})()}</span>
+        <span style={{fontSize:13,color:(form.hasRecipe||form.smeltingRecipes?.length)?C.text:C.faint}}>{(()=>{const p=[];if(form.hasRecipe)p.push("Crafting");(form.smeltingRecipes||[]).forEach(r=>{const t=SMELT_TYPES.find(s=>s.key===r.type);if(t)p.push(t.label);});return p.length?p.join(", "):"disabled";})()}</span>
         <Btn sm v={activePanel==="recipe"?"p":"g"} onClick={()=>setActivePanel(p=>p==="recipe"?null:"recipe")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
       </div>
     </div>
@@ -4368,17 +4459,21 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[]
   const TexRow=({label,fkey})=>{
     const t=textures.find(x=>x.id===form[fkey]);
     const dUrl=(form[fkey]||"").startsWith("__direct__")?form[fkey].split("__name__")[0].replace("__direct__",""):null;
+    const hasVal=!!(t||dUrl);
     return<div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
       <Lbl>{label}</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-          {(t||dUrl)
+          {hasVal
             ?<AImg url={t?.dataUrl||dUrl} size={20}/>
             :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>
           }
-          <span style={{fontSize:13,color:t||dUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?t.label:dUrl?"(direct)":"none selected"}</span>
+          <span style={{fontSize:13,color:hasVal?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?t.label:dUrl?"(direct)":"none selected"}</span>
         </div>
-        <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setFace(fkey)} style={{marginLeft:8,flexShrink:0}}>set</Btn>
+        <div style={{display:"flex",gap:4,flexShrink:0,marginLeft:8}}>
+          {hasVal&&<Btn sm v="g" onClick={()=>F(fkey,"")}>remove</Btn>}
+          <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setFace(fkey)}>{hasVal?"replace":"set"}</Btn>
+        </div>
       </div>
     </div>;
   };
@@ -4391,34 +4486,31 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[]
       <input value={form.id} onChange={e=>{const v=e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"");F("id",v);if(!isEdit){F("constName",v.toUpperCase());F("displayName",v.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join(" "));}if(!form.customConstName)F("constName",v.toUpperCase());}} style={{...SI.inp}}/>
     </div>
     <ConstField form={form} F={F}/>
-    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      <Lbl>Block Orientation</Lbl>
-      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{[{v:"simple",l:"Simple"},{v:"pillar",l:"Rotated Pillar"},{v:"directional",l:"Directional"}].map(o=><label key={o.v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><div onClick={()=>F("orientationType",o.v)} style={{width:13,height:13,borderRadius:"50%",border:`2px solid ${orient===o.v?C.accent:C.inpB}`,background:orient===o.v?C.accent:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:"#a0a09a"}}>{o.l}</span></label>)}</div>
-      <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
-        <Lbl>Drop</Lbl>
-        <Sel value={dropType} onChange={v=>F("dropType",v)} options={["Self","Ore","Custom"]} disabled={orient!=="simple"}/>
-        {(dropType==="Ore"||dropType==="Custom")&&<div style={{display:"grid",gridTemplateColumns:dropType==="Ore"?"1fr 100px":"1fr",gap:10,marginTop:4}}>
-          <Inp label="Drop Item/Block (ResourceLocation)" value={form.dropItem} onChange={v=>F("dropItem",v)}/>
-          {dropType==="Ore"&&<Inp label="XP (e.g. 1-3)" value={form.dropXp} onChange={v=>F("dropXp",v)}/>}
-        </div>}
-      </div>
-      {orient==="simple"&&<TexRow label="All Faces" fkey="textureId"/>}
-      {orient==="pillar"&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
-        <TexRow label="Top" fkey="textureTopId"/>
-        <TexRow label="Side" fkey="textureSideId"/>
-        <TexRow label="Bottom" fkey="textureBottomId"/>
-      </div>}
-      {orient==="directional"&&<div style={{display:"flex",flexDirection:"column",gap:2,border:`1px solid #1e1e1e`,borderRadius:C.r,padding:"4px 8px"}}>
-        <TexRow label="Top" fkey="textureTopId"/>
-        <TexRow label="Bottom" fkey="textureBottomId"/>
-        <TexRow label="Front" fkey="textureFrontId"/>
-        <TexRow label="Back" fkey="textureBackId"/>
-        <TexRow label="Left" fkey="textureLeftId"/>
-        <TexRow label="Right" fkey="textureRightId"/>
+    <Sel label="Block Orientation" value={orient} onChange={v=>F("orientationType",v)} options={[{value:"simple",label:"Simple"},{value:"pillar",label:"Pillar"},{value:"directional",label:"Directional"}]}/>
+    {orient==="simple"&&<TexRow label="Texture" fkey="textureId"/>}
+    {orient==="pillar"&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
+      <div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8}}><TexRow label="Top" fkey="textureTopId"/></div>
+      <TexRow label="Side" fkey="textureSideId"/>
+      <TexRow label="Bottom" fkey="textureBottomId"/>
+    </div>}
+    {orient==="directional"&&<div style={{display:"flex",flexDirection:"column",gap:2}}>
+      <div style={{borderTop:`1px solid ${C.inpB}`,paddingTop:8}}><TexRow label="Top" fkey="textureTopId"/></div>
+      <TexRow label="Bottom" fkey="textureBottomId"/>
+      <TexRow label="Front" fkey="textureFrontId"/>
+      <TexRow label="Back" fkey="textureBackId"/>
+      <TexRow label="Left" fkey="textureLeftId"/>
+      <TexRow label="Right" fkey="textureRightId"/>
+    </div>}
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
+      <Lbl>Drop</Lbl>
+      <Sel value={dropType} onChange={v=>F("dropType",v)} options={["Self","Ore","Custom"]} disabled={orient!=="simple"}/>
+      {(dropType==="Ore"||dropType==="Custom")&&<div style={{display:"grid",gridTemplateColumns:dropType==="Ore"?"1fr 100px":"1fr",gap:10,marginTop:4}}>
+        <Inp label="Drop Item/Block (ResourceLocation)" value={form.dropItem} onChange={v=>F("dropItem",v)}/>
+        {dropType==="Ore"&&<Inp label="XP (e.g. 1-3)" value={form.dropXp} onChange={v=>F("dropXp",v)}/>}
       </div>}
     </div>
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/><Sel label="Sound" value={form.soundType} onChange={v=>F("soundType",v)} options={SOUND_TYPES}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Inp label="Hardness" value={form.strength} onChange={v=>F("strength",v)} type="number"/><SearchSel label="Sound" value={form.soundType||"WOOD"} onChange={v=>F("soundType",v)} options={SOUND_TYPES.map(s=>({value:s,label:s}))}/></div>
     {orient==="simple"&&<div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Variants{(()=>{const vc=[["createSlab","Slab"],["createStairs","Stairs"],["createFence","Fence"],["createFenceGate","Fence Gate"],["createWall","Wall"],["createPressurePlate","Pressure Plate"],["createButton","Button"],["createDoor","Door"],["createTrapdoor","Trapdoor"]].filter(([k])=>form[k]).length;return vc>0?<span style={{color:C.accent,marginLeft:5}}>{vc}</span>:null;})()}</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
@@ -4443,7 +4535,7 @@ function BlockLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[]
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Recipe</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
-        <span style={{fontSize:13,color:(form.hasRecipe||form.smeltingRecipes?.length)?C.text:C.faint}}>{(()=>{const p=[];if(form.hasRecipe)p.push(`${form.recipe?.type||"shaped"} · ×${form.recipe?.result||1}`);const sc=form.smeltingRecipes?.length||0;if(sc)p.push(`${sc} smelting`);return p.length?p.join(" + "):"disabled";})()}</span>
+        <span style={{fontSize:13,color:(form.hasRecipe||form.smeltingRecipes?.length)?C.text:C.faint}}>{(()=>{const p=[];if(form.hasRecipe)p.push("Crafting");(form.smeltingRecipes||[]).forEach(r=>{const t=SMELT_TYPES.find(s=>s.key===r.type);if(t)p.push(t.label);});return p.length?p.join(", "):"disabled";})()}</span>
         <Btn sm v={activePanel==="recipe"?"p":"g"} onClick={()=>setActivePanel(p=>p==="recipe"?null:"recipe")} style={{marginLeft:8,flexShrink:0}}>edit</Btn>
       </div>
     </div>
