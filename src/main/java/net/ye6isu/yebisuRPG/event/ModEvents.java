@@ -22,15 +22,6 @@ import net.ye6isu.yebisuRPG.yebisuRPG;
 public class ModEvents {
 
     @SubscribeEvent
-    public static void livingDamage(LivingDamageEvent.Pre event) {
-        if(event.getEntity() instanceof LivingEntity livingEntity && event.getSource().getDirectEntity() instanceof Player player) {
-            if(player.getMainHandItem().getItem() == ModItems.PLANK.get()) {
-                player.sendSystemMessage(Component.literal(livingEntity.getName().getString().toUpperCase() + " HAS BEEN SPANKED WITH A PLANK!"));
-            }
-        }
-    }
-
-    @SubscribeEvent
     public static void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(ModEntities.JOE.get(), JoeEntity.createAttributes().build());
     }

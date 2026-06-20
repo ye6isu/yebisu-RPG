@@ -10,7 +10,7 @@ import { ycsInjectFeature, ycsRemoveFeature } from "../codegen/ycs.js";
 import { VisualEditorPanel } from "../components/VisualEditor.jsx";
 import RightPaneShell from "../panels/RightPaneShell.jsx";
 
-export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{}};
+export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{},dataComponents:[]};
 
 export function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 
@@ -76,6 +76,7 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
       }
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
+    if((form.dataComponents||[]).length){await api("/datacomponents/save",{components:form.dataComponents});}
     await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()},initial?.id);
   };
@@ -116,15 +117,15 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
             {!form.isTool&&<Chk label="Fuel" checked={!!form.isFuel} onChange={v=>F("isFuel",v)}/>}
           </div>
         </div>
-        {form.isTool&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:"2px solid #1a3040"}}>
+        {form.isTool&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}>
           <Sel label="Tool Type" value={form.toolType||"Sword"} onChange={v=>F("toolType",v)} options={TOOL_TYPES}/>
           <Sel label="Tier" value={form.tier||"Iron"} onChange={v=>F("tier",v)} options={TIERS}/>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Inp label="Damage" value={form.damage} onChange={v=>F("damage",v)} type="number"/><Inp label="Speed" value={form.speed} onChange={v=>F("speed",v)} type="number"/></div>
         </div>}
-        {form.isFuel&&<div style={{marginTop:8,paddingLeft:10,borderLeft:"2px solid #3a2a10"}}>
+        {!form.isTool&&form.isFuel&&<div style={{marginTop:8,paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}>
           <Inp label="Burn Time (ticks)" value={form.burnTime} onChange={v=>F("burnTime",v)} type="number"/>
         </div>}
-        {form.isFood&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:"2px solid #1a3020"}}>
+        {!form.isTool&&form.isFood&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Inp label="Nutrition" value={form.foodNutrition} onChange={v=>F("foodNutrition",v)} type="number"/><Inp label="Saturation" value={form.foodSaturation} onChange={v=>F("foodSaturation",v)} type="number"/></div>
           <Chk label="Always edible" checked={!!form.foodAlwaysEdible} onChange={v=>F("foodAlwaysEdible",v)}/>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
@@ -168,6 +169,13 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
       {form.hasDurability&&<Inp label="Durability" value={form.durability||"100"} onChange={v=>F("durability",v)} type="number"/>}
     </div>}
 
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Data Components</Lbl>
+      <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+        <span style={{fontSize:13,color:(form.dataComponents||[]).length?C.text:C.faint}}>{(form.dataComponents||[]).length?(form.dataComponents||[]).map(d=>d.name).join(", "):"none added"}</span>
+        <Btn sm v={activePanel==="datacomponents"?"p":"g"} onClick={()=>setActivePanel(p=>p==="datacomponents"?null:"datacomponents")} style={{marginLeft:8,flexShrink:0}}>{(form.dataComponents||[]).length?"edit":"set"}</Btn>
+      </div>
+    </div>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Tags{tags.length>0&&<span style={{color:C.accent,marginLeft:5}}>{tags.length}</span>}</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>

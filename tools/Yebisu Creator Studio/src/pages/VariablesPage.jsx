@@ -42,25 +42,35 @@ export default function VariablesPage({ onEditingChange, newTrigger, editing, se
   const { variables, reload } = useVariables();
   const [local, setLocal] = useState([]);
   const [dirty, setDirty] = useState(false);
-  useEffect(() => { setLocal(variables.map(v => ({ ...v }))); setDirty(false); }, [variables]);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  useEffect(() => { if (!dirtyRef.current) setLocal(variables.map(v => ({ ...v }))); }, [variables]);
   useEffect(() => { onEditingChange && onEditingChange(true); }, [onEditingChange]);
 
+  const migrateType = (t) => (t === "float" || t === "int") ? "double" : t;
+  const saveNow = useCallback(async (list) => { await api("/variables/save", { variables: list.map(v => ({...v, type: migrateType(v.type)})) }); setDirty(false); }, []);
   const upd = (idx, field, val) => { setLocal(l => { const n = [...l]; n[idx] = { ...n[idx], [field]: val }; return n; }); setDirty(true); };
-  const addVar = (type) => { const base = type === "bool" ? "new_bool" : type === "string" ? "new_string" : type === "item" ? "new_item" : type === "float" ? "new_float" : "new_int"; let name = base, i = 1; while (local.some(v => v.name === name)) name = `${base}_${i++}`; setLocal(l => [...l, { name, titleText: "", type, default: defaultForType(type), dropOnDeath: false }]); setDirty(true); };
-  const del = (idx) => { setLocal(l => l.filter((_, i) => i !== idx)); setDirty(true); };
+  const addVar = (type) => { setLocal(l => { const n = [...l, { name: "", titleText: "", type, default: defaultForType(type), dropOnDeath: false }]; saveNow(n); return n; }); };
+  const del = (idx) => { setLocal(l => { const n = l.filter((_, i) => i !== idx); saveNow(n); return n; }); };
   const saveRef = useRef(null);
-  useEffect(() => { if (!dirty) return; clearTimeout(saveRef.current); saveRef.current = setTimeout(async () => { await api("/variables/save", { variables: local }); setDirty(false); }, 800); return () => clearTimeout(saveRef.current); }, [dirty, local]);
+  useEffect(() => { if (!dirty) return; clearTimeout(saveRef.current); saveRef.current = setTimeout(async () => { await api("/variables/save", { variables: local.map(v => ({...v, type: migrateType(v.type)})) }); setDirty(false); }, 800); return () => clearTimeout(saveRef.current); }, [dirty, local]);
 
   const RS = { background: C.card, border: `1px solid ${C.inpB}`, borderRadius: 4, padding: "6px 10px", display: "flex", alignItems: "center", gap: 6, height: 40, position: "relative" };
   const IS = { ...SI.inp, padding: "4px 8px", fontSize: 12 };
   const [hov, setHov] = useState(null);
 
-  return <div style={{ flex: 1, background: C.panel, borderRadius: C.r, overflow: "hidden", padding: "20px 20px 90px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 24 }}>
-    <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>Variables</div>
+  return <div style={{ flex: 1, background: C.panel, borderRadius: C.r, overflow: "hidden", padding: "20px 20px 90px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {VAR_TYPES.map(vt => (
+        <Btn key={vt.value} sm v="g" onClick={() => addVar(vt.value)}>+ {vt.label}</Btn>
+      ))}
+    </div>
+    {local.length === 0 && <div style={{ color: C.faint, fontSize: 12, padding: "12px 0" }}>No variables defined</div>}
     {VAR_TYPES.map(vt => {
-      const vars = local.map((v, i) => ({ ...v, _idx: i })).filter(v => v.type === vt.value);
+      const vars = local.map((v, i) => ({ ...v, _idx: i })).filter(v => v.type === vt.value || (vt.value === "double" && v.type === "float") || (vt.value === "double" && v.type === "int"));
+      if (!vars.length) return null;
       return <div key={vt.value} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>{vt.label}</div>
+        <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 6 }}>{vt.label}</div>
         {vars.map(v => <div key={v._idx} style={RS} onMouseEnter={() => setHov(v._idx)} onMouseLeave={() => setHov(null)}>
           {hov === v._idx && <div onClick={() => del(v._idx)} style={{ position: "absolute", top: -5, right: -5, width: 13, height: 13, borderRadius: "50%", background: "#ff5f57", cursor: "pointer", zIndex: 5 }} />}
           <Lbl c={C.faint}>Name</Lbl>
@@ -76,7 +86,6 @@ export default function VariablesPage({ onEditingChange, newTrigger, editing, se
                 ? <div style={{ flex: 1 }}><VarItemPicker value={v.default} onChange={val => upd(v._idx, "default", val)} allItems={allItems} textures={textures} /></div>
                 : <input type="number" value={v.default ?? 0} onChange={e => upd(v._idx, "default", vt.value === "float" ? parseFloat(e.target.value) || 0 : parseInt(e.target.value) || 0)} style={{ ...IS, width: 80 }} />}
         </div>)}
-        <Btn sm v="g" onClick={() => addVar(vt.value)} style={{ alignSelf: "flex-start", marginTop: 2 }}>+ {vt.label}</Btn>
       </div>;
     })}
   </div>;

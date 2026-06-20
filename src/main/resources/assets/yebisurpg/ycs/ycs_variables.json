@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "name": "asdasda",
+    "titleText": "testsasda",
+    "type": "bool",
+    "default": false
+  }
+]

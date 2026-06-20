@@ -11,10 +11,15 @@ import { ycsInjectCompiledBody, ycsToggleMethod, ycsToggleEffectMethod, ycsSyncI
 import { useVariables } from '../pages/VariablesPage.jsx';
 import { useAttributes } from '../pages/AttributesPage.jsx';
 import { useEffects } from '../pages/EffectsPage.jsx';
+import { useDataComponents } from '../panels/DataComponentsPanel.jsx';
+import { blockDefRegistry } from '../codegen/visual/blockDefs.js';
+import { GenericDataContent, GenericActionContent, GenericSettingsPopup } from '../codegen/visual/blockRenderer.jsx';
+import { parseLabel, extractSlotDefs } from '../codegen/visual/labelParser.js';
 
 let __modAttributesCache = [];
 let __modEffectsCache = [];
 let __variablesCache = [];
+let __dataComponentsCache = [];
 
 function AttrDropdown({nodeId,value,onChange}){
   const allAttrs=[...VANILLA_ATTRIBUTES,...PEHKUI_SCALES,...__modAttributesCache.map(a=>({id:a.id,label:(a.titleText||a.id)+" (mod)"}))];
@@ -147,7 +152,7 @@ function VarDropdown({nodeId,varName,varType,onChange}){
         {filtered.map(v=><div key={v.name} onMouseDown={e=>{e.stopPropagation();pick(v);}}
           style={{padding:"5px 10px",fontSize:12,color:v.name===(varName||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:v.name===(varName||"")?"#2a2a2a":"transparent"}}
           onMouseEnter={e=>e.currentTarget.style.background="#2a2a2a"} onMouseLeave={e=>e.currentTarget.style.background=v.name===(varName||"")?"#2a2a2a":"transparent"}>
-          <span style={{color:"#aaa",fontSize:10,marginRight:5}}>[{v.type}]</span>{v.titleText||v.name}
+          <span style={{color:"#aaa",fontSize:10,marginRight:5}}>[{v.type==="float"||v.type==="double"?"num":v.type}]</span>{v.titleText||v.name}
         </div>)}
         {filtered.length===0&&<div style={{padding:"5px 10px",color:"#666",fontSize:12}}>{usable.length===0?"No variables defined":"No results"}</div>}
       </div>
@@ -164,17 +169,103 @@ function VarDropdown({nodeId,varName,varType,onChange}){
     {list}
   </div>;
 }
+function DataCompDropdown({nodeId,compName,compType,onChange}){
+  const usable=(__dataComponentsCache||[]);
+  const[open,setOpen]=useState(false);
+  const[rect,setRect]=useState(null);
+  const anchorRef=useRef(null);
+  const selected=usable.find(v=>v.name===(compName||""));
+  const filtered=usable;
+  const pick=(v)=>{onChange(v.name,v.type);setOpen(false);};
+  const openDropdown=(e)=>{
+    e.stopPropagation();
+    if(!open){const r=anchorRef.current?.getBoundingClientRect();if(r)setRect(r);}
+    setOpen(o=>!o);
+  };
+  useEffect(()=>{
+    if(!open)return;
+    const close=()=>setOpen(false);
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[open]);
+  const list=open&&rect?ReactDOM.createPortal(
+    <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
+      style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(160,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
+      <div style={{overflowY:"auto",maxHeight:180}}>
+        {filtered.map(v=><div key={v.name} onMouseDown={e=>{e.stopPropagation();pick(v);}}
+          style={{padding:"5px 10px",fontSize:12,color:v.name===(compName||"")?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:v.name===(compName||"")?"#2a2a2a":"transparent"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#2a2a2a"} onMouseLeave={e=>e.currentTarget.style.background=v.name===(compName||"")?"#2a2a2a":"transparent"}>
+          <span style={{color:"#aaa",fontSize:10,marginRight:5}}>[{v.type==="double"?"num":v.type}]</span>{v.name}
+        </div>)}
+        {filtered.length===0&&<div style={{padding:"5px 10px",color:"#666",fontSize:12}}>No data components defined</div>}
+      </div>
+    </div>,
+    document.body
+  ):null;
+  const label=selected?selected.name:"pick component…";
+  return<div ref={anchorRef} style={{position:"relative",display:"inline-block"}} onMouseDown={e=>e.stopPropagation()}>
+    <div onClick={openDropdown}
+      style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:selected?"#fff":"#888",fontSize:12,fontFamily:"sans-serif",fontWeight:700,cursor:"pointer",padding:"0 22px 0 6px",display:"flex",alignItems:"center",minWidth:100,maxWidth:160,overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",position:"relative"}}>
+      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
+      <span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"#aaa"}}>▾</span>
+    </div>
+    {list}
+  </div>;
+}
+function PortalSelect({value,options,onChange,minWidth,compact,transparent}){
+  const[open,setOpen]=useState(false);
+  const[rect,setRect]=useState(null);
+  const anchorRef=useRef(null);
+  const selected=options.find(o=>o.value===value)||options[0];
+  const openDrop=(e)=>{e.stopPropagation();if(!open){const r=anchorRef.current?.getBoundingClientRect();if(r)setRect(r);}setOpen(o=>!o);};
+  useEffect(()=>{if(!open)return;const close=()=>setOpen(false);document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close);},[open]);
+  const list=open&&rect?ReactDOM.createPortal(
+    <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
+      style={{position:"fixed",top:rect.bottom+2,left:rect.left,zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,minWidth:Math.max(minWidth||140,rect.width),maxHeight:220,display:"flex",flexDirection:"column",boxShadow:"0 4px 16px rgba(0,0,0,0.8)"}}>
+      <div style={{overflowY:"auto",maxHeight:200}}>
+        {options.map(o=><div key={o.value} onMouseDown={e=>{e.stopPropagation();onChange(o.value);setOpen(false);}}
+          style={{padding:"5px 10px",fontSize:12,color:o.value===value?C.accent:"#ddd",cursor:"pointer",whiteSpace:"nowrap",background:o.value===value?"#2a2a2a":"transparent"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#2a2a2a"} onMouseLeave={e=>e.currentTarget.style.background=o.value===value?"#2a2a2a":"transparent"}>
+          {o.label}
+        </div>)}
+      </div>
+    </div>,document.body):null;
+  return<div ref={anchorRef} style={{position:"relative",display:"inline-block"}} onMouseDown={e=>e.stopPropagation()}>
+    <div onClick={openDrop}
+      style={{height:30,background:transparent?"transparent":"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:compact?16:12,fontFamily:"sans-serif",fontWeight:700,cursor:"pointer",padding:compact?"0 8px":"0 22px 0 6px",display:"flex",alignItems:"center",justifyContent:compact?"center":"flex-start",minWidth:compact?undefined:(minWidth||80),overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",position:"relative"}}>
+      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected?.label||"—"}</span>
+      {!compact&&<span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"#aaa"}}>▾</span>}
+    </div>
+    {list}
+  </div>;
+}
+function SettingsPortal({open,onClose,anchorRef,children}){
+  useEffect(()=>{if(!open)return;const close=(e)=>{if(anchorRef?.current&&anchorRef.current.contains(e.target))return;onClose();};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close);},[open,onClose,anchorRef]);
+  if(!open)return null;
+  const r=anchorRef?.current?.getBoundingClientRect();
+  if(!r)return null;
+  return ReactDOM.createPortal(
+    <div onWheel={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}
+      style={{position:"fixed",left:r.left,top:r.top-8,transform:"translateY(-100%)",zIndex:99999,background:"#1e1e1e",border:"1px solid #3a3a3c",borderRadius:4,padding:"10px 14px",display:"flex",flexDirection:"column",gap:8,boxShadow:"0 4px 16px rgba(0,0,0,0.8)",minWidth:200}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{color:"#888",fontSize:11,fontWeight:600}}>Settings</span>
+        <span onClick={e=>{e.stopPropagation();onClose();}} style={{color:"#888",fontSize:14,cursor:"pointer",padding:"0 4px"}}>✕</span>
+      </div>
+      {children}
+    </div>,document.body);
+}
 function PaletteBlock({b}){
-  const bg=b.linkType===LINK_ENTITY?"#18282f":b.linkType===LINK_NUMBER?"#18222a":b.linkType===LINK_TEXT?"#182a1e":b.isAction?"#1a2a20":"transparent";
-  const dot=b.linkType===LINK_ENTITY?"#638999":b.linkType===LINK_NUMBER?"#6a8fa8":b.linkType===LINK_TEXT?"#5ba558":"#5a9a6a";
+  const bdef=blockDefRegistry.get(b.opcode);
+  const dotColor=bdef?.color||(b.linkType===LINK_ENTITY?"#30e1b9":b.linkType===LINK_NUMBER?"#4d65b4":b.linkType===LINK_TEXT?"#5ba558":b.linkType===LINK_LOGIC?"#6494a4":"#5a9a6a");
+  const bg=dotColor+"18";
   return<div draggable onDragStart={e=>e.dataTransfer.setData("block",JSON.stringify(b))} title={b.hint}
     style={{display:"flex",alignItems:"center",gap:7,padding:"7px 10px",cursor:"grab",borderBottom:"1px solid #181818",userSelect:"none",background:bg}}>
-    <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:dot}}/>
+    <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:dotColor}}/>
     <span style={{fontSize:12,color:C.text,fontFamily:"monospace"}}>{b.label}</span>
   </div>;
 }
 function PaletteSidebar({palette}){
-  const[collapsed,setCollapsed]=useState({});
+  const[collapsed,setCollapsed]=useState(()=>{const init={};palette.forEach(c=>{init[c.category]=true;});return init;});
   const[subCollapsed,setSubCollapsed]=useState({});
   const toggle=(key)=>setCollapsed(s=>({...s,[key]:!s[key]}));
   const toggleSub=(key)=>setSubCollapsed(s=>({...s,[key]:!s[key]}));
@@ -221,9 +312,15 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
   const{variables}=useVariables();
   const{attributes:modAttributes}=useAttributes();
   const{effects:modEffects}=useEffects();
+  const{components:serverDataComponents}=useDataComponents();
   __modAttributesCache = modAttributes || [];
   __modEffectsCache = modEffects || [];
   __variablesCache = variables || [];
+  const formDC = form.dataComponents || [];
+  const serverDC = serverDataComponents || [];
+  const merged = [...serverDC];
+  for (const fc of formDC) { if (!merged.some(s => s.name === fc.name)) merged.push(fc); }
+  __dataComponentsCache = merged;
   const palette=useMemo(()=>buildPalette(variables,modAttributes),[variables,modAttributes]);
   const init=()=>{const s=(form.methodBlocks||{})[methodKey];return s?.some(n=>n.id==="start")?s:[
     {id:"start",opcode:"start",x:60,y:60,fields:{},slots:{},nextId:null},
@@ -283,9 +380,16 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            }
            h += ih;
            n.height = ih;
-        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.")) {
+        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode === "aoe.each" || blockDefRegistry.get(n.opcode)?.body) {
+           const _bd = blockDefRegistry.get(n.opcode);
+           let _hdrH = 50;
+           if ((n.fields?.multiline || _bd?.multiline) && _bd) {
+             const _allL = [_bd.label||"",...(_bd.shapeSlots?[_bd.shapeSlots[n.fields?.shape]||""]:[]),_bd.suffixLabel||""].join(" ");
+             const _sc = (_allL.match(/\[\w+:\w+[.\w]*\]/g)||[]).filter(t=>t.match(/:(entity|number|text|logic)\]/)).length;
+             _hdrH = Math.max(50, _sc * 50);
+           }
            let d0h = Math.max(0, getH(n.slots?.do0));
-           let ih = 50 + d0h;
+           let ih = _hdrH + d0h;
            n.gapHeights = { do0: d0h };
            h += ih;
            n.height = ih;
@@ -319,8 +423,15 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
              innerY += Math.max(0, getH(n.slots?.doElse));
            }
            cy = innerY;
-        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.")) {
-           let innerY = cy + 50;
+        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode === "aoe.each" || blockDefRegistry.get(n.opcode)?.body) {
+           const _bd2 = blockDefRegistry.get(n.opcode);
+           let _hdrH2 = 50;
+           if ((n.fields?.multiline || _bd2?.multiline) && _bd2) {
+             const _allL2 = [_bd2.label||"",...(_bd2.shapeSlots?[_bd2.shapeSlots[n.fields?.shape]||""]:[]),_bd2.suffixLabel||""].join(" ");
+             const _sc2 = (_allL2.match(/\[\w+:\w+[.\w]*\]/g)||[]).filter(t=>t.match(/:(entity|number|text|logic)\]/)).length;
+             _hdrH2 = Math.max(50, _sc2 * 50);
+           }
+           let innerY = cy + _hdrH2;
            if (n.slots?.do0) layoutChain(n.slots.do0, sx + 30, innerY, depth + 1);
            innerY += Math.max(0, getH(n.slots?.do0));
            cy = innerY;
@@ -337,23 +448,49 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
     return nextNs;
   };
   const upd=fn=>setNodes(prev => recalcLayout(fn(prev)));
-  const SLOT_DEFAULTS={entity:{opcode:"entity.event",linkType:LINK_ENTITY,fields:{}},number:{opcode:"number.literal",linkType:LINK_NUMBER,fields:{value:"1"}},text:{opcode:"text.literal",linkType:LINK_TEXT,fields:{value:""}}};
+  const SLOT_DEFAULTS={entity:{opcode:"entity.event",linkType:LINK_ENTITY,fields:{}},number:{opcode:"number.literal",linkType:LINK_NUMBER,fields:{value:"0"}},text:{opcode:"text.literal",linkType:LINK_TEXT,fields:{value:""}}};
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
-    const slotDefs=bd.slotDefs||[];
+    const bdef = blockDefRegistry.get(bd.opcode);
+    let slotDefs;
+    if (bdef) {
+      const mainSlots = extractSlotDefs(parseLabel(bdef.label));
+      const shapeSlots = bdef.shapeSlots ? Object.values(bdef.shapeSlots).flatMap(s => extractSlotDefs(parseLabel(s))) : [];
+      const suffixSlots = bdef.suffixLabel ? extractSlotDefs(parseLabel(bdef.suffixLabel)) : [];
+      const seen = new Set();
+      slotDefs = [...mainSlots, ...shapeSlots, ...suffixSlots].filter(s => { if (seen.has(s.key)) return false; seen.add(s.key); return true; });
+    } else {
+      slotDefs = bd.slotDefs || [];
+    }
     const slots={};
     const extraNodes=[];
     slotDefs.forEach((sd,i)=>{
-      const defKey=sd.accepts===LINK_ENTITY?"entity":sd.accepts===LINK_NUMBER?"number":sd.accepts===LINK_TEXT?"text":null;
-      if(defKey&&SLOT_DEFAULTS[defKey]){
-        const def=SLOT_DEFAULTS[defKey];
-        const childId=def.opcode+"_"+Date.now()+"_"+i;
+      const sdDefault = bdef?.codegen?.slotDefaults?.[sd.key];
+      if (sdDefault) {
+        const childId = sdDefault.opcode+"_"+Date.now()+"_"+i;
+        const childBdef = blockDefRegistry.get(sdDefault.opcode);
+        const childLT = childBdef?.linkType || (sdDefault.opcode==="entity.event"?LINK_ENTITY:sdDefault.opcode==="number.literal"?LINK_NUMBER:sdDefault.opcode==="text.literal"?LINK_TEXT:sd.accepts==="entity"?LINK_ENTITY:sd.accepts==="number"?LINK_NUMBER:sd.accepts==="text"?LINK_TEXT:sd.accepts==="logic"?LINK_LOGIC:null);
         slots[sd.key]=childId;
-        extraNodes.push({id:childId,opcode:def.opcode,x:x+220,y:y+i*60,nextId:null,linkType:def.linkType,isAction:false,slotDefs:[],fields:{...def.fields},slots:{}});
+        extraNodes.push({id:childId,opcode:sdDefault.opcode,x:x+220,y:y+i*60,nextId:null,linkType:childLT,isAction:false,slotDefs:[],fields:{...(sdDefault.fields||{})},slots:{}});
+      } else if (!bdef) {
+        const defKey=sd.accepts===LINK_ENTITY||sd.accepts==="entity"?"entity":sd.accepts===LINK_NUMBER||sd.accepts==="number"?"number":sd.accepts===LINK_TEXT||sd.accepts==="text"?"text":null;
+        if(defKey&&SLOT_DEFAULTS[defKey]){
+          const def=SLOT_DEFAULTS[defKey];
+          const childId=def.opcode+"_"+Date.now()+"_"+i;
+          slots[sd.key]=childId;
+          extraNodes.push({id:childId,opcode:def.opcode,x:x+220,y:y+i*60,nextId:null,linkType:def.linkType,isAction:false,slotDefs:[],fields:{...def.fields},slots:{}});
+        }
       }
     });
-    const newNode={id,opcode:bd.opcode,x,y,nextId:null,linkType:bd.linkType||null,isAction:bd.isAction||false,slotDefs,
-      fields:bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"1"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="control.delay"?{delayTicks:"20",elseIfCount:0,hasElse:false}:bd.opcode.startsWith("aoe.each.")?{elseIfCount:0,hasElse:false,los:true,losOrigin:"caller",showParticles:true}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:bd.opcode==="anim.tppose.set"?{animName:"",filePath:""}:{},slots};
+    let defaultFields;
+    if (bdef) {
+      defaultFields = {};
+      if (bdef.fields) for (const [k,f] of Object.entries(bdef.fields)) defaultFields[k] = f.default !== undefined ? f.default : "";
+      if (bdef.settings) for (const [k,s] of Object.entries(bdef.settings)) if (!k.startsWith("_")) defaultFields[k] = s.default !== undefined ? s.default : false;
+    } else {
+      defaultFields = bd.opcode==="effect.apply"?{effect:"MobEffects.REGENERATION",duration:"200",level:"1"}:bd.opcode==="entity.apply_motion"?{x:"0",y:"0",z:"0",mode:"add"}:bd.opcode==="number.literal"?{value:"0"}:bd.opcode==="number.math"?{op:"+"}:bd.opcode==="text.literal"?{value:""}:bd.opcode==="control.if"?{elseIfCount:0,hasElse:false}:bd.opcode==="control.delay"?{delayTicks:"20",elseIfCount:0,hasElse:false}:bd.opcode.startsWith("aoe.each.")?{elseIfCount:0,hasElse:false,los:true,losOrigin:"caller",showParticles:true}:bd.opcode==="anim.firstperson.play"?{animName:"",filePath:""}:bd.opcode==="anim.handpose.set"?{animName:"",filePath:""}:bd.opcode==="anim.tppose.set"?{animName:"",filePath:""}:bd.opcode==="logic.compare"?{op:"=="}:bd.opcode==="chat.send"?{textCount:1}:bd.opcode==="datacomp.set"?{compName:"my_value",compType:"double"}:bd.opcode==="datacomp.get"?{compName:"my_value",compType:"double"}:bd.opcode==="convert.to_text"?{fromType:"number"}:{};
+    }
+    const newNode={id,opcode:bd.opcode,x,y,nextId:null,linkType:bdef?.linkType||bd.linkType||null,isAction:bdef?.isAction||bd.isAction||false,slotDefs:bd.slotDefs||[],fields:defaultFields,slots};
     upd(ns=>[...ns,newNode,...extraNodes]);
   };
   const del=id=>{
@@ -462,8 +599,9 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
                  if(n.id===dragged.id || getDescendants(dragged.id, nextNs).includes(n.id)) continue;
                  if(n.isAction||n.id==="start"){
                      let h = 50;
-                     if (n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.")) h = n.height || 50;
-                     if(n.opcode!=="control.if" && n.opcode!=="control.delay" && !n.opcode.startsWith("aoe.each.")){
+                     const _hasBody = n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || blockDefRegistry.get(n.opcode)?.body;
+                     if (_hasBody) h = n.height || 50;
+                     if(!_hasBody){
                        let snb={x:n.x+20,y:n.y+h};
                        let d=Math.hypot(mx-snb.x,my-snb.y);
                        if(d<md&&!n.nextId){md=d;cst=n.id;csk="nextId";}
@@ -517,8 +655,29 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
                    const paletteDef = PALETTE_BLOCKS.flatMap(c => [...(c.data||[]), ...(c.actions||[])]).find(b => b.opcode === parent?.opcode);
                    def = paletteDef?.slotDefs?.find(d => d.key === sk);
                }
-               const varSetValueAccepts = (parent?.opcode === "variable.set" && sk === "value") ? varTypeToLink(parent?.fields?.varType || "int") : null;
-               if ((varSetValueAccepts && varSetValueAccepts === dragged.linkType) || (def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
+               const parentBdef = blockDefRegistry.get(parent?.opcode);
+               let bdefAccepts = null;
+               if (parentBdef) {
+                 const da = parentBdef.dynamicAccepts?.[sk];
+                 if (da) {
+                   const fieldVal = parent?.fields?.[da.field] ?? "";
+                   bdefAccepts = da.map[fieldVal] ?? da.map["*"] ?? null;
+                 }
+                 if (!bdefAccepts && parentBdef.repeatableSlots && sk.startsWith(parentBdef.repeatableSlots.key)) {
+                   bdefAccepts = parentBdef.repeatableSlots.accepts;
+                 }
+                 if (!bdefAccepts) {
+                   let allSegs = parseLabel(parentBdef.label);
+                   if (parentBdef.shapeSlots) Object.values(parentBdef.shapeSlots).forEach(s => { allSegs = allSegs.concat(parseLabel(s)); });
+                   if (parentBdef.suffixLabel) allSegs = allSegs.concat(parseLabel(parentBdef.suffixLabel));
+                   const slotSeg = allSegs.find(s => s.type === "slot" && s.key === sk);
+                   if (slotSeg) bdefAccepts = slotSeg.accepts;
+                 }
+               }
+               const varSetValueAccepts = !bdefAccepts && (parent?.opcode === "variable.set" && sk === "value") ? varTypeToLink(parent?.fields?.varType || "int") : null;
+               const chatTextAccepts = !bdefAccepts && (parent?.opcode === "chat.send" && sk.startsWith("text")) ? LINK_TEXT : null;
+               const datacompSetAccepts = !bdefAccepts && (parent?.opcode === "datacomp.set" && sk === "value") ? (parent?.fields?.compType === "bool" ? LINK_LOGIC : parent?.fields?.compType === "string" ? LINK_TEXT : LINK_NUMBER) : null;
+               if ((bdefAccepts && bdefAccepts === dragged.linkType) || (varSetValueAccepts && varSetValueAccepts === dragged.linkType) || (chatTextAccepts && chatTextAccepts === dragged.linkType) || (datacompSetAccepts && datacompSetAccepts === dragged.linkType) || (def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
                    nextNs = nextNs.map(x => x.id === parent.id ? {...x, slots: {...(x.slots||{}), [sk]: dragged.id}} : x);
                }
            }
@@ -602,7 +761,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
              return <CanvasNode key={node.id} node={node} nodes={nodes} methodKey={methodKey} inChain={ch.has(node.id)} selected={selected} onSelect={(id)=>setSelected(id)} onDragStart={handleDragStart}
                onDelete={(nid)=>del(nid)}
                onCopy={typeof duplicateNode!=="undefined"?duplicateNode:null}
-               onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?f==="__linkType"?{...n,linkType:v}:{...n,fields:{...n.fields,[f]:v}}:n))}
+               onFieldChange={(nid,f,v)=>upd(ns=>ns.map(n=>n.id===nid?f==="__linkType"?{...n,linkType:v}:f==="__clearSlot"?{...n,slots:{...(n.slots||{}),[v]:null}}:{...n,fields:{...n.fields,[f]:v}}:n))}
                onDisconnectChain={(nid)=>upd(ns=>ns.map(n=>n.id===nid?{...n,nextId:null}:n))}
              />;
           })}
@@ -614,18 +773,23 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
 }
 
 function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldChange,onCopy,inline,selected,onSelect}){
-  
+  const settingsAnchorRef=useRef(null);
+
 
   const [showSettings, setShowSettings] = useState(false);
   const isSt=node.id==="start",isAct=node.isAction||isSt,isVal=!!node.linkType;
   const isIf=node.opcode==="control.if";
   const isDelay=node.opcode==="control.delay";
-  const isAoeEach=node.opcode.startsWith("aoe.each.");
+  const isAoeEach=node.opcode.startsWith("aoe.each.") || node.opcode==="aoe.each";
   
+  const _bdef = blockDefRegistry.get(node.opcode);
+  const _useGeneric = _bdef && !_bdef.codegen?.handler;
   const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":"#5a9a6a";
   const isAnimBlock = node.opcode.startsWith("anim.") || (node.opcode.startsWith("aoe.") && node.opcode !== "aoe.iterator.entity");
   const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf || isDelay || isAoeEach;
-  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":node.opcode==="effect.apply"?"#c46c94":isAnimBlock?"#3a5c3a":isLogicBlock?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#5ba558":"#5a9a6a";
+  const _typeColor = (t) => t==="bool"||t==="logic"?"#6494a4":t==="string"||t==="text"?"#5ba558":t==="entity"?"#30e1b9":"#4d65b4";
+  const _dynColor = _bdef?.dynamicLinkType ? _typeColor(node.fields?.[_bdef.dynamicLinkType.field]) : (node.opcode==="variable.set"||node.opcode==="variable.get")?_typeColor(node.fields?.varType):(node.opcode==="datacomp.set"||node.opcode==="datacomp.get")?_typeColor(node.fields?.compType):null;
+  const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":_dynColor?_dynColor:_bdef?.color?_bdef.color:node.opcode==="effect.apply"?"#c46c94":isAnimBlock?"#3a5c3a":isLogicBlock?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#5ba558":"#5a9a6a";
 
   const isAnimPlay = node.opcode === "anim.firstperson.play";
   const isAnimStop = node.opcode === "anim.firstperson.stop";
@@ -642,7 +806,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isAttrGet = node.opcode === "attribute.get";
   const isAttrModAdd = node.opcode === "attribute.modifier.add";
   const isAttrModRemove = node.opcode === "attribute.modifier.remove";
-  const lblStr = node.opcode==="entity.event"?"Event Entity"
+  const lblStr = _useGeneric ? null : node.opcode==="entity.event"?"Event Entity"
        :node.opcode==="entity.target"?"Target Entity"
        :node.opcode==="aoe.iterator.entity"?"Iterator Entity"
        :node.opcode==="number.literal"?null
@@ -663,6 +827,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
        :node.opcode==="entity.look_client_x"?"Get Look Direction X (Client) of"
        :node.opcode==="entity.look_client_y"?"Get Look Direction Y (Client) of"
        :node.opcode==="entity.look_client_z"?"Get Look Direction Z (Client) of"
+       :node.opcode==="logic.compare"?null
        :node.opcode==="entity.is_crouching"?"Is Crouching?"
        :node.opcode==="logic.true"?"True"
        :node.opcode==="logic.false"?"False"
@@ -671,6 +836,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
        :node.opcode==="attribute.modifier.add"?null
        :node.opcode==="attribute.modifier.remove"?null
        :node.opcode==="attribute.base.reset"?null
+       :node.opcode==="convert.to_text"?null
+       :node.opcode==="datacomp.get"?null
        :node.opcode;
 
   const valContent = (
@@ -678,43 +845,56 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {lblStr && <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>
         {lblStr}
       </span>}
-      {node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+      {_useGeneric && isVal && <GenericDataContent def={_bdef} node={node} nodes={nodes} methodKey={methodKey}
+        onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id}
+        onSelect={onSelect} selectedNodeId={selected} showSettings={showSettings} setShowSettings={setShowSettings} settingsAnchorRef={settingsAnchorRef}/>}
+      {!_useGeneric && node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
-      {node.opcode==="text.literal"&&<input value={node.fields?.value??""} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
+      {!_useGeneric && node.opcode==="text.literal"&&<input value={node.fields?.value??""} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(80, ((node.fields?.value||"").length*8)+24),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:14,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
-      {node.opcode==="number.math"&&<>
+      {!_useGeneric && node.opcode==="number.math"&&<>
           <SlotConn sk="a" sc="rgba(0,0,0,0.3)" connId={node.slots?.a} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <select value={node.fields?.op||"+"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"op",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-            style={{height:30,background:"rgba(0,0,0,0.2)",border:"none",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px",minWidth:48,textAlign:"center"}}>
-            <option value="+">+</option>
-            <option value="-">−</option>
-            <option value="*">×</option>
-            <option value="/">÷</option>
-            <option value="%">%</option>
-            <option value="min">min</option>
-            <option value="max">max</option>
-            <option value="pow">pow</option>
-          </select>
+          <PortalSelect value={node.fields?.op||"+"} onChange={v=>onFieldChange&&onFieldChange(node.id,"op",v)} minWidth={60} options={[
+            {value:"+",label:"+"},{value:"-",label:"−"},{value:"*",label:"×"},{value:"/",label:"÷"},
+            {value:"%",label:"%"},{value:"min",label:"min"},{value:"max",label:"max"},{value:"pow",label:"pow"},
+          ]}/>
           <SlotConn sk="b" sc="rgba(0,0,0,0.3)" connId={node.slots?.b} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
 
-      {isAttrGet&&<>
+      {!_useGeneric && isAttrGet&&<>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>Get Attribute </span>
           <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
-          <select value={node.fields?.layer||"total"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"layer",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-            style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px"}}>
-            <option value="total">Total</option>
-            <option value="base">Base</option>
-            <option value="bonus">Bonus (Total − Base)</option>
-          </select>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>of</span>
+          <PortalSelect value={node.fields?.layer||"total"} onChange={v=>onFieldChange&&onFieldChange(node.id,"layer",v)} minWidth={120} options={[
+            {value:"total",label:"Total"},{value:"base",label:"Base"},{value:"bonus",label:"Bonus (Total − Base)"},
+          ]}/>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="variable.get"&&<>
+      {!_useGeneric && node.opcode==="variable.get"&&<>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>Get Variable </span>
           <VarDropdown nodeId={node.id} varName={node.fields?.varName} varType={node.fields?.varType} onChange={(n,t,d)=>{if(onFieldChange){onFieldChange(node.id,"varName",n);onFieldChange(node.id,"varType",t);onFieldChange(node.id,"varDefault",d);onFieldChange(node.id,"__linkType",varTypeToLink(t));}}}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {!isAttrGet&&node.opcode!=="variable.get"&&node.opcode!=="number.math"&&node.slotDefs?.map(def => (
+      {!_useGeneric && node.opcode==="logic.compare"&&<>
+          <SlotConn sk="a" sc="rgba(0,0,0,0.3)" connId={node.slots?.a} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <PortalSelect compact value={node.fields?.op||"=="} onChange={v=>onFieldChange&&onFieldChange(node.id,"op",v)} minWidth={50} options={[
+            {value:"==",label:"＝"},{value:"!=",label:"≠"},{value:"<",label:"＜"},{value:">",label:"＞"},{value:"<=",label:"≤"},{value:">=",label:"≥"},
+          ]}/>
+          <SlotConn sk="b" sc="rgba(0,0,0,0.3)" connId={node.slots?.b} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
+      {!_useGeneric && node.opcode==="convert.to_text"&&<>
+          <PortalSelect value={node.fields?.fromType||"number"} onChange={v=>onFieldChange&&onFieldChange(node.id,"fromType",v)} minWidth={80} options={[
+            {value:"number",label:"Number"},
+          ]}/>
+          <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>→ Text</span>
+      </>}
+      {!_useGeneric && node.opcode==="datacomp.get"&&<>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>Get Data Component </span>
+          <DataCompDropdown nodeId={node.id} compName={node.fields?.compName} compType={node.fields?.compType} onChange={(n,t)=>{if(onFieldChange){onFieldChange(node.id,"compName",n);onFieldChange(node.id,"compType",t);onFieldChange(node.id,"__linkType",t==="bool"?LINK_LOGIC:t==="string"?LINK_TEXT:LINK_NUMBER);}}}/>
+      </>}
+      {!_useGeneric && !isAttrGet&&node.opcode!=="variable.get"&&node.opcode!=="number.math"&&node.opcode!=="logic.compare"&&node.opcode!=="convert.to_text"&&node.opcode!=="datacomp.get"&&node.slotDefs?.map(def => (
           <React.Fragment key={def.key}>
             {def.label&&<span style={{fontSize:11,fontFamily:"sans-serif",color:"rgba(255,255,255,0.6)",fontWeight:700}}>{def.label}</span>}
             <SlotConn sk={def.key} sc="rgba(0,0,0,0.3)" connId={node.slots?.[def.key]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -724,15 +904,21 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   );
 
   if(inline){
+     const _inlineMultiline = node.fields?.multiline && _bdef;
      return <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}
-       style={{display:"flex",alignItems:"center",background:bg,borderRadius:0,padding:"0 10px",height:30,minWidth:50,cursor:"grab",boxShadow:"0 2px 6px rgba(0,0,0,.3)",gap:10, border:selected===node.id?"2px solid #fff":"2px solid transparent", boxSizing:"border-box"}}>
+       style={{display:"flex",flexDirection:_inlineMultiline?"column":"row",alignItems:_inlineMultiline?"stretch":"center",background:bg,borderRadius:0,padding:_inlineMultiline?"10px 10px":"0 10px",minHeight:30,minWidth:50,cursor:"grab",boxShadow:"0 2px 6px rgba(0,0,0,.3)",gap:_inlineMultiline?0:10, border:selected===node.id?"2px solid #fff":"2px solid transparent", boxSizing:"border-box"}}>
         {valContent}
+        {_useGeneric && _bdef?.settings && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
      </div>;
   }
 
   const commonHeader = (
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 10px",cursor:"grab",background:isSt?"#0f172a":"transparent",flex:1,height:"100%",boxSizing:"border-box"}}>
-      <span style={{fontFamily:"sans-serif",fontSize:16,lineHeight:"20px",color:isSt?"#38bdf8":"#fff",fontWeight:700,whiteSpace:"nowrap"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 10px",cursor:"grab",background:isSt?"#0f172a":"transparent",flex:1,minHeight:50,boxSizing:"border-box"}}>
+      {_useGeneric && !isSt && <GenericActionContent def={_bdef} node={node} nodes={nodes} methodKey={methodKey}
+        onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id}
+        onSelect={onSelect} selectedNodeId={selected} showSettings={showSettings} setShowSettings={setShowSettings} settingsAnchorRef={settingsAnchorRef}/>}
+      {!_useGeneric && isIf && <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>}
+      {!_useGeneric && <span style={{fontFamily:"sans-serif",fontSize:16,lineHeight:"20px",color:isSt?"#38bdf8":"#fff",fontWeight:700,whiteSpace:"nowrap"}}>
         {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
          :node.opcode==="effect.apply"?"Add Effect to"
          :node.opcode==="control.if"?"If"
@@ -754,22 +940,23 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
          :node.opcode==="anim.tppose.set"?"Set TP Pose"
          :node.opcode==="anim.tppose.reset"?"Reset TP Pose on"
-         :node.opcode==="variable.set"?"Set Variable"
+         :node.opcode==="variable.set"?"Set Variable "
          :node.opcode==="entity.apply_motion"?"Apply Motion to"
-         :node.opcode==="attribute.modifier.add"?"Add Attr Modifier"
-         :node.opcode==="attribute.modifier.remove"?"Remove Attr Modifier"
-         :node.opcode==="attribute.base.reset"?"Reset Attr Base"
+         :node.opcode==="attribute.modifier.add"?"Set Attribute Modifier "
+         :node.opcode==="attribute.modifier.remove"?"Remove Attribute Modifier "
+         :node.opcode==="attribute.base.reset"?"Reset Attribute Base "
+         :node.opcode==="chat.send"?"Send Message"
+         :node.opcode==="datacomp.set"?"Set Data Component "
          :node.opcode}
-      </span>
-      {isIf&&<>
-        <span style={{cursor:"pointer",opacity:0.6,fontSize:14}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+      </span>}
+      {!_useGeneric && isIf&&<>
         <SlotConn sk="condition" sc="rgba(0,0,0,0.3)" connId={node.slots?.condition} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isDelay&&<>
+      {!_useGeneric && isDelay&&<>
         <SlotConn sk="delayTicks" sc="rgba(0,0,0,0.3)" connId={node.slots?.delayTicks} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
         <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>ticks</span>
       </>}
-      {node.opcode==="effect.apply"&&<>
+      {!_useGeneric && node.opcode==="effect.apply"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <EffectDropdown nodeId={node.id} value={node.fields?.effect} onChange={v=>onFieldChange&&onFieldChange(node.id,"effect",v)}/>
           <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Duration</span>
@@ -777,7 +964,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Level</span>
           <SlotConn sk="level" sc="rgba(0,0,0,0.3)" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="entity.apply_motion"&&<>
+      {!_useGeneric && node.opcode==="entity.apply_motion"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>X</span>
           <SlotConn sk="x" sc="rgba(0,0,0,0.3)" connId={node.slots?.x} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -785,13 +972,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <SlotConn sk="y" sc="rgba(0,0,0,0.3)" connId={node.slots?.y} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Z</span>
           <SlotConn sk="z" sc="rgba(0,0,0,0.3)" connId={node.slots?.z} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <select value={node.fields?.mode||"add"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"mode",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-            style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:12,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px"}}>
-            <option value="add">Add (impulse)</option>
-            <option value="set">Set (override)</option>
-          </select>
+          <PortalSelect value={node.fields?.mode||"add"} onChange={v=>onFieldChange&&onFieldChange(node.id,"mode",v)} minWidth={120} options={[
+            {value:"add",label:"Add (impulse)"},{value:"set",label:"Set (override)"},
+          ]}/>
       </>}
-      {isAnimPlay&&<>
+      {!_useGeneric && isAnimPlay&&<>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -800,17 +985,17 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimStop&&<>
+      {!_useGeneric && isAnimStop&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimPause&&<>
+      {!_useGeneric && isAnimPause&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimResume&&<>
+      {!_useGeneric && isAnimResume&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimTPPlay&&<>
-          <span style={{cursor:"pointer",opacity:0.6,fontSize:14,position:"relative"}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+      {!_useGeneric && isAnimTPPlay&&<>
+          <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -819,61 +1004,61 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimTPStop&&<>
+      {!_useGeneric && isAnimTPStop&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimTPPause&&<>
+      {!_useGeneric && isAnimTPPause&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAnimTPResume&&<>
+      {!_useGeneric && isAnimTPResume&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isHandPoseSet&&<>
-          <span style={{cursor:"pointer",opacity:0.6,fontSize:14,position:"relative"}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+      {!_useGeneric && isHandPoseSet&&<>
+          <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isHandPoseReset&&<>
+      {!_useGeneric && isHandPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isTPPoseSet&&<>
-          <span style={{cursor:"pointer",opacity:0.6,fontSize:14,position:"relative"}} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+      {!_useGeneric && isTPPoseSet&&<>
+          <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isTPPoseReset&&<>
+      {!_useGeneric && isTPPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="aoe.each.sphere"&&<>
+      {!_useGeneric && node.opcode==="aoe.each.sphere"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>r</span>
           <SlotConn sk="radius" sc="rgba(0,0,0,0.3)" connId={node.slots?.radius} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"los",!(node.fields?.los!==false));}}><input type="checkbox" checked={node.fields?.los!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>LoS</label>
-          {node.fields?.los!==false&&<select value={node.fields?.losOrigin||"caller"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"losOrigin",e.target.value);}} onMouseDown={e=>e.stopPropagation()} style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:10,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 4px"}}><option value="center">from Center</option><option value="caller">from Caller</option></select>}
+          {node.fields?.los!==false&&<PortalSelect value={node.fields?.losOrigin||"caller"} onChange={v=>onFieldChange&&onFieldChange(node.id,"losOrigin",v)} minWidth={90} options={[{value:"center",label:"from Center"},{value:"caller",label:"from Caller"}]}/>}
           <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",!node.fields?.showParticles);}}><input type="checkbox" checked={!!node.fields?.showParticles} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Vis</label>
           <span style={{fontSize:10,color:"#888"}}>X</span><SlotConn sk="offX" sc="rgba(0,0,0,0.3)" connId={node.slots?.offX} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="aoe.each.box"&&<>
+      {!_useGeneric && node.opcode==="aoe.each.box"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>W</span><SlotConn sk="width" sc="rgba(0,0,0,0.3)" connId={node.slots?.width} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>H</span><SlotConn sk="height" sc="rgba(0,0,0,0.3)" connId={node.slots?.height} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>D</span><SlotConn sk="depth" sc="rgba(0,0,0,0.3)" connId={node.slots?.depth} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"los",!(node.fields?.los!==false));}}><input type="checkbox" checked={node.fields?.los!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>LoS</label>
-          {node.fields?.los!==false&&<select value={node.fields?.losOrigin||"caller"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"losOrigin",e.target.value);}} onMouseDown={e=>e.stopPropagation()} style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:10,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 4px"}}><option value="center">from Center</option><option value="caller">from Caller</option></select>}
+          {node.fields?.los!==false&&<PortalSelect value={node.fields?.losOrigin||"caller"} onChange={v=>onFieldChange&&onFieldChange(node.id,"losOrigin",v)} minWidth={90} options={[{value:"center",label:"from Center"},{value:"caller",label:"from Caller"}]}/>}
           <label style={{display:"flex",alignItems:"center",gap:3,color:"#fff",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",!node.fields?.showParticles);}}><input type="checkbox" checked={!!node.fields?.showParticles} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>Vis</label>
           <span style={{fontSize:10,color:"#888"}}>X</span><SlotConn sk="offX" sc="rgba(0,0,0,0.3)" connId={node.slots?.offX} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="aoe.each.cone"&&<>
+      {!_useGeneric && node.opcode==="aoe.each.cone"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>dist</span><SlotConn sk="distance" sc="rgba(0,0,0,0.3)" connId={node.slots?.distance} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>angle°</span><SlotConn sk="angle" sc="rgba(0,0,0,0.3)" connId={node.slots?.angle} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -883,7 +1068,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="aoe.each.line"&&<>
+      {!_useGeneric && node.opcode==="aoe.each.line"&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>dist</span><SlotConn sk="distance" sc="rgba(0,0,0,0.3)" connId={node.slots?.distance} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>width</span><SlotConn sk="width" sc="rgba(0,0,0,0.3)" connId={node.slots?.width} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -893,56 +1078,67 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           <span style={{fontSize:10,color:"#888"}}>Y</span><SlotConn sk="offY" sc="rgba(0,0,0,0.3)" connId={node.slots?.offY} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:10,color:"#888"}}>Z</span><SlotConn sk="offZ" sc="rgba(0,0,0,0.3)" connId={node.slots?.offZ} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="variable.set"&&<>
-          <VarDropdown nodeId={node.id} varName={node.fields?.varName} varType={node.fields?.varType} onChange={(n,t,d)=>{if(onFieldChange){onFieldChange(node.id,"varName",n);onFieldChange(node.id,"varType",t);onFieldChange(node.id,"varDefault",d);}}}/>
+      {!_useGeneric && node.opcode==="variable.set"&&<>
+          <VarDropdown nodeId={node.id} varName={node.fields?.varName} varType={node.fields?.varType} onChange={(n,t,d)=>{if(onFieldChange){const oldType=node.fields?.varType;onFieldChange(node.id,"varName",n);onFieldChange(node.id,"varType",t);onFieldChange(node.id,"varDefault",d);if(t!==oldType)onFieldChange(node.id,"__clearSlot","value");}}}/>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>to</span>
           <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAttrModAdd&&<>
+      {!_useGeneric && isAttrModAdd&&<>
           <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
-          <select value={node.fields?.operation||"flat"} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"operation",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-            style={{height:30,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",cursor:"pointer",padding:"0 6px"}}>
-            <option value="flat">Flat bonus (ADD_VALUE)</option>
-            <option value="multiply">% Multiplier (ADD_MULTIPLIED_TOTAL)</option>
-            <option value="base_set">Set Base</option>
-            <option value="base_add">Add to Base</option>
-            <option value="base_multiply">Multiply Base</option>
-          </select>
-          {!["base_set","base_add","base_multiply"].includes(node.fields?.operation)&&<input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()}            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>}
+          <PortalSelect value={node.fields?.operation||"flat"} onChange={v=>onFieldChange&&onFieldChange(node.id,"operation",v)} minWidth={160} options={[
+            {value:"flat",label:"Flat Bonus"},
+            {value:"multiply",label:"% Multiplier"},
+            {value:"base_set",label:"Set Base"},
+          ]}/>
+          {!["base_set"].includes(node.fields?.operation)&&<input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()}            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>}
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>to</span>
           <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>on</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {isAttrModRemove&&<>
+      {!_useGeneric && isAttrModRemove&&<>
           <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
           <input value={node.fields?.modifierName||""} onChange={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"modifierName",e.target.value);}} onMouseDown={e=>e.stopPropagation()}            style={{height:30,width:130,background:"rgba(0,0,0,0.3)",border:"none",color:"#fff",fontSize:13,fontFamily:"sans-serif",fontWeight:700,outline:"none",padding:"0 8px",boxSizing:"border-box"}}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {node.opcode==="attribute.base.reset"&&<>
+      {!_useGeneric && node.opcode==="attribute.base.reset"&&<>
           <AttrDropdown nodeId={node.id} value={node.fields?.attrId} onChange={v=>onFieldChange&&onFieldChange(node.id,"attrId",v)}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>on</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700,whiteSpace:"nowrap",lineHeight:"20px"}}>for</span>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
-      {!inChain&&isAct&&!isSt&&<span style={{fontSize:14,color:"#fff",background:"#e11d48",padding:"2px 8px",borderRadius:6,fontWeight:700}} title="Not connected to Start">!</span>}
+      {!_useGeneric && node.opcode==="chat.send"&&<>
+          <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          {Array.from({length: node.fields?.textCount || 1}).map((_, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <span style={{fontSize:11,color:"rgba(255,255,255,0.5)",fontWeight:700}}>+</span>}
+              <SlotConn sk={"text"+i} sc="rgba(0,0,0,0.3)" connId={node.slots?.["text"+i]} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+            </React.Fragment>
+          ))}
+      </>}
+      {!_useGeneric && node.opcode==="datacomp.set"&&<>
+          <DataCompDropdown nodeId={node.id} compName={node.fields?.compName} compType={node.fields?.compType} onChange={(n,t)=>{if(onFieldChange){const oldType=node.fields?.compType||"double";onFieldChange(node.id,"compName",n);onFieldChange(node.id,"compType",t);if(t!==oldType)onFieldChange(node.id,"__clearSlot","value");}}}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>to</span>
+          <SlotConn sk="value" sc="rgba(0,0,0,0.3)" connId={node.slots?.value} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+      </>}
     </div>
   );
 
   if (isIf) {
       return (
         <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
-            {showSettings&&<div style={{position:"absolute",left:0,top:-90,background:"#222",border:"2px solid #444",padding:"8px 12px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:6,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
-               <div style={{color:"#aaa",fontSize:12,fontWeight:700,marginBottom:2}}>If Block Settings</div>
-               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={(e)=>{e.stopPropagation();setShowSettings(false)}}>✕</div>
-                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#3a5c3a",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id,"elseIfCount",(node.fields?.elseIfCount||0)+1)}>+ Else If</div>
-                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#5a3a3a",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id,"elseIfCount",Math.max(0,(node.fields?.elseIfCount||0)-1))}>− Else If</div>
-                 <div style={{color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",background:"#444",padding:"4px 10px",borderRadius:6}} onClick={()=>onFieldChange&&onFieldChange(node.id,"hasElse",!node.fields?.hasElse)}>{node.fields?.hasElse?"− Else":"+ Else"}</div>
+            <SettingsPortal open={showSettings} onClose={()=>setShowSettings(false)} anchorRef={settingsAnchorRef}>
+               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                 <div style={{color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",background:"#2a2a2a",padding:"4px 10px",borderRadius:4}} onClick={()=>onFieldChange&&onFieldChange(node.id,"elseIfCount",(node.fields?.elseIfCount||0)+1)}>+ Else If</div>
+                 <div style={{color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",background:"#2a2a2a",padding:"4px 10px",borderRadius:4}} onClick={()=>onFieldChange&&onFieldChange(node.id,"elseIfCount",Math.max(0,(node.fields?.elseIfCount||0)-1))}>− Else If</div>
+                 <div style={{color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",background:"#2a2a2a",padding:"4px 10px",borderRadius:4}} onClick={()=>onFieldChange&&onFieldChange(node.id,"hasElse",!node.fields?.hasElse)}>{node.fields?.hasElse?"− Else":"+ Else"}</div>
                </div>
-            </div>}
+            </SettingsPortal>
             
-            <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
+            <div style={{minHeight:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
             <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
 
             {Array.from({length: node.fields?.elseIfCount || 0}).map((_, i) => (
@@ -967,28 +1163,27 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       );
   }
 
-  if (isAoeEach) {
+  if (isAoeEach || isDelay || (_bdef?.body && !isIf)) {
+      const _isMultiline = node.fields?.multiline || _bdef?.multiline;
+      let _headerH = 50;
+      if (_isMultiline && _bdef) {
+        const _allLabel = [_bdef.label || "", ...(_bdef.shapeSlots ? [_bdef.shapeSlots[node.fields?.shape] || ""] : []), _bdef.suffixLabel || ""].join(" ");
+        const _slotCount = (_allLabel.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic)\]/)).length;
+        _headerH = Math.max(50, _slotCount * 50);
+      }
       return (
         <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
-            <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
+            <div style={{minHeight:_headerH,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
             <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
-        </div>
-      );
-  }
-
-  if (isDelay) {
-      return (
-        <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
-            <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
-            <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
+            {_useGeneric && !isHandPoseSet && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
         </div>
       );
   }
 
   return (
     <div id={"node-"+node.id} onContextMenu={e=>{e.preventDefault(); e.stopPropagation(); if(window.__showYcsCtx) window.__showYcsCtx(node.id, e.clientX, e.clientY);}}
-      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?50:50,width:isVal?undefined:"fit-content",minHeight:50,height:node.height||(isVal?"auto":50),
-        display:isVal?"flex":"block", alignItems:isVal?"center":"stretch", padding:isVal?"8px 10px":"0", gap:isVal?10:0, boxSizing:"border-box", border:selected===node.id?"2px solid #fff":"2px solid transparent",
+      style={{position:"absolute",left:node.x,top:node.y,minWidth:isVal?50:50,width:isVal?undefined:"fit-content",minHeight:isVal?undefined:50,height:node.height||(isVal?"auto":undefined),
+        display:isVal?"flex":"flex", alignItems:isVal?"center":"stretch", padding:isVal?"8px 10px":"0", gap:isVal?10:0, boxSizing:"border-box", border:selected===node.id?"2px solid #fff":"2px solid transparent",
         zIndex:isVal?100:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,
         background:bg, borderRadius:10}}
       onMouseDown={e=>{if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}}>
@@ -996,19 +1191,25 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
 
       
       {isVal ? valContent : commonHeader}
-      {showSettings&&isHandPoseSet&&(()=>{
-        return <div style={{position:"absolute",left:0,bottom:"100%",marginBottom:8,background:"#222",border:"2px solid #444",padding:"10px 14px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:8,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
+      {_useGeneric && !isHandPoseSet && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
+      {!_useGeneric && showSettings&&node.opcode==="chat.send"&&<SettingsPortal open={showSettings} onClose={()=>setShowSettings(false)} anchorRef={settingsAnchorRef}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div style={{color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",background:"#2a2a2a",padding:"4px 10px",borderRadius:4}} onClick={()=>onFieldChange&&onFieldChange(node.id,"textCount",(node.fields?.textCount||1)+1)}>+ Text</div>
+            {(node.fields?.textCount||1)>1&&<div style={{color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",background:"#2a2a2a",padding:"4px 10px",borderRadius:4}} onClick={()=>{if(onFieldChange){const cur=node.fields?.textCount||1;const nv=Math.max(1,cur-1);for(let ri=nv;ri<cur;ri++)onFieldChange(node.id,"__clearSlot","text"+ri);onFieldChange(node.id,"textCount",nv);}}}>− Text</div>}
+          </div>
+      </SettingsPortal>}
+      {showSettings&&isHandPoseSet&&<SettingsPortal open={showSettings} onClose={()=>setShowSettings(false)} anchorRef={settingsAnchorRef}>
           <label style={{display:"flex",alignItems:"center",gap:6,color:"#ccc",fontSize:12,cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"allowVanillaActions",!node.fields?.allowVanillaActions);}}>
             <input type="checkbox" checked={!!node.fields?.allowVanillaActions} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
             Allow Vanilla Actions
           </label>
-        </div>;
-      })()}
+      </SettingsPortal>}
       {showSettings&&(isAnimTPPlay||isTPPoseSet)&&(()=>{
         const lookMask = node.fields?.lookAtMask||0;
         const vanMask  = node.fields?.vanillaMask||0;
         const actMask  = node.fields?.allowActionsMask||0;
         const keepMask = node.fields?.keepPosScaleMask||0;
+        const _settingsClose = ()=>setShowSettings(false);
         const LookCB = ({bit})=>(
           <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"lookAtMask",(lookMask^bit));}}>
             <input type="checkbox" checked={!!(lookMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
@@ -1048,9 +1249,15 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
           {label:"Right Leg", lookBase:8,  vanBit:16},
           {label:"Left Leg",  lookBase:10, vanBit:32},
         ];
+        const fpMask = node.fields?.fpViewMask||0;
+        const FpCB = ({bit})=>(
+          <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"fpViewMask",(fpMask^bit));}}>
+            <input type="checkbox" checked={!!(fpMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+          </label>
+        );
         const tdC = {textAlign:"center",padding:"1px 6px"};
         const hdC = {color:"#888",fontSize:11,padding:"0 6px",textAlign:"center"};
-        return <div style={{position:"absolute",left:0,bottom:"100%",marginBottom:8,background:"#222",border:"2px solid #444",padding:"10px 14px",borderRadius:10,zIndex:100,display:"flex",flexDirection:"column",gap:8,pointerEvents:"auto"}} onMouseDown={e=>e.stopPropagation()}>
+        return <SettingsPortal open={showSettings} onClose={_settingsClose} anchorRef={settingsAnchorRef}>
           <table style={{borderCollapse:"collapse",fontSize:12,color:"#ccc"}}>
             <thead><tr>
               <td style={{paddingRight:8,color:"#888",fontSize:11}}></td>
@@ -1059,6 +1266,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               <td style={{...hdC,borderLeft:"1px solid #444"}}>Animation</td>
               {isTPPoseSet&&<td style={{...hdC,borderLeft:"1px solid #444"}}>Allow Act</td>}
               {isTPPoseSet&&<td style={{...hdC,borderLeft:"1px solid #444"}}>Keep Pos</td>}
+              <td style={{...hdC,borderLeft:"1px solid #444"}}>FP View</td>
             </tr></thead>
             <tbody>
               <tr style={{borderBottom:"1px solid #333"}}>
@@ -1068,6 +1276,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
               </tr>
               {parts.map(({label,lookBase,vanBit})=>(
                 <tr key={label}>
@@ -1077,6 +1286,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                   <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={vanBit}/></td>
                   {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><ActCB bit={vanBit}/></td>}
                   {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><KeepCB bit={vanBit}/></td>}
+                  <td style={{...tdC,borderLeft:"1px solid #444"}}><FpCB bit={vanBit}/></td>
                 </tr>
               ))}
               <tr style={{borderTop:"1px solid #333"}}>
@@ -1085,6 +1295,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={1}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><ActCB bit={1}/></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><KeepCB bit={1}/></td>}
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><FpCB bit={1}/></td>
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Torso</td>
@@ -1092,6 +1303,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={2}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><ActCB bit={2}/></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><KeepCB bit={2}/></td>}
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><FpCB bit={2}/></td>
               </tr>
               <tr style={{borderTop:"1px solid #333"}}>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Crouch</td>
@@ -1099,6 +1311,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={64}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Sitting</td>
@@ -1106,6 +1319,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={256}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Prone</td>
@@ -1113,30 +1327,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={128}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
               </tr>
             </tbody>
           </table>
-          {(()=>{
-            const fpMask = node.fields?.fpViewMask||0;
-            const FpCB = ({bit,label})=>(
-              <label style={{display:"flex",alignItems:"center",gap:5,color:"#ccc",fontSize:12,cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"fpViewMask",(fpMask^bit));}}>
-                <input type="checkbox" checked={!!(fpMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
-                {label}
-              </label>
-            );
-            return <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:4,borderTop:"1px solid #333",paddingTop:6}}>
-              <div style={{color:"#888",fontSize:11,fontWeight:600}}>Show in First Person</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                <FpCB bit={4} label="R.Arm"/>
-                <FpCB bit={8} label="L.Arm"/>
-                <FpCB bit={16} label="R.Leg"/>
-                <FpCB bit={32} label="L.Leg"/>
-                <FpCB bit={1} label="Head"/>
-                <FpCB bit={2} label="Torso"/>
-              </div>
-            </div>;
-          })()}
-        </div>;
+        </SettingsPortal>;
       })()}
     </div>
   );
@@ -1226,4 +1421,4 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
 }
 
 
-export { VisualEditorPanel, VisualEditorPanelInner, CanvasNode, SlotConn, AttrDropdown, EffectDropdown, VarDropdown, PaletteBlock, PaletteSidebar, MethodListPanel };
+export { VisualEditorPanel, VisualEditorPanelInner, CanvasNode, SlotConn, AttrDropdown, EffectDropdown, VarDropdown, DataCompDropdown, PortalSelect, SettingsPortal, PaletteBlock, PaletteSidebar, MethodListPanel };

@@ -60,7 +60,7 @@ public record VarSyncPayload(int entityId, List<VarEntry> vars) implements BaseP
      *   <li>Remaining: type-specific value</li>
      * </ul>
      */
-    public record VarEntry(String key, byte typeId, int intVal, float floatVal,
+    public record VarEntry(String key, byte typeId, int intVal, float floatVal, double doubleVal,
                            boolean boolVal, String stringVal, ItemStack itemVal) {
 
         public static final StreamCodec<RegistryFriendlyByteBuf, VarEntry> STREAM_CODEC =
@@ -72,6 +72,7 @@ public record VarSyncPayload(int entityId, List<VarEntry> vars) implements BaseP
                     return switch (EntityVarType.fromWireId(typeId)) {
                         case INT        -> ofInt(key,    ByteBufCodecs.VAR_INT.decode(buf));
                         case FLOAT      -> ofFloat(key,  buf.readFloat());
+                        case DOUBLE     -> ofDouble(key, buf.readDouble());
                         case BOOL       -> ofBool(key,   buf.readBoolean());
                         case STRING     -> ofString(key, ByteBufCodecs.stringUtf8(256).decode(buf));
                         case ITEM_STACK -> ofItem(key,   ItemStack.STREAM_CODEC.decode(buf));
@@ -85,6 +86,7 @@ public record VarSyncPayload(int entityId, List<VarEntry> vars) implements BaseP
                     switch (EntityVarType.fromWireId(e.typeId())) {
                         case INT        -> ByteBufCodecs.VAR_INT.encode(buf, e.intVal());
                         case FLOAT      -> buf.writeFloat(e.floatVal());
+                        case DOUBLE     -> buf.writeDouble(e.doubleVal());
                         case BOOL       -> buf.writeBoolean(e.boolVal());
                         case STRING     -> ByteBufCodecs.stringUtf8(256).encode(buf, e.stringVal());
                         case ITEM_STACK -> ItemStack.STREAM_CODEC.encode(buf, e.itemVal());
@@ -96,21 +98,24 @@ public record VarSyncPayload(int entityId, List<VarEntry> vars) implements BaseP
         // Factories
         // ---------------------------------------------------------------------------------
         public static VarEntry ofInt(String key, int v) {
-            return new VarEntry(key, EntityVarType.INT.wireId(), v, 0f, false, "", ItemStack.EMPTY); }
+            return new VarEntry(key, EntityVarType.INT.wireId(), v, 0f, 0.0, false, "", ItemStack.EMPTY); }
         public static VarEntry ofFloat(String key, float v) {
-            return new VarEntry(key, EntityVarType.FLOAT.wireId(), 0, v, false, "", ItemStack.EMPTY); }
+            return new VarEntry(key, EntityVarType.FLOAT.wireId(), 0, v, 0.0, false, "", ItemStack.EMPTY); }
+        public static VarEntry ofDouble(String key, double v) {
+            return new VarEntry(key, EntityVarType.DOUBLE.wireId(), 0, 0f, v, false, "", ItemStack.EMPTY); }
         public static VarEntry ofBool(String key, boolean v) {
-            return new VarEntry(key, EntityVarType.BOOL.wireId(), 0, 0f, v, "", ItemStack.EMPTY); }
+            return new VarEntry(key, EntityVarType.BOOL.wireId(), 0, 0f, 0.0, v, "", ItemStack.EMPTY); }
         public static VarEntry ofString(String key, String v) {
-            return new VarEntry(key, EntityVarType.STRING.wireId(), 0, 0f, false, v, ItemStack.EMPTY); }
+            return new VarEntry(key, EntityVarType.STRING.wireId(), 0, 0f, 0.0, false, v, ItemStack.EMPTY); }
         public static VarEntry ofItem(String key, ItemStack v) {
-            return new VarEntry(key, EntityVarType.ITEM_STACK.wireId(), 0, 0f, false, "", v); }
+            return new VarEntry(key, EntityVarType.ITEM_STACK.wireId(), 0, 0f, 0.0, false, "", v); }
 
         /** Build from a live {@link net.ye6isu.yebisuRPG.data.EntityVar}. */
         public static VarEntry from(String key, net.ye6isu.yebisuRPG.data.EntityVar var) {
             return switch (var.getType()) {
                 case INT        -> ofInt(key,    var.getInt());
                 case FLOAT      -> ofFloat(key,  var.getFloat());
+                case DOUBLE     -> ofDouble(key, var.getDouble());
                 case BOOL       -> ofBool(key,   var.getBool());
                 case STRING     -> ofString(key, var.getString());
                 case ITEM_STACK -> ofItem(key,   var.getItem());

@@ -1348,15 +1348,6 @@
   "yebisurpg:plank_chestplate",
   "yebisurpg:plank_helmet",
   "yebisurpg:plank_leggings",
-  "yebisurpg:test_block",
-  "yebisurpg:test_item",
-  "yebisurpg:walkman",
   "yebisurpg:ye6isu",
-  "yebisurpg:ye6isu_axe",
-  "yebisurpg:ye6isu_block",
-  "yebisurpg:ye6isu_hoe",
-  "yebisurpg:ye6isu_ore",
-  "yebisurpg:ye6isu_pickaxe",
-  "yebisurpg:ye6isu_shovel",
-  "yebisurpg:ye6isu_sword"
+  "yebisurpg:ye6isu_block"
 ]

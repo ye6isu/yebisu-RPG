@@ -5,14 +5,7 @@
   "item.yebisurpg.plank_chestplate": "Plank Chestplate",
   "item.yebisurpg.plank_helmet": "Plank Helmet",
   "item.yebisurpg.plank_leggings": "Plank Leggings",
-  "item.yebisurpg.test_item": "Test Item",
-  "item.yebisurpg.walkman": "Walkman",
   "item.yebisurpg.ye6isu": "ye6isu",
-  "item.yebisurpg.ye6isu_axe": "ye6isu Axe",
-  "item.yebisurpg.ye6isu_hoe": "ye6isu Hoe",
-  "item.yebisurpg.ye6isu_pickaxe": "ye6isu Pickaxe",
-  "item.yebisurpg.ye6isu_shovel": "ye6isu Shovel",
-  "item.yebisurpg.ye6isu_sword": "ye6isu Sword",
 
   "block.yebisurpg.crate_block": "Crate Block",
   "block.yebisurpg.crate_button": "Crate Button",
@@ -24,15 +17,11 @@
   "block.yebisurpg.crate_stairs": "Crate Stairs",
   "block.yebisurpg.crate_trapdoor": "Crate Trapdoor",
   "block.yebisurpg.crate_wall": "Crate Wall",
-  "block.yebisurpg.test_block": "Test Blocka",
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
-  "block.yebisurpg.ye6isu_ore": "ye6isu Ore",
 
   "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info",
 
   "creativetab.yebisurpg.yebisurpg_tab": "yebisu RPG",
 
-  "key.categories.yebisurpg": "yebisu RPG",
-
-  "effect.yebisurpg.test_effect": "Test Effect"
+  "key.categories.yebisurpg": "yebisu RPG"
 }

@@ -1,4 +1,5 @@
 import { LINK_ENTITY, LINK_NUMBER, LINK_TEXT, LINK_LOGIC } from './compiler.js';
+import { BLOCK_DEFS } from './blockDefs.js';
 
 export const PEHKUI_SCALES = [
   { id:"yebisurpg:scale.base",                    label:"Base Scale" },
@@ -66,165 +67,46 @@ export const VANILLA_ATTRIBUTES = [
   { id:"zombie.spawn_reinforcements",           label:"Spawn Reinforcements Chance" },
 ];
 
-export const PALETTE_BLOCKS = [
-  { category:"Entity", data:[
-    { opcode:"entity.event",  label:"Event Entity",  linkType:LINK_ENTITY, hint:"Entity that triggered this method" },
-    { opcode:"entity.target", label:"Target Entity", linkType:LINK_ENTITY, hint:"Target entity (hurtEnemy/interactLivingEntity)" },
-    { opcode:"aoe.iterator.entity", label:"Iterator Entity", linkType:LINK_ENTITY, hint:"Current entity in a For Each Entity loop" },
-  ], actions:[] },
-  { category:"Text", data:[
-    { opcode:"text.literal", label:"Text", linkType:LINK_TEXT, hint:"A literal text/string value" },
-  ], actions:[] },
-  { category:"Numbers", data:[
-    { opcode:"number.literal", label:"Number", linkType:LINK_NUMBER, hint:"A literal number" },
-    { opcode:"number.math", label:"Math", linkType:LINK_NUMBER, hint:"Apply an operator to two numbers",
-      slotDefs:[{key:"a",accepts:LINK_NUMBER},{key:"b",accepts:LINK_NUMBER}] },
-    { opcode:"entity.pos_x", label:"Pos X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.pos_y", label:"Pos Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.pos_z", label:"Pos Z of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.cam_x", label:"X at dist from", linkType:LINK_NUMBER, slotDefs:[{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"entity",accepts:LINK_ENTITY,label:"entity"}] },
-    { opcode:"entity.cam_y", label:"Y at dist from", linkType:LINK_NUMBER, slotDefs:[{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"entity",accepts:LINK_ENTITY,label:"entity"}] },
-    { opcode:"entity.cam_z", label:"Z at dist from", linkType:LINK_NUMBER, slotDefs:[{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"entity",accepts:LINK_ENTITY,label:"entity"}] },
-    { opcode:"vector.normalize_x", label:"Dir X from→to", linkType:LINK_NUMBER, hint:"X component of normalized direction from (x1,y1,z1) to (x2,y2,z2)",
-      slotDefs:[{key:"x1",accepts:LINK_NUMBER,label:"x1"},{key:"y1",accepts:LINK_NUMBER,label:"y1"},{key:"z1",accepts:LINK_NUMBER,label:"z1"},{key:"x2",accepts:LINK_NUMBER,label:"x2"},{key:"y2",accepts:LINK_NUMBER,label:"y2"},{key:"z2",accepts:LINK_NUMBER,label:"z2"}] },
-    { opcode:"vector.normalize_y", label:"Dir Y from→to", linkType:LINK_NUMBER, hint:"Y component of normalized direction from (x1,y1,z1) to (x2,y2,z2)",
-      slotDefs:[{key:"x1",accepts:LINK_NUMBER,label:"x1"},{key:"y1",accepts:LINK_NUMBER,label:"y1"},{key:"z1",accepts:LINK_NUMBER,label:"z1"},{key:"x2",accepts:LINK_NUMBER,label:"x2"},{key:"y2",accepts:LINK_NUMBER,label:"y2"},{key:"z2",accepts:LINK_NUMBER,label:"z2"}] },
-    { opcode:"vector.normalize_z", label:"Dir Z from→to", linkType:LINK_NUMBER, hint:"Z component of normalized direction from (x1,y1,z1) to (x2,y2,z2)",
-      slotDefs:[{key:"x1",accepts:LINK_NUMBER,label:"x1"},{key:"y1",accepts:LINK_NUMBER,label:"y1"},{key:"z1",accepts:LINK_NUMBER,label:"z1"},{key:"x2",accepts:LINK_NUMBER,label:"x2"},{key:"y2",accepts:LINK_NUMBER,label:"y2"},{key:"z2",accepts:LINK_NUMBER,label:"z2"}] },
-    { opcode:"entity.look_x", label:"Look Dir X of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_y", label:"Look Dir Y of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_z", label:"Look Dir Z of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_client_x", label:"Look Dir X (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_client_y", label:"Look Dir Y (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-    { opcode:"entity.look_client_z", label:"Look Dir Z (Client) of", linkType:LINK_NUMBER, slotDefs:[{key:"entity",accepts:LINK_ENTITY}] },
-  ], actions:[] },
-  { category:"Logic", data:[
-    { opcode:"logic.true", label:"True", linkType:LINK_LOGIC, hint:"True value" },
-    { opcode:"logic.false", label:"False", linkType:LINK_LOGIC, hint:"False value" },
-    { opcode:"entity.is_crouching", label:"Is Crouching?", linkType:LINK_LOGIC, hint:"True if the entity is crouching/sneaking", slotDefs:[{key:"entity", accepts:LINK_ENTITY}] },
-  ], actions:[
-    { opcode:"control.if", label:"If", isAction:true, hint:"If statement", slotDefs:[{key:"condition",accepts:LINK_LOGIC}] },
-    { opcode:"control.delay", label:"Delay", isAction:true, hint:"Run actions after [Number] ticks delay (server-side)", slotDefs:[{key:"delayTicks",accepts:LINK_NUMBER,label:"ticks"}] },
-  ]},
-  { category:"Effects", data:[], actions:[
-    { opcode:"effect.apply", label:"Add Effect", isAction:true, hint:"Apply a potion effect",
-      slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"duration",accepts:LINK_NUMBER},{key:"level",accepts:LINK_NUMBER}] },
-    { opcode:"entity.apply_motion", label:"Apply Motion", isAction:true, hint:"Add velocity to an entity (X/Y/Z). Set mode: add=impulse, set=override velocity.",
-      slotDefs:[{key:"entity",accepts:LINK_ENTITY},{key:"x",accepts:LINK_NUMBER},{key:"y",accepts:LINK_NUMBER},{key:"z",accepts:LINK_NUMBER}] },
-  ]},
-  { category:"AoE", data:[], actions:[
-    { opcode:"aoe.each.sphere", label:"For Each in Sphere", isAction:true, hint:"Run actions for each entity in sphere",
-      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"radius",accepts:LINK_NUMBER,label:"radius"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
-    { opcode:"aoe.each.box", label:"For Each in Box", isAction:true, hint:"Run actions for each entity in box",
-      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"width",accepts:LINK_NUMBER,label:"width"},{key:"height",accepts:LINK_NUMBER,label:"height"},{key:"depth",accepts:LINK_NUMBER,label:"depth"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
-    { opcode:"aoe.each.cone", label:"For Each in Cone", isAction:true, hint:"Run actions for each entity in cone",
-      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"angle",accepts:LINK_NUMBER,label:"angle°"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
-    { opcode:"aoe.each.line", label:"For Each in Line", isAction:true, hint:"Run actions for each entity in line",
-      slotDefs:[{key:"entity",accepts:LINK_ENTITY,label:"entity"},{key:"distance",accepts:LINK_NUMBER,label:"distance"},{key:"width",accepts:LINK_NUMBER,label:"width"},{key:"offX",accepts:LINK_NUMBER,label:"offX"},{key:"offY",accepts:LINK_NUMBER,label:"offY"},{key:"offZ",accepts:LINK_NUMBER,label:"offZ"}] },
-  ]},
-  { category:"Anim — First Person", data:[], actions:[
-    { opcode:"anim.firstperson.play", label:"Play Anim", isAction:true,
-      hint:"Play FP Anim [Text] for [Entity] with playback speed [Number] from file [Text]",
-      slotDefs:[
-        {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
-        {key:"entity",        accepts:LINK_ENTITY, label:"entity"},
-        {key:"playbackSpeed", accepts:LINK_NUMBER, label:"playback speed"},
-        {key:"filePath",      accepts:LINK_TEXT,   label:"from file"},
-      ] },
-    { opcode:"anim.firstperson.stop", label:"Stop Anim", isAction:true,
-      hint:"Stop any playing first-person animation on an entity",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.firstperson.pause", label:"Pause Anim", isAction:true,
-      hint:"Freeze the playing first-person animation on an entity at its current position",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.firstperson.resume", label:"Resume Anim", isAction:true,
-      hint:"Resume a paused first-person animation; if expired while paused, stops it",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.handpose.set", label:"Set Hand Pose", isAction:true,
-      hint:"Set FP hand pose to [Text] for [Entity] from [Text]",
-      slotDefs:[
-        {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
-        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
-        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
-      ] },
-    { opcode:"anim.handpose.reset", label:"Reset Hand Pose", isAction:true,
-      hint:"Reset FP hand pose for [Entity] to vanilla default",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-  ]},
-  { category:"Anim — Third Person", data:[], actions:[
-    { opcode:"anim.thirdperson.play", label:"Play Anim", isAction:true,
-      hint:"Play TP Anim [Text] for [Entity] with playback speed [Number] from file [Text]",
-      slotDefs:[
-        {key:"animName",      accepts:LINK_TEXT,   label:"anim name"},
-        {key:"entity",        accepts:LINK_ENTITY, label:"entity"},
-        {key:"playbackSpeed", accepts:LINK_NUMBER, label:"playback speed"},
-        {key:"filePath",      accepts:LINK_TEXT,   label:"from file"},
-      ] },
-    { opcode:"anim.thirdperson.stop", label:"Stop Anim", isAction:true,
-      hint:"Stop any playing third-person animation on an entity",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.thirdperson.pause", label:"Pause Anim", isAction:true,
-      hint:"Freeze the playing third-person animation on an entity at its current position",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.thirdperson.resume", label:"Resume Anim", isAction:true,
-      hint:"Resume a paused third-person animation; if expired while paused, stops it",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    { opcode:"anim.tppose.set", label:"Set Pose", isAction:true,
-      hint:"Set TP pose to [Text] for [Entity] from [Text]",
-      slotDefs:[
-        {key:"animName", accepts:LINK_TEXT,   label:"pose anim"},
-        {key:"entity",   accepts:LINK_ENTITY, label:"entity"},
-        {key:"filePath", accepts:LINK_TEXT,   label:"from file"},
-      ] },
-    { opcode:"anim.tppose.reset", label:"Reset Pose", isAction:true,
-      hint:"Reset TP pose for [Entity] to vanilla default",
-      slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-  ]},
-];
+export const PALETTE_BLOCKS = [];
 
 export function buildPalette(variables, modAttributes) {
   const result = [...PALETTE_BLOCKS];
 
-  result.push({
-    category:"Variables",
-    data:[
-      { opcode:"variable.get", label:"Get Variable", linkType:LINK_NUMBER,
-        hint:"Get a declared variable for [Entity] — pick the variable inline on the canvas",
-        slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    ],
-    actions:[
-      { opcode:"variable.set", label:"Set Variable", isAction:true,
-        hint:"Set a declared variable for [Entity] — pick the variable inline on the canvas",
-        slotDefs:[{key:"value", accepts:LINK_NUMBER, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-    ],
-  });
-
-  const allAttrs = [
-    ...VANILLA_ATTRIBUTES,
-    ...PEHKUI_SCALES,
-    ...(modAttributes || []).map(a => ({ id:a.id, label:a.titleText || a.id, mod:true })),
-  ];
-  if (allAttrs.length) {
-    result.push({
-      category:"Attributes",
-      data:[
-        { opcode:"attribute.get", label:"Get Attribute", linkType:LINK_NUMBER,
-          hint:"Read an attribute value (total / base / bonus) for [Entity]",
-          slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-      ],
-      actions:[
-        { opcode:"attribute.modifier.add", label:"Add Attr Modifier", isAction:true,
-          hint:"Add a named modifier (flat ADD_VALUE or % ADD_MULTIPLIED_TOTAL) to an attribute on [Entity]",
-          slotDefs:[{key:"value", accepts:LINK_NUMBER, label:"value"},{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-        { opcode:"attribute.modifier.remove", label:"Remove Attr Modifier", isAction:true,
-          hint:"Remove a named modifier from an attribute on [Entity]",
-          slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-        { opcode:"attribute.base.reset", label:"Reset Attr Base", isAction:true,
-          hint:"Reset an attribute's base value back to its default on [Entity]",
-          slotDefs:[{key:"entity", accepts:LINK_ENTITY, label:"entity"}] },
-      ],
-    });
+  const existingOpcodes = new Set(result.flatMap(c => [...(c.data||[]), ...(c.actions||[])]).map(b => b.opcode));
+  const jsonCats = {};
+  for (const bdef of BLOCK_DEFS) {
+    if (existingOpcodes.has(bdef.opcode)) continue;
+    if (!jsonCats[bdef.category]) jsonCats[bdef.category] = { data: [], actions: [] };
+    const entry = {
+      opcode: bdef.opcode,
+      label: bdef.paletteLabel || bdef.label.replace(/\[[\w:.]+\]/g, '').trim() || bdef.opcode,
+      linkType: bdef.linkType || undefined,
+      isAction: bdef.isAction || false,
+      hint: bdef.hint,
+      slotDefs: [],
+    };
+    if (bdef.sub === "data") jsonCats[bdef.category].data.push(entry);
+    else jsonCats[bdef.category].actions.push(entry);
+  }
+  for (const [cat, items] of Object.entries(jsonCats)) {
+    const existing = result.find(c => c.category === cat);
+    if (existing) {
+      existing.data.push(...items.data);
+      existing.actions.push(...items.actions);
+    } else {
+      result.push({ category: cat, data: items.data, actions: items.actions });
+    }
   }
 
-  return result;
+  const merged = [];
+  for (const cat of result) {
+    const existing = merged.find(c => c.category === cat.category);
+    if (existing) {
+      existing.data.push(...(cat.data||[]));
+      existing.actions.push(...(cat.actions||[]));
+    } else {
+      merged.push({ category: cat.category, data: [...(cat.data||[])], actions: [...(cat.actions||[])] });
+    }
+  }
+  return merged;
 }

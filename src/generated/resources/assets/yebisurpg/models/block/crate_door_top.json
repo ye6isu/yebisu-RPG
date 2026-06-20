@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "yebisurpg:block/test_block"
+    "all": "yebisurpg:block/crate_door_top"
   }
 }

@@ -1005,7 +1005,7 @@ app.post('/api/variables/save', (req, res) => {
   try {
     const { variables } = req.body
     if (!Array.isArray(variables)) return res.json({ ok:false, reason:'variables must be an array' })
-    const VAR_TYPES = ['int','float','bool','string','item']
+    const VAR_TYPES = ['int','float','double','bool','string','item']
     for (const v of variables) {
       if (!/^[a-z][a-z0-9_]*$/.test(v.name)) return res.json({ ok:false, reason:`invalid variable name: ${v.name}` })
       if (!VAR_TYPES.includes(v.type)) return res.json({ ok:false, reason:`invalid type for ${v.name}` })
@@ -1013,6 +1013,7 @@ app.post('/api/variables/save', (req, res) => {
     }
     writeVariables(variables.map(v => ({
       name: v.name,
+      titleText: v.titleText || "",
       type: v.type,
       default: v.type === 'item'
         ? { itemId: v.default?.itemId ?? null, count: Math.max(1, parseInt(v.default?.count) || 1) }
@@ -1073,6 +1074,73 @@ app.post('/api/attributes/save', (req, res) => {
     }
     writeAttributes(attributes)
     writeAttributesJava(attributes)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+// ─── Data Components ──────────────────────────────────────────────────────────
+// Syncs YCS-defined data components to ModDataComponents.java between
+// //YCS_DataComponents_START and //YCS_DataComponents_END markers.
+
+const MOD_DATA_COMPONENTS_JAVA = jp(JAVA_ROOT, 'component', 'ModDataComponents.java')
+const DATA_COMPONENTS_JSON = jp(MOD_ROOT, 'assets', MODID, 'ycs', 'ycs_data_components.json')
+
+function readDataComponents() {
+  try { return JSON.parse(rf(DATA_COMPONENTS_JSON)) } catch { return [] }
+}
+function writeDataComponents(list) { wf(DATA_COMPONENTS_JSON, JSON.stringify(list, null, 2)) }
+
+function writeDataComponentsJava(list) {
+  let src = rf(MOD_DATA_COMPONENTS_JAVA)
+  const lines = list.map(dc => {
+    const constName = 'YCS_' + dc.name.toUpperCase().replace(/[^A-Z0-9]/g, '_')
+    const regId = 'ycs_' + dc.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+    if (dc.type === 'bool') {
+      return `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>>\n` +
+             `        ${constName} = COMPONENTS.register("${regId}", () ->\n` +
+             `            DataComponentType.<Boolean>builder()\n` +
+             `                .persistent(Codec.BOOL)\n` +
+             `                .networkSynchronized(ByteBufCodecs.BOOL)\n` +
+             `                .build());\n`
+    }
+    if (dc.type === 'string') {
+      return `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>>\n` +
+             `        ${constName} = COMPONENTS.register("${regId}", () ->\n` +
+             `            DataComponentType.<String>builder()\n` +
+             `                .persistent(Codec.STRING)\n` +
+             `                .networkSynchronized(ByteBufCodecs.stringUtf8(256))\n` +
+             `                .build());\n`
+    }
+    return `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>\n` +
+           `        ${constName} = COMPONENTS.register("${regId}", () ->\n` +
+           `            DataComponentType.<Double>builder()\n` +
+           `                .persistent(Codec.DOUBLE)\n` +
+           `                .build());\n`
+  })
+  src = src.replace(
+    /(\/\/YCS_DataComponents_START\n)[\s\S]*?(\/\/YCS_DataComponents_END)/,
+    `$1${lines.join('\n')}    $2`
+  )
+  wf(MOD_DATA_COMPONENTS_JAVA, src)
+  markDirty()
+}
+
+app.get('/api/datacomponents/list', (req, res) => {
+  try { res.json({ ok:true, components: readDataComponents() }) }
+  catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+app.post('/api/datacomponents/save', (req, res) => {
+  try {
+    const { components } = req.body
+    if (!Array.isArray(components)) return res.json({ ok:false, reason:'components must be an array' })
+    const DC_TYPES = ['double','bool','string','item']
+    for (const c of components) {
+      if (!/^[a-z][a-z0-9_]*$/.test(c.name)) return res.json({ ok:false, reason:`invalid component name: ${c.name}` })
+      if (!DC_TYPES.includes(c.type)) return res.json({ ok:false, reason:`invalid type for ${c.name}` })
+    }
+    writeDataComponents(components)
+    writeDataComponentsJava(components.filter(c => c.type !== 'item'))
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })

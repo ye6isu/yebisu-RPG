@@ -217,7 +217,6 @@ export default function TabsPage({ allItems, allBlocks, textures, reloadMod, onE
   }
 
   return <div style={{ flex: 1, background: C.panel, borderRadius: C.r, overflow: "hidden", padding: "20px 20px 90px", overflowY: "auto" }}>
-    <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>CUSTOM TABS</div>
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {customList.map((o, i) => {
         const tabObj = customTabs.find(c => c.key === o.key);

@@ -35,18 +35,10 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
         //Special Non-Block Block drop
         add(ModBlocks.CRATE_SLAB.get(), block -> createSlabItemTable(ModBlocks.CRATE_SLAB.get()));
         add(ModBlocks.CRATE_DOOR.get(), block -> createDoorTable(ModBlocks.CRATE_DOOR.get()));
-
-        //Ore drop
-        add(ModBlocks.YE6ISU_ORE.get(),
-                block -> createOreDrop(ModBlocks.YE6ISU_ORE.get(), ModItems.YE6ISU.get()));
-
-        //Same Block drop from creator;
-
+        
         //YCS_Mod_Block_Loot_START
 
 ;
-
-        dropSelf(ModBlocks.TEST_BLOCK.get());
 
         //YCS_Mod_Block_Loot_END
     }

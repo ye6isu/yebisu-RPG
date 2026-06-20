@@ -11,6 +11,7 @@ import TagsPanel from "./TagsPanel.jsx";
 import TooltipPanel from "./TooltipPanel.jsx";
 import RecipePanelWrapper from "./RecipePanel.jsx";
 import VariantsPanel from "./VariantsPanel.jsx";
+import DataComponentsPanel from "./DataComponentsPanel.jsx";
 
 export function MethodListPanel({form,F,onEnterEditor,className}){
   const[busyKey,setBusyKey]=useState(null);
@@ -111,6 +112,7 @@ export default function RightPaneShell({modItems=[],modBlocks=[],textures=[],isB
       {activePanel==="tooltip"&&<TooltipPanel/>}
       {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks} textures={textures}/>}
       {activePanel==="variants"&&<VariantsPanel textures={textures}/>}
+      {activePanel==="datacomponents"&&<DataComponentsPanel/>}
     </div>
   </div>;
 }

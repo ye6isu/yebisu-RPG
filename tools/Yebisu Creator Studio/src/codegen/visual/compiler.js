@@ -1,8 +1,18 @@
+import { blockDefRegistry } from './blockDefs.js';
+import { resolveFromDef, compileFromDef } from './blockCompiler.js';
+
 export const LINK_ENTITY = "entity";
 export const LINK_NUMBER = "number";
 export const LINK_LOGIC = "logic";
 export const LINK_TEXT = "text";
 export const LINK_ITERATOR = "iterator";
+
+export function resolveStackExpr(methodKey) {
+  if (methodKey === "useOn") return "context.getItemInHand()";
+  if (methodKey === "use") return "player.getItemInHand(usedHand)";
+  if (methodKey === "onEffectStarted" || methodKey === "onEffectTick" || methodKey === "onEffectEnd") return null;
+  return "stack";
+}
 
 export function resolveEntityVar(opcode, methodKey) {
   if (opcode === "entity.event") {
@@ -32,24 +42,28 @@ export function varGetterMethod(type) {
   if (type === "bool") return "getBool";
   if (type === "string") return "getString";
   if (type === "float") return "getFloat";
+  if (type === "double") return "getDouble";
   return "getInt";
 }
 export function varSetterMethod(type) {
   if (type === "bool") return "setBool";
   if (type === "string") return "setString";
   if (type === "float") return "setFloat";
+  if (type === "double") return "setDouble";
   return "setInt";
 }
 export function varDefaultLiteral(type, def) {
   if (type === "bool") return def ? "true" : "false";
   if (type === "string") return `"${(def ?? "").toString().replace(/"/g, '\\"')}"`;
   if (type === "float") return `${parseFloat(def) || 0}f`;
+  if (type === "double") return `${parseFloat(def) || 0}d`;
   return `${parseInt(def) || 0}`;
 }
 export function varOfFactory(type) {
   if (type === "bool") return "ofBool";
   if (type === "string") return "ofString";
   if (type === "float") return "ofFloat";
+  if (type === "double") return "ofDouble";
   return "ofInt";
 }
 export function varsExpr(ent) {
@@ -121,6 +135,11 @@ export function compileChain(startNextId, nodes, methodKey) {
 }
 
 export function compileActionNode(node, nodes, methodKey) {
+  const _bdef = blockDefRegistry.get(node.opcode);
+  if (_bdef && !_bdef.codegen?.handler) {
+    const result = compileFromDef(_bdef, node, nodes, methodKey);
+    if (result !== null) return result;
+  }
   if (node.opcode === "control.if") {
     const fields = node.fields || {elseIfCount:0, hasElse:false};
     let code = "";
@@ -167,7 +186,7 @@ export function compileActionNode(node, nodes, methodKey) {
       return [`${ent}.push((double)(${x}), (double)(${y}), (double)(${z}));`];
     }
   }
-  if (node.opcode?.startsWith("aoe.each.")) {
+  if (node.opcode === "aoe.each" || node.opcode?.startsWith("aoe.each.")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const ox = resolveSlotValue(node.slots?.offX, nodes, methodKey) ?? "0";
     const oy = resolveSlotValue(node.slots?.offY, nodes, methodKey) ?? "0";
@@ -176,7 +195,7 @@ export function compileActionNode(node, nodes, methodKey) {
     const los = node.fields?.los !== false;
     const losOrigin = node.fields?.losOrigin || "caller";
     const showP = !!node.fields?.showParticles;
-    const shape = node.opcode.replace("aoe.each.", "");
+    const shape = node.opcode === "aoe.each" ? (node.fields?.shape || "sphere") : node.opcode.replace("aoe.each.", "");
 
     let lines = [
       "if (" + ent + ".level() instanceof net.minecraft.server.level.ServerLevel _sl) {",
@@ -426,6 +445,38 @@ export function compileActionNode(node, nodes, methodKey) {
       `}`,
     ];
   }
+  if (node.opcode === "chat.send") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const textParts = [];
+    const fields = node.fields || {};
+    const textCount = fields.textCount || 1;
+    for (let i = 0; i < textCount; i++) {
+      const val = resolveSlotValue(node.slots?.["text" + i], nodes, methodKey);
+      if (val !== null) textParts.push(val);
+    }
+    const wrapText = (t) => {
+      if (t.startsWith('"') || t.startsWith("String.valueOf") || t.startsWith("(")) return t;
+      return `"${t.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    };
+    const combined = textParts.length > 0 ? textParts.map(t => `Component.literal(${wrapText(t)})`).join(".append(") + ")".repeat(Math.max(0, textParts.length - 1)) : `Component.literal("")`;
+    return [
+      `if (${ent} instanceof Player _cp) {`,
+      `    _cp.sendSystemMessage(${combined});`,
+      `}`,
+    ];
+  }
+  if (node.opcode === "datacomp.set") {
+    const stackExpr = resolveStackExpr(methodKey);
+    if (!stackExpr) return ["// datacomp.set not available in this method"];
+    const compName = node.fields?.compName || "my_value";
+    const compType = node.fields?.compType || "double";
+    const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? "0";
+    const constName = "YCS_" + compName.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    const ref = `ModDataComponents.${constName}.get()`;
+    if (compType === "bool") return [`${stackExpr}.set(${ref}, ${valueExpr});`];
+    if (compType === "string") return [`${stackExpr}.set(${ref}, ${valueExpr});`];
+    return [`${stackExpr}.set(${ref}, (double)(${valueExpr}));`];
+  }
   if (node.opcode === "variable.set") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const type = node.fields?.varType || "int";
@@ -439,6 +490,11 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (!slotNodeId) return null;
   const node = nodes.find(n => n.id === slotNodeId);
   if (!node) return null;
+  const _bdef = blockDefRegistry.get(node.opcode);
+  if (_bdef && !_bdef.codegen?.handler) {
+    const result = resolveFromDef(_bdef, node, nodes, methodKey);
+    if (result !== null) return result;
+  }
   if (node.opcode === "entity.event" || node.opcode === "entity.target") return resolveEntityVar(node.opcode, methodKey);
   if (node.opcode === "number.literal") return node.fields?.value ?? "0";
   if (node.opcode === "number.math") {
@@ -453,6 +509,12 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (node.opcode === "text.literal") return node.fields?.value ?? "";
   if (node.opcode === "logic.true") return "true";
   if (node.opcode === "logic.false") return "false";
+  if (node.opcode === "logic.compare") {
+    const a = resolveSlotValue(node.slots?.a, nodes, methodKey) ?? "0";
+    const b = resolveSlotValue(node.slots?.b, nodes, methodKey) ?? "0";
+    const op = node.fields?.op || "==";
+    return `((double)(${a})${op}(double)(${b}))`;
+  }
   if (node.opcode === "entity.is_crouching") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     return `(${ent}.isCrouching())`;
@@ -471,7 +533,7 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     if (node.opcode === "entity.cam_y") return `(${ent}.getY() + ${ent}.getEyeHeight() + ${ent}.getLookAngle().normalize().y * (double)(${dist}))`;
     if (node.opcode === "entity.cam_z") return `(${ent}.getZ() + ${ent}.getLookAngle().normalize().z * (double)(${dist}))`;
   }
-  if (node.opcode.startsWith("vector.normalize_")) {
+  if (node.opcode === "vector.normalize" || node.opcode.startsWith("vector.normalize_")) {
     const x1 = resolveSlotValue(node.slots?.x1, nodes, methodKey) ?? "0";
     const y1 = resolveSlotValue(node.slots?.y1, nodes, methodKey) ?? "0";
     const z1 = resolveSlotValue(node.slots?.z1, nodes, methodKey) ?? "0";
@@ -483,9 +545,10 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     const dz = `((double)(${z2})-(double)(${z1}))`;
     const len = `Math.sqrt(${dx}*${dx}+${dy}*${dy}+${dz}*${dz})`;
     const safe = `(${len} > 0.001 ? ${len} : 1.0)`;
-    if (node.opcode === "vector.normalize_x") return `(${dx} / ${safe})`;
-    if (node.opcode === "vector.normalize_y") return `(${dy} / ${safe})`;
-    if (node.opcode === "vector.normalize_z") return `(${dz} / ${safe})`;
+    const axis = node.opcode === "vector.normalize" ? (node.fields?.axis || "x") : node.opcode.replace("vector.normalize_", "");
+    if (axis === "x") return `(${dx} / ${safe})`;
+    if (axis === "y") return `(${dy} / ${safe})`;
+    if (axis === "z") return `(${dz} / ${safe})`;
   }
   if (node.opcode.startsWith("entity.look_")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -499,6 +562,21 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (node.opcode === "variable.get") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     return varGetExpr(node.fields?.varName, node.fields?.varType, node.fields?.varDefault, ent);
+  }
+  if (node.opcode === "convert.to_text") {
+    const val = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? "0";
+    return `String.valueOf((double)(${val}))`;
+  }
+  if (node.opcode === "datacomp.get") {
+    const stackExpr = resolveStackExpr(methodKey);
+    if (!stackExpr) return "0";
+    const compName = node.fields?.compName || "my_value";
+    const compType = node.fields?.compType || "double";
+    const constName = "YCS_" + compName.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    const ref = `ModDataComponents.${constName}.get()`;
+    if (compType === "bool") return `(${stackExpr}.getOrDefault(${ref}, false))`;
+    if (compType === "string") return `(${stackExpr}.getOrDefault(${ref}, ""))`;
+    return `(${stackExpr}.getOrDefault(${ref}, 0.0))`;
   }
   if (node.opcode === "attribute.get") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);

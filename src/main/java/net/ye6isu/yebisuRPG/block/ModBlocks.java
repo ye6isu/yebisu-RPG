@@ -29,10 +29,7 @@ public class ModBlocks {
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(2.0F)
                     .sound(SoundType.WOOD)));
-    //Ore Blocks
-    public static final DeferredBlock<Block> YE6ISU_ORE = registerBlock("ye6isu_ore",
-            () -> new DropExperienceBlock(UniformInt.of(2, 4),
-                    BlockBehaviour.Properties.of().strength(3f).requiresCorrectToolForDrops().sound(SoundType.STONE)));
+    //Ore Blocks
 
     //Non-Block Blocks (generated from Crate Block)
     public static final DeferredBlock<StairBlock> CRATE_STAIRS = registerBlock("crate_stairs",
@@ -67,11 +64,6 @@ public class ModBlocks {
     //Blocks from creator
 
     //YCS_Mod_Blocks_START
-
-    public static final DeferredBlock<Block> TEST_BLOCK = registerBlock("test_block",
-                    () -> new Block(BlockBehaviour.Properties.of()
-                                .strength(2f)
-                                .sound(SoundType.GRASS)));
 
 //YCS_Mod_Blocks_END
 

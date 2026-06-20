@@ -173,7 +173,6 @@ export default function KeybindsPage({ reloadMod, onEditingChange, newTrigger, e
   }
 
   return <div style={{ flex: 1, background: C.panel, borderRadius: C.r, overflow: "hidden", padding: "20px 20px 90px", overflowY: "auto" }}>
-    <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>KEYBINDS</div>
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {keybinds.map((k, i) => <div key={k.key}
         draggable

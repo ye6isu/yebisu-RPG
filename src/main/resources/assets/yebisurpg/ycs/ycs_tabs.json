@@ -1,13 +1,6 @@
 {
-  "test_item": "yebisurpg_tab",
   "plank": "yebisurpg_tab",
   "ye6isu": "yebisurpg_tab",
-  "walkman": "yebisurpg_tab",
-  "ye6isu_sword": "yebisurpg_tab",
-  "ye6isu_pickaxe": "yebisurpg_tab",
-  "ye6isu_shovel": "yebisurpg_tab",
-  "ye6isu_axe": "yebisurpg_tab",
-  "ye6isu_hoe": "yebisurpg_tab",
   "plank_helmet": "yebisurpg_tab",
   "plank_chestplate": "yebisurpg_tab",
   "plank_leggings": "yebisurpg_tab",
@@ -15,7 +8,6 @@
   "joe_spawn_egg": "yebisurpg_tab",
   "block:ye6isu_block": "yebisurpg_tab",
   "block:crate_block": "yebisurpg_tab",
-  "block:ye6isu_ore": "yebisurpg_tab",
   "block:crate_stairs": "yebisurpg_tab",
   "block:crate_slab": "yebisurpg_tab",
   "block:crate_pressure_plate": "yebisurpg_tab",
@@ -24,6 +16,5 @@
   "block:crate_fence_gate": "yebisurpg_tab",
   "block:crate_wall": "yebisurpg_tab",
   "block:crate_door": "yebisurpg_tab",
-  "block:crate_trapdoor": "yebisurpg_tab",
-  "block:test_block": "yebisurpg_tab"
+  "block:crate_trapdoor": "yebisurpg_tab"
 }
