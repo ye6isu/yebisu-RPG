@@ -68,10 +68,10 @@ public class ModBlocks {
 
     //YCS_Mod_Blocks_START
 
-    public static final DeferredBlock<Block> YEBISU_CAT = registerBlock("yebisu_cat",
+    public static final DeferredBlock<Block> TEST_BLOCK = registerBlock("test_block",
                     () -> new Block(BlockBehaviour.Properties.of()
                                 .strength(2f)
-                                .sound(SoundType.WOOD)));
+                                .sound(SoundType.GRASS)));
 
 //YCS_Mod_Blocks_END
 

@@ -71,8 +71,8 @@ public class ModItems {
 
     //YCS_Mod_Items_START
 
-    public static final DeferredItem<Item> NORBIT_THE_ORBIT = ITEMS.register("norbit_the_orbit",
-                () -> new NorbitTheOrbitItem(new Item.Properties()));
+    public static final DeferredItem<Item> TEST_ITEM = ITEMS.register("test_item",
+                () -> new TestItemItem(new Item.Properties().stacksTo(1)));
 
     //YCS_Mod_Items_END
 

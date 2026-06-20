@@ -2,13 +2,13 @@
   {
     "id": "test_effect",
     "constName": "TEST_EFFECT",
-    "titleText": "test",
+    "titleText": "Test Effect",
     "category": "NEUTRAL",
-    "color": 5460048,
+    "color": 11101798,
     "hasTexture": true,
-    "textureId": "orb",
+    "textureId": "export",
     "textureAnimated": true,
-    "textureFrametime": 2,
+    "textureFrametime": 1,
     "enabledMethods": [],
     "methodBlocks": {}
   }

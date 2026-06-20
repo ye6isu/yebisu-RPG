@@ -34,10 +34,6 @@ public class ModBlockTagProvider extends BlockTagsProvider {
         tag(BlockTags.BUTTONS).add(ModBlocks.CRATE_BUTTON.get());
         tag(BlockTags.PRESSURE_PLATES).add(ModBlocks.CRATE_PRESSURE_PLATE.get());
 
-
-
-
-
         //YCS_Mod_Block_Tags_START
 
         //YCS_Mod_Block_Tags_END

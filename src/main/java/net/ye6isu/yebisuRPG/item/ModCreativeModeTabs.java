@@ -17,7 +17,7 @@ public class ModCreativeModeTabs {
     //YCS_Mod_Creative_Tabs_START
 
     public static final Supplier<CreativeModeTab> YEBISURPG_TAB = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("yebisurpg_tab", () -> CreativeModeTab.builder()
-            .icon(() -> new ItemStack(ModBlocks.CRATE_BLOCK.get()))
+            .icon(() -> new ItemStack(ModItems.TEST_ITEM.get()))
             .title(Component.translatable("creativetab.yebisurpg.yebisurpg_tab"))
             .build());
 

@@ -64,8 +64,6 @@ public final class ModKeybinds {
 
     //YCS_Mod_Keybinds_START
 
-    public static final KeyMapping TEST_BIND = bind("test_bind", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KeyModifier.ALT, CATEGORY);
-
     //YCS_Mod_Keybinds_END
 
     // ---------------------------------------------------------------------------------
@@ -84,8 +82,6 @@ public final class ModKeybinds {
         event.register(OPEN_HAND_DEBUG);
 
         //YCS_Mod_Keybinds_Register_START
-
-        event.register(TEST_BIND);
 
         //YCS_Mod_Keybinds_Register_END
     }

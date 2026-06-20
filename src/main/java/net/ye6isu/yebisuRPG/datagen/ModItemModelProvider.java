@@ -97,28 +97,19 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/test_utem"),TEXTURE);
 
-        getBuilder(ModBlocks.YEBISU_CAT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/yebisu_cat"));
-
         basicItem(ModItems.PLANK.get());
 
-        basicItem(ModItems.YE6ISU.get());
-
         basicItem(ModItems.WALKMAN.get());
-
-        basicItem(ModItems.YE6ISU_SWORD.get());
-
-        basicItem(ModItems.YE6ISU_PICKAXE.get());
-
-        basicItem(ModItems.YE6ISU_SHOVEL.get());
-
-        basicItem(ModItems.YE6ISU_AXE.get());
-
-        basicItem(ModItems.YE6ISU_HOE.get());
 
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/spirit"),TEXTURE);
 
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
-        getBuilder(ModItems.NORBIT_THE_ORBIT.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","yebisurpg:item/norbit_the_orbit");
+
+        basicItem(ModItems.YE6ISU.get());
+
+        handheldItem(ModItems.TEST_ITEM);
+
+        getBuilder(ModBlocks.TEST_BLOCK.getId().getPath()).parent(new ModelFile.UncheckedModelFile("yebisurpg:block/test_block"));
 
         //YCS_Mod_Item_Model_END
     }
