@@ -298,6 +298,13 @@ function PaletteSidebar({palette}){
             </div>
             {actOpen&&actions.map(b=><PaletteBlock key={b.opcode} b={b}/>)}
           </>}
+          {(cat.actionSubs||[]).map(as=>{const asKey=cat.category+"_"+as.label;const asOpen=!subCollapsed[asKey];return<div key={asKey}>
+            <div onClick={()=>toggleSub(asKey)} style={{padding:"4px 14px 4px 28px",background:"#131315",borderBottom:"1px solid #181818",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:10,color:C.dim,fontFamily:"monospace",letterSpacing:0.5}}>{as.label.toUpperCase()}</span>
+              <span style={{fontSize:9,color:C.faint,fontFamily:"monospace"}}>{asOpen?"▾":"▸"}</span>
+            </div>
+            {asOpen&&as.blocks.map(b=><PaletteBlock key={b.opcode} b={b}/>)}
+          </div>;})}
         </>}
       </div>;
     })}
@@ -353,6 +360,39 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
   const canvasRef=useRef();
   const ip=useRef(false),ps=useRef(null),dn=useRef(null);
   useEffect(()=>{F("methodBlocks",{...(form.methodBlocks||{}),[methodKey]:nodes});},[nodes]);
+  const measuredRef = useRef({});
+  function getInlineH(nodeId, ns) {
+    if (!nodeId) return 0;
+    const n = ns.find(x => x.id === nodeId);
+    if (!n) return 0;
+    const bd = blockDefRegistry.get(n.opcode);
+    if (!bd || !n.fields?.multiline) return 0;
+    const allL = [bd.label || "", ...(bd.shapeSlots ? [bd.shapeSlots[n.fields?.shape] || ""] : []), bd.suffixLabel || ""].join(" ");
+    const slotCount = (allL.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
+    if (slotCount <= 1) return 0;
+    return slotCount * 40;
+  }
+  function getActionH(n, ns) {
+      const measured = measuredRef.current[n.id];
+      if (measured && measured > 50) return measured;
+      const bd = blockDefRegistry.get(n.opcode);
+      let base = 50;
+      if ((n.fields?.multiline || bd?.multiline) && bd) {
+        const allL = [bd.label || "", ...(bd.shapeSlots ? [bd.shapeSlots[n.fields?.shape] || ""] : []), bd.suffixLabel || ""].join(" ");
+        const sc = (allL.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
+        base = Math.max(50, sc * 50);
+      }
+      if (bd && n.slots && ns) {
+        const allL = [bd.label || "", ...(bd.shapeSlots ? Object.values(bd.shapeSlots) : []), bd.suffixLabel || ""].join(" ");
+        const slotKeys = (allL.match(/\[(\w+):(entity|number|text|logic|itemstack)\]/g) || []).map(t => t.match(/\[(\w+):/)[1]);
+        let maxChildH = 0;
+        for (const sk of slotKeys) {
+          if (n.slots[sk]) maxChildH = Math.max(maxChildH, getInlineH(n.slots[sk], ns));
+        }
+        if (maxChildH > 0) base = Math.max(base, maxChildH + 20);
+      }
+      return base;
+  }
   const recalcLayout = (nodes) => {
     let nextNs = nodes.map(n => ({...n}));
     const roots = nextNs.filter(n => n.id === "start" || (!nextNs.some(p => p.nextId === n.id || (p.slots && Object.values(p.slots).includes(n.id)))));
@@ -385,7 +425,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            let _hdrH = 50;
            if ((n.fields?.multiline || _bd?.multiline) && _bd) {
              const _allL = [_bd.label||"",...(_bd.shapeSlots?[_bd.shapeSlots[n.fields?.shape]||""]:[]),_bd.suffixLabel||""].join(" ");
-             const _sc = (_allL.match(/\[\w+:\w+[.\w]*\]/g)||[]).filter(t=>t.match(/:(entity|number|text|logic)\]/)).length;
+             const _sc = (_allL.match(/\[\w+:\w+[.\w]*\]/g)||[]).filter(t=>t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
              _hdrH = Math.max(50, _sc * 50);
            }
            let d0h = Math.max(0, getH(n.slots?.do0));
@@ -394,7 +434,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            h += ih;
            n.height = ih;
         } else {
-           h += 50;
+           h += getActionH(n, nextNs);
         }
         cur = n.nextId;
       }
@@ -428,7 +468,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            let _hdrH2 = 50;
            if ((n.fields?.multiline || _bd2?.multiline) && _bd2) {
              const _allL2 = [_bd2.label||"",...(_bd2.shapeSlots?[_bd2.shapeSlots[n.fields?.shape]||""]:[]),_bd2.suffixLabel||""].join(" ");
-             const _sc2 = (_allL2.match(/\[\w+:\w+[.\w]*\]/g)||[]).filter(t=>t.match(/:(entity|number|text|logic)\]/)).length;
+             const _sc2 = (_allL2.match(/\[\w+:\w+[.\w]*\]/g)||[]).filter(t=>t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
              _hdrH2 = Math.max(50, _sc2 * 50);
            }
            let innerY = cy + _hdrH2;
@@ -436,7 +476,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            innerY += Math.max(0, getH(n.slots?.do0));
            cy = innerY;
         } else {
-           cy += 50;
+           cy += getActionH(n, nextNs);
         }
         cur = n.nextId;
       }
@@ -448,6 +488,25 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
     return nextNs;
   };
   const upd=fn=>setNodes(prev => recalcLayout(fn(prev)));
+  useEffect(() => {
+    let changed = false;
+    const newMeasured = {};
+    for (const n of nodes) {
+      if (!n.isAction && n.opcode !== "start") continue;
+      const _hasBody = n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || blockDefRegistry.get(n.opcode)?.body;
+      if (_hasBody) continue;
+      const el = document.getElementById("node-" + n.id);
+      if (!el) continue;
+      const domH = el.offsetHeight;
+      newMeasured[n.id] = domH;
+      const prev = measuredRef.current[n.id] || 50;
+      if (Math.abs(domH - prev) > 5) changed = true;
+    }
+    if (changed) {
+      measuredRef.current = newMeasured;
+      setNodes(ns => recalcLayout(ns));
+    }
+  });
   const SLOT_DEFAULTS={entity:{opcode:"entity.event",linkType:LINK_ENTITY,fields:{}},number:{opcode:"number.literal",linkType:LINK_NUMBER,fields:{value:"0"}},text:{opcode:"text.literal",linkType:LINK_TEXT,fields:{value:""}}};
   const add=(bd,x,y)=>{
     const id=bd.opcode+"_"+Date.now();
@@ -598,9 +657,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
              for(const n of nextNs){
                  if(n.id===dragged.id || getDescendants(dragged.id, nextNs).includes(n.id)) continue;
                  if(n.isAction||n.id==="start"){
-                     let h = 50;
                      const _hasBody = n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || blockDefRegistry.get(n.opcode)?.body;
-                     if (_hasBody) h = n.height || 50;
+                     let h = _hasBody ? (n.height || 50) : getActionH(n, nextNs);
                      if(!_hasBody){
                        let snb={x:n.x+20,y:n.y+h};
                        let d=Math.hypot(mx-snb.x,my-snb.y);
@@ -828,7 +886,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
        :node.opcode==="entity.look_client_y"?"Get Look Direction Y (Client) of"
        :node.opcode==="entity.look_client_z"?"Get Look Direction Z (Client) of"
        :node.opcode==="logic.compare"?null
-       :node.opcode==="entity.is_crouching"?"Is Crouching?"
+       :node.opcode==="entity.is_crouching"?null
        :node.opcode==="logic.true"?"True"
        :node.opcode==="logic.false"?"False"
        :node.opcode==="variable.get"?null
@@ -920,7 +978,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {!_useGeneric && isIf && <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>}
       {!_useGeneric && <span style={{fontFamily:"sans-serif",fontSize:16,lineHeight:"20px",color:isSt?"#38bdf8":"#fff",fontWeight:700,whiteSpace:"nowrap"}}>
         {isSt?"Start: "+(ITEM_METHODS.find(m=>m.key===methodKey)?.label||methodKey)
-         :node.opcode==="effect.apply"?"Add Effect to"
+         :node.opcode==="effect.apply"?"Add Effect"
          :node.opcode==="control.if"?"If"
          :node.opcode==="control.delay"?"Delay"
          :node.opcode==="aoe.each.sphere"?"For Each in Sphere"
@@ -928,20 +986,20 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
          :node.opcode==="aoe.each.cone"?"For Each in Cone"
          :node.opcode==="aoe.each.line"?"For Each in Line"
          :node.opcode==="aoe.iterator.entity"?"Iterator Entity"
-         :node.opcode==="anim.firstperson.play"?"Play FP Anim"
-         :node.opcode==="anim.firstperson.stop"?"Stop FP Anim on"
-         :node.opcode==="anim.firstperson.pause"?"Pause FP Anim on"
-         :node.opcode==="anim.firstperson.resume"?"Resume FP Anim on"
-         :node.opcode==="anim.thirdperson.play"?"Play TP Anim"
-         :node.opcode==="anim.thirdperson.stop"?"Stop TP Anim on"
-         :node.opcode==="anim.thirdperson.pause"?"Pause TP Anim on"
-         :node.opcode==="anim.thirdperson.resume"?"Resume TP Anim on"
-         :node.opcode==="anim.handpose.set"?"Set FP Hand Pose"
-         :node.opcode==="anim.handpose.reset"?"Reset FP Hand Pose on"
-         :node.opcode==="anim.tppose.set"?"Set TP Pose"
-         :node.opcode==="anim.tppose.reset"?"Reset TP Pose on"
+         :node.opcode==="anim.firstperson.play"?"Play First Person Animation"
+         :node.opcode==="anim.firstperson.stop"?"Stop First Person Animation for"
+         :node.opcode==="anim.firstperson.pause"?"Pause First Person Animation for"
+         :node.opcode==="anim.firstperson.resume"?"Resume First Person Animation for"
+         :node.opcode==="anim.thirdperson.play"?"Play Third Person Animation"
+         :node.opcode==="anim.thirdperson.stop"?"Stop Third Person Animation for"
+         :node.opcode==="anim.thirdperson.pause"?"Pause Third Person Animation for"
+         :node.opcode==="anim.thirdperson.resume"?"Resume Third Person Animation for"
+         :node.opcode==="anim.handpose.set"?"Set First Person Hand Pose"
+         :node.opcode==="anim.handpose.reset"?"Reset First Person Hand Pose for"
+         :node.opcode==="anim.tppose.set"?"Set Third Person Pose"
+         :node.opcode==="anim.tppose.reset"?"Reset Third Person Pose for"
          :node.opcode==="variable.set"?"Set Variable "
-         :node.opcode==="entity.apply_motion"?"Apply Motion to"
+         :node.opcode==="entity.apply_motion"?"Add Velocity"
          :node.opcode==="attribute.modifier.add"?"Set Attribute Modifier "
          :node.opcode==="attribute.modifier.remove"?"Remove Attribute Modifier "
          :node.opcode==="attribute.base.reset"?"Reset Attribute Base "
@@ -957,33 +1015,36 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>ticks</span>
       </>}
       {!_useGeneric && node.opcode==="effect.apply"&&<>
-          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <EffectDropdown nodeId={node.id} value={node.fields?.effect} onChange={v=>onFieldChange&&onFieldChange(node.id,"effect",v)}/>
-          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Duration</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>to</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>duration</span>
           <SlotConn sk="duration" sc="rgba(0,0,0,0.3)" connId={node.slots?.duration} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Level</span>
+          <span style={{fontSize:16,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>level</span>
           <SlotConn sk="level" sc="rgba(0,0,0,0.3)" connId={node.slots?.level} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!_useGeneric && node.opcode==="entity.apply_motion"&&<>
-          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>X</span>
           <SlotConn sk="x" sc="rgba(0,0,0,0.3)" connId={node.slots?.x} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Y</span>
           <SlotConn sk="y" sc="rgba(0,0,0,0.3)" connId={node.slots?.y} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>Z</span>
           <SlotConn sk="z" sc="rgba(0,0,0,0.3)" connId={node.slots?.z} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>to</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <PortalSelect value={node.fields?.mode||"add"} onChange={v=>onFieldChange&&onFieldChange(node.id,"mode",v)} minWidth={120} options={[
             {value:"add",label:"Add (impulse)"},{value:"set",label:"Set (override)"},
           ]}/>
       </>}
       {!_useGeneric && isAnimPlay&&<>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
-          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>speed</span>
           <SlotConn sk="playbackSpeed" sc="rgba(0,0,0,0.3)" connId={node.slots?.playbackSpeed} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!_useGeneric && isAnimStop&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -997,12 +1058,12 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {!_useGeneric && isAnimTPPlay&&<>
           <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
-          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>speed</span>
           <SlotConn sk="playbackSpeed" sc="rgba(0,0,0,0.3)" connId={node.slots?.playbackSpeed} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from file</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!_useGeneric && isAnimTPStop&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -1016,10 +1077,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {!_useGeneric && isHandPoseSet&&<>
           <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
-          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!_useGeneric && isHandPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -1027,10 +1088,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {!_useGeneric && isTPPoseSet&&<>
           <span ref={settingsAnchorRef} style={{cursor:"pointer",opacity:0.6,fontSize:14}} onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation();setShowSettings(s=>!s)}}>⚙</span>
           <SlotConn sk="animName" sc="rgba(0,0,0,0.3)" connId={node.slots?.animName} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
-          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
-          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>from</span>
           <SlotConn sk="filePath" sc="rgba(0,0,0,0.3)" connId={node.slots?.filePath} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+          <span style={{fontSize:14,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>for</span>
+          <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
       </>}
       {!_useGeneric && isTPPoseReset&&<>
           <SlotConn sk="entity" sc="rgba(0,0,0,0.3)" connId={node.slots?.entity} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
@@ -1168,7 +1229,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       let _headerH = 50;
       if (_isMultiline && _bdef) {
         const _allLabel = [_bdef.label || "", ...(_bdef.shapeSlots ? [_bdef.shapeSlots[node.fields?.shape] || ""] : []), _bdef.suffixLabel || ""].join(" ");
-        const _slotCount = (_allLabel.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic)\]/)).length;
+        const _slotCount = (_allLabel.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
         _headerH = Math.max(50, _slotCount * 50);
       }
       return (
@@ -1192,6 +1253,11 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       
       {isVal ? valContent : commonHeader}
       {_useGeneric && !isHandPoseSet && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
+      {!_useGeneric && showSettings&&node.opcode==="effect.apply"&&<SettingsPortal open={showSettings} onClose={()=>setShowSettings(false)} anchorRef={settingsAnchorRef}>
+          <label style={{display:"flex",alignItems:"center",gap:6,color:"#ccc",fontSize:12,cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",node.fields?.showParticles===false);}}>
+            <input type="checkbox" checked={node.fields?.showParticles!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+            Show Particles</label>
+      </SettingsPortal>}
       {!_useGeneric && showSettings&&node.opcode==="chat.send"&&<SettingsPortal open={showSettings} onClose={()=>setShowSettings(false)} anchorRef={settingsAnchorRef}>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             <div style={{color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",background:"#2a2a2a",padding:"4px 10px",borderRadius:4}} onClick={()=>onFieldChange&&onFieldChange(node.id,"textCount",(node.fields?.textCount||1)+1)}>+ Text</div>

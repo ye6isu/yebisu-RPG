@@ -46,13 +46,870 @@ export const BLOCK_DEFS = [
     },
   },
   {
-    opcode: "aoe.iterator.entity",
+    opcode: "entity.is_crouching",
     category: "Entity", sub: "data",
-    linkType: "entity",
-    label: "Iterator Entity",
-    hint: "Current entity in a For Each Entity loop",
-    color: "#30e1b9",
-    codegen: { type: "value", expr: "_iterEnt" },
+    linkType: "logic",
+    label: "Is [entity:entity] Crouching?",
+    hint: "True if the entity is crouching/sneaking",
+    color: "#6494a4",
+    codegen: {
+      type: "value",
+      expr: "({{entity}}.isCrouching())",
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "entity.position",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    paletteLabel: "Position",
+    label: "Get [axis:dropdown] Position of [entity:entity]",
+    hint: "Get X, Y, or Z position of an entity",
+    color: "#4d65b4",
+    transparent: true,
+    fields: {
+      axis: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "x", label: "X" },
+          { value: "y", label: "Y" },
+          { value: "z", label: "Z" },
+        ],
+        default: "x",
+      },
+    },
+    codegen: {
+      type: "value",
+      variants: {
+        "axis == 'x'": { expr: "({{entity}}.getX())" },
+        "axis == 'y'": { expr: "({{entity}}.getY())" },
+        "axis == 'z'": { expr: "({{entity}}.getZ())" },
+      },
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "entity.position_offset",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    paletteLabel: "Position Offset",
+    label: "Get [axis:dropdown] Position offset by [distance:number] from [entity:entity]",
+    hint: "Get position offset along look direction from entity",
+    color: "#4d65b4",
+    transparent: true,
+    fields: {
+      axis: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "x", label: "X" },
+          { value: "y", label: "Y" },
+          { value: "z", label: "Z" },
+        ],
+        default: "x",
+      },
+    },
+    codegen: {
+      type: "value",
+      variants: {
+        "axis == 'x'": { expr: "({{entity}}.getX() + {{entity}}.getLookAngle().normalize().x * (double)({{distance}}))" },
+        "axis == 'y'": { expr: "({{entity}}.getY() + {{entity}}.getEyeHeight() + {{entity}}.getLookAngle().normalize().y * (double)({{distance}}))" },
+        "axis == 'z'": { expr: "({{entity}}.getZ() + {{entity}}.getLookAngle().normalize().z * (double)({{distance}}))" },
+      },
+      slotDefaults: {
+        distance: { opcode: "number.literal", fields: { value: "0" } },
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+  {
+    opcode: "entity.look_dir",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    paletteLabel: "Look Direction",
+    label: "Get [axis:dropdown] Look Direction of [entity:entity]",
+    hint: "Get X, Y, or Z component of look direction (server)",
+    color: "#4d65b4",
+    transparent: true,
+    fields: {
+      axis: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "x", label: "X" },
+          { value: "y", label: "Y" },
+          { value: "z", label: "Z" },
+        ],
+        default: "x",
+      },
+    },
+    codegen: {
+      type: "value",
+      variants: {
+        "axis == 'x'": { expr: "({{entity}}.getLookAngle().x)" },
+        "axis == 'y'": { expr: "({{entity}}.getLookAngle().y)" },
+        "axis == 'z'": { expr: "({{entity}}.getLookAngle().z)" },
+      },
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "vector.normalize",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    paletteLabel: "Direction",
+    label: "Get Normalized Direction [axis:dropdown] from x1 [x1:number] y1 [y1:number] z1 [z1:number] to x2 [x2:number] y2 [y2:number] z2 [z2:number]",
+    hint: "Component of normalized direction vector from point A to point B",
+    color: "#4d65b4",
+    transparent: true,
+    fields: {
+      axis: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "x", label: "X" },
+          { value: "y", label: "Y" },
+          { value: "z", label: "Z" },
+        ],
+        default: "x",
+      },
+      multiline: { type: "hidden", default: false },
+    },
+    settings: {
+      multiline: { type: "checkbox", label: "New Line per Link", default: false },
+    },
+    codegen: {
+      type: "value",
+      slotDefaults: {
+        x1: { opcode: "number.literal", fields: { value: "0" } },
+        y1: { opcode: "number.literal", fields: { value: "0" } },
+        z1: { opcode: "number.literal", fields: { value: "0" } },
+        x2: { opcode: "number.literal", fields: { value: "0" } },
+        y2: { opcode: "number.literal", fields: { value: "0" } },
+        z2: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ENTITY — Actions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "effect.apply",
+    category: "Entity", sub: "actions",
+    isAction: true,
+    label: "Add Effect [effect:dropdown.effects] to [entity:entity] with duration [duration:number] with level [level:number]",
+    hint: "Apply a potion effect",
+    color: "#c46c94",
+    settings: {
+      showParticles: { type: "checkbox", label: "Show Particles", default: true },
+    },
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance({{effect}}, (int)({{duration}}), Math.max(0,(int)({{level}})-1), false, {{showParticles}})); }",
+      imports: [
+        "net.minecraft.world.entity.LivingEntity",
+        "net.minecraft.world.effect.MobEffectInstance",
+        "net.minecraft.world.effect.MobEffects",
+      ],
+      conditionalImports: {
+        "effect contains 'ModEffects.'": ["net.ye6isu.yebisuRPG.effect.ModEffects"],
+      },
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        duration: { opcode: "number.literal", fields: { value: "0" } },
+        level: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+    fields: {
+      effect: { type: "dropdown", source: "effects", default: "MobEffects.REGENERATION" },
+      showParticles: { type: "hidden", default: true },
+    },
+  },
+  {
+    opcode: "entity.apply_motion",
+    category: "Entity", sub: "actions",
+    isAction: true,
+    label: "Add Velocity X [x:number] Y [y:number] Z [z:number] to [entity:entity] [mode:dropdown]",
+    hint: "Add velocity to an entity (X/Y/Z). Set mode: add=impulse, set=override velocity.",
+    color: "#c46c94",
+    fields: {
+      mode: {
+        type: "dropdown",
+        options: [
+          { value: "add", label: "Add (impulse)" },
+          { value: "set", label: "Set (override)" },
+        ],
+        default: "add",
+      },
+    },
+    codegen: {
+      type: "action",
+      variants: {
+        "mode == 'set'": { template: "{{entity}}.setDeltaMovement((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
+        "mode == 'add'": { template: "{{entity}}.push((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
+      },
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        x: { opcode: "number.literal", fields: { value: "0" } },
+        y: { opcode: "number.literal", fields: { value: "0" } },
+        z: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PLAYER — First Person Animations (Actions)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "anim.firstperson.play",
+    category: "Player", sub: "First Person Animations",
+    isAction: true,
+    label: "Play First Person Animation [animName:text] speed [playbackSpeed:number] from file [filePath:text] for [entity:entity]",
+    hint: "Play first person animation for entity with playback speed from file",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _ae && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(_ae,\n        AnimationCategory.ENTITY,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}});\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: {
+        animName: { opcode: "text.literal", fields: { value: "" } },
+        entity: { opcode: "entity.event" },
+        playbackSpeed: { opcode: "number.literal", fields: { value: "0" } },
+        filePath: { opcode: "text.literal", fields: { value: "" } },
+      },
+    },
+  },
+  {
+    opcode: "anim.firstperson.stop",
+    category: "Player", sub: "First Person Animations",
+    isAction: true,
+    label: "Stop First Person Animation for [entity:entity]",
+    hint: "Stop any playing first-person animation on an entity",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _se && !level.isClientSide()) {\n    AnimationAPI.stopFirstPersonAnimation(_se);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "anim.firstperson.pause",
+    category: "Player", sub: "First Person Animations",
+    isAction: true,
+    label: "Pause First Person Animation for [entity:entity]",
+    hint: "Freeze the playing first-person animation at its current position",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _pe && !level.isClientSide()) {\n    AnimationAPI.pauseAnimation(_pe,\n        AnimationCategory.ENTITY);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "anim.firstperson.resume",
+    category: "Player", sub: "First Person Animations",
+    isAction: true,
+    label: "Resume First Person Animation for [entity:entity]",
+    hint: "Resume a paused first-person animation",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _re && !level.isClientSide()) {\n    AnimationAPI.resumeAnimation(_re,\n        AnimationCategory.ENTITY);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "anim.handpose.set",
+    category: "Player", sub: "First Person Animations",
+    isAction: true,
+    label: "Set First Person Hand Pose [animName:text] from [filePath:text] for [entity:entity]",
+    hint: "Set first person hand pose",
+    color: "#3a5c3a",
+    settings: {
+      allowVanillaActions: { type: "checkbox", label: "Allow Vanilla Actions", default: false },
+    },
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _hp && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(_hp,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, false);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: {
+        animName: { opcode: "text.literal", fields: { value: "" } },
+        entity: { opcode: "entity.event" },
+        filePath: { opcode: "text.literal", fields: { value: "" } },
+      },
+    },
+  },
+  {
+    opcode: "anim.handpose.reset",
+    category: "Player", sub: "First Person Animations",
+    isAction: true,
+    label: "Reset First Person Hand Pose for [entity:entity]",
+    hint: "Reset first person hand pose to vanilla default",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _hr && !level.isClientSide()) {\n    AnimationAPI.resetFirstPersonHandPose(_hr);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PLAYER — Third Person Animations (Actions)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "anim.thirdperson.play",
+    category: "Player", sub: "Third Person Animations",
+    isAction: true,
+    label: "Play Third Person Animation [animName:text] speed [playbackSpeed:number] from file [filePath:text] for [entity:entity]",
+    hint: "Play third person animation for entity with playback speed from file",
+    color: "#3a5c3a",
+    settings: {
+      lookAtMask: { type: "hidden", default: 0 },
+      vanillaMask: { type: "hidden", default: 0 },
+      vanillaMoveMask: { type: "hidden", default: 0 },
+      fpViewMask: { type: "hidden", default: 0 },
+    },
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _tpa && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(_tpa,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{fpViewMask}});\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: {
+        animName: { opcode: "text.literal", fields: { value: "" } },
+        entity: { opcode: "entity.event" },
+        playbackSpeed: { opcode: "number.literal", fields: { value: "0" } },
+        filePath: { opcode: "text.literal", fields: { value: "" } },
+      },
+    },
+  },
+  {
+    opcode: "anim.thirdperson.stop",
+    category: "Player", sub: "Third Person Animations",
+    isAction: true,
+    label: "Stop Third Person Animation for [entity:entity]",
+    hint: "Stop any playing third-person animation on an entity",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _tps && !level.isClientSide()) {\n    AnimationAPI.stopThirdPersonAnimation(_tps);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "anim.thirdperson.pause",
+    category: "Player", sub: "Third Person Animations",
+    isAction: true,
+    label: "Pause Third Person Animation for [entity:entity]",
+    hint: "Freeze the playing third-person animation at its current position",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _tpp && !level.isClientSide()) {\n    AnimationAPI.pauseThirdPersonAnimation(_tpp);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "anim.thirdperson.resume",
+    category: "Player", sub: "Third Person Animations",
+    isAction: true,
+    label: "Resume Third Person Animation for [entity:entity]",
+    hint: "Resume a paused third-person animation",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _tpr && !level.isClientSide()) {\n    AnimationAPI.resumeThirdPersonAnimation(_tpr);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "anim.tppose.set",
+    category: "Player", sub: "Third Person Animations",
+    isAction: true,
+    label: "Set Third Person Pose [animName:text] from [filePath:text] for [entity:entity]",
+    hint: "Set third person pose",
+    color: "#3a5c3a",
+    settings: {
+      lookAtMask: { type: "hidden", default: 0 },
+      vanillaMask: { type: "hidden", default: 0 },
+      vanillaMoveMask: { type: "hidden", default: 0 },
+      allowActionsMask: { type: "hidden", default: 0 },
+      keepPosScaleMask: { type: "hidden", default: 0 },
+      fpViewMask: { type: "hidden", default: 0 },
+    },
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _tps && !level.isClientSide()) {\n    AnimationAPI.setThirdPersonPose(_tps,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{allowActionsMask}}, {{keepPosScaleMask}}, {{fpViewMask}});\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: {
+        animName: { opcode: "text.literal", fields: { value: "" } },
+        entity: { opcode: "entity.event" },
+        filePath: { opcode: "text.literal", fields: { value: "" } },
+      },
+    },
+  },
+  {
+    opcode: "anim.tppose.reset",
+    category: "Player", sub: "Third Person Animations",
+    isAction: true,
+    label: "Reset Third Person Pose for [entity:entity]",
+    hint: "Reset third person pose to vanilla default",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Entity _tpr && !level.isClientSide()) {\n    AnimationAPI.resetThirdPersonPose(_tpr);\n}",
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DATA — Variables, Attributes, Data Components
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "variable.get",
+    category: "Data", sub: "data",
+    linkType: "number",
+    paletteLabel: "Get Variable",
+    label: "Get Variable [varName:dropdown.variables] for [entity:entity]",
+    hint: "Get a declared variable for entity — pick the variable inline on the canvas",
+    color: "#4d65b4",
+    dynamicLinkType: {
+      field: "varType",
+      map: { bool: "logic", string: "text", "*": "number" },
+    },
+    codegen: {
+      type: "value",
+      handler: "variable.get",
+      imports: [
+        "net.ye6isu.yebisuRPG.data.EntityVarCapability",
+        "net.ye6isu.yebisuRPG.data.EntityVar",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "variable.set",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Variable",
+    label: "Set Variable [varName:dropdown.variables] to [value:number] for [entity:entity]",
+    hint: "Set a declared variable for entity — pick the variable inline on the canvas",
+    color: "#4d65b4",
+    dynamicAccepts: {
+      value: { field: "varType", map: { bool: "logic", string: "text", "*": "number" } },
+    },
+    codegen: {
+      type: "action",
+      handler: "variable.set",
+      imports: [
+        "net.ye6isu.yebisuRPG.data.EntityVarCapability",
+        "net.ye6isu.yebisuRPG.data.EntityVar",
+      ],
+      slotDefaults: {
+        value: { opcode: "number.literal", fields: { value: "0" } },
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+  {
+    opcode: "attribute.get",
+    category: "Data", sub: "data",
+    linkType: "number",
+    paletteLabel: "Get Attribute",
+    label: "Get Attribute [attrId:dropdown.attributes] [layer:dropdown] for [entity:entity]",
+    hint: "Read an attribute value (total / base / bonus) for entity",
+    color: "#4d65b4",
+    fields: {
+      layer: {
+        type: "dropdown",
+        options: [
+          { value: "total", label: "Total" },
+          { value: "base", label: "Base" },
+          { value: "bonus", label: "Bonus (Total − Base)" },
+        ],
+        default: "total",
+      },
+    },
+    codegen: {
+      type: "value",
+      handler: "attribute.get",
+      imports: [
+        "net.minecraft.world.entity.ai.attributes.Attributes",
+        "net.minecraft.world.entity.LivingEntity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "attribute.modifier.add",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Attribute Modifier",
+    label: "Set Attribute Modifier [attrId:dropdown.attributes] [operation:dropdown] [modifierName:input.text] to [value:number] for [entity:entity]",
+    hint: "Add a named modifier to an attribute on entity",
+    color: "#4d65b4",
+    fields: {
+      operation: {
+        type: "dropdown",
+        options: [
+          { value: "flat", label: "Flat Bonus" },
+          { value: "multiply", label: "% Multiplier" },
+          { value: "base_set", label: "Set Base" },
+        ],
+        default: "flat",
+      },
+      modifierName: { type: "input", inputType: "text", default: "", showIf: "operation != 'base_set'" },
+    },
+    dynamicAccepts: {
+      value: { field: "operation", map: { "*": "number" } },
+    },
+    codegen: {
+      type: "action",
+      handler: "attribute.modifier.add",
+      imports: [
+        "net.minecraft.world.entity.ai.attributes.Attributes",
+        "net.minecraft.world.entity.ai.attributes.AttributeModifier",
+        "net.minecraft.resources.ResourceLocation",
+        "net.minecraft.world.entity.LivingEntity",
+      ],
+      slotDefaults: {
+        value: { opcode: "number.literal", fields: { value: "0" } },
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+  {
+    opcode: "attribute.modifier.remove",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Remove Attr Modifier",
+    label: "Remove Attribute Modifier [attrId:dropdown.attributes] [modifierName:input.text] for [entity:entity]",
+    hint: "Remove a named modifier from an attribute on entity",
+    color: "#4d65b4",
+    fields: {
+      modifierName: { type: "input", inputType: "text", default: "" },
+    },
+    codegen: {
+      type: "action",
+      handler: "attribute.modifier.remove",
+      imports: [
+        "net.minecraft.world.entity.ai.attributes.Attributes",
+        "net.minecraft.world.entity.ai.attributes.AttributeModifier",
+        "net.minecraft.resources.ResourceLocation",
+        "net.minecraft.world.entity.LivingEntity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "attribute.base.reset",
+    category: "Data", sub: "actions",
+    isAction: true,
+    label: "Reset Attribute Base [attrId:dropdown.attributes] for [entity:entity]",
+    hint: "Reset an attribute's base value back to its default on entity",
+    color: "#4d65b4",
+    codegen: {
+      type: "action",
+      handler: "attribute.base.reset",
+      imports: [
+        "net.minecraft.world.entity.ai.attributes.Attributes",
+        "net.minecraft.world.entity.LivingEntity",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "datacomp.get",
+    category: "Data", sub: "data",
+    linkType: "number",
+    paletteLabel: "Get Data Component",
+    label: "Get Data Component [compName:dropdown.dataComponents]",
+    hint: "Get a data component value from the item stack",
+    color: "#4d65b4",
+    dynamicLinkType: {
+      field: "compType",
+      map: { bool: "logic", string: "text", "*": "number" },
+    },
+    codegen: {
+      type: "value",
+      handler: "datacomp.get",
+      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents"],
+    },
+  },
+  {
+    opcode: "datacomp.set",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Data Component",
+    label: "Set Data Component [compName:dropdown.dataComponents] to [value:number]",
+    hint: "Set a data component value on the item stack",
+    color: "#4d65b4",
+    dynamicAccepts: {
+      value: { field: "compType", map: { bool: "logic", string: "text", "*": "number" } },
+    },
+    codegen: {
+      type: "action",
+      handler: "datacomp.set",
+      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents"],
+      slotDefaults: {
+        value: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ITEM — Data & Actions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "itemstack.literal",
+    category: "Item", sub: "data",
+    linkType: "itemstack",
+    paletteLabel: "Item Stack",
+    label: "Item Stack",
+    hint: "The current item stack (context-sensitive)",
+    color: "#945d66",
+    codegen: {
+      type: "value",
+      methodVariants: {
+        "useOn": "context.getItemInHand()",
+        "use": "player.getItemInHand(usedHand)",
+        "continuousUse": "stack",
+        "finishUsingItem": "stack",
+        "releaseUsing": "stack",
+        "inventoryTick": "stack",
+        "hurtEnemy": "stack",
+        "interactLivingEntity": "stack",
+        "*": "stack",
+      },
+    },
+  },
+  {
+    opcode: "itemstack.mainhand",
+    category: "Item", sub: "data",
+    linkType: "itemstack",
+    label: "Get Main Hand Item of [entity:entity]",
+    hint: "Get the item stack in the entity's main hand",
+    color: "#945d66",
+    codegen: {
+      type: "value",
+      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getMainHandItem())",
+      imports: ["net.minecraft.world.entity.LivingEntity"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "itemstack.offhand",
+    category: "Item", sub: "data",
+    linkType: "itemstack",
+    label: "Get Off Hand Item of [entity:entity]",
+    hint: "Get the item stack in the entity's off hand",
+    color: "#945d66",
+    codegen: {
+      type: "value",
+      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getOffhandItem())",
+      imports: ["net.minecraft.world.entity.LivingEntity"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "itemstack.is_on_cooldown",
+    category: "Item", sub: "data",
+    linkType: "logic",
+    paletteLabel: "On Cooldown?",
+    label: "Is [stack:itemstack] on Cooldown?",
+    hint: "Check if the item is currently on cooldown for the player",
+    color: "#6494a4",
+    codegen: {
+      type: "value",
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+      },
+    },
+  },
+  {
+    opcode: "itemstack.use_duration",
+    category: "Item", sub: "data",
+    linkType: "number",
+    paletteLabel: "Use Duration",
+    label: "Get Use Duration of [stack:itemstack]",
+    hint: "How many ticks the item has been used (bow charge, eating progress, etc.)",
+    color: "#4d65b4",
+    codegen: {
+      type: "value",
+      methodVariants: {
+        "continuousUse": "(stack.getUseDuration(livingEntity) - remainingUseDuration)",
+        "releaseUsing": "(stack.getUseDuration(livingEntity) - timeCharged)",
+        "*": "0",
+      },
+      slotDefaults: { stack: { opcode: "itemstack.literal" } },
+    },
+  },
+  {
+    opcode: "itemstack.set_texture_frame",
+    category: "Item", sub: "actions",
+    isAction: true,
+    label: "Set Item Texture Frame to [frame:number] for [stack:itemstack]",
+    hint: "Set the visual frame of a spritesheet item via CustomModelData",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "{{stack}}.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)({{frame}})) + 1));",
+      imports: [
+        "net.minecraft.core.component.DataComponents",
+        "net.minecraft.world.item.component.CustomModelData",
+      ],
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+        frame: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "itemstack.reset_texture_frame",
+    category: "Item", sub: "actions",
+    isAction: true,
+    label: "Reset Item Texture Frame for [stack:itemstack]",
+    hint: "Reset the item's visual frame back to its default texture",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "{{stack}}.remove(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA);",
+      imports: [
+        "net.minecraft.core.component.DataComponents",
+      ],
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+      },
+    },
+  },
+  {
+    opcode: "itemstack.set_cooldown",
+    category: "Item", sub: "actions",
+    isAction: true,
+    label: "Set Cooldown to [ticks:number] for [stack:itemstack]",
+    hint: "Put the item on cooldown for the given number of ticks",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      imports: ["net.minecraft.world.entity.player.Player"],
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+        ticks: { opcode: "number.literal", fields: { value: "20" } },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NUMBER — Data
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "number.literal",
+    category: "Number", sub: "data",
+    linkType: "number",
+    paletteLabel: "Number",
+    label: "[value:input.number]",
+    hint: "A literal number",
+    color: "#4d65b4",
+    fields: {
+      value: { type: "input", inputType: "number", default: "0" },
+    },
+    codegen: { type: "value", expr: "{{value}}" },
+  },
+  {
+    opcode: "number.math",
+    category: "Number", sub: "data",
+    linkType: "number",
+    paletteLabel: "Math",
+    label: "[a:number] [op:dropdown] [b:number]",
+    hint: "Apply an operator to two numbers",
+    color: "#4d65b4",
+    transparent: true,
+    fields: {
+      op: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "+", label: "+" },
+          { value: "-", label: "−" },
+          { value: "*", label: "×" },
+          { value: "/", label: "÷" },
+          { value: "%", label: "%" },
+          { value: "min", label: "min" },
+          { value: "max", label: "max" },
+          { value: "pow", label: "pow" },
+        ],
+        default: "+",
+      },
+    },
+    codegen: {
+      type: "value",
+      expr: "(({{a}}){{op}}({{b}}))",
+      variants: {
+        "op == 'min'": { expr: "(Math.min((double)({{a}}),(double)({{b}})))" },
+        "op == 'max'": { expr: "(Math.max((double)({{a}}),(double)({{b}})))" },
+        "op == 'pow'": { expr: "(Math.pow((double)({{a}}),(double)({{b}})))" },
+      },
+    },
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -76,8 +933,8 @@ export const BLOCK_DEFS = [
     opcode: "convert.to_text",
     category: "Text", sub: "data",
     linkType: "text",
-    paletteLabel: "Parse Text",
-    label: "Parse Text from [value:number]",
+    paletteLabel: "Convert to Text",
+    label: "Convert [value:number] to Text",
     hint: "Convert a number to text",
     color: "#5ba558",
     codegen: {
@@ -124,262 +981,7 @@ export const BLOCK_DEFS = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // NUMBERS — Data
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "number.literal",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    paletteLabel: "Number",
-    label: "[value:input.number]",
-    hint: "A literal number",
-    color: "#4d65b4",
-    fields: {
-      value: { type: "input", inputType: "number", default: "0" },
-    },
-    codegen: { type: "value", expr: "{{value}}" },
-  },
-  {
-    opcode: "number.math",
-    category: "Math", sub: "data",
-    linkType: "number",
-    paletteLabel: "Math",
-    label: "[a:number] [op:dropdown] [b:number]",
-    hint: "Apply an operator to two numbers",
-    color: "#4d65b4",
-    transparent: true,
-    fields: {
-      op: {
-        type: "dropdown",
-        compact: true,
-        options: [
-          { value: "+", label: "+" },
-          { value: "-", label: "−" },
-          { value: "*", label: "×" },
-          { value: "/", label: "÷" },
-          { value: "%", label: "%" },
-          { value: "min", label: "min" },
-          { value: "max", label: "max" },
-          { value: "pow", label: "pow" },
-        ],
-        default: "+",
-      },
-    },
-    codegen: {
-      type: "value",
-      expr: "(({{a}}){{op}}({{b}}))",
-      variants: {
-        "op == 'min'": { expr: "(Math.min((double)({{a}}),(double)({{b}})))" },
-        "op == 'max'": { expr: "(Math.max((double)({{a}}),(double)({{b}})))" },
-        "op == 'pow'": { expr: "(Math.pow((double)({{a}}),(double)({{b}})))" },
-      },
-    },
-  },
-  {
-    opcode: "entity.pos_x",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Pos X of [entity:entity]",
-    hint: "X position of an entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getX())",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.pos_y",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Pos Y of [entity:entity]",
-    hint: "Y position of an entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getY())",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.pos_z",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Pos Z of [entity:entity]",
-    hint: "Z position of an entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getZ())",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.cam_x",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "X at [distance:number] from [entity:entity]",
-    hint: "X at distance along look direction from entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getX() + {{entity}}.getLookAngle().normalize().x * (double)({{distance}}))",
-      slotDefaults: {
-        distance: { opcode: "number.literal", fields: { value: "0" } },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-  {
-    opcode: "entity.cam_y",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Y at [distance:number] from [entity:entity]",
-    hint: "Y at distance along look direction from entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getY() + {{entity}}.getEyeHeight() + {{entity}}.getLookAngle().normalize().y * (double)({{distance}}))",
-      slotDefaults: {
-        distance: { opcode: "number.literal", fields: { value: "0" } },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-  {
-    opcode: "entity.cam_z",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Z at [distance:number] from [entity:entity]",
-    hint: "Z at distance along look direction from entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getZ() + {{entity}}.getLookAngle().normalize().z * (double)({{distance}}))",
-      slotDefaults: {
-        distance: { opcode: "number.literal", fields: { value: "0" } },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-  {
-    opcode: "entity.look_x",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Look Dir X of [entity:entity]",
-    hint: "X component of look direction (server)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getLookAngle().x)",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.look_y",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Look Dir Y of [entity:entity]",
-    hint: "Y component of look direction (server)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getLookAngle().y)",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.look_z",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Look Dir Z of [entity:entity]",
-    hint: "Z component of look direction (server)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getLookAngle().z)",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.look_client_x",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Look Dir X (Client) of [entity:entity]",
-    hint: "X component of look direction (client interpolated)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getViewVector(1.0F).x)",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.look_client_y",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Look Dir Y (Client) of [entity:entity]",
-    hint: "Y component of look direction (client interpolated)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getViewVector(1.0F).y)",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.look_client_z",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    label: "Look Dir Z (Client) of [entity:entity]",
-    hint: "Z component of look direction (client interpolated)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.getViewVector(1.0F).z)",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "vector.normalize",
-    category: "Numbers", sub: "data",
-    linkType: "number",
-    paletteLabel: "Direction",
-    label: "Dir [axis:dropdown] from x1 [x1:number] y1 [y1:number] z1 [z1:number] to x2 [x2:number] y2 [y2:number] z2 [z2:number]",
-    hint: "Component of normalized direction vector from point A to point B",
-    color: "#4d65b4",
-    fields: {
-      axis: {
-        type: "dropdown",
-        compact: true,
-        options: [
-          { value: "x", label: "X" },
-          { value: "y", label: "Y" },
-          { value: "z", label: "Z" },
-        ],
-        default: "x",
-      },
-      multiline: { type: "hidden", default: false },
-    },
-    settings: {
-      multiline: { type: "checkbox", label: "New Line per Link", default: false },
-    },
-    codegen: {
-      type: "value",
-      slotDefaults: {
-        x1: { opcode: "number.literal", fields: { value: "0" } },
-        y1: { opcode: "number.literal", fields: { value: "0" } },
-        z1: { opcode: "number.literal", fields: { value: "0" } },
-        x2: { opcode: "number.literal", fields: { value: "0" } },
-        y2: { opcode: "number.literal", fields: { value: "0" } },
-        z2: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LOGIC — Data & Actions
+  // LOGIC — Data & Flow Control
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
@@ -401,8 +1003,50 @@ export const BLOCK_DEFS = [
     codegen: { type: "value", expr: "false" },
   },
   {
+    opcode: "logic.not",
+    category: "Logic", sub: "data",
+    linkType: "logic",
+    paletteLabel: "Not",
+    label: "Not [value:logic]",
+    hint: "Negate a boolean value",
+    color: "#6494a4",
+    codegen: {
+      type: "value",
+      expr: "(!({{value}}))",
+    },
+  },
+  {
+    opcode: "itemstack.compare",
+    category: "Logic", sub: "Flow Control",
+    linkType: "logic",
+    paletteLabel: "Item Compare",
+    label: "[a:itemstack] [op:dropdown] [b:itemstack]",
+    hint: "Compare two item stacks",
+    color: "#945d66",
+    transparent: true,
+    fields: {
+      op: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "==", label: "＝" },
+          { value: "!=", label: "≠" },
+        ],
+        default: "==",
+      },
+    },
+    codegen: {
+      type: "value",
+      variants: {
+        "op == '=='": { expr: "(net.minecraft.world.item.ItemStack.isSameItem({{a}}, {{b}}))" },
+        "op == '!='": { expr: "(!net.minecraft.world.item.ItemStack.isSameItem({{a}}, {{b}}))" },
+      },
+      imports: ["net.minecraft.world.item.ItemStack"],
+    },
+  },
+  {
     opcode: "logic.compare",
-    category: "Flow Control", sub: "data",
+    category: "Logic", sub: "Flow Control",
     linkType: "logic",
     paletteLabel: "Num Compare",
     label: "[a:number] [op:dropdown] [b:number]",
@@ -431,7 +1075,7 @@ export const BLOCK_DEFS = [
   },
   {
     opcode: "logic.compare_string",
-    category: "Flow Control", sub: "data",
+    category: "Logic", sub: "Flow Control",
     linkType: "logic",
     paletteLabel: "Text Compare",
     label: "[a:text] [op:dropdown] [b:text]",
@@ -459,7 +1103,7 @@ export const BLOCK_DEFS = [
   },
   {
     opcode: "logic.compare_bool",
-    category: "Flow Control", sub: "data",
+    category: "Logic", sub: "Flow Control",
     linkType: "logic",
     paletteLabel: "Bool Compare",
     label: "[a:logic] [op:dropdown] [b:logic]",
@@ -485,21 +1129,8 @@ export const BLOCK_DEFS = [
     },
   },
   {
-    opcode: "entity.is_crouching",
-    category: "Flow Control", sub: "data",
-    linkType: "logic",
-    label: "Is Crouching? [entity:entity]",
-    hint: "True if the entity is crouching/sneaking",
-    color: "#6494a4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}}.isCrouching())",
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
     opcode: "control.if",
-    category: "Flow Control", sub: "actions",
+    category: "Logic", sub: "Flow Control",
     isAction: true,
     label: "If [condition:logic]",
     hint: "If statement",
@@ -520,7 +1151,7 @@ export const BLOCK_DEFS = [
   },
   {
     opcode: "control.delay",
-    category: "Flow Control", sub: "actions",
+    category: "Logic", sub: "Flow Control",
     isAction: true,
     label: "Delay [delayTicks:number] ticks",
     hint: "Run actions after a tick delay (server-side)",
@@ -538,78 +1169,18 @@ export const BLOCK_DEFS = [
       },
     },
   },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // EFFECTS — Actions
-  // ═══════════════════════════════════════════════════════════════════════════
-
   {
-    opcode: "effect.apply",
-    category: "Effects", sub: "actions",
-    isAction: true,
-    label: "Add Effect to [entity:entity] [effect:dropdown.effects] Duration [duration:number] Level [level:number]",
-    hint: "Apply a potion effect",
-    color: "#c46c94",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance({{effect}}, (int)({{duration}}), Math.max(0,(int)({{level}})-1))); }",
-      imports: [
-        "net.minecraft.world.entity.LivingEntity",
-        "net.minecraft.world.effect.MobEffectInstance",
-        "net.minecraft.world.effect.MobEffects",
-      ],
-      conditionalImports: {
-        "effect contains 'ModEffects.'": ["net.ye6isu.yebisuRPG.effect.ModEffects"],
-      },
-      slotDefaults: {
-        entity: { opcode: "entity.event" },
-        duration: { opcode: "number.literal", fields: { value: "0" } },
-        level: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-    fields: {
-      effect: { type: "dropdown", source: "effects", default: "MobEffects.REGENERATION" },
-    },
+    opcode: "aoe.iterator.entity",
+    category: "Logic", sub: "Flow Control",
+    linkType: "entity",
+    label: "Iterator Entity",
+    hint: "Current entity in a For Each Entity loop",
+    color: "#30e1b9",
+    codegen: { type: "value", expr: "_iterEnt" },
   },
-  {
-    opcode: "entity.apply_motion",
-    category: "Effects", sub: "actions",
-    isAction: true,
-    label: "Apply Motion to [entity:entity] X [x:number] Y [y:number] Z [z:number] [mode:dropdown]",
-    hint: "Add velocity to an entity (X/Y/Z). Set mode: add=impulse, set=override velocity.",
-    color: "#c46c94",
-    fields: {
-      mode: {
-        type: "dropdown",
-        options: [
-          { value: "add", label: "Add (impulse)" },
-          { value: "set", label: "Set (override)" },
-        ],
-        default: "add",
-      },
-    },
-    codegen: {
-      type: "action",
-      variants: {
-        "mode == 'set'": { template: "{{entity}}.setDeltaMovement((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
-        "mode == 'add'": { template: "{{entity}}.push((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
-      },
-      slotDefaults: {
-        entity: { opcode: "entity.event" },
-        x: { opcode: "number.literal", fields: { value: "0" } },
-        y: { opcode: "number.literal", fields: { value: "0" } },
-        z: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AoE — Actions (compound, hardcoded codegen)
-  // ═══════════════════════════════════════════════════════════════════════════
-
   {
     opcode: "aoe.each",
-    category: "AoE", sub: "actions",
+    category: "Logic", sub: "Flow Control",
     isAction: true,
     paletteLabel: "For Each in Shape",
     label: "For Each in [shape:dropdown] of [entity:entity]",
@@ -666,676 +1237,38 @@ export const BLOCK_DEFS = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ANIM — First Person (Actions)
+  // LEVEL — Client
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    opcode: "anim.firstperson.play",
-    category: "Anim — First Person", sub: "actions",
-    isAction: true,
-    label: "Play FP Anim [animName:text] for [entity:entity] speed [playbackSpeed:number] from file [filePath:text]",
-    hint: "Play FP Anim for entity with playback speed from file",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _ae && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(_ae,\n        AnimationCategory.ENTITY,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}});\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: {
-        animName: { opcode: "text.literal", fields: { value: "" } },
-        entity: { opcode: "entity.event" },
-        playbackSpeed: { opcode: "number.literal", fields: { value: "0" } },
-        filePath: { opcode: "text.literal", fields: { value: "" } },
-      },
-    },
-  },
-  {
-    opcode: "anim.firstperson.stop",
-    category: "Anim — First Person", sub: "actions",
-    isAction: true,
-    label: "Stop FP Anim on [entity:entity]",
-    hint: "Stop any playing first-person animation on an entity",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _se && !level.isClientSide()) {\n    AnimationAPI.stopFirstPersonAnimation(_se);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "anim.firstperson.pause",
-    category: "Anim — First Person", sub: "actions",
-    isAction: true,
-    label: "Pause FP Anim on [entity:entity]",
-    hint: "Freeze the playing first-person animation at its current position",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _pe && !level.isClientSide()) {\n    AnimationAPI.pauseAnimation(_pe,\n        AnimationCategory.ENTITY);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "anim.firstperson.resume",
-    category: "Anim — First Person", sub: "actions",
-    isAction: true,
-    label: "Resume FP Anim on [entity:entity]",
-    hint: "Resume a paused first-person animation",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _re && !level.isClientSide()) {\n    AnimationAPI.resumeAnimation(_re,\n        AnimationCategory.ENTITY);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "anim.handpose.set",
-    category: "Anim — First Person", sub: "actions",
-    isAction: true,
-    label: "Set FP Hand Pose [animName:text] for [entity:entity] from [filePath:text]",
-    hint: "Set FP hand pose",
-    color: "#3a5c3a",
-    settings: {
-      allowVanillaActions: { type: "checkbox", label: "Allow Vanilla Actions", default: false },
-    },
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _hp && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(_hp,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, false);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: {
-        animName: { opcode: "text.literal", fields: { value: "" } },
-        entity: { opcode: "entity.event" },
-        filePath: { opcode: "text.literal", fields: { value: "" } },
-      },
-    },
-  },
-  {
-    opcode: "anim.handpose.reset",
-    category: "Anim — First Person", sub: "actions",
-    isAction: true,
-    label: "Reset FP Hand Pose on [entity:entity]",
-    hint: "Reset FP hand pose to vanilla default",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _hr && !level.isClientSide()) {\n    AnimationAPI.resetFirstPersonHandPose(_hr);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // ANIM — Third Person (Actions)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "anim.thirdperson.play",
-    category: "Anim — Third Person", sub: "actions",
-    isAction: true,
-    label: "Play TP Anim [animName:text] for [entity:entity] speed [playbackSpeed:number] from file [filePath:text]",
-    hint: "Play TP Anim for entity with playback speed from file",
-    color: "#3a5c3a",
-    settings: {
-      lookAtMask: { type: "hidden", default: 0 },
-      vanillaMask: { type: "hidden", default: 0 },
-      vanillaMoveMask: { type: "hidden", default: 0 },
-      fpViewMask: { type: "hidden", default: 0 },
-    },
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _tpa && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(_tpa,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{fpViewMask}});\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: {
-        animName: { opcode: "text.literal", fields: { value: "" } },
-        entity: { opcode: "entity.event" },
-        playbackSpeed: { opcode: "number.literal", fields: { value: "0" } },
-        filePath: { opcode: "text.literal", fields: { value: "" } },
-      },
-    },
-  },
-  {
-    opcode: "anim.thirdperson.stop",
-    category: "Anim — Third Person", sub: "actions",
-    isAction: true,
-    label: "Stop TP Anim on [entity:entity]",
-    hint: "Stop any playing third-person animation on an entity",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _tps && !level.isClientSide()) {\n    AnimationAPI.stopThirdPersonAnimation(_tps);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "anim.thirdperson.pause",
-    category: "Anim — Third Person", sub: "actions",
-    isAction: true,
-    label: "Pause TP Anim on [entity:entity]",
-    hint: "Freeze the playing third-person animation at its current position",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _tpp && !level.isClientSide()) {\n    AnimationAPI.pauseThirdPersonAnimation(_tpp);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "anim.thirdperson.resume",
-    category: "Anim — Third Person", sub: "actions",
-    isAction: true,
-    label: "Resume TP Anim on [entity:entity]",
-    hint: "Resume a paused third-person animation",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _tpr && !level.isClientSide()) {\n    AnimationAPI.resumeThirdPersonAnimation(_tpr);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "anim.tppose.set",
-    category: "Anim — Third Person", sub: "actions",
-    isAction: true,
-    label: "Set TP Pose [animName:text] for [entity:entity] from [filePath:text]",
-    hint: "Set TP pose",
-    color: "#3a5c3a",
-    settings: {
-      lookAtMask: { type: "hidden", default: 0 },
-      vanillaMask: { type: "hidden", default: 0 },
-      vanillaMoveMask: { type: "hidden", default: 0 },
-      allowActionsMask: { type: "hidden", default: 0 },
-      keepPosScaleMask: { type: "hidden", default: 0 },
-      fpViewMask: { type: "hidden", default: 0 },
-    },
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _tps && !level.isClientSide()) {\n    AnimationAPI.setThirdPersonPose(_tps,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{allowActionsMask}}, {{keepPosScaleMask}}, {{fpViewMask}});\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: {
-        animName: { opcode: "text.literal", fields: { value: "" } },
-        entity: { opcode: "entity.event" },
-        filePath: { opcode: "text.literal", fields: { value: "" } },
-      },
-    },
-  },
-  {
-    opcode: "anim.tppose.reset",
-    category: "Anim — Third Person", sub: "actions",
-    isAction: true,
-    label: "Reset TP Pose on [entity:entity]",
-    hint: "Reset TP pose to vanilla default",
-    color: "#3a5c3a",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof Entity _tpr && !level.isClientSide()) {\n    AnimationAPI.resetThirdPersonPose(_tpr);\n}",
-      imports: [
-        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
-        "net.minecraft.world.entity.Entity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // VARIABLES — Data & Actions (dynamic, hardcoded codegen)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "variable.get",
-    category: "Variables", sub: "data",
+    opcode: "entity.look_dir_client",
+    category: "Level", sub: "Client",
     linkType: "number",
-    paletteLabel: "Get Variable",
-    label: "Get Variable [varName:dropdown.variables] for [entity:entity]",
-    hint: "Get a declared variable for entity — pick the variable inline on the canvas",
+    paletteLabel: "Look Direction (Client)",
+    label: "Get [axis:dropdown] Look Direction of [entity:entity] 🖥",
+    hint: "Get X, Y, or Z component of look direction (client interpolated)",
     color: "#4d65b4",
-    dynamicLinkType: {
-      field: "varType",
-      map: { bool: "logic", string: "text", "*": "number" },
-    },
-    codegen: {
-      type: "value",
-      handler: "variable.get",
-      imports: [
-        "net.ye6isu.yebisuRPG.data.EntityVarCapability",
-        "net.ye6isu.yebisuRPG.data.EntityVar",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "variable.set",
-    category: "Variables", sub: "actions",
-    isAction: true,
-    paletteLabel: "Set Variable",
-    label: "Set Variable [varName:dropdown.variables] to [value:number] for [entity:entity]",
-    hint: "Set a declared variable for entity — pick the variable inline on the canvas",
-    color: "#4d65b4",
-    dynamicAccepts: {
-      value: { field: "varType", map: { bool: "logic", string: "text", "*": "number" } },
-    },
-    codegen: {
-      type: "action",
-      handler: "variable.set",
-      imports: [
-        "net.ye6isu.yebisuRPG.data.EntityVarCapability",
-        "net.ye6isu.yebisuRPG.data.EntityVar",
-      ],
-      slotDefaults: {
-        value: { opcode: "number.literal", fields: { value: "0" } },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // ATTRIBUTES — Data & Actions (hardcoded codegen)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "attribute.get",
-    category: "Attributes", sub: "data",
-    linkType: "number",
-    paletteLabel: "Get Attribute",
-    label: "Get Attribute [attrId:dropdown.attributes] [layer:dropdown] for [entity:entity]",
-    hint: "Read an attribute value (total / base / bonus) for entity",
-    color: "#4d65b4",
-    fields: {
-      layer: {
-        type: "dropdown",
-        options: [
-          { value: "total", label: "Total" },
-          { value: "base", label: "Base" },
-          { value: "bonus", label: "Bonus (Total − Base)" },
-        ],
-        default: "total",
-      },
-    },
-    codegen: {
-      type: "value",
-      handler: "attribute.get",
-      imports: [
-        "net.minecraft.world.entity.ai.attributes.Attributes",
-        "net.minecraft.world.entity.LivingEntity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "attribute.modifier.add",
-    category: "Attributes", sub: "actions",
-    isAction: true,
-    paletteLabel: "Set Attribute Modifier",
-    label: "Set Attribute Modifier [attrId:dropdown.attributes] [operation:dropdown] [modifierName:input.text] to [value:number] for [entity:entity]",
-    hint: "Add a named modifier to an attribute on entity",
-    color: "#4d65b4",
-    fields: {
-      operation: {
-        type: "dropdown",
-        options: [
-          { value: "flat", label: "Flat Bonus" },
-          { value: "multiply", label: "% Multiplier" },
-          { value: "base_set", label: "Set Base" },
-        ],
-        default: "flat",
-      },
-      modifierName: { type: "input", inputType: "text", default: "", showIf: "operation != 'base_set'" },
-    },
-    dynamicAccepts: {
-      value: { field: "operation", map: { "*": "number" } },
-    },
-    codegen: {
-      type: "action",
-      handler: "attribute.modifier.add",
-      imports: [
-        "net.minecraft.world.entity.ai.attributes.Attributes",
-        "net.minecraft.world.entity.ai.attributes.AttributeModifier",
-        "net.minecraft.resources.ResourceLocation",
-        "net.minecraft.world.entity.LivingEntity",
-      ],
-      slotDefaults: {
-        value: { opcode: "number.literal", fields: { value: "0" } },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-  {
-    opcode: "attribute.modifier.remove",
-    category: "Attributes", sub: "actions",
-    isAction: true,
-    paletteLabel: "Remove Attr Modifier",
-    label: "Remove Attribute Modifier [attrId:dropdown.attributes] [modifierName:input.text] for [entity:entity]",
-    hint: "Remove a named modifier from an attribute on entity",
-    color: "#4d65b4",
-    fields: {
-      modifierName: { type: "input", inputType: "text", default: "" },
-    },
-    codegen: {
-      type: "action",
-      handler: "attribute.modifier.remove",
-      imports: [
-        "net.minecraft.world.entity.ai.attributes.Attributes",
-        "net.minecraft.world.entity.ai.attributes.AttributeModifier",
-        "net.minecraft.resources.ResourceLocation",
-        "net.minecraft.world.entity.LivingEntity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "attribute.base.reset",
-    category: "Attributes", sub: "actions",
-    isAction: true,
-    label: "Reset Attribute Base [attrId:dropdown.attributes] for [entity:entity]",
-    hint: "Reset an attribute's base value back to its default on entity",
-    color: "#4d65b4",
-    codegen: {
-      type: "action",
-      handler: "attribute.base.reset",
-      imports: [
-        "net.minecraft.world.entity.ai.attributes.Attributes",
-        "net.minecraft.world.entity.LivingEntity",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DATA COMPONENTS — Data & Actions (hardcoded codegen)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "datacomp.get",
-    category: "Data Components", sub: "data",
-    linkType: "number",
-    paletteLabel: "Get Data Component",
-    label: "Get Data Component [compName:dropdown.dataComponents]",
-    hint: "Get a data component value from the item stack",
-    color: "#4d65b4",
-    dynamicLinkType: {
-      field: "compType",
-      map: { bool: "logic", string: "text", "*": "number" },
-    },
-    codegen: {
-      type: "value",
-      handler: "datacomp.get",
-      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents"],
-    },
-  },
-  {
-    opcode: "datacomp.set",
-    category: "Data Components", sub: "actions",
-    isAction: true,
-    paletteLabel: "Set Data Component",
-    label: "Set Data Component [compName:dropdown.dataComponents] to [value:number]",
-    hint: "Set a data component value on the item stack",
-    color: "#4d65b4",
-    dynamicAccepts: {
-      value: { field: "compType", map: { bool: "logic", string: "text", "*": "number" } },
-    },
-    codegen: {
-      type: "action",
-      handler: "datacomp.set",
-      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents"],
-      slotDefaults: {
-        value: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // TEXTURE — Actions
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "texture.set_frame",
-    category: "Effects", sub: "actions",
-    isAction: true,
-    label: "Set Texture Frame [entity:entity] to [frame:number]",
-    hint: "Set the spritesheet frame on all texture layers of an entity",
-    color: "#c46c94",
-    codegen: {
-      type: "action",
-      template: "net.ye6isu.yebisuRPG.texture.TextureServerEvents.setFrame({{entity}}, (int)((double)({{frame}})));",
-      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
-      slotDefaults: {
-        entity: { opcode: "entity.event" },
-        frame: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-  },
-  {
-    opcode: "texture.reset_frame",
-    category: "Effects", sub: "actions",
-    isAction: true,
-    label: "Reset Texture Frame [entity:entity]",
-    hint: "Reset all texture layers to frame 0",
-    color: "#c46c94",
-    codegen: {
-      type: "action",
-      template: "net.ye6isu.yebisuRPG.texture.TextureServerEvents.resetFrame({{entity}});",
-      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
-      slotDefaults: {
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // ITEM STACK — Data & Actions
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  {
-    opcode: "itemstack.mainhand",
-    category: "Entity", sub: "data",
-    linkType: "itemstack",
-    label: "Main Hand Stack [entity:entity]",
-    hint: "Get the item stack in the entity's main hand",
-    color: "#945d66",
-    codegen: {
-      type: "value",
-      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getMainHandItem())",
-      imports: ["net.minecraft.world.entity.LivingEntity"],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "itemstack.offhand",
-    category: "Entity", sub: "data",
-    linkType: "itemstack",
-    label: "Off Hand Stack [entity:entity]",
-    hint: "Get the item stack in the entity's off hand",
-    color: "#945d66",
-    codegen: {
-      type: "value",
-      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getOffhandItem())",
-      imports: ["net.minecraft.world.entity.LivingEntity"],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "itemstack.literal",
-    category: "Entity", sub: "data",
-    linkType: "itemstack",
-    paletteLabel: "Item Stack",
-    label: "Item Stack",
-    hint: "The current item stack (context-sensitive)",
-    color: "#945d66",
-    codegen: {
-      type: "value",
-      methodVariants: {
-        "useOn": "context.getItemInHand()",
-        "use": "player.getItemInHand(usedHand)",
-        "continuousUse": "stack",
-        "finishUsingItem": "stack",
-        "releaseUsing": "stack",
-        "inventoryTick": "stack",
-        "hurtEnemy": "stack",
-        "interactLivingEntity": "stack",
-        "*": "stack",
-      },
-    },
-  },
-  {
-    opcode: "itemstack.compare",
-    category: "Flow Control", sub: "data",
-    linkType: "logic",
-    paletteLabel: "Item Compare",
-    label: "[a:itemstack] [op:dropdown] [b:itemstack]",
-    hint: "Compare two item stacks",
-    color: "#945d66",
     transparent: true,
     fields: {
-      op: {
+      axis: {
         type: "dropdown",
         compact: true,
         options: [
-          { value: "==", label: "＝" },
-          { value: "!=", label: "≠" },
+          { value: "x", label: "X" },
+          { value: "y", label: "Y" },
+          { value: "z", label: "Z" },
         ],
-        default: "==",
+        default: "x",
       },
     },
     codegen: {
       type: "value",
       variants: {
-        "op == '=='": { expr: "(net.minecraft.world.item.ItemStack.isSameItem({{a}}, {{b}}))" },
-        "op == '!='": { expr: "(!net.minecraft.world.item.ItemStack.isSameItem({{a}}, {{b}}))" },
+        "axis == 'x'": { expr: "({{entity}}.getViewVector(1.0F).x)" },
+        "axis == 'y'": { expr: "({{entity}}.getViewVector(1.0F).y)" },
+        "axis == 'z'": { expr: "({{entity}}.getViewVector(1.0F).z)" },
       },
-      imports: ["net.minecraft.world.item.ItemStack"],
-    },
-  },
-  {
-    opcode: "itemstack.set_texture_frame",
-    category: "Effects", sub: "actions",
-    isAction: true,
-    label: "Set Item Texture Frame [stack:itemstack] to [frame:number]",
-    hint: "Set the visual frame of a spritesheet item via CustomModelData",
-    color: "#c46c94",
-    codegen: {
-      type: "action",
-      template: "{{stack}}.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)({{frame}})) + 1));",
-      imports: [
-        "net.minecraft.core.component.DataComponents",
-        "net.minecraft.world.item.component.CustomModelData",
-      ],
-      slotDefaults: {
-        stack: { opcode: "itemstack.literal" },
-        frame: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-  },
-  {
-    opcode: "itemstack.use_duration",
-    category: "Entity", sub: "data",
-    linkType: "number",
-    paletteLabel: "Use Duration",
-    label: "Use Duration of [stack:itemstack]",
-    hint: "How many ticks the item has been used (bow charge, eating progress, etc.)",
-    color: "#4d65b4",
-    codegen: {
-      type: "value",
-      methodVariants: {
-        "continuousUse": "(stack.getUseDuration(livingEntity) - remainingUseDuration)",
-        "releaseUsing": "(stack.getUseDuration(livingEntity) - timeCharged)",
-        "*": "0",
-      },
-      slotDefaults: { stack: { opcode: "itemstack.literal" } },
-    },
-  },
-  {
-    opcode: "itemstack.set_cooldown",
-    category: "Effects", sub: "actions",
-    isAction: true,
-    label: "Set Cooldown [ticks:number] for [stack:itemstack] on [entity:entity]",
-    hint: "Put the item on cooldown for the given number of ticks",
-    color: "#c46c94",
-    codegen: {
-      type: "action",
-      template: "if ({{entity}} instanceof net.minecraft.world.entity.player.Player _cdp) { _cdp.getCooldowns().addCooldown({{stack}}.getItem(), (int)((double)({{ticks}}))); }",
-      imports: ["net.minecraft.world.entity.player.Player"],
-      slotDefaults: {
-        entity: { opcode: "entity.event" },
-        stack: { opcode: "itemstack.literal" },
-        ticks: { opcode: "number.literal", fields: { value: "20" } },
-      },
-    },
-  },
-  {
-    opcode: "itemstack.is_on_cooldown",
-    category: "Flow Control", sub: "data",
-    linkType: "logic",
-    paletteLabel: "On Cooldown?",
-    label: "Is [stack:itemstack] on Cooldown? [entity:entity]",
-    hint: "Check if the item is currently on cooldown for the player",
-    color: "#6494a4",
-    codegen: {
-      type: "value",
-      expr: "({{entity}} instanceof net.minecraft.world.entity.player.Player _cdq && _cdq.getCooldowns().isOnCooldown({{stack}}.getItem()))",
-      slotDefaults: {
-        stack: { opcode: "itemstack.literal" },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-  {
-    opcode: "logic.not",
-    category: "Flow Control", sub: "data",
-    linkType: "logic",
-    paletteLabel: "Not",
-    label: "Not [value:logic]",
-    hint: "Negate a boolean value",
-    color: "#6494a4",
-    codegen: {
-      type: "value",
-      expr: "(!({{value}}))",
+      slotDefaults: { entity: { opcode: "entity.event" } },
     },
   },
 ];

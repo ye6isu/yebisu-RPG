@@ -173,7 +173,8 @@ export function compileActionNode(node, nodes, methodKey) {
     const eff = node.fields?.effect || "MobEffects.REGENERATION";
     const dur = resolveSlotValue(node.slots?.duration, nodes, methodKey) ?? (node.fields?.duration ?? "200");
     const lvl = resolveSlotValue(node.slots?.level, nodes, methodKey) ?? (node.fields?.level ?? "1");
-    return ["if (" + ent + " instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1))); }"];
+    const particles = node.fields?.showParticles !== false;
+    return ["if (" + ent + " instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1), false, " + particles + ")); }"];
   }
   if (node.opcode === "entity.apply_motion") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -488,6 +489,12 @@ export function compileActionNode(node, nodes, methodKey) {
     const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? varDefaultLiteral(type, node.fields?.varDefault);
     return [varSetStmt(node.fields?.varName, type, node.fields?.varDefault, ent, valueExpr)];
   }
+  if (node.opcode === "itemstack.set_cooldown") {
+    const ent = resolveEntityVar("entity.event", methodKey);
+    const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
+    const ticks = resolveSlotValue(node.slots?.ticks, nodes, methodKey) || "20";
+    return [`if (${ent} instanceof net.minecraft.world.entity.player.Player _cdp) { _cdp.getCooldowns().addCooldown(${stack}.getItem(), (int)((double)(${ticks}))); }`];
+  }
   return ["// unknown: " + node.opcode];
 }
 
@@ -525,11 +532,26 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     return `(${ent}.isCrouching())`;
   }
   if (node.opcode === "aoe.iterator.entity") return "_iterEnt";
+  if (node.opcode === "entity.position") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const axis = node.fields?.axis || "x";
+    if (axis === "x") return `(${ent}.getX())`;
+    if (axis === "y") return `(${ent}.getY())`;
+    if (axis === "z") return `(${ent}.getZ())`;
+  }
   if (node.opcode.startsWith("entity.pos_")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     if (node.opcode === "entity.pos_x") return `(${ent}.getX())`;
     if (node.opcode === "entity.pos_y") return `(${ent}.getY())`;
     if (node.opcode === "entity.pos_z") return `(${ent}.getZ())`;
+  }
+  if (node.opcode === "entity.position_offset") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const dist = resolveSlotValue(node.slots?.distance, nodes, methodKey) ?? "5";
+    const axis = node.fields?.axis || "x";
+    if (axis === "x") return `(${ent}.getX() + ${ent}.getLookAngle().normalize().x * (double)(${dist}))`;
+    if (axis === "y") return `(${ent}.getY() + ${ent}.getEyeHeight() + ${ent}.getLookAngle().normalize().y * (double)(${dist}))`;
+    if (axis === "z") return `(${ent}.getZ() + ${ent}.getLookAngle().normalize().z * (double)(${dist}))`;
   }
   if (node.opcode.startsWith("entity.cam_")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -554,6 +576,20 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     if (axis === "x") return `(${dx} / ${safe})`;
     if (axis === "y") return `(${dy} / ${safe})`;
     if (axis === "z") return `(${dz} / ${safe})`;
+  }
+  if (node.opcode === "entity.look_dir") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const axis = node.fields?.axis || "x";
+    if (axis === "x") return `(${ent}.getLookAngle().x)`;
+    if (axis === "y") return `(${ent}.getLookAngle().y)`;
+    if (axis === "z") return `(${ent}.getLookAngle().z)`;
+  }
+  if (node.opcode === "entity.look_dir_client") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const axis = node.fields?.axis || "x";
+    if (axis === "x") return `(${ent}.getViewVector(1.0F).x)`;
+    if (axis === "y") return `(${ent}.getViewVector(1.0F).y)`;
+    if (axis === "z") return `(${ent}.getViewVector(1.0F).z)`;
   }
   if (node.opcode.startsWith("entity.look_")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -582,6 +618,11 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     if (compType === "bool") return `(${stackExpr}.getOrDefault(${ref}, false))`;
     if (compType === "string") return `(${stackExpr}.getOrDefault(${ref}, ""))`;
     return `(${stackExpr}.getOrDefault(${ref}, 0.0))`;
+  }
+  if (node.opcode === "itemstack.is_on_cooldown") {
+    const ent = resolveEntityVar("entity.event", methodKey);
+    const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
+    return `(${ent} instanceof net.minecraft.world.entity.player.Player _cdq && _cdq.getCooldowns().isOnCooldown(${stack}.getItem()))`;
   }
   if (node.opcode === "attribute.get") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);

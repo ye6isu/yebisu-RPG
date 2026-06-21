@@ -308,6 +308,17 @@ When a multiline data block is slotted inline inside another block:
 - Compound block (C-shape) headers use `minHeight: _headerH` where `_headerH` accounts for the block's own multiline state
 - Normal action blocks use `minHeight: 50` with `display: flex` so flex children push the height
 
+### Layout Height Measurement (DOM-based)
+
+The layout system (`recalcLayout`) cannot know the exact rendered height of an action block when it contains a multiline inline child — the height depends on CSS flex layout, padding, and the child's slot count. Instead of estimating, the system uses **DOM measurement with a post-render correction pass**:
+
+1. **`getActionH(n, ns)`** — called by `getH` and `layoutChain` to determine how much vertical space an action block occupies. It first checks `measuredRef.current[n.id]` for a previously measured DOM height. If found (and > 50), it returns that. Otherwise it falls back to estimation (scanning label slots for multiline children).
+2. **`getInlineH(nodeId, ns)`** — estimates the height of a multiline data block when slotted inline: `slotCount * 40` pixels. Used as fallback when no DOM measurement exists yet.
+3. **Post-render `useEffect`** — after every render, measures `offsetHeight` of all action block DOM elements via `document.getElementById("node-" + n.id)`. If any measurement differs from the stored value by > 5px, it stores the new height in `measuredRef` and triggers `recalcLayout` once. The second layout uses the measured heights, producing pixel-perfect positioning. Subsequent renders find no mismatch and don't re-layout.
+4. **Snap logic (`onMU`)** — also calls `getActionH`, so drag-snap targets use the same measured heights.
+
+**When adding new blocks**: no extra work needed — the measurement system handles any block automatically. Just ensure action blocks have `id={"node-"+node.id}` on their root DOM element (already set in `CanvasNode`).
+
 ### Shape-Switching Blocks
 
 For blocks that change their slots based on a dropdown (like AoE's shape selector):
