@@ -78,8 +78,8 @@ export default function App(){
     });
   },[modBlocks]);
   const texEntries=useMemo(()=>textures.map(t=>({...t,displayName:t.label,previewDataUrl:t.dataUrl})),[textures]);
-  const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl,isAnimated:t?.isAnimated,frames:t?.frames,ticksPerFrame:t?.ticksPerFrame};}), [allItems,textures]);
-  const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl,isAnimated:t?.isAnimated,frames:t?.frames,ticksPerFrame:t?.ticksPerFrame};}), [allBlocks,textures]);
+  const itemEntries=useMemo(()=>allItems.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl,isSpritesheet:t?.isSpritesheet,isAnimated:t?.isAnimated,frames:t?.frames,ticksPerFrame:t?.ticksPerFrame,defaultFrame:t?.defaultFrame};}), [allItems,textures]);
+  const blockEntries=useMemo(()=>allBlocks.map(x=>{const t=textures.find(tx=>tx.id===x.textureId);return{...x,previewDataUrl:t?.dataUrl||x.textureDataUrl,isSpritesheet:t?.isSpritesheet,isAnimated:t?.isAnimated,frames:t?.frames,ticksPerFrame:t?.ticksPerFrame,defaultFrame:t?.defaultFrame};}), [allBlocks,textures]);
   const delTex=id=>setTextures(arr=>arr.filter(x=>x.id!==id));
   const delItem=async id=>{const item=allItems.find(x=>x.id===id);if(!item)return;await api("/items/delete",{id,constName:item.constName||id.toUpperCase()});if(item.customItemClass)await api("/items/custom-class/delete",{className:item.customItemClass});await api("/texture/delete",{filename:`${id}.png`,folder:"item"});setItems(arr=>arr.filter(x=>x.id!==id));reloadMod();};
   const delBlock=async id=>{const b=allBlocks.find(x=>x.id===id);if(!b)return;await api("/blocks/delete",{id,constName:b.constName||id.toUpperCase()});await api("/texture/delete",{filename:`${id}.png`,folder:"block"});setBlocks(arr=>arr.filter(x=>x.id!==id));reloadMod();};

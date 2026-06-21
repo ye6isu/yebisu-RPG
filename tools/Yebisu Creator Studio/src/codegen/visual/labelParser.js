@@ -1,6 +1,6 @@
 const TOKEN_RE = /\[([a-zA-Z0-9_]+):([a-zA-Z0-9_.]+)\]/g;
 
-const SLOT_TYPES = new Set(["entity", "number", "text", "logic"]);
+const SLOT_TYPES = new Set(["entity", "number", "text", "logic", "itemstack"]);
 
 export function parseLabel(label) {
   if (!label) return [];

@@ -11,7 +11,7 @@ export default function CardGrid({ entries, onDelete, onOpen, emptyLabel, render
         {isH && <div onClick={ev => { ev.stopPropagation(); onDelete(e.id); }} style={{ position: "absolute", top: -5, right: -5, width: 13, height: 13, borderRadius: "50%", background: "#ff5f57", cursor: "pointer", zIndex: 5 }} />}
         {renderCard ? renderCard(e) : <>
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            {e.previewDataUrl ? <AImg url={e.previewDataUrl} size={180} anim={e.isAnimated} frames={e.frames || 1} ticks={e.ticksPerFrame || 4} /> : <div />}
+            {e.previewDataUrl ? <AImg url={e.previewDataUrl} size={180} anim={e.isSpritesheet && e.isAnimated} frames={e.isSpritesheet ? (e.frames || 1) : 1} ticks={e.ticksPerFrame || 4} defaultFrame={e.defaultFrame ?? 0} /> : <div />}
           </div>
           <div style={{ padding: "6px 10px 8px", background: C.card }}>
             <div style={{ fontWeight: 500, fontSize: 13, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.displayName || e.id}</div>

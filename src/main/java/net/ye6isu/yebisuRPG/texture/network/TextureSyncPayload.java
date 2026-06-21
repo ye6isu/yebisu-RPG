@@ -49,25 +49,53 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
             return new LayerData(new LayerBase(texturePath, zIndex, (byte)1, true, maskPath, 0), LayerAnim.NONE, new LayerEmissive(emissivePath));
         }
 
+        public static LayerData spritesheet(String texturePath, int zIndex,
+                int columns, int rows, int defaultFrame) {
+            return new LayerData(new LayerBase(texturePath, zIndex, (byte)0, false, "", 0),
+                new LayerAnim(false, columns, rows, 1, (byte)0, defaultFrame), LayerEmissive.NONE);
+        }
+
+        public static LayerData spritesheetWithMask(String texturePath, int zIndex, String maskPath,
+                int columns, int rows, int defaultFrame) {
+            return new LayerData(new LayerBase(texturePath, zIndex, (byte)1, true, maskPath, 0),
+                new LayerAnim(false, columns, rows, 1, (byte)0, defaultFrame), LayerEmissive.NONE);
+        }
+
         public static LayerData animatedCutoutWithMask(String texturePath, int zIndex, String maskPath,
                 int columns, int rows, int ticksPerFrame, byte animModeByte) {
+            return animatedCutoutWithMask(texturePath, zIndex, maskPath, columns, rows, ticksPerFrame, animModeByte, 0);
+        }
+
+        public static LayerData animatedCutoutWithMask(String texturePath, int zIndex, String maskPath,
+                int columns, int rows, int ticksPerFrame, byte animModeByte, int defaultFrame) {
             return new LayerData(new LayerBase(texturePath, zIndex, (byte)1, true, maskPath, 0),
-                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte), LayerEmissive.NONE);
+                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte, defaultFrame), LayerEmissive.NONE);
         }
 
         public static LayerData animatedCutoutWithMaskAndEmissive(String texturePath, int zIndex,
                 String maskPath, String emissivePath, int columns, int rows, int ticksPerFrame, byte animModeByte) {
+            return animatedCutoutWithMaskAndEmissive(texturePath, zIndex, maskPath, emissivePath, columns, rows, ticksPerFrame, animModeByte, 0);
+        }
+
+        public static LayerData animatedCutoutWithMaskAndEmissive(String texturePath, int zIndex,
+                String maskPath, String emissivePath, int columns, int rows, int ticksPerFrame, byte animModeByte, int defaultFrame) {
             return new LayerData(new LayerBase(texturePath, zIndex, (byte)1, true, maskPath, 0),
-                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte), new LayerEmissive(emissivePath));
+                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte, defaultFrame), new LayerEmissive(emissivePath));
         }
 
         public static LayerData animated(String texturePath, int zIndex,
                 byte maskModeByte, String maskPath, int maskZIndex,
                 int columns, int rows, int ticksPerFrame, byte animModeByte) {
+            return animated(texturePath, zIndex, maskModeByte, maskPath, maskZIndex, columns, rows, ticksPerFrame, animModeByte, 0);
+        }
+
+        public static LayerData animated(String texturePath, int zIndex,
+                byte maskModeByte, String maskPath, int maskZIndex,
+                int columns, int rows, int ticksPerFrame, byte animModeByte, int defaultFrame) {
             boolean hasMask = maskModeByte == 2 && !maskPath.isEmpty();
             return new LayerData(
                 new LayerBase(texturePath, zIndex, maskModeByte, hasMask, hasMask ? maskPath : "", maskZIndex),
-                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte), LayerEmissive.NONE);
+                new LayerAnim(true, columns, rows, ticksPerFrame, animModeByte, defaultFrame), LayerEmissive.NONE);
         }
     }
 
@@ -83,8 +111,8 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
                 LayerBase::new);
     }
 
-    public record LayerAnim(boolean isAnimated, int columns, int rows, int ticksPerFrame, byte animModeByte) {
-        public static final LayerAnim NONE = new LayerAnim(false, 1, 1, 1, (byte)0);
+    public record LayerAnim(boolean isAnimated, int columns, int rows, int ticksPerFrame, byte animModeByte, int defaultFrame) {
+        public static final LayerAnim NONE = new LayerAnim(false, 1, 1, 1, (byte)0, 0);
         public static final StreamCodec<ByteBuf, LayerAnim> STREAM_CODEC =
             StreamCodec.composite(
                 ByteBufCodecs.BOOL,    LayerAnim::isAnimated,
@@ -92,6 +120,7 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
                 ByteBufCodecs.VAR_INT, LayerAnim::rows,
                 ByteBufCodecs.VAR_INT, LayerAnim::ticksPerFrame,
                 ByteBufCodecs.BYTE,    LayerAnim::animModeByte,
+                ByteBufCodecs.VAR_INT, LayerAnim::defaultFrame,
                 LayerAnim::new);
     }
 

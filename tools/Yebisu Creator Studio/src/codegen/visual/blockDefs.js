@@ -1129,6 +1129,215 @@ export const BLOCK_DEFS = [
       },
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEXTURE — Actions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "texture.set_frame",
+    category: "Effects", sub: "actions",
+    isAction: true,
+    label: "Set Texture Frame [entity:entity] to [frame:number]",
+    hint: "Set the spritesheet frame on all texture layers of an entity",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "net.ye6isu.yebisuRPG.texture.TextureServerEvents.setFrame({{entity}}, (int)((double)({{frame}})));",
+      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        frame: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "texture.reset_frame",
+    category: "Effects", sub: "actions",
+    isAction: true,
+    label: "Reset Texture Frame [entity:entity]",
+    hint: "Reset all texture layers to frame 0",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "net.ye6isu.yebisuRPG.texture.TextureServerEvents.resetFrame({{entity}});",
+      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ITEM STACK — Data & Actions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "itemstack.mainhand",
+    category: "Entity", sub: "data",
+    linkType: "itemstack",
+    label: "Main Hand Stack [entity:entity]",
+    hint: "Get the item stack in the entity's main hand",
+    color: "#945d66",
+    codegen: {
+      type: "value",
+      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getMainHandItem())",
+      imports: ["net.minecraft.world.entity.LivingEntity"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "itemstack.offhand",
+    category: "Entity", sub: "data",
+    linkType: "itemstack",
+    label: "Off Hand Stack [entity:entity]",
+    hint: "Get the item stack in the entity's off hand",
+    color: "#945d66",
+    codegen: {
+      type: "value",
+      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getOffhandItem())",
+      imports: ["net.minecraft.world.entity.LivingEntity"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "itemstack.literal",
+    category: "Entity", sub: "data",
+    linkType: "itemstack",
+    paletteLabel: "Item Stack",
+    label: "Item Stack",
+    hint: "The current item stack (context-sensitive)",
+    color: "#945d66",
+    codegen: {
+      type: "value",
+      methodVariants: {
+        "useOn": "context.getItemInHand()",
+        "use": "player.getItemInHand(usedHand)",
+        "continuousUse": "stack",
+        "finishUsingItem": "stack",
+        "releaseUsing": "stack",
+        "inventoryTick": "stack",
+        "hurtEnemy": "stack",
+        "interactLivingEntity": "stack",
+        "*": "stack",
+      },
+    },
+  },
+  {
+    opcode: "itemstack.compare",
+    category: "Flow Control", sub: "data",
+    linkType: "logic",
+    paletteLabel: "Item Compare",
+    label: "[a:itemstack] [op:dropdown] [b:itemstack]",
+    hint: "Compare two item stacks",
+    color: "#945d66",
+    transparent: true,
+    fields: {
+      op: {
+        type: "dropdown",
+        compact: true,
+        options: [
+          { value: "==", label: "＝" },
+          { value: "!=", label: "≠" },
+        ],
+        default: "==",
+      },
+    },
+    codegen: {
+      type: "value",
+      variants: {
+        "op == '=='": { expr: "(net.minecraft.world.item.ItemStack.isSameItem({{a}}, {{b}}))" },
+        "op == '!='": { expr: "(!net.minecraft.world.item.ItemStack.isSameItem({{a}}, {{b}}))" },
+      },
+      imports: ["net.minecraft.world.item.ItemStack"],
+    },
+  },
+  {
+    opcode: "itemstack.set_texture_frame",
+    category: "Effects", sub: "actions",
+    isAction: true,
+    label: "Set Item Texture Frame [stack:itemstack] to [frame:number]",
+    hint: "Set the visual frame of a spritesheet item via CustomModelData",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "{{stack}}.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)({{frame}})) + 1));",
+      imports: [
+        "net.minecraft.core.component.DataComponents",
+        "net.minecraft.world.item.component.CustomModelData",
+      ],
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+        frame: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "itemstack.use_duration",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    paletteLabel: "Use Duration",
+    label: "Use Duration of [stack:itemstack]",
+    hint: "How many ticks the item has been used (bow charge, eating progress, etc.)",
+    color: "#4d65b4",
+    codegen: {
+      type: "value",
+      methodVariants: {
+        "continuousUse": "(stack.getUseDuration(livingEntity) - remainingUseDuration)",
+        "releaseUsing": "(stack.getUseDuration(livingEntity) - timeCharged)",
+        "*": "0",
+      },
+      slotDefaults: { stack: { opcode: "itemstack.literal" } },
+    },
+  },
+  {
+    opcode: "itemstack.set_cooldown",
+    category: "Effects", sub: "actions",
+    isAction: true,
+    label: "Set Cooldown [ticks:number] for [stack:itemstack] on [entity:entity]",
+    hint: "Put the item on cooldown for the given number of ticks",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof net.minecraft.world.entity.player.Player _cdp) { _cdp.getCooldowns().addCooldown({{stack}}.getItem(), (int)((double)({{ticks}}))); }",
+      imports: ["net.minecraft.world.entity.player.Player"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        stack: { opcode: "itemstack.literal" },
+        ticks: { opcode: "number.literal", fields: { value: "20" } },
+      },
+    },
+  },
+  {
+    opcode: "itemstack.is_on_cooldown",
+    category: "Flow Control", sub: "data",
+    linkType: "logic",
+    paletteLabel: "On Cooldown?",
+    label: "Is [stack:itemstack] on Cooldown? [entity:entity]",
+    hint: "Check if the item is currently on cooldown for the player",
+    color: "#6494a4",
+    codegen: {
+      type: "value",
+      expr: "({{entity}} instanceof net.minecraft.world.entity.player.Player _cdq && _cdq.getCooldowns().isOnCooldown({{stack}}.getItem()))",
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+  {
+    opcode: "logic.not",
+    category: "Flow Control", sub: "data",
+    linkType: "logic",
+    paletteLabel: "Not",
+    label: "Not [value:logic]",
+    hint: "Negate a boolean value",
+    color: "#6494a4",
+    codegen: {
+      type: "value",
+      expr: "(!({{value}}))",
+    },
+  },
 ];
 
 export const blockDefRegistry = new Map();

@@ -52,6 +52,7 @@ public final class TextureComponent {
         @Nullable private ResourceLocation emissiveTexture = null;
         private int columns = 1;
         private int rows = 1;
+        private int defaultFrame = 0;
         @Nullable private AnimationState animation = null;
 
         public Builder(String texturePath, int zIndex) {
@@ -65,17 +66,22 @@ public final class TextureComponent {
         }
 
         public Builder spritesheet(int columns, int rows) {
+            return spritesheet(columns, rows, 0);
+        }
+
+        public Builder spritesheet(int columns, int rows, int defaultFrame) {
             if (columns < 1 || rows < 1) throw new IllegalArgumentException("columns and rows >= 1");
-            this.columns   = columns;
-            this.rows      = rows;
-            this.animation = new AnimationState(columns * rows, Integer.MAX_VALUE, AnimationMode.MANUAL);
+            this.columns      = columns;
+            this.rows         = rows;
+            this.defaultFrame = defaultFrame;
+            this.animation    = new AnimationState(columns * rows, Integer.MAX_VALUE, AnimationMode.MANUAL, defaultFrame);
             return this;
         }
 
         public Builder animated(AnimationMode mode, int ticksPerFrame) {
             if (this.animation == null) throw new IllegalStateException("Call spritesheet() before animated()");
             if (mode == AnimationMode.MANUAL) throw new IllegalArgumentException("Use spritesheet() alone for MANUAL");
-            this.animation = new AnimationState(columns * rows, ticksPerFrame, mode);
+            this.animation = new AnimationState(columns * rows, ticksPerFrame, mode, defaultFrame);
             return this;
         }
 

@@ -68,8 +68,7 @@ function pickVariant(variants, node) {
       if ((node.fields?.[field] ?? "") === val) return body;
     }
   }
-  const entries = Object.entries(variants);
-  return entries.length > 0 ? entries[entries.length - 1][1] : null;
+  return null;
 }
 
 export function evalCondition(cond, fields) {

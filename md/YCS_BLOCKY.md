@@ -23,11 +23,16 @@ Colors signal category at a glance. All blocks in the same category share one co
 | Text value | `linkType === "text"` | `#5ba558` | Text literal nodes |
 | Entity value | `linkType === "entity"` | `#30e1b9` | Entity reference nodes |
 | Number value | `linkType === "number"` | `#4d65b4` | Number literal and number link nodes |
+| Item Stack value | `linkType === "itemstack"` | `#945d66` | Item stack reference nodes |
 | Disconnected | — | `#4a4a5a` | Dimmed Grey, opacity `0.6` |
+
+### Block Color Rule — Return Type Determines Color
+
+Data blocks (getters) use the color of the **type they return**, not the category they operate on. For example, a block that reads an item stack property but returns a number uses the number color (`#4d65b4`), not the item stack color (`#945d66`). The block's `color` field in `blockDefs.js` must match its `linkType`.
 
 ### Dynamic Block Colors
 
-Blocks with `dynamicLinkType` (variable.get/set, datacomp.get/set) change their color based on the selected type field. The `_typeColor` helper maps: `bool`/`logic` → `#6494a4`, `string`/`text` → `#5ba558`, `entity` → `#30e1b9`, default → `#4d65b4`. This is resolved automatically for JSON-defined blocks via `dynamicLinkType.field`.
+Blocks with `dynamicLinkType` (variable.get/set, datacomp.get/set) change their color based on the selected type field. The `_typeColor` helper maps: `bool`/`logic` → `#6494a4`, `string`/`text` → `#5ba558`, `entity` → `#30e1b9`, `itemstack` → `#945d66`, default → `#4d65b4`. This is resolved automatically for JSON-defined blocks via `dynamicLinkType.field`.
 
 ### Dropdown Selection Must Not Disconnect Valid Slots
 

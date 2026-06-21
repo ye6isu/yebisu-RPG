@@ -6,6 +6,7 @@ export const LINK_NUMBER = "number";
 export const LINK_LOGIC = "logic";
 export const LINK_TEXT = "text";
 export const LINK_ITERATOR = "iterator";
+export const LINK_ITEMSTACK = "itemstack";
 
 export function resolveStackExpr(methodKey) {
   if (methodKey === "useOn") return "context.getItemInHand()";

@@ -28,6 +28,30 @@ public final class TextureServerEvents {
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, new TextureSyncPayload(entity.getId(), layers));
     }
 
+    public static void setFrame(Entity entity, int frame) {
+        if (!(entity.level() instanceof ServerLevel sl)) return;
+        List<TextureSyncPayload.LayerData> layers =
+            TextureAuthority.get(sl).getAll().get(entity.getUUID());
+        if (layers == null || layers.isEmpty()) return;
+        List<TextureSyncPayload.LayerData> updated = new java.util.ArrayList<>(layers.size());
+        for (TextureSyncPayload.LayerData layer : layers) {
+            TextureSyncPayload.LayerAnim a = layer.anim();
+            if (a.columns() * a.rows() > 1) {
+                updated.add(new TextureSyncPayload.LayerData(layer.base(),
+                    new TextureSyncPayload.LayerAnim(a.isAnimated(), a.columns(), a.rows(),
+                        a.ticksPerFrame(), a.animModeByte(), frame),
+                    layer.emissive()));
+            } else {
+                updated.add(layer);
+            }
+        }
+        apply(entity, updated);
+    }
+
+    public static void resetFrame(Entity entity) {
+        setFrame(entity, 0);
+    }
+
     public static void clear(Entity entity) {
         if (!(entity.level() instanceof ServerLevel sl)) return;
         TextureAuthority.get(sl).remove(entity.getUUID());
