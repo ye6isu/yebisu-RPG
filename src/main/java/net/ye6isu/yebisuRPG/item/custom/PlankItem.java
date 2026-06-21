@@ -13,6 +13,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Entity;
 import net.ye6isu.yebisuRPG.animation.AnimationAPI;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.util.AoeShapes;
+import net.ye6isu.yebisuRPG.data.EntityVarCapability;
+import net.ye6isu.yebisuRPG.data.EntityVar;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.resources.ResourceLocation;
@@ -25,25 +28,28 @@ public class PlankItem extends Item {
         super(properties);
     }
 
+    //YCS:hurtEnemy:start
+    @Override
+    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+                EntityVarCapability.get(target).define("testbool", EntityVar.ofBool(false)).setBool("testbool", true);
+        return super.hurtEnemy(stack, target, attacker);
+    }
+    //YCS:hurtEnemy:end
+
     //YCS:use:start
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                if ((player.isCrouching())) {
-          if (player instanceof LivingEntity _armet) {
-              var _ari = _armet.getAttribute(Attributes.MOVEMENT_SPEED);
-              if (_ari != null) _ari.removeModifier(ResourceLocation.parse("yebisurpg:spd"));
-          }
-        } else {
-          if (player instanceof LivingEntity _amet) {
-              var _ai = _amet.getAttribute(Attributes.MOVEMENT_SPEED);
-              if (_ai != null) {
-                  var _amid = ResourceLocation.parse("yebisurpg:spd");
-                  _ai.removeModifier(_amid);
-                  _ai.addOrUpdateTransientModifier(new AttributeModifier(
-                      _amid, (double)(2), AttributeModifier.Operation.ADD_VALUE));
+                if (player.level() instanceof net.minecraft.server.level.ServerLevel _sl) {
+            net.minecraft.world.phys.Vec3[] _f = AoeShapes.frameFromEntity(player);
+            net.minecraft.world.phys.Vec3 _c = player.getEyePosition();
+            AoeShapes.visualizeBox(_sl, _c, (double)(4), (double)(4), (double)(20), _f[2], _f[0], _f[1]);
+            for (net.minecraft.world.entity.LivingEntity _iterEnt : AoeShapes.queryBox(_sl, _c, (double)(4), (double)(4), (double)(20), _f[2], _f[0], _f[1], player, true, player.getEyePosition())) {
+              _iterEnt.setYRot(player.getYRot());
+              if ((EntityVarCapability.get(_iterEnt).define("testbool", EntityVar.ofBool(false)).getBool("testbool"))) {
+                if (_iterEnt instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance(MobEffects.LEVITATION, (int)(20), Math.max(0,(int)(32)-1))); }
               }
-          }
+            }
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

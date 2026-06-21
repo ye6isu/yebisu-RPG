@@ -38,11 +38,9 @@ public final class AoeShapes {
         for (Vec3 p : points) {
             if (rayClear(level, from, p, target)) return true;
         }
-        // Entity AABB intersection check — same as vanilla crosshair/attack indicator detection.
-        // If a ray from the origin hits the entity's bounding box without a block in the way, it's visible.
-        Vec3 look = target.position().add(0, cy - from.y, 0).subtract(from).normalize();
+        Vec3 dirToTarget = target.position().add(0, cy - from.y, 0).subtract(from).normalize();
         double dist = from.distanceTo(target.position().add(0, target.getBbHeight() * 0.5, 0));
-        Vec3 end = from.add(look.scale(dist + 1));
+        Vec3 end = from.add(dirToTarget.scale(dist + 1));
         AABB targetBox = target.getBoundingBox().inflate(0.1);
         java.util.Optional<Vec3> hitOpt = targetBox.clip(from, end);
         if (hitOpt.isPresent()) {
@@ -54,8 +52,13 @@ public final class AoeShapes {
 
     private static boolean rayClear(ServerLevel level, Vec3 from, Vec3 to, Entity context) {
         BlockHitResult hit = level.clip(new ClipContext(
-            from, to, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, context));
+            from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, context));
         return hit.getType() == HitResult.Type.MISS;
+    }
+
+    private static Vec3 yawOnly(Entity source) {
+        double yawRad = Math.toRadians(-source.getYRot());
+        return new Vec3(Math.sin(yawRad), 0, Math.cos(yawRad));
     }
 
     // ── Local coordinate frame from look direction ───────────────────────────
@@ -160,7 +163,7 @@ public final class AoeShapes {
 
     public static void visualizeCone(ServerLevel level, Entity source, double distance, double angleDeg) {
         Vec3 eye = source.getEyePosition();
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         Vec3[] frame = buildFrame(look);
         Vec3 right = frame[0], localUp = frame[1];
         double halfAngle = Math.toRadians(angleDeg / 2.0);
@@ -195,7 +198,7 @@ public final class AoeShapes {
     public static List<LivingEntity> queryCone(ServerLevel level, Entity source, double distance, double angleDeg,
                                                  boolean excludeSelf, boolean requireLoS) {
         Vec3 eye = source.getEyePosition();
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         double halfAngle = Math.toRadians(angleDeg / 2.0);
         double cosHalf = Math.cos(halfAngle);
         AABB aabb = AABB.ofSize(eye, distance * 2, distance * 2, distance * 2);
@@ -217,7 +220,7 @@ public final class AoeShapes {
 
     public static void visualizeLine(ServerLevel level, Entity source, double distance, double width) {
         Vec3 eye = source.getEyePosition();
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         Vec3[] frame = buildFrame(look);
         Vec3 right = frame[0], localUp = frame[1];
         double radius = width / 2.0;
@@ -249,7 +252,7 @@ public final class AoeShapes {
     public static List<LivingEntity> queryLine(ServerLevel level, Entity source, double distance, double width,
                                                  boolean excludeSelf, boolean requireLoS) {
         Vec3 eye = source.getEyePosition();
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         double radius = width / 2.0;
         AABB aabb = AABB.ofSize(eye.add(look.scale(distance / 2)), distance + width, distance + width, distance + width);
         List<LivingEntity> result = new ArrayList<>();
@@ -271,7 +274,7 @@ public final class AoeShapes {
 
     public static void visualizeConeOffset(ServerLevel level, Entity source, Vec3 offset, double distance, double angleDeg) {
         Vec3 eye = source.getEyePosition().add(offset);
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         Vec3[] frame = buildFrame(look);
         Vec3 right = frame[0], localUp = frame[1];
         double halfAngle = Math.toRadians(angleDeg / 2.0);
@@ -306,7 +309,7 @@ public final class AoeShapes {
                                                       double distance, double angleDeg,
                                                       boolean excludeSelf, boolean requireLoS) {
         Vec3 eye = source.getEyePosition().add(offset);
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         double halfAngle = Math.toRadians(angleDeg / 2.0);
         double cosHalf = Math.cos(halfAngle);
         AABB aabb = AABB.ofSize(eye, distance * 2, distance * 2, distance * 2);
@@ -328,7 +331,7 @@ public final class AoeShapes {
 
     public static void visualizeLineOffset(ServerLevel level, Entity source, Vec3 offset, double distance, double width) {
         Vec3 eye = source.getEyePosition().add(offset);
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         Vec3[] frame = buildFrame(look);
         Vec3 right = frame[0], localUp = frame[1];
         double radius = width / 2.0;
@@ -360,7 +363,7 @@ public final class AoeShapes {
                                                       double distance, double width,
                                                       boolean excludeSelf, boolean requireLoS) {
         Vec3 eye = source.getEyePosition().add(offset);
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         double radius = width / 2.0;
         AABB aabb = AABB.ofSize(eye.add(look.scale(distance / 2)), distance + width, distance + width, distance + width);
         List<LivingEntity> result = new ArrayList<>();
@@ -381,12 +384,12 @@ public final class AoeShapes {
     // ── Helpers for "in front" positioning ────────────────────────────────────
 
     public static Vec3 centerInFront(Entity source, double forwardOffset) {
-        Vec3 look = source.getLookAngle().normalize();
+        Vec3 look = yawOnly(source);
         return source.getEyePosition().add(look.scale(forwardOffset));
     }
 
     public static Vec3 offsetInCameraSpace(Entity source, double ox, double oy, double oz) {
-        Vec3[] frame = buildFrame(source.getLookAngle().normalize());
+        Vec3[] frame = buildFrame(yawOnly(source));
         Vec3 right = frame[0], up = frame[1], forward = frame[2];
         return source.getEyePosition()
             .add(right.scale(ox))
@@ -395,8 +398,7 @@ public final class AoeShapes {
     }
 
     public static Vec3[] frameFromEntity(Entity source) {
-        Vec3 look = source.getLookAngle().normalize();
-        return buildFrame(look);
+        return buildFrame(yawOnly(source));
     }
 
     // ── Glowing helper ───────────────────────────────────────────────────────

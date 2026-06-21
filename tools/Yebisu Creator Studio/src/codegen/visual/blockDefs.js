@@ -630,6 +630,7 @@ export const BLOCK_DEFS = [
       los: { type: "hidden", default: false },
       losOrigin: { type: "hidden", default: "caller" },
       showParticles: { type: "hidden", default: false },
+      copyPitch: { type: "hidden", default: false },
       multiline: { type: "hidden", default: false },
     },
     shapeSlots: {
@@ -642,7 +643,9 @@ export const BLOCK_DEFS = [
     settings: {
       multiline: { type: "checkbox", label: "New Line per Link", default: false },
       los: { type: "checkbox", label: "Line of Sight", default: false },
+      losOrigin: { type: "dropdown", label: "LOS Origin", options: [{ value: "caller", label: "Caller" }, { value: "center", label: "Shape Center" }], default: "caller", showIf: "los" },
       showParticles: { type: "checkbox", label: "Visual", default: false },
+      copyPitch: { type: "checkbox", label: "Copy Pitch", default: false },
     },
     codegen: {
       type: "compound",
