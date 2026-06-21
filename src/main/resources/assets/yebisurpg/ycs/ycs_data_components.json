@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "name": "itemcounter",
+    "type": "double",
+    "default": 0
+  }
+]

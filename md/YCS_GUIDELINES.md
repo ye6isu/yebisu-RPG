@@ -8,6 +8,38 @@ YCS is a visual mod creator for NeoForge. It manages items and blocks by generat
 
 ## Sentinel Format
 
+### The universal sentinel pattern
+
+Every YCS-managed region in a Java file uses paired `//YCS_*_START` / `//YCS_*_END` comment markers. All sentinel pairs follow the same server-side conventions:
+
+1. **Registration**: Add both marker strings to the `YCS_MARKERS` array in `server.js`. This enables `wf()` (the write-file helper) to auto-format any file containing these markers via `formatYCSSection()`.
+2. **Reading**: Find markers with `src.indexOf(startMarker)` / `src.indexOf(endMarker)`. Never use regex to find markers — `indexOf` is line-ending agnostic and handles `\r\n` (Windows) and `\n` (Unix) transparently.
+3. **Writing**: Splice new content between markers: `src = before + '\n' + entries.join('\n\n') + '\n' + after`. Then call `wf(filePath, src)` — this auto-runs `formatYCSSection` which ensures one blank line inside on both sides, trims excessive blank lines, and preserves indentation.
+4. **Cleanup**: To empty a block, write with no entries: `src = before + '\n' + after`. `formatYCSSection` collapses it to two blank lines between the markers.
+
+**Never use regex with `\n` to match line boundaries in Java files** — Windows `\r\n` breaks it. Use `indexOf` for markers, string slicing for content replacement.
+
+### Existing sentinel pairs
+
+| Marker pair | File | Content |
+|---|---|---|
+| `YCS_Mod_Items_START/END` | `ModItems.java` | Item field declarations |
+| `YCS_Mod_Blocks_START/END` | `ModBlocks.java` | Block field declarations |
+| `YCS_Import_START/END` | Custom class files | Import statements |
+| `YCS:methodKey:start/end` | Custom class files | Method overrides |
+| `YCS:food/fuel/tooltip:start/end` | Custom class files | Feature overrides |
+| `YCS_DataComponents_START/END` | `ModDataComponents.java` | Data component registrations |
+| `YCS_Mod_Keybinds_START/END` | `ModKeybinds.java` | Keybind declarations |
+| `YCS_Mod_Keybinds_Register_START/END` | `ModKeybinds.java` | Keybind registrations |
+| `YCS_Effects_START/END` | `ModEffects.java` | Effect registrations |
+| `YCS_Mod_Item_Model_START/END` | `ModItemModelProvider.java` | Model provider lines |
+| `YCS_Mod_Creative_Tabs_START/END` | `ModCreativeTabEvents.java` | Creative tab entries |
+| `YCS_Mod_Recipe_Provider_START/END` | `ModRecipeProvider.java` | Recipe code |
+| `YCS_Mod_Item_Tags_START/END` | `ModItemTagProvider.java` | Item tag entries |
+| `YCS_Mod_Block_Tags_START/END` | `ModBlockTagProvider.java` | Block tag entries |
+| `YCS_Mod_Block_State_START/END` | `ModBlockStateProvider.java` | Blockstate lines |
+| `YCS_Mod_Block_Loot_START/END` | `ModBlockLootTableProvider.java` | Loot table lines |
+
 ### ModItems.java / ModBlocks.java registration block
 ```java
 //YCS_Mod_Items_START

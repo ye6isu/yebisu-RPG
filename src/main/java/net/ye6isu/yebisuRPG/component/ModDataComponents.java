@@ -51,12 +51,15 @@ public final class ModDataComponents {
                 .build());
 
     //YCS_DataComponents_START
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>
-        YCS_TESTNUM = COMPONENTS.register("ycs_testnum", () ->
+
+public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>
+        YCS_ITEMCOUNTER = COMPONENTS.register("ycs_itemcounter", () ->
             DataComponentType.<Double>builder()
                 .persistent(Codec.DOUBLE)
+                .networkSynchronized(ByteBufCodecs.DOUBLE)
                 .build());
-    //YCS_DataComponents_END
+
+//YCS_DataComponents_END
 
     private ModDataComponents() {}
 

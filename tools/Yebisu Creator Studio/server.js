@@ -26,7 +26,8 @@ const YCS_MARKERS = [
   ['//YCS_Mod_Item_Model_START', '//YCS_Mod_Item_Model_END'],
   ['//YCS_Mod_Creative_Tabs_START', '//YCS_Mod_Creative_Tabs_END'],
   ['//YCS_Mod_Keybinds_START', '//YCS_Mod_Keybinds_END'],
-  ['//YCS_Mod_Keybinds_Register_START', '//YCS_Mod_Keybinds_Register_END']
+  ['//YCS_Mod_Keybinds_Register_START', '//YCS_Mod_Keybinds_Register_END'],
+  ['//YCS_DataComponents_START', '//YCS_DataComponents_END']
 ]
 const wf = (f, s) => {
   if (typeof s === 'string') {
@@ -1119,7 +1120,14 @@ function writeDataComponents(list) { wf(DATA_COMPONENTS_JSON, JSON.stringify(lis
 
 function writeDataComponentsJava(list) {
   let src = rf(MOD_DATA_COMPONENTS_JAVA)
-  const lines = list.map(dc => {
+  const startMarker = '//YCS_DataComponents_START'
+  const endMarker = '//YCS_DataComponents_END'
+  const sIdx = src.indexOf(startMarker)
+  const eIdx = src.indexOf(endMarker)
+  if (sIdx === -1 || eIdx === -1) return
+  const before = src.slice(0, sIdx + startMarker.length)
+  const after = src.slice(eIdx)
+  const entries = list.map(dc => {
     const constName = 'YCS_' + dc.name.toUpperCase().replace(/[^A-Z0-9]/g, '_')
     const regId = 'ycs_' + dc.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')
     if (dc.type === 'bool') {
@@ -1128,7 +1136,7 @@ function writeDataComponentsJava(list) {
              `            DataComponentType.<Boolean>builder()\n` +
              `                .persistent(Codec.BOOL)\n` +
              `                .networkSynchronized(ByteBufCodecs.BOOL)\n` +
-             `                .build());\n`
+             `                .build());`
     }
     if (dc.type === 'string') {
       return `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>>\n` +
@@ -1136,18 +1144,16 @@ function writeDataComponentsJava(list) {
              `            DataComponentType.<String>builder()\n` +
              `                .persistent(Codec.STRING)\n` +
              `                .networkSynchronized(ByteBufCodecs.stringUtf8(256))\n` +
-             `                .build());\n`
+             `                .build());`
     }
     return `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>\n` +
            `        ${constName} = COMPONENTS.register("${regId}", () ->\n` +
            `            DataComponentType.<Double>builder()\n` +
            `                .persistent(Codec.DOUBLE)\n` +
-           `                .build());\n`
+           `                .networkSynchronized(ByteBufCodecs.DOUBLE)\n` +
+           `                .build());`
   })
-  src = src.replace(
-    /(\/\/YCS_DataComponents_START\n)[\s\S]*?(\/\/YCS_DataComponents_END)/,
-    `$1${lines.join('\n')}    $2`
-  )
+  src = before + '\n' + entries.join('\n\n') + '\n' + after
   wf(MOD_DATA_COMPONENTS_JAVA, src)
   markDirty()
 }
