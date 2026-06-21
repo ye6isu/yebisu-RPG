@@ -85,11 +85,11 @@ export function IdField({label,value,onChange,disabled=false}){const err=valId(v
 
 export function ConstField({form,F}){if(!form.customConstName)return null;return<div style={{display:"flex",flexDirection:"column",gap:4}}><Lbl>Const name</Lbl><input value={form.constName} onChange={e=>F("constName",e.target.value)} style={{...SI.inp}}/></div>;}
 
-export function AImg({url,size=52,anim=false,frames=1,ticks=4}){
+export function AImg({url,size=52,anim=false,frames=1,ticks=4,defaultFrame=0}){
   const[f,setF]=useState(0);
   useEffect(()=>{if(!anim||frames<=1)return;const id=setInterval(()=>setF(p=>(p+1)%frames),ticks*50);return()=>clearInterval(id);},[anim,frames,ticks]);
   if(!url)return<div style={{width:size,height:size,background:C.prev,border:`1px dashed ${C.inpB}`,borderRadius:4,flexShrink:0}}/>;
-  if(anim&&frames>1){const pct=(f/frames)*100;return<div style={{width:size,height:size,overflow:"hidden",borderRadius:4,border:`1px solid ${C.inpB}`,background:C.prev,flexShrink:0}}><img src={url} alt="" style={{width:size,height:size*frames,imageRendering:"pixelated",transform:`translateY(-${pct}%)`,display:"block"}}/></div>;}
+  if(frames>1){const idx=anim?f:defaultFrame;const pct=(idx/frames)*100;return<div style={{width:size,height:size,overflow:"hidden",borderRadius:4,border:`1px solid ${C.inpB}`,background:C.prev,flexShrink:0}}><img src={url} alt="" style={{width:size,height:size*frames,imageRendering:"pixelated",transform:`translateY(-${pct}%)`,display:"block"}}/></div>;}
   return<img src={url} alt="" style={{width:size,height:size,imageRendering:"pixelated",borderRadius:4,border:`1px solid ${C.inpB}`,background:C.prev,flexShrink:0,objectFit:"contain"}}/>;
 }
 

@@ -10,6 +10,21 @@ import { ycsInjectFeature, ycsRemoveFeature } from "../codegen/ycs.js";
 import { VisualEditorPanel } from "../components/VisualEditor.jsx";
 import RightPaneShell from "../panels/RightPaneShell.jsx";
 
+function extractFrames(dataUrl,frameCount){
+  return new Promise(resolve=>{
+    const img=new Image();img.onload=()=>{
+      const fw=img.width,fh=img.height/frameCount;
+      const urls=[];
+      for(let i=0;i<frameCount;i++){
+        const c=document.createElement("canvas");c.width=fw;c.height=fh;
+        c.getContext("2d").drawImage(img,0,i*fh,fw,fh,0,0,fw,fh);
+        urls.push(c.toDataURL("image/png"));
+      }
+      resolve(urls);
+    };img.src=dataUrl;
+  });
+}
+
 export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{},dataComponents:[]};
 
 export function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
@@ -28,15 +43,28 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     const CN=form.customConstName?form.constName:form.id.toUpperCase();
     const item={...form,constName:CN,savedAt:Date.now()};const code=gItemCode(item,textures);const msgs=[];
     const wtItem=async()=>{
+      const jm=await api("/texture/setup-mode",{
+        id:form.id,texMode:code.texMode,isHandheld:code.isHandheld,
+        frames:code.spritesheet?.frames||1,defaultFrame:code.spritesheet?.defaultFrame||0,
+        frametime:selTex?.ticksPerFrame||4
+      });
+      msgs.push({ok:jm.ok,label:"tex-mode",msg:jm.ok?"ok":jm.reason});
       if(dUrl){
         const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:dUrl,folder:"item"});
         msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
       }else if(selTex?.dataUrl){
-        const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"item"});
-        msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
-        if(selTex.isAnimated){
-          const jm=await api("/texture/mcmeta",{filename:`${form.id}.png`,frametime:selTex.ticksPerFrame||4,folder:"item"});
-          msgs.push({ok:jm.ok,label:"mcmeta",msg:jm.ok?"ok":jm.reason});
+        if(code.texMode==="multistate"){
+          const frameUrls=await extractFrames(selTex.dataUrl,selTex.frames||1);
+          const defFrame=selTex.defaultFrame||0;
+          const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:frameUrls[defFrame],folder:"item"});
+          msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
+          for(let i=0;i<frameUrls.length;i++){
+            const jf=await api("/texture",{filename:`${form.id}_frame_${i}.png`,dataUrl:frameUrls[i],folder:"item"});
+            msgs.push({ok:jf.ok,label:`frame_${i}`,msg:jf.ok?"ok":jf.reason});
+          }
+        }else{
+          const j=await api("/texture",{filename:`${form.id}.png`,dataUrl:selTex.dataUrl,folder:"item"});
+          msgs.push({ok:j.ok,label:"texture",msg:j.ok?"ok":j.reason});
         }
       }
     };

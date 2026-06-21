@@ -227,6 +227,38 @@ app.post('/api/texture/mcmeta', (req, res) => {
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
+app.post('/api/texture/multistate-model', (req, res) => {
+  try {
+    const { id, frames, defaultFrame, isHandheld } = req.body
+    writeMultistateModelJson(id, frames, defaultFrame || 0, !!isHandheld)
+    res.json({ ok:true })
+  } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+app.post('/api/texture/setup-mode', (req, res) => {
+  try {
+    const { id, texMode, isHandheld, frames, defaultFrame, frametime } = req.body
+    const texDir = jp(MOD_ROOT,'assets',MODID,'textures','item')
+    const mainResModelDir = jp(MOD_ROOT,'assets',MODID,'models','item')
+    const mcmeta = jp(texDir, `${id}.png.mcmeta`)
+    // Always clean up previous mode artifacts
+    cleanupFrameFiles(id)
+    if (fs.existsSync(mcmeta)) { fs.unlinkSync(mcmeta); triggerIdeaReload(mcmeta) }
+    const mainResModel = jp(mainResModelDir, `${id}.json`)
+    if (fs.existsSync(mainResModel)) { fs.unlinkSync(mainResModel); triggerIdeaReload(mainResModel) }
+    // Set up new mode
+    if (texMode === 'animated') {
+      wf(mcmeta, JSON.stringify({ animation: { frametime: frametime || 4 } }, null, 2))
+      // Write model to main/resources for animated (handheld or generated)
+      if (!fs.existsSync(mainResModelDir)) fs.mkdirSync(mainResModelDir, { recursive: true })
+      const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated'
+      fs.writeFileSync(mainResModel, JSON.stringify({ parent, textures: { layer0: `${MODID}:item/${id}` } }, null, 2))
+    } else if (texMode === 'multistate') {
+      writeMultistateModelJson(id, frames || 1, defaultFrame || 0, !!isHandheld)
+    }
+    // 'normal' mode: no extra files needed, datagen handles the model
+    res.json({ ok: true })
+  } catch(e) { res.json({ ok: false, reason: e.message }) }
+})
 
 // ─── Lang ──────────────────────────────────────────────────────────────────────
 const LANG_PREFIX_ORDER = ['item.','block.','tooltip.','creativetab.','key.','enchantment.','entity.']
@@ -448,16 +480,10 @@ app.post('/api/items/update', (req, res) => {
         const mPath = tPath + '.mcmeta'
         if (fs.existsSync(mPath)) { fs.unlinkSync(mPath); triggerIdeaReload(mPath); }
       } catch {}
-    } else {
-      // Same id — check if animated→static or static→animated: clean up stale mcmeta or irrelevant files
-      try {
-        const texBase = path.join(MOD_ROOT,'assets',MODID,'textures','item',`${newId}.png`)
-        const mcmeta  = texBase + '.mcmeta'
-        const isNowAnimated = (req.body.isAnimated === true || req.body.isAnimated === 'true')
-        if (!isNowAnimated && fs.existsSync(mcmeta)) {
-          fs.unlinkSync(mcmeta); triggerIdeaReload(mcmeta)
-        }
-      } catch {}
+    }
+    // Clean up old frame files only when id changes (new id gets fresh files)
+    if (oldId && oldId !== newId) {
+      try { cleanupFrameFiles(oldId) } catch {}
     }
     const fpFile = jp(JAVA_ROOT, 'item', 'ModFoodProperties.java')
     const PKG = 'net.ye6isu.yebisuRPG'
@@ -522,6 +548,7 @@ app.post('/api/items/delete', (req, res) => {
     if (fs.existsSync(fpFile)) {
       try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${constName} =`)) } catch {}
     }
+    try { cleanupFrameFiles(id) } catch {}
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -1664,6 +1691,37 @@ function writeModelJson(id, isHandheld=false) {
   if (fs.existsSync(modelPath)) return
   const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated'
   fs.writeFileSync(modelPath, JSON.stringify({ parent, textures: { layer0: `${MODID}:item/${id}` } }, null, 2))
+}
+
+function cleanupFrameFiles(id) {
+  const texDir = jp(MOD_ROOT,'assets',MODID,'textures','item')
+  const modelDir = jp(MOD_ROOT,'assets',MODID,'models','item')
+  for (let i = 0; i < 64; i++) {
+    const texF = jp(texDir, `${id}_frame_${i}.png`)
+    const modF = jp(modelDir, `${id}_frame_${i}.json`)
+    if (fs.existsSync(texF)) { fs.unlinkSync(texF); triggerIdeaReload(texF) }
+    if (fs.existsSync(modF)) { fs.unlinkSync(modF); triggerIdeaReload(modF) }
+    if (!fs.existsSync(texF) && !fs.existsSync(modF) && i > 0) break
+  }
+}
+
+function writeMultistateModelJson(id, frames, defaultFrame, isHandheld) {
+  const modelDir = jp(MOD_ROOT,'assets',MODID,'models','item')
+  if (!fs.existsSync(modelDir)) fs.mkdirSync(modelDir, { recursive:true })
+  const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated'
+  for (let i = 0; i < frames; i++) {
+    const framePath = jp(modelDir, `${id}_frame_${i}.json`)
+    fs.writeFileSync(framePath, JSON.stringify({
+      parent,
+      textures: { layer0: `${MODID}:item/${id}_frame_${i}` }
+    }, null, 2))
+  }
+  const overrides = []
+  for (let i = 0; i < frames; i++) {
+    overrides.push({ predicate: { custom_model_data: i + 1 }, model: `${MODID}:item/${id}_frame_${i}` })
+  }
+  const mainModel = { parent, textures: { layer0: `${MODID}:item/${id}` }, overrides }
+  fs.writeFileSync(jp(modelDir, `${id}.json`), JSON.stringify(mainModel, null, 2))
 }
 
 function writeBlockStateJson(id) {

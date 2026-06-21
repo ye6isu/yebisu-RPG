@@ -784,10 +784,10 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   
   const _bdef = blockDefRegistry.get(node.opcode);
   const _useGeneric = _bdef && !_bdef.codegen?.handler;
-  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":"#5a9a6a";
+  const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":node.linkType==="itemstack"?"#945d66":"#5a9a6a";
   const isAnimBlock = node.opcode.startsWith("anim.") || (node.opcode.startsWith("aoe.") && node.opcode !== "aoe.iterator.entity");
   const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf || isDelay || isAoeEach;
-  const _typeColor = (t) => t==="bool"||t==="logic"?"#6494a4":t==="string"||t==="text"?"#5ba558":t==="entity"?"#30e1b9":"#4d65b4";
+  const _typeColor = (t) => t==="bool"||t==="logic"?"#6494a4":t==="string"||t==="text"?"#5ba558":t==="entity"?"#30e1b9":t==="itemstack"?"#945d66":"#4d65b4";
   const _dynColor = _bdef?.dynamicLinkType ? _typeColor(node.fields?.[_bdef.dynamicLinkType.field]) : (node.opcode==="variable.set"||node.opcode==="variable.get")?_typeColor(node.fields?.varType):(node.opcode==="datacomp.set"||node.opcode==="datacomp.get")?_typeColor(node.fields?.compType):null;
   const bg=isSt?"#1e293b":(!inChain&&isAct)?"#4a4a5a":_dynColor?_dynColor:_bdef?.color?_bdef.color:node.opcode==="effect.apply"?"#c46c94":isAnimBlock?"#3a5c3a":isLogicBlock?"#6494a4":node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="text"?"#5ba558":"#5a9a6a";
 
@@ -851,7 +851,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       {!_useGeneric && node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
       {!_useGeneric && node.opcode==="text.literal"&&<input value={node.fields?.value??""} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
-        style={{width:Math.max(80, ((node.fields?.value||"").length*8)+24),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:14,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
+        style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
       {!_useGeneric && node.opcode==="number.math"&&<>
           <SlotConn sk="a" sc="rgba(0,0,0,0.3)" connId={node.slots?.a} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
           <PortalSelect value={node.fields?.op||"+"} onChange={v=>onFieldChange&&onFieldChange(node.id,"op",v)} minWidth={60} options={[

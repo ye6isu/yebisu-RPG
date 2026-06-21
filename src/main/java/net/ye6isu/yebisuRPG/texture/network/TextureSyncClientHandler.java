@@ -32,7 +32,7 @@ public final class TextureSyncClientHandler {
             }
 
             if (anim.columns() > 1 || anim.rows() > 1) {
-                builder.spritesheet(anim.columns(), anim.rows());
+                builder.spritesheet(anim.columns(), anim.rows(), anim.defaultFrame());
                 if (anim.isAnimated()) {
                     builder.animated(toAnimMode(anim.animModeByte()), anim.ticksPerFrame());
                 }

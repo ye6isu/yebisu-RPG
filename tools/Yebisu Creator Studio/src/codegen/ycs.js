@@ -160,6 +160,16 @@ export function ycsSyncImports(code, enabledMethodKeys) {
   if (code.includes('ModDataComponents.')) {
     needed.add('net.ye6isu.yebisuRPG.component.ModDataComponents');
   }
+  if (code.includes('TextureServerEvents.')) {
+    needed.add('net.ye6isu.yebisuRPG.texture.TextureServerEvents');
+  }
+  if (code.includes('CustomModelData')) {
+    needed.add('net.minecraft.core.component.DataComponents');
+    needed.add('net.minecraft.world.item.component.CustomModelData');
+  }
+  if (code.includes('ItemStack.isSameItem')) {
+    needed.add('net.minecraft.world.item.ItemStack');
+  }
 
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');
   result = result.replace(/\/\/YCS:import:[^\n]+\n?import [^;]+;\n?/g, '');
@@ -312,6 +322,16 @@ export function ycsEffectSyncImports(code, enabledMethodKeys) {
   }
   if (code.includes('ModDataComponents.')) {
     needed.add('net.ye6isu.yebisuRPG.component.ModDataComponents');
+  }
+  if (code.includes('TextureServerEvents.')) {
+    needed.add('net.ye6isu.yebisuRPG.texture.TextureServerEvents');
+  }
+  if (code.includes('CustomModelData')) {
+    needed.add('net.minecraft.core.component.DataComponents');
+    needed.add('net.minecraft.world.item.component.CustomModelData');
+  }
+  if (code.includes('ItemStack.isSameItem')) {
+    needed.add('net.minecraft.world.item.ItemStack');
   }
 
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');

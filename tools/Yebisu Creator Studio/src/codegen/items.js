@@ -98,6 +98,14 @@ export function gItemCode(item,textures){
   }
 
   const isHandheld=item.holdingMode==="handheld";
-  const modelLine=isHandheld?`handheldItem(ModItems.${CN});`:(tex?.isAnimated?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);\n        getBuilder(ModItems.${CN}.getId().getPath()).parent(new ModelFile.UncheckedModelFile("minecraft:item/generated")).texture("layer0","${MODID}:item/${id}");`:`basicItem(ModItems.${CN}.get());`);
-  return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN,fpReg};
+  const isSpritesheet=!!tex?.isSpritesheet;
+  const isAnimated=isSpritesheet&&!!tex?.isAnimated;
+  const isMultistate=isSpritesheet&&!isAnimated&&(tex?.frames||1)>1;
+  const needsManualModel=isAnimated||isMultistate;
+  const modelLine=needsManualModel
+    ?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);`
+    :(isHandheld?`handheldItem(ModItems.${CN});`:`basicItem(ModItems.${CN}.get());`);
+  const spritesheet=isMultistate?{frames:tex.frames,defaultFrame:tex.defaultFrame||0}:null;
+  const texMode=isMultistate?"multistate":isAnimated?"animated":"normal";
+  return{reg,langKey:`item.${MODID}.${id}`,langVal:dn,modelLine,tex,CN,fpReg,spritesheet,texMode,isHandheld};
 }

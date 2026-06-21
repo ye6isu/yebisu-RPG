@@ -32,6 +32,9 @@ public class ModItemTagProvider extends ItemTagsProvider {
 
         //YCS_Mod_Item_Tags_START
 
+        tag(TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("yebisurpg", "no_use_slowdown")))
+                .add(ModItems.PLANK.get());
+
         //YCS_Mod_Item_Tags_END
     }
 }

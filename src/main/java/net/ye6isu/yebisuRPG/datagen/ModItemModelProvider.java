@@ -64,7 +64,7 @@ public class ModItemModelProvider extends ItemModelProvider {
 
 
         //Normal Items
-        basicItem(ModItems.PLANK.get());
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/plank"),TEXTURE);
 
         //Tool Items
 
@@ -84,7 +84,7 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         //YCS_Mod_Item_Model_START
 
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/test_utem"),TEXTURE);
+existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/test_utem"),TEXTURE);
 
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/spirit"),TEXTURE);
 
@@ -92,7 +92,7 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         basicItem(ModItems.YE6ISU.get());
 
-        handheldItem(ModItems.PLANK);
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/plank"),TEXTURE);
 
         //YCS_Mod_Item_Model_END
     }

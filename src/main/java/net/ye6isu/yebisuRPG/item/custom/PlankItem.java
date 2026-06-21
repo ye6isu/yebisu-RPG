@@ -10,6 +10,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.entity.Entity;
 import net.ye6isu.yebisuRPG.animation.AnimationAPI;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
@@ -20,6 +21,8 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.food.FoodProperties;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.CustomModelData;
 //YCS_Import_END
 
 public class PlankItem extends Item {
@@ -28,29 +31,43 @@ public class PlankItem extends Item {
         super(properties);
     }
 
-    //YCS:hurtEnemy:start
+    //YCS:useDuration:start
     @Override
-    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-                EntityVarCapability.get(target).define("testbool", EntityVar.ofBool(false)).setBool("testbool", true);
-        return super.hurtEnemy(stack, target, attacker);
+    public int getUseDuration(ItemStack stack, LivingEntity entity) {
+        return 7200;
     }
-    //YCS:hurtEnemy:end
+    //YCS:useDuration:end
+
+    //YCS:useAnimation:start
+    @Override
+    public UseAnim getUseAnimation(ItemStack stack) {
+        return UseAnim.BOW;
+    }
+    //YCS:useAnimation:end
+
+    //YCS:continuousUse:start
+    @Override
+    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration) {
+                if ((!((livingEntity instanceof net.minecraft.world.entity.player.Player _cdq && _cdq.getCooldowns().isOnCooldown(stack.getItem()))))) {
+        }
+    }
+    //YCS:continuousUse:end
+
+    //YCS:releaseUsing:start
+    @Override
+    public void releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged) {
+                if ((!((livingEntity instanceof net.minecraft.world.entity.player.Player _cdq && _cdq.getCooldowns().isOnCooldown(stack.getItem()))))) {
+          livingEntity.setDeltaMovement((double)((((livingEntity.getLookAngle().x))*((((stack.getUseDuration(livingEntity) - timeCharged))/(1))))), (double)((((livingEntity.getLookAngle().y))*((((stack.getUseDuration(livingEntity) - timeCharged))/(1))))), (double)((((livingEntity.getLookAngle().z))*((((stack.getUseDuration(livingEntity) - timeCharged))/(1))))));
+          if (livingEntity instanceof net.minecraft.world.entity.player.Player _cdp) { _cdp.getCooldowns().addCooldown(stack.getItem(), (int)((double)(20))); }
+        }
+    }
+    //YCS:releaseUsing:end
 
     //YCS:use:start
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                if (player.level() instanceof net.minecraft.server.level.ServerLevel _sl) {
-            net.minecraft.world.phys.Vec3[] _f = AoeShapes.frameFromEntity(player);
-            net.minecraft.world.phys.Vec3 _c = player.getEyePosition();
-            AoeShapes.visualizeBox(_sl, _c, (double)(4), (double)(4), (double)(20), _f[2], _f[0], _f[1]);
-            for (net.minecraft.world.entity.LivingEntity _iterEnt : AoeShapes.queryBox(_sl, _c, (double)(4), (double)(4), (double)(20), _f[2], _f[0], _f[1], player, true, player.getEyePosition())) {
-              _iterEnt.setYRot(player.getYRot());
-              if ((EntityVarCapability.get(_iterEnt).define("testbool", EntityVar.ofBool(false)).getBool("testbool"))) {
-                if (_iterEnt instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance(MobEffects.LEVITATION, (int)(20), Math.max(0,(int)(32)-1))); }
-              }
-            }
-        }
+                // (empty)
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }
     //YCS:use:end
