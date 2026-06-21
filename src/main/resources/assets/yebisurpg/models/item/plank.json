@@ -2,5 +2,31 @@
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "yebisurpg:item/plank"
-  }
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "custom_model_data": 1
+      },
+      "model": "yebisurpg:item/plank_frame_0"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 2
+      },
+      "model": "yebisurpg:item/plank_frame_1"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 3
+      },
+      "model": "yebisurpg:item/plank_frame_2"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 4
+      },
+      "model": "yebisurpg:item/plank_frame_3"
+    }
+  ]
 }

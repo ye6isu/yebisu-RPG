@@ -32,6 +32,7 @@ export default function DataComponentsPanel() {
   const { form, F } = useContext(FormCtx);
   const comps = form.dataComponents || [];
   const [dirty, setDirty] = useState(false);
+  const [hov, setHov] = useState(null);
   const saveRef = useRef(null);
 
   const update = (next) => {
@@ -80,7 +81,9 @@ export default function DataComponentsPanel() {
       return <div key={dt.value} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ fontSize: 11, color: C.dim, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 6 }}>{dt.label}</div>
         {ofType.map(c => (
-          <div key={c._idx} style={{ display: "flex", alignItems: "center", gap: 6, background: C.card, border: `1px solid ${C.inpB}`, borderRadius: 4, padding: "6px 10px" }}>
+          <div key={c._idx} style={{ display: "flex", alignItems: "center", gap: 6, background: C.card, border: `1px solid ${C.inpB}`, borderRadius: 4, padding: "6px 10px", position: "relative" }}
+            onMouseEnter={() => setHov(c._idx)} onMouseLeave={() => setHov(null)}>
+            {hov === c._idx && <div onClick={() => del(c._idx)} style={{ position: "absolute", top: -5, right: -5, width: 13, height: 13, borderRadius: "50%", background: "#ff5f57", cursor: "pointer", zIndex: 5 }} />}
             <input value={c.name} onChange={e => upd(c._idx, "name", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
               style={{ ...SI.inp, flex: 1, padding: "4px 8px", fontSize: 12 }} placeholder="name" />
             {c.type === "double" && <input type="number" value={c.default ?? 0} onChange={e => upd(c._idx, "default", parseFloat(e.target.value) || 0)}
@@ -93,7 +96,6 @@ export default function DataComponentsPanel() {
             {c.type === "string" && <input value={c.default ?? ""} onChange={e => upd(c._idx, "default", e.target.value)}
               style={{ ...SI.inp, width: 100, padding: "4px 8px", fontSize: 12 }} placeholder="default" />}
             {c.type === "item" && <span style={{ fontSize: 11, color: C.faint }}>item stack</span>}
-            <span onClick={() => del(c._idx)} style={{ cursor: "pointer", color: "#cc5a5a", fontSize: 14, padding: "0 4px" }}>✕</span>
           </div>
         ))}
       </div>;

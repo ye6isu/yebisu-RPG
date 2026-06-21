@@ -403,7 +403,23 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
         if(loops++ > 500) break;
         const n = nextNs.find(x=>x.id===cur);
         if(!n) break;
-        if (n.opcode === "control.if") {
+        if (n.opcode === "entity.dash") {
+           let ih = 50;
+           n.gapHeights = {};
+           if (n.fields?.hasCollision) {
+             let d0h = Math.max(0, getH(n.slots?.do0));
+             ih += 50 + d0h;
+             n.gapHeights.do0 = d0h;
+           }
+           if (n.fields?.hasThen) {
+             const thenSlot = n.fields?.hasCollision ? "do1" : "do0";
+             let dTh = Math.max(0, getH(n.slots?.[thenSlot]));
+             ih += 50 + dTh;
+             n.gapHeights[thenSlot] = dTh;
+           }
+           h += ih;
+           n.height = ih;
+        } else if (n.opcode === "control.if") {
            const f = n.fields || {elseIfCount:0, hasElse:false};
            let d0h = Math.max(0, getH(n.slots?.do0));
            let ih = 50 + d0h;
@@ -447,7 +463,21 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
         const n = nextNs.find(x=>x.id===cur);
         if(!n) break;
         n.x = sx; n.y = cy; n.depth = depth;
-        if (n.opcode === "control.if") {
+        if (n.opcode === "entity.dash") {
+           let innerY = cy + 50;
+           if (n.fields?.hasCollision) {
+             innerY += 50;
+             if (n.slots?.do0) layoutChain(n.slots.do0, sx + 30, innerY, depth + 1);
+             innerY += Math.max(0, getH(n.slots?.do0));
+           }
+           if (n.fields?.hasThen) {
+             innerY += 50;
+             const thenSlot = n.fields?.hasCollision ? "do1" : "do0";
+             if (n.slots?.[thenSlot]) layoutChain(n.slots[thenSlot], sx + 30, innerY, depth + 1);
+             innerY += Math.max(0, getH(n.slots?.[thenSlot]));
+           }
+           cy = innerY;
+        } else if (n.opcode === "control.if") {
            const f = n.fields || {elseIfCount:0, hasElse:false};
            let innerY = cy + 50;
            if (n.slots?.do0) layoutChain(n.slots.do0, sx + 30, innerY, depth + 1);
@@ -663,6 +693,26 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
                        let snb={x:n.x+20,y:n.y+h};
                        let d=Math.hypot(mx-snb.x,my-snb.y);
                        if(d<md&&!n.nextId){md=d;cst=n.id;csk="nextId";}
+                     } else if (n.opcode === "entity.dash") {
+                       let curY = 50;
+                       if (n.fields?.hasCollision) {
+                         curY += 50;
+                         let snb = {x: n.x + 45, y: n.y + curY};
+                         let d = Math.hypot(mx - snb.x, my - snb.y);
+                         if (d < md && !n.slots?.do0) { md = d; cst = n.id; csk = "do0"; }
+                         curY += (n.gapHeights?.do0 || 0);
+                       }
+                       if (n.fields?.hasThen) {
+                         curY += 50;
+                         const thenSlot = n.fields?.hasCollision ? "do1" : "do0";
+                         let snb = {x: n.x + 45, y: n.y + curY};
+                         let d = Math.hypot(mx - snb.x, my - snb.y);
+                         if (d < md && !n.slots?.[thenSlot]) { md = d; cst = n.id; csk = thenSlot; }
+                         curY += (n.gapHeights?.[thenSlot] || 0);
+                       }
+                       let bottomSnb = {x: n.x + 20, y: n.y + (n.height || 50)};
+                       let db = Math.hypot(mx - bottomSnb.x, my - bottomSnb.y);
+                       if (db < md && !n.nextId) { md = db; cst = n.id; csk = "nextId"; }
                      } else {
                        let curY = 50;
                        const f = n.fields || {elseIfCount:0, hasElse:false};
@@ -735,7 +785,8 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
                const varSetValueAccepts = !bdefAccepts && (parent?.opcode === "variable.set" && sk === "value") ? varTypeToLink(parent?.fields?.varType || "int") : null;
                const chatTextAccepts = !bdefAccepts && (parent?.opcode === "chat.send" && sk.startsWith("text")) ? LINK_TEXT : null;
                const datacompSetAccepts = !bdefAccepts && (parent?.opcode === "datacomp.set" && sk === "value") ? (parent?.fields?.compType === "bool" ? LINK_LOGIC : parent?.fields?.compType === "string" ? LINK_TEXT : LINK_NUMBER) : null;
-               if ((bdefAccepts && bdefAccepts === dragged.linkType) || (varSetValueAccepts && varSetValueAccepts === dragged.linkType) || (chatTextAccepts && chatTextAccepts === dragged.linkType) || (datacompSetAccepts && datacompSetAccepts === dragged.linkType) || (def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
+               const dashColAccepts = !bdefAccepts && parent?.opcode === "entity.dash" && (sk === "colRadius" || sk === "colWidth" || sk === "colHeight" || sk === "colDepth") ? LINK_NUMBER : null;
+               if ((bdefAccepts && bdefAccepts === dragged.linkType) || (varSetValueAccepts && varSetValueAccepts === dragged.linkType) || (chatTextAccepts && chatTextAccepts === dragged.linkType) || (datacompSetAccepts && datacompSetAccepts === dragged.linkType) || (dashColAccepts && dashColAccepts === dragged.linkType) || (def && def.accepts === dragged.linkType) || (isLogicSlot && dragged.linkType === "logic")) {
                    nextNs = nextNs.map(x => x.id === parent.id ? {...x, slots: {...(x.slots||{}), [sk]: dragged.id}} : x);
                }
            }
@@ -1187,6 +1238,43 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       </>}
     </div>
   );
+
+  if (node.opcode === "entity.dash" && (node.fields?.hasCollision || node.fields?.hasThen)) {
+      const _dashHasCol = !!node.fields?.hasCollision;
+      const _dashHasThen = !!node.fields?.hasThen;
+      const _dashThenSlot = _dashHasCol ? "do1" : "do0";
+      return (
+        <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+            <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>
+            <div style={{minHeight:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
+            {_dashHasCol && <>
+              <div style={{minHeight:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,gap:10,borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
+                <span style={{fontFamily:"sans-serif",fontSize:16,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>On Collision</span>
+                <PortalSelect value={node.fields?.collisionShape||"sphere"} onChange={v=>onFieldChange&&onFieldChange(node.id,"collisionShape",v)} minWidth={80} options={[{value:"sphere",label:"Sphere"},{value:"box",label:"Box"}]}/>
+                {(node.fields?.collisionShape||"sphere")==="sphere"&&<>
+                  <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>radius</span>
+                  <SlotConn sk="colRadius" sc="rgba(0,0,0,0.3)" connId={node.slots?.colRadius} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+                </>}
+                {node.fields?.collisionShape==="box"&&<>
+                  <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>w</span>
+                  <SlotConn sk="colWidth" sc="rgba(0,0,0,0.3)" connId={node.slots?.colWidth} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+                  <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>h</span>
+                  <SlotConn sk="colHeight" sc="rgba(0,0,0,0.3)" connId={node.slots?.colHeight} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+                  <span style={{fontSize:13,fontFamily:"sans-serif",color:"#fff",fontWeight:700}}>d</span>
+                  <SlotConn sk="colDepth" sc="rgba(0,0,0,0.3)" connId={node.slots?.colDepth} nodes={nodes} mk={methodKey} onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selectedNodeId={selected}/>
+                </>}
+              </div>
+              <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
+            </>}
+            {_dashHasThen && <>
+              <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
+                <span style={{fontFamily:"sans-serif",fontSize:16,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>Then</span>
+              </div>
+              <div style={{height:node.gapHeights?.[_dashThenSlot]||0,background:"transparent"}}/>
+            </>}
+        </div>
+      );
+  }
 
   if (isIf) {
       return (

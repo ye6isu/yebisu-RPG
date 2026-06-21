@@ -103,6 +103,7 @@ public final class AoeShapes {
             if (requireLoS && !hasLineOfSight(level, losOrigin, e)) continue;
             result.add(e);
         }
+        addMultipartEntities(level, aabb, exclude, result, pos -> pos.distanceTo(center) <= radius);
         return result;
     }
 
@@ -156,6 +157,11 @@ public final class AoeShapes {
             if (requireLoS && !hasLineOfSight(level, losOrigin, e)) continue;
             result.add(e);
         }
+        final Vec3 fR = right, fU = up, fF = forward;
+        addMultipartEntities(level, aabb, exclude, result, pos -> {
+            Vec3 rel = pos.subtract(center);
+            return Math.abs(rel.dot(fR)) <= hw && Math.abs(rel.dot(fU)) <= hh && Math.abs(rel.dot(fF)) <= hd;
+        });
         return result;
     }
 
@@ -213,6 +219,11 @@ public final class AoeShapes {
             if (requireLoS && !hasLineOfSight(level, eye, e)) continue;
             result.add(e);
         }
+        final Vec3 fEye = eye; final Vec3 fLook = look; final double fDist = distance; final double fCos = cosHalf;
+        addMultipartEntities(level, aabb, excludeSelf ? source : null, result, pos -> {
+            Vec3 toP = pos.subtract(fEye); double d = toP.length();
+            return d <= fDist && d > 0.001 && toP.normalize().dot(fLook) >= fCos;
+        });
         return result;
     }
 
@@ -267,6 +278,12 @@ public final class AoeShapes {
             if (requireLoS && !hasLineOfSight(level, eye, e)) continue;
             result.add(e);
         }
+        final Vec3 fEye2 = eye; final Vec3 fLook2 = look; final double fDist2 = distance; final double fRad2 = radius;
+        addMultipartEntities(level, aabb, excludeSelf ? source : null, result, pos -> {
+            Vec3 toP = pos.subtract(fEye2); double along = toP.dot(fLook2);
+            if (along < 0 || along > fDist2) return false;
+            return pos.distanceTo(fEye2.add(fLook2.scale(along))) <= fRad2;
+        });
         return result;
     }
 
@@ -324,6 +341,11 @@ public final class AoeShapes {
             if (requireLoS && !hasLineOfSight(level, eye, e)) continue;
             result.add(e);
         }
+        final Vec3 fEye3 = eye; final Vec3 fLook3 = look; final double fDist3 = distance; final double fCos3 = cosHalf;
+        addMultipartEntities(level, aabb, excludeSelf ? source : null, result, pos -> {
+            Vec3 toP = pos.subtract(fEye3); double d = toP.length();
+            return d <= fDist3 && d > 0.001 && toP.normalize().dot(fLook3) >= fCos3;
+        });
         return result;
     }
 
@@ -378,7 +400,31 @@ public final class AoeShapes {
             if (requireLoS && !hasLineOfSight(level, eye, e)) continue;
             result.add(e);
         }
+        final Vec3 fEye4 = eye; final Vec3 fLook4 = look; final double fDist4 = distance; final double fRad4 = radius;
+        addMultipartEntities(level, aabb, excludeSelf ? source : null, result, pos -> {
+            Vec3 toP = pos.subtract(fEye4); double along = toP.dot(fLook4);
+            if (along < 0 || along > fDist4) return false;
+            return pos.distanceTo(fEye4.add(fLook4.scale(along))) <= fRad4;
+        });
         return result;
+    }
+
+    // ── Multi-part entity support ───────────────────────────────────────────
+
+    private static void addMultipartEntities(ServerLevel level, AABB broadBox, Entity exclude,
+                                              List<LivingEntity> result, java.util.function.Predicate<Vec3> inShape) {
+        for (Entity ent : level.getEntities(exclude, broadBox, e -> e.isMultipartEntity() && e instanceof LivingEntity && e.isAlive())) {
+            LivingEntity le = (LivingEntity) ent;
+            if (result.contains(le)) continue;
+            if (ent.getParts() == null) continue;
+            for (var part : ent.getParts()) {
+                Vec3 partCenter = part.getBoundingBox().getCenter();
+                if (inShape.test(partCenter)) {
+                    result.add(le);
+                    break;
+                }
+            }
+        }
     }
 
     // ── Helpers for "in front" positioning ────────────────────────────────────

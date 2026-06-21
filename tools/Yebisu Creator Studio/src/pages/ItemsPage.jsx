@@ -104,7 +104,16 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
       }
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
-    if((form.dataComponents||[]).length){await api("/datacomponents/save",{components:form.dataComponents});}
+    const allDC=[...(form.dataComponents||[])];
+    const allBlocks=Object.values(form.methodBlocks||{}).flat();
+    for(const bn of allBlocks){
+      if((bn.opcode==="datacomp.get"||bn.opcode==="datacomp.set")&&bn.fields?.compName){
+        const name=bn.fields.compName;
+        const type=bn.fields.compType||"double";
+        if(!allDC.some(d=>d.name===name))allDC.push({name,type});
+      }
+    }
+    if(allDC.length){await api("/datacomponents/save",{components:allDC});}
     await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()},initial?.id);
   };

@@ -447,7 +447,7 @@ export function compileActionNode(node, nodes, methodKey) {
     return [
       `if (${ent} instanceof LivingEntity _abrst) {`,
       `    var _abrsti = _abrst.getAttribute(${attrRef});`,
-      `    if (_abrsti != null) _abrsti.setBaseValue(_abrsti.getAttribute().getDefaultValue());`,
+      `    if (_abrsti != null) _abrsti.setBaseValue(_abrsti.getAttribute().value().getDefaultValue());`,
       `}`,
     ];
   }
@@ -494,6 +494,35 @@ export function compileActionNode(node, nodes, methodKey) {
     const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
     const ticks = resolveSlotValue(node.slots?.ticks, nodes, methodKey) || "20";
     return [`if (${ent} instanceof net.minecraft.world.entity.player.Player _cdp) { _cdp.getCooldowns().addCooldown(${stack}.getItem(), (int)((double)(${ticks}))); }`];
+  }
+  if (node.opcode === "entity.dash") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const x = resolveSlotValue(node.slots?.x, nodes, methodKey) || "0";
+    const y = resolveSlotValue(node.slots?.y, nodes, methodKey) || "0";
+    const z = resolveSlotValue(node.slots?.z, nodes, methodKey) || "0";
+    const distance = resolveSlotValue(node.slots?.distance, nodes, methodKey) || "10";
+    const ticks = resolveSlotValue(node.slots?.ticks, nodes, methodKey) || "5";
+    const easing = node.fields?.easing || "LINEAR";
+    const hasCollision = !!node.fields?.hasCollision;
+    const hasThen = !!node.fields?.hasThen;
+    const shape = node.fields?.collisionShape || "sphere";
+    const particles = !!node.fields?.showParticles;
+    const colRadius = resolveSlotValue(node.slots?.colRadius, nodes, methodKey) || "1.5";
+    const colWidth = resolveSlotValue(node.slots?.colWidth, nodes, methodKey) || "3";
+    const colHeight = resolveSlotValue(node.slots?.colHeight, nodes, methodKey) || "3";
+    const colDepth = resolveSlotValue(node.slots?.colDepth, nodes, methodKey) || "3";
+    const colA = shape === "box" ? colWidth : colRadius;
+    const colB = shape === "box" ? colHeight : "0";
+    const colC = shape === "box" ? colDepth : "0";
+    const collisionBody = hasCollision ? compileChain(node.slots?.do0, nodes, methodKey).map(l => "    " + l) : [];
+    const thenBody = hasThen ? compileChain(node.slots?.[hasCollision ? "do1" : "do0"], nodes, methodKey).map(l => "    " + l) : [];
+    const collisionParam = hasCollision
+      ? `(_dashSrc, _iterEnt) -> {\n${collisionBody.length ? collisionBody.join("\n") : "    // collision"}\n}`
+      : "null";
+    const thenParam = hasThen
+      ? `() -> {\n${thenBody.length ? thenBody.join("\n") : "    // then"}\n}`
+      : "null";
+    return [`DashUtil.start(${ent}, (double)(${x}), (double)(${y}), (double)(${z}), (double)(${distance}), (int)((double)(${ticks})), DashUtil.Easing.${easing}, ${collisionParam}, ${thenParam}, "${shape}", (double)(${colA}), (double)(${colB}), (double)(${colC}), ${particles});`];
   }
   return ["// unknown: " + node.opcode];
 }

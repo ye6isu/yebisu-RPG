@@ -170,6 +170,9 @@ export function ycsSyncImports(code, enabledMethodKeys) {
   if (code.includes('ItemStack.isSameItem')) {
     needed.add('net.minecraft.world.item.ItemStack');
   }
+  if (code.includes('DashUtil.')) {
+    needed.add('net.ye6isu.yebisuRPG.util.DashUtil');
+  }
 
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');
   result = result.replace(/\/\/YCS:import:[^\n]+\n?import [^;]+;\n?/g, '');
@@ -332,6 +335,9 @@ export function ycsEffectSyncImports(code, enabledMethodKeys) {
   }
   if (code.includes('ItemStack.isSameItem')) {
     needed.add('net.minecraft.world.item.ItemStack');
+  }
+  if (code.includes('DashUtil.')) {
+    needed.add('net.ye6isu.yebisuRPG.util.DashUtil');
   }
 
   let result = code.replace(/\/\/YCS_Import_START\n[\s\S]*?\/\/YCS_Import_END\n?/g, '');

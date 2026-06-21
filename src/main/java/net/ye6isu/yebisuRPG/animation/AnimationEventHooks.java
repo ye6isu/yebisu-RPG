@@ -204,6 +204,7 @@ public final class AnimationEventHooks {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         net.ye6isu.yebisuRPG.util.TickScheduler.INSTANCE.tick();
+        net.ye6isu.yebisuRPG.util.DashUtil.tick();
 
         // Per-tick hit sets are rebuilt fresh each tick — clear first.
         TICK_HIT_SETS.clear();
