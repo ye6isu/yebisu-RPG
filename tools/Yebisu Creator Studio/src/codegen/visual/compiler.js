@@ -241,6 +241,10 @@ export function compileActionNode(node, nodes, methodKey) {
 
     if (visExpr) lines.push(visExpr);
     lines.push("    for (net.minecraft.world.entity.LivingEntity _iterEnt : " + queryExpr + ") {");
+    lines.push("      _iterEnt.setYRot(" + ent + ".getYRot());");
+    if (node.fields?.copyPitch) {
+      lines.push("      _iterEnt.setXRot(" + ent + ".getXRot());");
+    }
     if (node.slots?.do0) {
       const body = compileChain(node.slots.do0, nodes, methodKey).map(l => "      " + l);
       lines.push(...body);

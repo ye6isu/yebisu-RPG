@@ -608,7 +608,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
                      } else {
                        let curY = 50;
                        const f = n.fields || {elseIfCount:0, hasElse:false};
-                       for (let i=0; i<=f.elseIfCount + (f.hasElse?1:0); i++) {
+                       for (let i=0; i<=(f.elseIfCount||0) + (f.hasElse?1:0); i++) {
                            let sk = i===0 ? "do0" : i<=f.elseIfCount ? "do"+i : "doElse";
                            let snb = {x: n.x + 45, y: n.y + curY};
                            let d = Math.hypot(mx - snb.x, my - snb.y);

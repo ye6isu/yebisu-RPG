@@ -79,6 +79,8 @@ export function evalCondition(cond, fields) {
   if (neqMatch) return (fields?.[neqMatch[1]] ?? "") !== neqMatch[2];
   const containsMatch = cond.match(/^(\w+)\s+contains\s+'([^']*)'$/);
   if (containsMatch) return ((fields?.[containsMatch[1]] ?? "") + "").includes(containsMatch[2]);
+  const bareMatch = cond.match(/^(\w+)$/);
+  if (bareMatch) return !!(fields?.[bareMatch[1]]);
   return true;
 }
 

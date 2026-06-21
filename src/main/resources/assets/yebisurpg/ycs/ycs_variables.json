@@ -1,7 +1,7 @@
 [
   {
-    "name": "asdasda",
-    "titleText": "testsasda",
+    "name": "testbool",
+    "titleText": "Test Bool",
     "type": "bool",
     "default": false
   }
