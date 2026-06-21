@@ -76,7 +76,11 @@ export function buildPalette(variables, modAttributes) {
   const jsonCats = {};
   for (const bdef of BLOCK_DEFS) {
     if (existingOpcodes.has(bdef.opcode)) continue;
-    if (!jsonCats[bdef.category]) jsonCats[bdef.category] = { data: [], actions: [] };
+    if (!jsonCats[bdef.category]) jsonCats[bdef.category] = { subs: {} };
+    const subKey = bdef.sub || "actions";
+    const isData = subKey === "data";
+    const normalizedSub = isData ? "data" : subKey;
+    if (!jsonCats[bdef.category].subs[normalizedSub]) jsonCats[bdef.category].subs[normalizedSub] = [];
     const entry = {
       opcode: bdef.opcode,
       label: bdef.paletteLabel || bdef.label.replace(/\[[\w:.]+\]/g, '').trim() || bdef.opcode,
@@ -85,16 +89,24 @@ export function buildPalette(variables, modAttributes) {
       hint: bdef.hint,
       slotDefs: [],
     };
-    if (bdef.sub === "data") jsonCats[bdef.category].data.push(entry);
-    else jsonCats[bdef.category].actions.push(entry);
+    jsonCats[bdef.category].subs[normalizedSub].push(entry);
   }
-  for (const [cat, items] of Object.entries(jsonCats)) {
+  for (const [cat, info] of Object.entries(jsonCats)) {
     const existing = result.find(c => c.category === cat);
-    if (existing) {
-      existing.data.push(...items.data);
-      existing.actions.push(...items.actions);
+    const data = info.subs["data"] || [];
+    const actionSubs = Object.entries(info.subs).filter(([k]) => k !== "data");
+    if (actionSubs.length === 1 && actionSubs[0][0] === "actions") {
+      if (existing) { existing.data.push(...data); existing.actions.push(...actionSubs[0][1]); }
+      else result.push({ category: cat, data, actions: actionSubs[0][1] });
     } else {
-      result.push({ category: cat, data: items.data, actions: items.actions });
+      const catObj = existing || { category: cat, data: [], actions: [] };
+      if (!existing) result.push(catObj);
+      catObj.data.push(...data);
+      if (!catObj.actionSubs) catObj.actionSubs = [];
+      for (const [subName, blocks] of actionSubs) {
+        catObj.actionSubs.push({ label: subName, blocks });
+      }
+      catObj.actionSubs.sort((a, b) => b.label.localeCompare(a.label));
     }
   }
 
@@ -104,8 +116,9 @@ export function buildPalette(variables, modAttributes) {
     if (existing) {
       existing.data.push(...(cat.data||[]));
       existing.actions.push(...(cat.actions||[]));
+      if (cat.actionSubs) { if (!existing.actionSubs) existing.actionSubs = []; existing.actionSubs.push(...cat.actionSubs); }
     } else {
-      merged.push({ category: cat.category, data: [...(cat.data||[])], actions: [...(cat.actions||[])] });
+      merged.push({ category: cat.category, data: [...(cat.data||[])], actions: [...(cat.actions||[])], actionSubs: cat.actionSubs ? [...cat.actionSubs] : undefined });
     }
   }
   return merged;
