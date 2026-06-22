@@ -204,7 +204,10 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
 
         float weight = 1.0f;
         if (playhead != null) {
-            weight *= playhead.getBlendInWeight(partialTick);
+            // Skip blend-in when a pose is active — the animation's frame 0 should match
+            // the pose, so blending from rest would cause a visible snap to T-pose.
+            boolean hasPose = engine.getThirdPersonPose(entityId) != null;
+            if (!hasPose) weight *= playhead.getBlendInWeight(partialTick);
         }
         if (blender != null && blender.isActive()) {
             weight *= 1.0f - blender.getBlendAlpha(partialTick);
@@ -235,6 +238,10 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         boolean lArmVan  = (vanMask & AnimationPlayhead.VAN_LEFT_ARM) != 0;
         boolean rLegVan  = (vanMask & AnimationPlayhead.VAN_RIGHT_LEG) != 0;
         boolean lLegVan  = (vanMask & AnimationPlayhead.VAN_LEFT_LEG) != 0;
+
+        // HAND_SKIP: the animation skips this arm, but a TP pose should still drive it.
+        boolean rArmPoseFallback = !rArmVan && (vanMask & AnimationPlayhead.HAND_SKIP_RIGHT) != 0;
+        boolean lArmPoseFallback = !lArmVan && (vanMask & AnimationPlayhead.HAND_SKIP_LEFT)  != 0;
 
         // Snapshot vanilla pose deltas for crouch/sitting BEFORE any resetPose() calls.
         // Vanilla rest positions: head.y=0, body.y=0, arms.y=2, legs.y=12, legs.z=0.
@@ -422,10 +429,44 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         float rArmLookYaw = (lookMask & AnimationPlayhead.LOOK_RARM_YAW) != 0 ? yawRad : 0f;
         float lArmLookYaw = (lookMask & AnimationPlayhead.LOOK_LARM_YAW) != 0 ? yawRad : 0f;
 
-        if (!rArmVan)  { this.rightArm.resetPose(); applyBone(this.rightArm, rArmP,  timeSecs, weight,
-            rArmLookYaw, rArmLookPitch); }
-        if (!lArmVan)  { this.leftArm.resetPose();  applyBone(this.leftArm,  lArmP,  timeSecs, weight,
-            lArmLookYaw, lArmLookPitch); }
+        // Resolve pose fallback for skipped arms: use TP pose data + pose's own look-at settings.
+        HandAnimationLoader.BonePose rArmFinal = rArmP;
+        HandAnimationLoader.BonePose lArmFinal = lArmP;
+        float rArmT = timeSecs, lArmT = timeSecs;
+        float rArmLookYawFinal = rArmLookYaw, rArmLookPitchFinal = rArmLookPitch;
+        float lArmLookYawFinal = lArmLookYaw, lArmLookPitchFinal = lArmLookPitch;
+        if (rArmPoseFallback || lArmPoseFallback) {
+            HandAnimationLoader.AnimData tpPoseAnim = engine.getThirdPersonPose(entityId);
+            net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload posePl = engine.getThirdPersonPosePayload(entityId);
+            int poseLookMask = posePl != null ? posePl.lookAtMask() : 0;
+            float poseT = 0f;
+            if (tpPoseAnim != null) {
+                if (tpPoseAnim.loopMode() == AnimationLoopMode.LOOP && tpPoseAnim.length() > 0f) {
+                    poseT = engine.getPoseElapsedSecs(entityId, true) % tpPoseAnim.length();
+                } else {
+                    poseT = tpPoseAnim.length();
+                }
+            }
+            if (rArmPoseFallback) {
+                if (tpPoseAnim != null) {
+                    rArmFinal = tpPoseAnim.bone("right_arm"); rArmT = poseT;
+                    rArmLookYawFinal = (poseLookMask & AnimationPlayhead.LOOK_RARM_YAW) != 0 ? yawRad : 0f;
+                    rArmLookPitchFinal = (poseLookMask & AnimationPlayhead.LOOK_RARM_PITCH) != 0 ? pitchRad : 0f;
+                } else rArmVan = true;
+            }
+            if (lArmPoseFallback) {
+                if (tpPoseAnim != null) {
+                    lArmFinal = tpPoseAnim.bone("left_arm"); lArmT = poseT;
+                    lArmLookYawFinal = (poseLookMask & AnimationPlayhead.LOOK_LARM_YAW) != 0 ? yawRad : 0f;
+                    lArmLookPitchFinal = (poseLookMask & AnimationPlayhead.LOOK_LARM_PITCH) != 0 ? pitchRad : 0f;
+                } else lArmVan = true;
+            }
+        }
+
+        if (!rArmVan)  { this.rightArm.resetPose(); applyBone(this.rightArm, rArmFinal,  rArmT, weight,
+            rArmLookYawFinal, rArmLookPitchFinal); }
+        if (!lArmVan)  { this.leftArm.resetPose();  applyBone(this.leftArm,  lArmFinal,  lArmT, weight,
+            lArmLookYawFinal, lArmLookPitchFinal); }
         if (!rLegVan)  { this.rightLeg.resetPose(); applyBone(this.rightLeg, rLegP,  timeSecs, weight,
             (lookMask & AnimationPlayhead.LOOK_RLEG_YAW)   != 0 ? yawRad : 0f,
             (lookMask & AnimationPlayhead.LOOK_RLEG_PITCH) != 0 ? pitchRad : 0f); }
