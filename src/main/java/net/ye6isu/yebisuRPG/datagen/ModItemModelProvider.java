@@ -92,7 +92,11 @@ existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRP
 
         basicItem(ModItems.YE6ISU.get());
 
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/axer"),TEXTURE);
+
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/plank"),TEXTURE);
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/arererer"),TEXTURE);
 
         //YCS_Mod_Item_Model_END
     }

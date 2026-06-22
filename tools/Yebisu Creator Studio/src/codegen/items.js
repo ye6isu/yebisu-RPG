@@ -41,9 +41,11 @@ export function gTagCode(id,form,isBlock=false){if(!form.tags?.length)return[];c
 export function idToClassName(id){return id.split("_").map(w=>w?w[0].toUpperCase()+w.slice(1):"").join("")+"Item";}
 
 export function gItemCode(item,textures){
-  const texId=(item.textureId||"").startsWith("__direct__")?null:item.textureId;const tex=textures.find(t=>t.id===texId);
+  const rawTexId=item.holdingMode==="3d"?(item.modelTexture3dId||""):(item.textureId||"");
+  const texId=rawTexId.startsWith("__direct__")?null:rawTexId;const tex=textures.find(t=>t.id===texId);
   const id=item.id||"my_item",CN=item.customConstName?item.constName:id.toUpperCase(),dn=item.displayName||id;
-  const cls2=item.customItemClass||null;
+  const hasClassFeatures=(item.enabledMethods||[]).length>0||item.isFood||item.isFuel||item.hasTooltip||item.hasUseDuration||item.hasUseAnimation;
+  const cls2=(item.customItemClass&&hasClassFeatures)?item.customItemClass:null;
   const isTool=!!item.isTool;
   const isFood=!!item.isFood;
   const isFuel=!!item.isFuel;
@@ -97,12 +99,15 @@ export function gItemCode(item,textures){
     reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new Item(${props})`)});`;
   }
 
+  const is3d=item.holdingMode==="3d";
   const isHandheld=item.holdingMode==="handheld";
   const isSpritesheet=!!tex?.isSpritesheet;
   const isAnimated=isSpritesheet&&!!tex?.isAnimated;
   const isMultistate=isSpritesheet&&!isAnimated&&(tex?.frames||1)>1;
-  const needsManualModel=isAnimated||isMultistate;
-  const modelLine=needsManualModel
+  const needsManualModel=isAnimated||isMultistate||is3d;
+  const modelLine=is3d
+    ?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);`
+    :needsManualModel
     ?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);`
     :(isHandheld?`handheldItem(ModItems.${CN});`:`basicItem(ModItems.${CN}.get());`);
   const spritesheet=isMultistate?{frames:tex.frames,defaultFrame:tex.defaultFrame||0}:null;

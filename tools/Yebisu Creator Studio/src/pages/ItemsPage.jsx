@@ -25,18 +25,37 @@ function extractFrames(dataUrl,frameCount){
   });
 }
 
-export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{},dataComponents:[]};
+export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{},dataComponents:[],geoModelJson:null,geoModelFileName:null,itemModelJson:null,itemModelFileName:null,modelTextureInvId:"",modelTexture3dId:"",hasCustomInvTexture:false};
 
 export function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
+
+function TexField({label,textures,texKey,form,F,activePanel,setActivePanel,panelKey}){
+  const tid=(form[texKey]||"").startsWith("__direct__")?null:form[texKey];
+  const st=textures.find(t=>t.id===tid);
+  const du=(form[texKey]||"").startsWith("__direct__")?form[texKey].split("__name__")[0].replace("__direct__",""):null;
+  return<div style={{display:"flex",flexDirection:"column",gap:4}}>
+    <Lbl>{label}</Lbl>
+    <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+        {(st||du)
+          ?<AImg url={st?.dataUrl||du} size={20} anim={st?.isAnimated} frames={st?.frames||1} ticks={st?.ticksPerFrame||4}/>
+          :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+        <span style={{fontSize:13,color:st||du?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st?st.label:du?"(direct)":"none selected"}</span>
+      </div>
+      <Btn sm v={activePanel===panelKey?"p":"g"} onClick={()=>setActivePanel(p=>p===panelKey?null:panelKey)} style={{marginLeft:8,flexShrink:0}}>{(st||du)?"edit":"set"}</Btn>
+    </div>
+  </div>;
+}
 
 export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modItems=[],showCons,consoleH,activePanel,setActivePanel,rightView,setRightView}){
   const{form,F}=useContext(FormCtx);
   const{options:creativeTabOptions}=useCreativeTabs();
   const[saving,setSaving]=useState(false);const[status,setStatus]=useState([]);
-  const texId=(form.textureId||"").startsWith("__direct__")?null:form.textureId;
+  const activeTexId=form.holdingMode==="3d"?(form.modelTexture3dId||""):(form.textureId||"");
+  const texId=activeTexId.startsWith("__direct__")?null:activeTexId;
   const selTex=textures.find(t=>t.id===texId);
-  const dUrl=(form.textureId||"").startsWith("__direct__")?form.textureId.split("__name__")[0].replace("__direct__",""):null;
-  const dName=(form.textureId||"").startsWith("__direct__")?form.textureId.split("__name__")[1]:null;
+  const dUrl=activeTexId.startsWith("__direct__")?activeTexId.split("__name__")[0].replace("__direct__",""):null;
+  const dName=activeTexId.startsWith("__direct__")?activeTexId.split("__name__")[1]:null;
   const tags=form.tags||[];
   const save=async()=>{
     if(!form.id.trim())return;setSaving(true);setStatus([]);
@@ -68,8 +87,23 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
         }
       }
     };
+    const wtGeo=async()=>{
+      if(form.holdingMode!=="3d")return;
+      if(form.geoModelJson||form.itemModelJson){
+        const jg=await api("/geo/save",{id:form.id,type:"item",geoJson:form.geoModelJson,itemModelJson:form.itemModelJson,constName:CN});
+        msgs.push({ok:jg.ok,label:"3d-model",msg:jg.ok?"ok":jg.reason});
+      }
+      const tex3dId=(form.modelTexture3dId||"").startsWith("__direct__")?null:form.modelTexture3dId;
+      const tex3d=textures.find(t=>t.id===tex3dId);
+      const d3dUrl=(form.modelTexture3dId||"").startsWith("__direct__")?(form.modelTexture3dId).split("__name__")[0].replace("__direct__",""):null;
+      const tex3dData=d3dUrl||tex3d?.dataUrl;
+      if(tex3dData){
+        const j3d=await api("/texture",{filename:`${form.id}.png`,dataUrl:tex3dData,folder:"geo/item"});
+        msgs.push({ok:j3d.ok,label:"3d-texture",msg:j3d.ok?"ok":j3d.reason});
+      }
+    };
     if(!isEdit){
-      await wtItem();
+      await wtItem();await wtGeo();
       const j2=await api("/items/register",{line:code.reg,constName:CN,fpReg:code.fpReg});msgs.push({ok:j2.ok,label:"ModItems",msg:j2.ok?"ok":j2.reason});
       const j3=await api("/lang/set",{key:code.langKey,value:code.langVal});msgs.push({ok:j3.ok,label:"lang",msg:j3.ok?"ok":j3.reason});
       const j4=await api("/items/model",{line:code.modelLine,constName:code.CN,id:form.id});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
@@ -79,7 +113,7 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     }else{
       const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine,fpReg:code.fpReg,isAnimated:code.tex?.isAnimated||false});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
-      await wtItem();
+      await wtItem();await wtGeo();
       if(form.hasTooltip){for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}}
       else{await api("/lang/delete",{keys:[`tooltip.${MODID}.${form.id}.normal`,`tooltip.${MODID}.${form.id}.shift_hint`,`tooltip.${MODID}.${form.id}.hidden`]});}
       if(gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
@@ -88,19 +122,26 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     }
     if(form.customItemClass) {
       const clsName = form.customItemClass;
-      const cc = await api("/items/custom-class/read",{className:clsName});
-      if(cc.ok) {
-        let nCode = cc.code;
-        nCode = form.isFood ? ycsInjectFeature(nCode, "food", form, form.id) : ycsRemoveFeature(nCode, "food");
-        nCode = form.isFuel ? ycsInjectFeature(nCode, "fuel", form, form.id) : ycsRemoveFeature(nCode, "fuel");
-        nCode = form.hasTooltip ? ycsInjectFeature(nCode, "tooltip", form, form.id) : ycsRemoveFeature(nCode, "tooltip");
-        const needsDuration = form.hasUseDuration || form.hasUseAnimation;
-        nCode = needsDuration ? ycsInjectFeature(nCode, "useDuration", form, form.id) : ycsRemoveFeature(nCode, "useDuration");
-        nCode = form.hasUseAnimation ? ycsInjectFeature(nCode, "useAnimation", form, form.id) : ycsRemoveFeature(nCode, "useAnimation");
-        if (nCode !== cc.code) {
-          const cw = await api("/items/custom-class/write",{className:clsName,code:nCode});
-          msgs.push({ok:cw.ok,label:"class",msg:cw.ok?"ok":cw.reason});
+      const needsClass=(form.enabledMethods||[]).length>0||form.isFood||form.isFuel||form.hasTooltip||form.hasUseDuration||form.hasUseAnimation;
+      if(needsClass){
+        const cc = await api("/items/custom-class/read",{className:clsName});
+        if(cc.ok) {
+          let nCode = cc.code;
+          nCode = form.isFood ? ycsInjectFeature(nCode, "food", form, form.id) : ycsRemoveFeature(nCode, "food");
+          nCode = form.isFuel ? ycsInjectFeature(nCode, "fuel", form, form.id) : ycsRemoveFeature(nCode, "fuel");
+          nCode = form.hasTooltip ? ycsInjectFeature(nCode, "tooltip", form, form.id) : ycsRemoveFeature(nCode, "tooltip");
+          const needsDuration = form.hasUseDuration || form.hasUseAnimation;
+          nCode = needsDuration ? ycsInjectFeature(nCode, "useDuration", form, form.id) : ycsRemoveFeature(nCode, "useDuration");
+          nCode = form.hasUseAnimation ? ycsInjectFeature(nCode, "useAnimation", form, form.id) : ycsRemoveFeature(nCode, "useAnimation");
+          if (nCode !== cc.code) {
+            const cw = await api("/items/custom-class/write",{className:clsName,code:nCode});
+            msgs.push({ok:cw.ok,label:"class",msg:cw.ok?"ok":cw.reason});
+          }
         }
+      } else {
+        await api("/items/custom-class/delete",{className:clsName});
+        F("customItemClass","");
+        msgs.push({ok:true,label:"class",msg:"removed (no features)"});
       }
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
@@ -132,6 +173,15 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     </div>
     <ConstField form={form} F={F}/>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <Lbl>Model</Lbl>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <div style={{flex:1}}><Sel value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default"},{value:"handheld",label:"Handheld"},{value:"3d",label:"3D Model"}]}/></div>
+        {form.holdingMode==="3d"&&<Btn sm v={activePanel==="3dmodel"?"p":"g"} onClick={()=>setActivePanel(p=>p==="3dmodel"?null:"3dmodel")} style={{flexShrink:0}}>{(form.geoModelJson||form.itemModelJson)?"edit":"set"}</Btn>}
+      </div>
+    </div>
+    {form.holdingMode==="3d"
+      ?<TexField label="Texture" textures={textures} texKey="modelTexture3dId" form={form} F={F} activePanel={activePanel} setActivePanel={setActivePanel} panelKey="texture-3d"/>
+    :<div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Texture</Lbl>
       <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
@@ -142,7 +192,7 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
         </div>
         <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>{(selTex||dUrl)?"edit":"set"}</Btn>
       </div>
-    </div>
+    </div>}
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
     <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
       <div style={{flex:1}}>
@@ -195,7 +245,6 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     </div>
       </div>
     </div>
-    <Sel label="Holding Mode" value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default"},{value:"handheld",label:"Handheld"}]}/>
     {!form.isTool&&<Inp label="Max Stack Size" type="number" value={form.maxStackSize??64} onChange={v=>{const n=Math.max(1,Math.min(99,parseInt(v)||64));F("maxStackSize",String(n));}} style={{width:"100%"}}/>}
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       <Chk label="Set Use Duration" checked={!!form.hasUseDuration} onChange={v=>F("hasUseDuration",v)}/>

@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useRef, useContext } from "react";
 import { C, SI } from "../theme.js";
 import { Lbl, Btn, Sel, Pill, AImg } from "../components/ui.jsx";
 import { ITEM_METHODS } from "../codegen/visual/methods.js";
@@ -83,6 +83,46 @@ export function MethodListPanel({form,F,onEnterEditor,className}){
   </div>;
 }
 
+function JsonFileField({label,jsonKey,nameKey,form,F,accept}){
+  const ref=useRef();
+  const hasFile=!!form[jsonKey];
+  const fileName=form[nameKey]||null;
+  const load=()=>{
+    const f=ref.current.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=e=>{
+      try{const parsed=JSON.parse(e.target.result);F(jsonKey,parsed);F(nameKey,f.name);}
+      catch(err){F(jsonKey,null);F(nameKey,null);}
+    };
+    r.readAsText(f);
+    ref.current.value="";
+  };
+  return<div style={{display:"flex",flexDirection:"column",gap:6}}>
+    <Lbl>{label}</Lbl>
+    <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default",minHeight:38}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+        <div style={{width:20,height:20,background:hasFile?"#1a2a1a":C.prev,borderRadius:3,border:`1px ${hasFile?"solid":"dashed"} ${C.inpB}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:hasFile?"#6a8":"#555"}}>{hasFile?"{ }":""}</div>
+        <span style={{fontSize:13,color:hasFile?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fileName||"none selected"}</span>
+      </div>
+      <div style={{display:"flex",gap:4,flexShrink:0,marginLeft:8}}>
+        {hasFile&&<Btn sm v="g" onClick={()=>ref.current.click()}>replace</Btn>}
+        {hasFile
+          ?<Btn sm v="g" onClick={()=>{F(jsonKey,null);F(nameKey,null);}}>remove</Btn>
+          :<Btn sm v="g" onClick={()=>ref.current.click()}>set</Btn>}
+      </div>
+    </div>
+    <input ref={ref} type="file" accept={accept||".json"} style={{display:"none"}} onChange={load}/>
+  </div>;
+}
+
+function GeoModelPanel({form,F}){
+  return<div style={{padding:"14px",display:"flex",flexDirection:"column",gap:14}}>
+    <Lbl>3D Model Files</Lbl>
+    <JsonFileField label="Geometry File (.geo.json)" jsonKey="geoModelJson" nameKey="geoModelFileName" form={form} F={F} accept=".json,.geo.json"/>
+    <JsonFileField label="Item Model File (.item.json)" jsonKey="itemModelJson" nameKey="itemModelFileName" form={form} F={F} accept=".json,.item.json"/>
+  </div>;
+}
+
 export default function RightPaneShell({modItems=[],modBlocks=[],textures=[],isBlock=false,activePanel,setActivePanel,highlightFaceKey,rightView,setRightView,itemForm,itemF}){
   const faceLabel=highlightFaceKey?highlightFaceKey.replace(/^texture/,"").replace(/Id$/,"")+" face":"Texture";
   if(!activePanel){
@@ -108,6 +148,9 @@ export default function RightPaneShell({modItems=[],modBlocks=[],textures=[],isB
               onEnterEditor={key=>setRightView({mode:"visualEditor",editingMethod:key})}/>
       )}
       {activePanel==="texture"&&<TexturePickerPanel textures={textures} fkey={highlightFaceKey||"textureId"} label={faceLabel}/>}
+      {activePanel==="texture-inv"&&<TexturePickerPanel textures={textures} fkey="modelTextureInvId" label="Inventory Texture"/>}
+      {activePanel==="texture-3d"&&<TexturePickerPanel textures={textures} fkey="modelTexture3dId" label="3D Model Texture"/>}
+      {activePanel==="3dmodel"&&<GeoModelPanel form={itemForm} F={itemF}/>}
       {activePanel==="tags"&&<TagsPanel/>}
       {activePanel==="tooltip"&&<TooltipPanel/>}
       {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks} textures={textures}/>}

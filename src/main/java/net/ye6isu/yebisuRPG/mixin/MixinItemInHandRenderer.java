@@ -320,8 +320,14 @@ public abstract class MixinItemInHandRenderer {
             MultiBufferSource.BufferSource bufferSource, int packedLight) {
 
         float origX = arm.xRot, origY = arm.yRot, origZ = arm.zRot;
+        float origPosX = arm.x, origPosY = arm.y, origPosZ = arm.z;
+        float origScaleX = arm.xScale, origScaleY = arm.yScale, origScaleZ = arm.zScale;
         float origSX = sleeve.xRot, origSY = sleeve.yRot, origSZ = sleeve.zRot;
+        float origSPosX = sleeve.x, origSPosY = sleeve.y, origSPosZ = sleeve.z;
+        float origSScaleX = sleeve.xScale, origSScaleY = sleeve.yScale, origSScaleZ = sleeve.zScale;
 
+        arm.resetPose();
+        sleeve.resetPose();
         arm.xRot    = (float) Math.toRadians(rx);
         arm.yRot    = (float) Math.toRadians(ry);
         arm.zRot    = (float) Math.toRadians(rz);
@@ -376,7 +382,11 @@ public abstract class MixinItemInHandRenderer {
         }
 
         arm.xRot = origX; arm.yRot = origY; arm.zRot = origZ;
+        arm.x = origPosX; arm.y = origPosY; arm.z = origPosZ;
+        arm.xScale = origScaleX; arm.yScale = origScaleY; arm.zScale = origScaleZ;
         sleeve.xRot = origSX; sleeve.yRot = origSY; sleeve.zRot = origSZ;
+        sleeve.x = origSPosX; sleeve.y = origSPosY; sleeve.z = origSPosZ;
+        sleeve.xScale = origSScaleX; sleeve.yScale = origSScaleY; sleeve.zScale = origSScaleZ;
     }
 
     /**
@@ -402,6 +412,13 @@ public abstract class MixinItemInHandRenderer {
      * moves the item in the rendered scene.
      */
     private static final float ITEM_SOCKET_RATIO = 1f / 16f;
+
+    // ── Slim model first-person item offset ──────────────────────────────────
+    // Tune these to align the held item for slim (3px arm) skins.
+    // Wide model uses: X = 1/16f, Y = 0.125f, Z = -0.625f
+    private static final float SLIM_ITEM_OFFSET_X = 0.1f / 16f;   // left/right
+    private static final float SLIM_ITEM_OFFSET_Y = 0.125f;     // up/down
+    private static final float SLIM_ITEM_OFFSET_Z = -0.625f;    // forward/back
 
     private static void renderHandWithItem(
             float rx, float ry, float rz,
@@ -451,7 +468,16 @@ public abstract class MixinItemInHandRenderer {
 
         // 4. Default hand-tip offset — already in scaled space because scale was applied above.
         // scale(-1,1,1) mirrors X, so the left hand needs a negated X to land correctly.
-        pose.translate((leftHand ? -1f : 1f) / 16f, 0.125f, -0.625f);
+        // Slim models (3px arm) need a different offset than wide models (4px arm).
+        boolean slim = player.getSkin().model() == net.minecraft.client.resources.PlayerSkin.Model.SLIM;
+        if (slim) {
+            // ── SLIM MODEL ITEM OFFSET ──
+            // Adjust these 3 values to align the item in slim-model first person.
+            // X = left/right, Y = up/down, Z = forward/back (in arm-local space after rotation).
+            pose.translate((leftHand ? -1f : 1f) * SLIM_ITEM_OFFSET_X, SLIM_ITEM_OFFSET_Y, SLIM_ITEM_OFFSET_Z);
+        } else {
+            pose.translate((leftHand ? -1f : 1f) / 16f, 0.125f, -0.625f);
+        }
 
         // 5. Item socket — animation position + rotation for right_item_socket / left_item_socket.
         //    Position units from Blockbench are scaled by ITEM_SOCKET_RATIO.
