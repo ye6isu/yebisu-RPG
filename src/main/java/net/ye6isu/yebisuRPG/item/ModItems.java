@@ -18,7 +18,7 @@ public class ModItems {
 
     //Normal Items
     public static final DeferredItem<Item> PLANK = ITEMS.register("plank",
-                () -> new PlankItem(new Item.Properties().stacksTo(1)));
+                () -> new Item(new Item.Properties().stacksTo(1)));
 
     public static final DeferredItem<Item> YE6ISU = ITEMS.register("ye6isu",
                 () -> new Item(new Item.Properties()));
@@ -47,9 +47,6 @@ public class ModItems {
                     new Item.Properties()));
 
     //YCS_Mod_Items_START
-
-    public static final DeferredItem<Item> ARERERER = ITEMS.register("arererer",
-                () -> new ArerererItem(new Item.Properties().stacksTo(1)));
 
     //YCS_Mod_Items_END
 

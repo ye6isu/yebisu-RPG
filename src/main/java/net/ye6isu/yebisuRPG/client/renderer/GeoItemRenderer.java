@@ -152,6 +152,8 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         int customModelData = stack.getOrDefault(
                 net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
                 new net.minecraft.world.item.component.CustomModelData(0)).value();
+        int itemState = stack.getOrDefault(
+                net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get(), 0);
 
         int resolvedFrameCount = entry.frames() > 1 ? entry.frames()
                 : (spritesheetFrameCounts.containsKey(item) ? spritesheetFrameCounts.get(item) : 0);
@@ -170,7 +172,7 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         int effectiveTexH;
 
         if (entry.textures().size() > 1) {
-            int idx = Math.min(frame, entry.textures().size() - 1);
+            int idx = Math.min(itemState, entry.textures().size() - 1);
             textureLoc = entry.textures().get(idx);
             effectiveTexH = model.texHeight();
         } else {

@@ -99,12 +99,13 @@ export function gItemCode(item,textures){
     reg=`public static final DeferredItem<Item> ${CN} = ITEMS.register("${id}",\n        () -> ${addTooltipInline(`new Item(${props})`)});`;
   }
 
+  const hasStates=(item.stateCount||1)>1;
   const is3d=item.holdingMode==="3d";
   const isHandheld=item.holdingMode==="handheld";
   const isSpritesheet=!!tex?.isSpritesheet;
   const isAnimated=isSpritesheet&&!!tex?.isAnimated;
   const isMultistate=isSpritesheet&&!isAnimated&&(tex?.frames||1)>1;
-  const needsManualModel=isAnimated||isMultistate||is3d;
+  const needsManualModel=isAnimated||isMultistate||is3d||hasStates;
   const modelLine=is3d
     ?`existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/${id}"),TEXTURE);`
     :needsManualModel

@@ -1054,6 +1054,51 @@ export const BLOCK_DEFS = [
     },
   },
   {
+    opcode: "itemstack.set_state",
+    category: "Item", sub: "actions",
+    isAction: true,
+    label: "Set Item State to [state:number] for [stack:itemstack]",
+    hint: "Set the visual state of an item (0 = default, 1 = second state, etc.)",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "{{stack}}.set(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get(), (int)((double)({{state}})));",
+      imports: [],
+      slotDefaults: {
+        stack: { opcode: "itemstack.literal" },
+        state: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "itemstack.reset_state",
+    category: "Item", sub: "actions",
+    isAction: true,
+    label: "Reset Item State for [stack:itemstack]",
+    hint: "Reset item back to default visual state (state 0)",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "{{stack}}.remove(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get());",
+      imports: [],
+      slotDefaults: { stack: { opcode: "itemstack.literal" } },
+    },
+  },
+  {
+    opcode: "itemstack.get_state",
+    category: "Item", sub: "data",
+    linkType: "number",
+    label: "Get Item State of [stack:itemstack]",
+    hint: "Get the current visual state of an item (0 = default, 1 = second state, etc.)",
+    color: "#4d65b4",
+    codegen: {
+      type: "value",
+      expr: "({{stack}}.getOrDefault(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get(), 0))",
+      imports: [],
+      slotDefaults: { stack: { opcode: "itemstack.literal" } },
+    },
+  },
+  {
     opcode: "itemstack.set_texture_frame",
     category: "Item", sub: "actions",
     isAction: true,
@@ -1084,6 +1129,20 @@ export const BLOCK_DEFS = [
       slotDefaults: {
         stack: { opcode: "itemstack.literal" },
       },
+    },
+  },
+  {
+    opcode: "itemstack.get_texture_frame",
+    category: "Item", sub: "data",
+    linkType: "number",
+    label: "Get Item Texture Frame of [stack:itemstack]",
+    hint: "Get the current texture frame of a spritesheet item (0 = default)",
+    color: "#4d65b4",
+    codegen: {
+      type: "value",
+      expr: "(Math.max(0, {{stack}}.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData(0)).value() - 1))",
+      imports: [],
+      slotDefaults: { stack: { opcode: "itemstack.literal" } },
     },
   },
   {
