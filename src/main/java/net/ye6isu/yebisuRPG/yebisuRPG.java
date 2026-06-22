@@ -110,9 +110,14 @@ public class yebisuRPG {
     }
 
     private void clientSetup(FMLClientSetupEvent event) {
-        // Runs on the client only during mod loading.
-        // ModKeybinds self-registers via @EventBusSubscriber(Dist.CLIENT) — no manual call needed.
-        // Add other client-only setup here (screen registration, renderer registration, etc.)
+        event.enqueueWork(() -> {
+            net.minecraft.client.renderer.item.ItemProperties.registerGeneric(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MODID, "item_state"),
+                (stack, level, entity, seed) -> {
+                    Integer state = stack.get(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get());
+                    return state != null ? (float) state : 0f;
+                });
+        });
     }
 
     /* To be decided if needed

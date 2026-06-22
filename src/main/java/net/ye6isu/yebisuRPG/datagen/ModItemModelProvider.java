@@ -84,19 +84,9 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         //YCS_Mod_Item_Model_START
 
-existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/test_utem"),TEXTURE);
+basicItem(ModItems.YE6ISU.get());
 
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/spirit"),TEXTURE);
-
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/norbit_the_orbit"),TEXTURE);
-
-        basicItem(ModItems.YE6ISU.get());
-
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/axer"),TEXTURE);
-
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/plank"),TEXTURE);
-
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/arererer"),TEXTURE);
+        handheldItem(ModItems.PLANK);
 
         //YCS_Mod_Item_Model_END
     }

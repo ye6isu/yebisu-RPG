@@ -50,14 +50,14 @@ public final class ModDataComponents {
                 .networkSynchronized(ByteBufCodecs.VAR_INT)
                 .build());
 
-    //YCS_DataComponents_START
-
-public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>
-        YCS_TESTER = COMPONENTS.register("ycs_tester", () ->
-            DataComponentType.<Double>builder()
-                .persistent(Codec.DOUBLE)
-                .networkSynchronized(ByteBufCodecs.DOUBLE)
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>>
+        ITEM_STATE = COMPONENTS.register("item_state", () ->
+            DataComponentType.<Integer>builder()
+                .persistent(Codec.INT)
+                .networkSynchronized(ByteBufCodecs.VAR_INT)
                 .build());
+
+    //YCS_DataComponents_START
 
 //YCS_DataComponents_END
 

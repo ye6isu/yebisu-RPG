@@ -59,8 +59,6 @@ public class GeoItemRegistry {
 
         //YCS_Geo_Collect_START
 
-tryRegister(items, ModItems.ARERERER, "arererer", 4, false, 4);
-
 //YCS_Geo_Collect_END
 
         return items;
@@ -68,6 +66,19 @@ tryRegister(items, ModItems.ARERERER, "arererer", 4, false, 4);
 
     private static void tryRegister(List<Item> items, DeferredItem<Item> deferred, String id) {
         tryRegister(items, deferred, id, 0, false, 0);
+    }
+
+    private static void tryRegisterStates(List<Item> items, DeferredItem<Item> deferred, String id, String[] stateGeoIds) {
+        ResourceLocation geoLoc = ResourceLocation.fromNamespaceAndPath(
+            yebisuRPG.MODID, "geo/item/" + id + ".geo.json");
+        java.util.List<ResourceLocation> textures = new java.util.ArrayList<>();
+        for (String geoId : stateGeoIds) {
+            textures.add(ResourceLocation.fromNamespaceAndPath(
+                yebisuRPG.MODID, "textures/geo/item/" + geoId + ".png"));
+        }
+        Item item = deferred.get();
+        GeoItemRenderer.register(item, geoLoc, textures);
+        items.add(item);
     }
 
     private static void tryRegister(List<Item> items, DeferredItem<Item> deferred, String id,

@@ -115,11 +115,16 @@ function JsonFileField({label,jsonKey,nameKey,form,F,accept}){
   </div>;
 }
 
-function GeoModelPanel({form,F}){
+function GeoModelPanel({form,F,stateIndex}){
+  const si=stateIndex!=null?stateIndex:null;
+  const stForm=si!=null&&form.states?form.states[si]||{}:form;
+  const stF=si!=null?(k,v)=>{
+    F(`_stateField_${si}_${k}`,v);
+  }:F;
   return<div style={{padding:"14px",display:"flex",flexDirection:"column",gap:14}}>
-    <Lbl>3D Model Files</Lbl>
-    <JsonFileField label="Geometry File (.geo.json)" jsonKey="geoModelJson" nameKey="geoModelFileName" form={form} F={F} accept=".json,.geo.json"/>
-    <JsonFileField label="Item Model File (.item.json)" jsonKey="itemModelJson" nameKey="itemModelFileName" form={form} F={F} accept=".json,.item.json"/>
+    <Lbl>{si!=null?`State ${si+1} — 3D Model Files`:"3D Model Files"}</Lbl>
+    <JsonFileField label="Geometry File (.geo.json)" jsonKey="geoModelJson" nameKey="geoModelFileName" form={stForm} F={stF} accept=".json,.geo.json"/>
+    <JsonFileField label="Item Model File (.item.json)" jsonKey="itemModelJson" nameKey="itemModelFileName" form={stForm} F={stF} accept=".json,.item.json"/>
   </div>;
 }
 
@@ -151,6 +156,9 @@ export default function RightPaneShell({modItems=[],modBlocks=[],textures=[],isB
       {activePanel==="texture-inv"&&<TexturePickerPanel textures={textures} fkey="modelTextureInvId" label="Inventory Texture"/>}
       {activePanel==="texture-3d"&&<TexturePickerPanel textures={textures} fkey="modelTexture3dId" label="3D Model Texture"/>}
       {activePanel==="3dmodel"&&<GeoModelPanel form={itemForm} F={itemF}/>}
+      {activePanel?.startsWith("texture_s")&&<TexturePickerPanel textures={textures} fkey={`stateTexId_${activePanel.replace("texture_s","")}`} label={`State ${parseInt(activePanel.replace("texture_s",""))+1} Texture`}/>}
+      {activePanel?.startsWith("texture-3d_s")&&<TexturePickerPanel textures={textures} fkey={`state3dTexId_${activePanel.replace("texture-3d_s","")}`} label={`State ${parseInt(activePanel.replace("texture-3d_s",""))+1} 3D Texture`}/>}
+      {activePanel?.startsWith("3dmodel_s")&&<GeoModelPanel form={itemForm} F={itemF} stateIndex={parseInt(activePanel.replace("3dmodel_s",""))}/>}
       {activePanel==="tags"&&<TagsPanel/>}
       {activePanel==="tooltip"&&<TooltipPanel/>}
       {activePanel==="recipe"&&<RecipePanelWrapper modItems={modItems} modBlocks={modBlocks} textures={textures}/>}

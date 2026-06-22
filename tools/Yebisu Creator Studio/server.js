@@ -210,7 +210,8 @@ app.post('/api/texture', (req, res) => {
     const { filename, dataUrl, folder='item' } = req.body
     const dir = jp(MOD_ROOT,'assets',MODID,'textures',folder)
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-    wf(jp(dir, filename), Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/,''),'base64'))
+    const fp = jp(dir, filename)
+    wf(fp, Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/,''),'base64'))
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -262,6 +263,124 @@ app.post('/api/texture/setup-mode', (req, res) => {
     // 'normal' mode: no extra files needed, datagen handles the model
     res.json({ ok: true })
   } catch(e) { res.json({ ok: false, reason: e.message }) }
+})
+
+// ─── Item States ──────────────────────────────────────────────────────────────
+app.post('/api/items/states-model', (req, res) => {
+  try {
+    const { id, states, constName, state0ItemModel } = req.body
+    if (!id || !states || !states.length) return res.json({ ok: false, reason: 'missing id or states' })
+
+    const modelDir = jp(MOD_ROOT, 'assets', MODID, 'models', 'item')
+    if (!fs.existsSync(modelDir)) fs.mkdirSync(modelDir, { recursive: true })
+
+    // Clean up old state model + frame model files
+    for (const f of fs.readdirSync(modelDir)) {
+      if (f.startsWith(`${id}_state_`) || f.startsWith(`${id}_frame_`)) {
+        const p = jp(modelDir, f)
+        fs.unlinkSync(p); triggerIdeaReload(p)
+      }
+    }
+
+    // Determine default state parent for main model
+    const state0 = states[0]
+    const defaultParent = state0.mode === '3d' ? 'builtin/entity'
+      : state0.mode === 'handheld' ? 'minecraft:item/handheld'
+      : 'minecraft:item/generated'
+
+    // Write per-state model files and build overrides
+    const overrides = []
+    const has3d = states.some(s => s.mode === '3d')
+    for (let i = 0; i < states.length; i++) {
+      const st = states[i]
+      const stateParent = st.mode === '3d' ? 'builtin/entity'
+        : st.mode === 'handheld' ? 'minecraft:item/handheld'
+        : 'minecraft:item/generated'
+
+      if (st.mode === '3d') {
+        const stateModel = { parent: 'builtin/entity', textures: { particle: `${MODID}:geo/item/${id}_state_${i}` } }
+        const sp = jp(modelDir, `${id}_state_${i}.json`)
+        fs.writeFileSync(sp, JSON.stringify(stateModel, null, 2))
+      } else {
+        const stateModel = { parent: stateParent, textures: { layer0: `${MODID}:item/${id}_state_${i}` } }
+        const sp = jp(modelDir, `${id}_state_${i}.json`)
+        fs.writeFileSync(sp, JSON.stringify(stateModel, null, 2))
+        // Generate per-frame models for spritesheet states
+        const frames = st.frames || 1
+        if (frames > 1) {
+          for (let fi = 0; fi < frames; fi++) {
+            const frameModel = { parent: stateParent, textures: { layer0: `${MODID}:item/${id}_state_${i}_frame_${fi}` } }
+            const fp = jp(modelDir, `${id}_state_${i}_frame_${fi}.json`)
+            fs.writeFileSync(fp, JSON.stringify(frameModel, null, 2))
+              }
+        }
+      }
+    }
+
+    // Build overrides: first per-frame overrides for spritesheet states (custom_model_data),
+    // then state overrides (yebisurpg:item_state). State overrides come last so they win.
+    for (let i = 0; i < states.length; i++) {
+      const st = states[i]
+      if (st.mode !== '3d' && (st.frames || 1) > 1) {
+        for (let fi = 0; fi < st.frames; fi++) {
+          overrides.push({ predicate: { custom_model_data: fi + 1 }, model: `${MODID}:item/${id}_state_${i}_frame_${fi}` })
+        }
+      }
+    }
+    for (let i = 1; i < states.length; i++) {
+      overrides.push({ predicate: { 'yebisurpg:item_state': i }, model: `${MODID}:item/${id}_state_${i}` })
+    }
+
+    // Write main model (state 0 is default when no item_state component)
+    const mainTextures = state0.mode === '3d'
+      ? { particle: `${MODID}:geo/item/${id}` }
+      : { layer0: `${MODID}:item/${id}` }
+    const mainModel = { parent: defaultParent, textures: mainTextures, overrides }
+    // If state 0 is 3D and has uploaded display transforms, merge them into the base model
+    if (state0ItemModel && state0.mode === '3d') {
+      if (state0ItemModel.display) mainModel.display = state0ItemModel.display
+      if (state0ItemModel.textures) mainModel.textures = { ...mainModel.textures, ...state0ItemModel.textures }
+    }
+    const mainModelPath = jp(modelDir, `${id}.json`)
+    fs.writeFileSync(mainModelPath, JSON.stringify(mainModel, null, 2))
+
+    // If any state is 3D, register in GeoItemRegistry
+    if (has3d && constName) {
+      const regFile = jp(JAVA_ROOT, 'client', 'renderer', 'GeoItemRegistry.java')
+      if (fs.existsSync(regFile)) {
+        let src = rf(regFile)
+        const startM = '//YCS_Geo_Collect_START'
+        const endM = '//YCS_Geo_Collect_END'
+        const si = src.indexOf(startM)
+        const ei = src.indexOf(endM)
+        if (si !== -1 && ei !== -1) {
+          const section = src.slice(si + startM.length, ei)
+          const geoStates = states.filter(s => s.mode === '3d')
+          let line
+          if (geoStates.length === 1 && geoStates[0].texMeta) {
+            // Single 3D state with spritesheet animation — use tryRegister with animation params
+            const tm = geoStates[0].texMeta
+            const geoId = geoStates[0].geoId || id
+            line = `        tryRegister(items, ModItems.${constName}, "${geoId}", ${tm.frames}, ${tm.animated}, ${tm.ticksPerFrame});`
+          } else {
+            // Multiple 3D states or no animation — use tryRegisterStates
+            const geoIds = states.map((s, i) => s.mode === '3d' ? `${id}_state_${i}` : null).filter(Boolean)
+            line = `        tryRegisterStates(items, ModItems.${constName}, "${id}", new String[]{${geoIds.map(g => `"${g}"`).join(', ')}});`
+          }
+          const cleanedSection = section.split('\n').filter(l => !l.includes(`ModItems.${constName}`)).join('\n')
+          const before = src.slice(0, si + startM.length)
+          const after = src.slice(ei)
+          const trimmed = cleanedSection.replace(/^\n+|\n+$/g, '')
+          const newSection = trimmed ? '\n' + trimmed + '\n' + line + '\n' : '\n' + line + '\n'
+          src = before + newSection + after
+          wf(regFile, src)
+        }
+      }
+    }
+
+    markDirty()
+    res.json({ ok: true })
+  } catch (e) { res.json({ ok: false, reason: e.message }) }
 })
 
 // ─── Lang ──────────────────────────────────────────────────────────────────────
@@ -537,7 +656,7 @@ app.post('/api/items/delete', (req, res) => {
     let skipNext = false
     for (let i = 0; i < modelLines.length; i++) {
       const l = modelLines[i]
-      if (l.includes(`ModItems.${constName}`) || l.includes(`"${id}"`)) { skipNext = true; continue }
+      if (l.includes(`ModItems.${constName}`) || l.includes(`"${id}"`) || l.includes(`"item/${id}"`)) { skipNext = true; continue }
       if (skipNext) { if (l.trim().startsWith('.') || l.trim() === ';') continue; skipNext = false }
       cleanedModel.push(l)
     }
@@ -553,6 +672,45 @@ app.post('/api/items/delete', (req, res) => {
       try { removeLines(fpFile, l => l.includes(`public static final FoodProperties ${constName} =`)) } catch {}
     }
     try { cleanupFrameFiles(id) } catch {}
+    try { cleanupItemFiles(id) } catch {}
+    // Remove from ycs_vanilla_items.json
+    try {
+      const viPath = jp(MOD_ROOT, 'assets', MODID, 'ycs', 'ycs_vanilla_items.json')
+      if (fs.existsSync(viPath)) {
+        const viList = JSON.parse(rf(viPath))
+        const entry = `${MODID}:${id}`
+        const filtered = viList.filter(v => v !== entry)
+        if (filtered.length !== viList.length) wf(viPath, JSON.stringify(filtered, null, 2))
+      }
+    } catch {}
+    // Remove from GeoItemRegistry
+    if (constName) {
+      try {
+        const regFile = jp(JAVA_ROOT, 'client', 'renderer', 'GeoItemRegistry.java')
+        if (fs.existsSync(regFile)) {
+          let geoSrc = rf(regFile)
+          const startM = '//YCS_Geo_Collect_START'
+          const endM = '//YCS_Geo_Collect_END'
+          const gsi = geoSrc.indexOf(startM)
+          const gei = geoSrc.indexOf(endM)
+          if (gsi !== -1 && gei !== -1) {
+            const before = geoSrc.slice(0, gsi + startM.length)
+            const section = geoSrc.slice(gsi + startM.length, gei)
+            const after = geoSrc.slice(gei)
+            const cleaned = section.split('\n').filter(l => !l.includes(`ModItems.${constName}`)).join('\n')
+            geoSrc = before + cleaned + after
+            wf(regFile, geoSrc)
+          }
+        }
+      } catch {}
+    }
+    // Remove custom item class
+    try {
+      const clsDir = jp(JAVA_ROOT, 'item', 'custom')
+      const clsName = id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') + 'Item'
+      const clsFile = jp(clsDir, `${clsName}.java`)
+      if (fs.existsSync(clsFile)) { fs.unlinkSync(clsFile); triggerIdeaReload(clsFile) }
+    } catch {}
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
@@ -561,7 +719,6 @@ app.post('/api/items/delete', (req, res) => {
 app.post('/api/geo/save', (req, res) => {
   try {
     const { id, type, geoJson, itemModelJson, constName, texMeta } = req.body
-    console.log('[geo/save] id=%s constName=%s texMeta=%s', id, constName, JSON.stringify(texMeta))
     if (!id || !type) return res.json({ ok: false, reason: 'missing id or type' })
     const geoDir = jp(MOD_ROOT, 'assets', MODID, 'geo', type)
     if (!fs.existsSync(geoDir)) fs.mkdirSync(geoDir, { recursive: true })
@@ -1804,6 +1961,39 @@ function cleanupFrameFiles(id) {
   }
 }
 
+function cleanupItemFiles(id) {
+  const del = (p) => { if (fs.existsSync(p)) { try { fs.unlinkSync(p); triggerIdeaReload(p) } catch {} } }
+  const delMatching = (dir, prefix) => {
+    if (!fs.existsSync(dir)) return
+    for (const f of fs.readdirSync(dir)) {
+      if (f.startsWith(prefix)) del(jp(dir, f))
+    }
+  }
+  // Flat textures: ${id}.png, ${id}.png.mcmeta, ${id}_*.png, ${id}_*.png.mcmeta
+  const texDir = jp(MOD_ROOT,'assets',MODID,'textures','item')
+  del(jp(texDir, `${id}.png`))
+  del(jp(texDir, `${id}.png.mcmeta`))
+  delMatching(texDir, `${id}_`)
+  // Flat models: ${id}.json, ${id}_*.json
+  const modelDir = jp(MOD_ROOT,'assets',MODID,'models','item')
+  del(jp(modelDir, `${id}.json`))
+  delMatching(modelDir, `${id}_`)
+  // Generated models
+  const genModelDir = jp(GEN_ROOT, 'assets', MODID, 'models', 'item')
+  if (fs.existsSync(genModelDir)) {
+    del(jp(genModelDir, `${id}.json`))
+    delMatching(genModelDir, `${id}_`)
+  }
+  // Geo textures
+  const geoTexDir = jp(MOD_ROOT,'assets',MODID,'textures','geo','item')
+  del(jp(geoTexDir, `${id}.png`))
+  delMatching(geoTexDir, `${id}_`)
+  // Geo models
+  const geoDir = jp(MOD_ROOT,'assets',MODID,'geo','item')
+  del(jp(geoDir, `${id}.geo.json`))
+  delMatching(geoDir, `${id}_`)
+}
+
 function writeMultistateModelJson(id, frames, defaultFrame, isHandheld) {
   const modelDir = jp(MOD_ROOT,'assets',MODID,'models','item')
   if (!fs.existsSync(modelDir)) fs.mkdirSync(modelDir, { recursive:true })
@@ -1850,6 +2040,10 @@ function autoWriteMissingModelJsons() {
       for (const f of fs.readdirSync(itemTexDir)) {
         if (!f.endsWith('.png')) continue
         const id = f.replace('.png','')
+        if (/_state_\d+/.test(id) || /_frame_\d+/.test(id)) continue
+        // Skip items that have a manual model in main/resources (states, 3d, multistate)
+        const manualModel = jp(MOD_ROOT, 'assets', MODID, 'models', 'item', `${id}.json`)
+        if (fs.existsSync(manualModel)) continue
         const isHandheld = modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()})`) || modelProvSrc.includes(`handheldItem(ModItems.${id.toUpperCase()};`)
         writeModelJson(id, isHandheld)
       }

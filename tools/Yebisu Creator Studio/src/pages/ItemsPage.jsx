@@ -25,9 +25,9 @@ function extractFrames(dataUrl,frameCount){
   });
 }
 
-export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{},dataComponents:[],geoModelJson:null,geoModelFileName:null,itemModelJson:null,itemModelFileName:null,modelTextureInvId:"",modelTexture3dId:"",hasCustomInvTexture:false};
+export const ITEM_DEF={id:"",constName:"",customConstName:false,displayName:"",textureId:"",isTool:false,isFood:false,isFuel:false,hasDurability:false,durability:"100",hasUseDuration:false,useDuration:"72000",customItemClass:"",toolType:"Sword",tier:"Iron",damage:"3",speed:"-2.4",burnTime:"1600",holdingMode:"none",maxStackSize:"64",foodNutrition:"3",foodSaturation:"0.3",foodAlwaysEdible:false,foodEffects:[],creativeTab:"",tags:[],hasRecipe:false,recipe:{type:"shaped",pattern:["   ","   ","   "],keys:{},result:1},hasTooltip:false,tooltipNormal:"",hasHiddenTooltip:false,useDefaultShiftHint:true,tooltipShiftHint:"",tooltipHidden:"",enabledMethods:[],methodBlocks:{},dataComponents:[],geoModelJson:null,geoModelFileName:null,itemModelJson:null,itemModelFileName:null,modelTextureInvId:"",modelTexture3dId:"",hasCustomInvTexture:false,stateCount:1,states:[]};
 
-export function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
+export function ItemProv({initial,formOverride,onFormChange,children}){const[form,setForm]=useState(formOverride||(initial?{...ITEM_DEF,...initial}:ITEM_DEF));const F=useCallback((k,v)=>setForm(f=>{const m=k.match(/^_stateField_(\d+)_(.+)$/);if(m){const si=parseInt(m[1]),fk=m[2],ns=[...(f.states||[])];ns[si]={...ns[si],[fk]:v};const nf={...f,states:ns};onFormChange&&onFormChange(nf);return nf;}const nf={...f,[k]:v};onFormChange&&onFormChange(nf);return nf;}),[onFormChange]);return<FormCtx.Provider value={{form,F}}>{children}</FormCtx.Provider>;}
 
 function TexField({label,textures,texKey,form,F,activePanel,setActivePanel,panelKey}){
   const tid=(form[texKey]||"").startsWith("__direct__")?null:form[texKey];
@@ -92,7 +92,6 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
       const tex3dId=(form.modelTexture3dId||"").startsWith("__direct__")?null:form.modelTexture3dId;
       const tex3d=textures.find(t=>t.id===tex3dId);
       const texMeta=tex3d&&tex3d.isSpritesheet&&(tex3d.frames||1)>1?{isSpritesheet:true,isAnimated:!!tex3d.isAnimated,frames:tex3d.frames,ticksPerFrame:tex3d.ticksPerFrame||4}:null;
-      console.log('[wtGeo] tex3dId=%s tex3d=%o texMeta=%o', tex3dId, tex3d, texMeta);
       if(form.geoModelJson||form.itemModelJson||texMeta){
         const jg=await api("/geo/save",{id:form.id,type:"item",geoJson:form.geoModelJson||null,itemModelJson:form.itemModelJson||null,constName:CN,texMeta});
         msgs.push({ok:jg.ok,label:"3d-model",msg:jg.ok?"ok":jg.reason});
@@ -104,8 +103,85 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
         msgs.push({ok:j3d.ok,label:"3d-texture",msg:j3d.ok?"ok":j3d.reason});
       }
     };
+    const wtStates=async()=>{
+      if((form.stateCount||1)<=1)return;
+      const states=form.states||[];
+      const stateInfos=[];
+      // First pass: collect state info and save flat textures
+      for(let si=0;si<states.length;si++){
+        const st=states[si];
+        const suffix=`_state_${si}`;
+        if(st.holdingMode==="3d"){
+          const raw3d=form[`state3dTexId_${si}`]||(si===0?form.modelTexture3dId:"")||"";
+          const t3id=raw3d.startsWith("__direct__")?null:raw3d;
+          const t3=textures.find(t=>t.id===t3id);
+          const texMeta3d=t3&&t3.isSpritesheet&&(t3.frames||1)>1?{frames:t3.frames,animated:!!t3.isAnimated,ticksPerFrame:t3.ticksPerFrame||4}:null;
+          stateInfos.push({mode:"3d",geoId:form.id+suffix,texMeta:texMeta3d});
+        }else{
+          const rawTex=form[`stateTexId_${si}`]||(si===0?form.textureId:"")||"";
+          const tid=rawTex.startsWith("__direct__")?null:rawTex;
+          const tex=textures.find(t=>t.id===tid);
+          const durl=rawTex.startsWith("__direct__")?rawTex.split("__name__")[0].replace("__direct__",""):null;
+          let texData=durl||tex?.dataUrl;
+          const isMultistate=tex?.isSpritesheet&&!tex?.isAnimated&&(tex?.frames||1)>1;
+          const isAnim=tex?.isSpritesheet&&tex?.isAnimated;
+          const frames=isMultistate?(tex.frames||1):1;
+          if(texData){
+            if(isMultistate){
+              const frameUrls=await extractFrames(texData,frames);
+              const defFrame=tex.defaultFrame||0;
+              // Save default frame as the state texture and base
+              const defData=frameUrls[defFrame];
+              await api("/texture",{filename:`${form.id}${suffix}.png`,dataUrl:defData,folder:"item"});
+              if(si===0) await api("/texture",{filename:`${form.id}.png`,dataUrl:defData,folder:"item"});
+              // Save all per-frame textures for "Set Item Texture Frame"
+              for(let fi=0;fi<frameUrls.length;fi++){
+                await api("/texture",{filename:`${form.id}${suffix}_frame_${fi}.png`,dataUrl:frameUrls[fi],folder:"item"});
+              }
+              msgs.push({ok:true,label:`s${si}-tex`,msg:`${frames} frames`});
+            }else{
+              await api("/texture",{filename:`${form.id}${suffix}.png`,dataUrl:texData,folder:"item"});
+              if(si===0) await api("/texture",{filename:`${form.id}.png`,dataUrl:texData,folder:"item"});
+              msgs.push({ok:true,label:`s${si}-tex`,msg:"ok"});
+            }
+            if(isAnim){
+              await api("/texture/mcmeta",{filename:`${form.id}${suffix}.png`,frametime:tex.ticksPerFrame||4,folder:"item"});
+              if(si===0) await api("/texture/mcmeta",{filename:`${form.id}.png`,frametime:tex.ticksPerFrame||4,folder:"item"});
+            }
+          }
+          stateInfos.push({mode:st.holdingMode||"none",frames,isHandheld:st.holdingMode==="handheld"});
+        }
+      }
+      // Generate model overrides (writes fallback models for all states)
+      const state0ItemModel=states[0]?.holdingMode==="3d"?states[0].itemModelJson:null;
+      const js=await api("/items/states-model",{id:form.id,states:stateInfos,constName:CN,state0ItemModel});
+      msgs.push({ok:js.ok,label:"states-model",msg:js.ok?"ok":js.reason});
+      // Second pass: save 3D geo models + textures (overwrites fallback model JSONs with full display transforms)
+      for(let si=0;si<states.length;si++){
+        const st=states[si];
+        const suffix=`_state_${si}`;
+        if(st.holdingMode!=="3d")continue;
+        const raw3d=form[`state3dTexId_${si}`]||(si===0?form.modelTexture3dId:"")||"";
+        const t3id=raw3d.startsWith("__direct__")?null:raw3d;
+        const tex=textures.find(t=>t.id===t3id);
+        const durl=raw3d.startsWith("__direct__")?raw3d.split("__name__")[0].replace("__direct__",""):null;
+        const texData=durl||tex?.dataUrl;
+        if(st.geoModelJson||st.itemModelJson){
+          const jg=await api("/geo/save",{id:form.id+suffix,type:"item",geoJson:st.geoModelJson||null,itemModelJson:st.itemModelJson||null,constName:null});
+          msgs.push({ok:jg.ok,label:`s${si}-3d-model`,msg:jg.ok?"ok":jg.reason});
+        }
+        if(texData){
+          const j=await api("/texture",{filename:`${form.id}${suffix}.png`,dataUrl:texData,folder:"geo/item"});
+          msgs.push({ok:j.ok,label:`s${si}-3d-tex`,msg:j.ok?"ok":j.reason});
+          if(si===0){
+            await api("/texture",{filename:`${form.id}.png`,dataUrl:texData,folder:"geo/item"});
+          }
+        }
+      }
+    };
+    const hasStates=(form.stateCount||1)>1;
     if(!isEdit){
-      await wtItem();await wtGeo();
+      if(!hasStates){await wtItem();await wtGeo();}await wtStates();
       const j2=await api("/items/register",{line:code.reg,constName:CN,fpReg:code.fpReg});msgs.push({ok:j2.ok,label:"ModItems",msg:j2.ok?"ok":j2.reason});
       const j3=await api("/lang/set",{key:code.langKey,value:code.langVal});msgs.push({ok:j3.ok,label:"lang",msg:j3.ok?"ok":j3.reason});
       const j4=await api("/items/model",{line:code.modelLine,constName:code.CN,id:form.id});msgs.push({ok:j4.ok,label:"model",msg:j4.ok?"ok":j4.reason});
@@ -115,7 +191,7 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     }else{
       const j=await api("/items/update",{oldConstName:initial.constName||initial.id?.toUpperCase(),oldId:initial.id,newLine:code.reg,newConstName:CN,newId:form.id,langKey:code.langKey,langVal:code.langVal,newModelLine:code.modelLine,fpReg:code.fpReg,isAnimated:code.tex?.isAnimated||false});msgs.push({ok:j.ok,label:"update",msg:j.ok?"ok":j.reason});
       if(initial.creativeTab&&initial.creativeTab!==form.creativeTab)await api("/creativetab/remove",{ref:`ModItems.${initial.constName||initial.id?.toUpperCase()}`});
-      await wtItem();await wtGeo();
+      if(!hasStates){await wtItem();await wtGeo();}await wtStates();
       if(form.hasTooltip){for(const tk of gTTKeys(form.id,form)){const jt=await api("/lang/set",{key:tk.key,value:tk.value,update:true});msgs.push({ok:jt.ok,label:tk.key,msg:jt.ok?"ok":jt.reason});}}
       else{await api("/lang/delete",{keys:[`tooltip.${MODID}.${form.id}.normal`,`tooltip.${MODID}.${form.id}.shift_hint`,`tooltip.${MODID}.${form.id}.hidden`]});}
       if(gRecipe(form.id,form)){const jr=await api("/recipes/set",{id:form.id,constName:CN,recipeCode:gRecipe(form.id,form)});msgs.push({ok:jr.ok,label:"recipe",msg:jr.ok?"ok":jr.reason});}
@@ -174,11 +250,16 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
       <input value={form.id} onChange={e=>{const v=e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"");F("id",v);if(!form.customConstName)F("constName",v.toUpperCase());}} style={{...SI.inp}}/>
     </div>
     <ConstField form={form} F={F}/>
+    <Chk label="Has States" checked={(form.stateCount||1)>1} onChange={v=>{if(v){F("stateCount",2);const st=[...(form.states||[])];while(st.length<2)st.push({holdingMode:"none",textureId:"",modelTexture3dId:"",geoModelJson:null,itemModelJson:null});if(!st[0].holdingMode||st[0].holdingMode==="none")st[0].holdingMode=form.holdingMode||"none";F("states",st.slice(0,2));if(!form.stateTexId_0&&form.textureId)F("stateTexId_0",form.textureId);if(!form.state3dTexId_0&&form.modelTexture3dId)F("state3dTexId_0",form.modelTexture3dId);if(!st[0].geoModelJson&&form.geoModelJson){st[0].geoModelJson=form.geoModelJson;st[0].itemModelJson=form.itemModelJson;st[0].geoModelFileName=form.geoModelFileName;st[0].itemModelFileName=form.itemModelFileName;F("states",[...st.slice(0,2)]);}}else{F("stateCount",1);F("states",[]);}}}/>
+    {(form.stateCount||1)>1&&<div style={{paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}><Inp label="Count" type="number" value={form.stateCount} onChange={v=>{const n=Math.max(2,Math.min(16,parseInt(v)||2));F("stateCount",n);const st=[...(form.states||[])];while(st.length<n)st.push({holdingMode:"none",textureId:"",modelTexture3dId:"",geoModelJson:null,itemModelJson:null});F("states",st.slice(0,n));}} style={{width:"100%"}}/></div>}
+    {(form.stateCount||1)<=1?<>
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <Lbl>Model</Lbl>
-      <div style={{display:"flex",gap:6,alignItems:"center"}}>
-        <div style={{flex:1}}><Sel value={form.holdingMode||"none"} onChange={v=>F("holdingMode",v)} options={[{value:"none",label:"Default"},{value:"handheld",label:"Handheld"},{value:"3d",label:"3D Model"}]}/></div>
-        {form.holdingMode==="3d"&&<Btn sm v={activePanel==="3dmodel"?"p":"g"} onClick={()=>setActivePanel(p=>p==="3dmodel"?null:"3dmodel")} style={{flexShrink:0}}>{(form.geoModelJson||form.itemModelJson)?"edit":"set"}</Btn>}
+      <div style={{...SI.inp,display:"flex",alignItems:"center",padding:0,overflow:"hidden"}}>
+        <select value={form.holdingMode||"none"} onChange={e=>F("holdingMode",e.target.value)} style={{flex:1,background:"transparent",border:"none",color:C.text,fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"7px 10px",outline:"none",cursor:"pointer"}}>
+          {[{value:"none",label:"Default"},{value:"handheld",label:"Handheld"},{value:"3d",label:"3D Model"}].map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        {form.holdingMode==="3d"&&<Btn sm v={activePanel==="3dmodel"?"p":"g"} onClick={()=>setActivePanel(p=>p==="3dmodel"?null:"3dmodel")} style={{flexShrink:0,marginRight:10}}>{(form.geoModelJson||form.itemModelJson)?"edit":"set"}</Btn>}
       </div>
     </div>
     {form.holdingMode==="3d"
@@ -195,6 +276,43 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
         <Btn sm v={activePanel==="texture"?"p":"g"} onClick={()=>setActivePanel(p=>p==="texture"?null:"texture")} style={{marginLeft:8,flexShrink:0}}>{(selTex||dUrl)?"edit":"set"}</Btn>
       </div>
     </div>}
+    </>
+    :(form.states||[]).map((st,si)=>{
+      const texFk=`stateTexId_${si}`;
+      const tex3dFk=`state3dTexId_${si}`;
+      const stTexVal=form[texFk]||"";
+      const stTexId=stTexVal.startsWith("__direct__")?null:stTexVal;
+      const stTex=textures.find(t=>t.id===stTexId);
+      const stDUrl=stTexVal.startsWith("__direct__")?stTexVal.split("__name__")[0].replace("__direct__",""):null;
+      const stF=(k,v)=>{const ns=[...(form.states||[])];ns[si]={...ns[si],[k]:v};F("states",ns);};
+      const geoFk=`stateGeo_${si}`;
+      return<div key={si} style={{display:"flex",flexDirection:"column",gap:8,paddingLeft:10,borderLeft:`2px solid ${C.inpB}`}}>
+        <Lbl>{`State ${si+1}${si===0?" (default)":""}`}</Lbl>
+        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+          <Lbl>Model</Lbl>
+          <div style={{...SI.inp,display:"flex",alignItems:"center",padding:0,overflow:"hidden"}}>
+            <select value={st.holdingMode||"none"} onChange={e=>stF("holdingMode",e.target.value)} style={{flex:1,background:"transparent",border:"none",color:C.text,fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"7px 10px",outline:"none",cursor:"pointer"}}>
+              {[{value:"none",label:"Default"},{value:"handheld",label:"Handheld"},{value:"3d",label:"3D Model"}].map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {st.holdingMode==="3d"&&<Btn sm v={activePanel===("3dmodel_s"+si)?"p":"g"} onClick={()=>setActivePanel(p=>p===("3dmodel_s"+si)?null:"3dmodel_s"+si)} style={{flexShrink:0,marginRight:10}}>{(st.geoModelJson||st.itemModelJson)?"edit":"set"}</Btn>}
+          </div>
+        </div>
+        {st.holdingMode==="3d"
+          ?<TexField label="Texture" textures={textures} texKey={tex3dFk} form={form} F={F} activePanel={activePanel} setActivePanel={setActivePanel} panelKey={"texture-3d_s"+si}/>
+          :<div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <Lbl>Texture</Lbl>
+            <div style={{...SI.inp,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",cursor:"default"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                {(stTex||stDUrl)
+                  ?<AImg url={stTex?.dataUrl||stDUrl} size={20}/>
+                  :<div style={{width:20,height:20,background:C.prev,borderRadius:3,border:`1px dashed ${C.inpB}`,flexShrink:0}}/>}
+                <span style={{fontSize:13,color:stTex||stDUrl?C.text:C.faint,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stTex?stTex.label:stDUrl?"(direct)":"none selected"}</span>
+              </div>
+              <Btn sm v={activePanel===("texture_s"+si)?"p":"g"} onClick={()=>setActivePanel(p=>p===("texture_s"+si)?null:"texture_s"+si)} style={{marginLeft:8,flexShrink:0}}>{(stTex||stDUrl)?"edit":"set"}</Btn>
+            </div>
+          </div>}
+      </div>;
+    })}
     <Sel label="Creative Tab" value={form.creativeTab} onChange={v=>F("creativeTab",v)} options={creativeTabOptions}/>
     <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
       <div style={{flex:1}}>

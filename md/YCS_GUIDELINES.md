@@ -244,11 +244,38 @@ When a new feature needs to touch a file/path not already listed under "Files YC
 
 ## Cleanup Rules
 
-When you delete an item or block, YCS:
-1. Removes its line from the `//YCS_Mod_Items_START ... //YCS_Mod_Items_END` block.
-2. Deletes its custom class file (if one exists).
-3. Deletes its texture file from `resources/assets/yebisurpg/textures/item/`.
-4. Rebuilds lang, model, and loot table files.
+**Principle: zero leftovers.** Deleting an item through YCS must remove every file and code injection it created, as if it never existed. No orphaned textures, models, geo files, or registry lines should remain.
+
+When you delete an item, YCS removes:
+
+**Java code injections:**
+- `ModItems.java` — registration field from `//YCS_Mod_Items_START...END`
+- `ModItemModelProvider.java` — model line from `//YCS_Mod_Item_Model_START...END`
+- `ModItemTagProvider.java` — tag lines referencing `ModItems.CONST`
+- `ModRecipeProvider.java` — recipe code
+- `ModCreativeTabEvents.java` — creative tab line
+- `ModFoodProperties.java` — food properties field (if exists)
+- `GeoItemRegistry.java` — `tryRegister`/`tryRegisterStates` line from `//YCS_Geo_Collect_START...END`
+- Custom class file `item/custom/XxxItem.java`
+
+**Resource files:**
+- `textures/item/${id}.png` + `.mcmeta`
+- `textures/item/${id}_frame_*.png` (spritesheet frames)
+- `textures/item/${id}_state_*.png` + `.mcmeta` (per-state textures)
+- `textures/item/${id}_state_*_frame_*.png` (per-state spritesheet frames)
+- `models/item/${id}.json` (manual model)
+- `models/item/${id}_frame_*.json` (spritesheet frame models)
+- `models/item/${id}_state_*.json` (per-state models)
+- `models/item/${id}_state_*_frame_*.json` (per-state frame models)
+- `geo/item/${id}.geo.json` (3D geo model)
+- `textures/geo/item/${id}.png` (3D texture)
+- `geo/item/${id}_state_*.geo.json` (per-state 3D geo models)
+- `textures/geo/item/${id}_state_*.png` (per-state 3D textures)
+
+**Data files:**
+- `en_us.json` — item name + tooltip lang keys
+- `ycs_tabs.json` — creative tab assignment
+- `ycs_vanilla_items.json` — item list entry
 
 When you uncheck a feature (Food / Fuel / Tooltip) on an item with a custom class:
 - The corresponding `//YCS:featureKey:start ... //YCS:featureKey:end` block is removed from the class file.
