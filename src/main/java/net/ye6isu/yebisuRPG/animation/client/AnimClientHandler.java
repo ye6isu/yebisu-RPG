@@ -58,4 +58,8 @@ public final class AnimClientHandler {
     public static void onThirdPersonPose(ThirdPersonPosePayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.setThirdPersonPose(payload));
     }
+
+    public static void onItemAnimPose(net.ye6isu.yebisuRPG.network.animation.ItemAnimPosePayload payload, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientAnimationEngine.INSTANCE.setItemAnimPose(payload));
+    }
 }

@@ -36,6 +36,16 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
     private static final Map<Item, GeoItemEntry> REGISTRY = new HashMap<>();
     private final Map<Item, BakedGeoModel> models = new HashMap<>();
 
+    private static int currentRenderEntityId = -1;
+
+    public static void setRenderEntity(int entityId) {
+        currentRenderEntityId = entityId;
+    }
+
+    public static void clearRenderEntity() {
+        currentRenderEntityId = -1;
+    }
+
     public GeoItemRenderer(BlockEntityRenderDispatcher dispatcher, EntityModelSet models) {
         super(dispatcher, models);
     }
@@ -69,6 +79,44 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         BakedGeoModel model = models.get(item);
         if (model == null) return;
 
+        // Resolve item animation data
+        boolean isMainHand = displayContext == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
+                || displayContext == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
+        int entityId = currentRenderEntityId >= 0 ? currentRenderEntityId
+                : (Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getId() : -1);
+
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData itemAnim = null;
+        float timeSecs = 0f;
+        if (entityId >= 0) {
+            net.ye6isu.yebisuRPG.animation.AnimationCategory cat = isMainHand
+                    ? net.ye6isu.yebisuRPG.animation.AnimationCategory.ITEM_MAIN_HAND
+                    : net.ye6isu.yebisuRPG.animation.AnimationCategory.ITEM_OFF_HAND;
+            net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine engine =
+                    net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE;
+            var playhead = engine.getPlayhead(entityId, cat);
+
+            if (playhead != null) {
+                itemAnim = playhead.filePath() != null
+                        ? net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId(), playhead.filePath())
+                        : net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId());
+                if (itemAnim != null) {
+                    float raw = playhead.getCurrentTimeSecs();
+                    var loopMode = playhead.effectiveLoopMode(itemAnim);
+                    timeSecs = (loopMode == net.ye6isu.yebisuRPG.animation.AnimationLoopMode.HOLD_LAST)
+                            ? Math.min(raw, itemAnim.length()) : raw;
+                }
+            } else {
+                itemAnim = engine.getItemAnimPose(entityId, isMainHand);
+                if (itemAnim != null) {
+                    if (itemAnim.loopMode() == net.ye6isu.yebisuRPG.animation.AnimationLoopMode.LOOP && itemAnim.length() > 0f) {
+                        timeSecs = engine.getItemPoseElapsedSecs(entityId, isMainHand) % itemAnim.length();
+                    } else {
+                        timeSecs = itemAnim.length();
+                    }
+                }
+            }
+        }
+
         RenderType renderType = RenderType.entityCutoutNoCull(entry.textureLocation());
         VertexConsumer vc = ItemRenderer.getFoilBufferDirect(buffer, renderType, false, stack.hasFoil());
 
@@ -77,21 +125,52 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.scale(1.0f / 16.0f, 1.0f / 16.0f, 1.0f / 16.0f);
 
         for (BakedBone bone : model.bones()) {
-            renderBone(bone, poseStack, vc, packedLight, packedOverlay, model.texWidth(), model.texHeight());
+            renderBone(bone, poseStack, vc, packedLight, packedOverlay, model.texWidth(), model.texHeight(), itemAnim, timeSecs);
         }
 
         poseStack.popPose();
     }
 
     private void renderBone(BakedBone bone, PoseStack poseStack, VertexConsumer vc,
-                            int light, int overlay, int texW, int texH) {
+                            int light, int overlay, int texW, int texH,
+                            net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim,
+                            float timeSecs) {
         poseStack.pushPose();
 
         float px = bone.pivotX(), py = bone.pivotY(), pz = bone.pivotZ();
-        poseStack.translate(px, py, pz);
-        if (bone.rotX() != 0) poseStack.mulPose(Axis.XP.rotationDegrees(-bone.rotX()));
-        if (bone.rotY() != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-bone.rotY()));
-        if (bone.rotZ() != 0) poseStack.mulPose(Axis.ZP.rotationDegrees(bone.rotZ()));
+
+        // Apply animation overrides for this bone if available
+        float animRX = 0, animRY = 0, animRZ = 0;
+        float animPX = 0, animPY = 0, animPZ = 0;
+        float animSX = 1, animSY = 1, animSZ = 1;
+        if (anim != null) {
+            var bp = anim.bone(bone.name());
+            animRX = bp.rotation().evalX(timeSecs);
+            animRY = bp.rotation().evalY(timeSecs);
+            animRZ = bp.rotation().evalZ(timeSecs);
+            animPX = bp.position().evalX(timeSecs);
+            animPY = bp.position().evalY(timeSecs);
+            animPZ = bp.position().evalZ(timeSecs);
+            animSX = bp.scale().evalX(timeSecs);
+            animSY = bp.scale().evalY(timeSecs);
+            animSZ = bp.scale().evalZ(timeSecs);
+        }
+
+        // Compose base bone rotation + animation rotation via quaternions
+        // so animated axes stay correct regardless of base pose
+        org.joml.Quaternionf qBase = eulerToQuat(
+            (float) Math.toRadians(-bone.rotX()),
+            (float) Math.toRadians(-bone.rotY()),
+            (float) Math.toRadians(bone.rotZ()));
+        org.joml.Quaternionf qAnim = eulerToQuat(
+            (float) Math.toRadians(-animRX),
+            (float) Math.toRadians(-animRY),
+            (float) Math.toRadians(animRZ));
+        org.joml.Quaternionf qFinal = qBase.mul(qAnim, new org.joml.Quaternionf());
+
+        poseStack.translate(px + animPX, py + animPY, pz + animPZ);
+        poseStack.mulPose(qFinal);
+        if (animSX != 1 || animSY != 1 || animSZ != 1) poseStack.scale(animSX, animSY, animSZ);
         poseStack.translate(-px, -py, -pz);
 
         for (BakedCube cube : bone.cubes()) {
@@ -99,7 +178,7 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         }
 
         for (BakedBone child : bone.children()) {
-            renderBone(child, poseStack, vc, light, overlay, texW, texH);
+            renderBone(child, poseStack, vc, light, overlay, texW, texH, anim, timeSecs);
         }
 
         poseStack.popPose();
@@ -113,9 +192,12 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         if (px != 0 || py != 0 || pz != 0) {
             poseStack.translate(px, py, pz);
         }
-        if (cube.rotX() != 0) poseStack.mulPose(Axis.XP.rotationDegrees(-cube.rotX()));
-        if (cube.rotY() != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-cube.rotY()));
-        if (cube.rotZ() != 0) poseStack.mulPose(Axis.ZP.rotationDegrees(cube.rotZ()));
+        if (cube.rotX() != 0 || cube.rotY() != 0 || cube.rotZ() != 0) {
+            poseStack.mulPose(eulerToQuat(
+                (float) Math.toRadians(-cube.rotX()),
+                (float) Math.toRadians(-cube.rotY()),
+                (float) Math.toRadians(cube.rotZ())));
+        }
         if (px != 0 || py != 0 || pz != 0) {
             poseStack.translate(-px, -py, -pz);
         }
@@ -271,6 +353,10 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
             yebisuRPG.LOGGER.warn("Failed to load geo model {}: {}", loc, e.getMessage());
             return null;
         }
+    }
+
+    private static org.joml.Quaternionf eulerToQuat(float rx, float ry, float rz) {
+        return new org.joml.Quaternionf().rotationZYX(rz, ry, rx);
     }
 
     private float[] readVec3(JsonObject obj, String key) {

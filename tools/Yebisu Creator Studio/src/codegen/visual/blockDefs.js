@@ -650,6 +650,122 @@ export const BLOCK_DEFS = [
     },
   },
 
+  // ITEM — Item Animations (Actions)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "anim.item.play",
+    category: "Item", sub: "Item Animations",
+    isAction: true,
+    label: "Play Item Animation [animName:text] speed [playbackSpeed:number] from file [filePath:text] for [stack:itemstack]",
+    hint: "Play animation on the 3D item model held by entity",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      handler: "anim.item", genericRender: true,
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: {
+        animName: { opcode: "text.literal", fields: { value: "" } },
+        playbackSpeed: { opcode: "number.literal", fields: { value: "1" } },
+        filePath: { opcode: "text.literal", fields: { value: "" } },
+        stack: { opcode: "itemstack.mainhand" },
+      },
+    },
+  },
+  {
+    opcode: "anim.item.stop",
+    category: "Item", sub: "Item Animations",
+    isAction: true,
+    label: "Stop Item Animation for [stack:itemstack]",
+    hint: "Stop any playing animation on the held 3D item model",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      handler: "anim.item", genericRender: true,
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+    },
+  },
+  {
+    opcode: "anim.item.pause",
+    category: "Item", sub: "Item Animations",
+    isAction: true,
+    label: "Pause Item Animation for [stack:itemstack]",
+    hint: "Freeze the playing item animation at its current position",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      handler: "anim.item", genericRender: true,
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+    },
+  },
+  {
+    opcode: "anim.item.resume",
+    category: "Item", sub: "Item Animations",
+    isAction: true,
+    label: "Resume Item Animation for [stack:itemstack]",
+    hint: "Resume a paused item animation from where it was frozen",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      handler: "anim.item", genericRender: true,
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+    },
+  },
+  {
+    opcode: "anim.item.pose.set",
+    category: "Item", sub: "Item Animations",
+    isAction: true,
+    label: "Set Item Pose [animName:text] speed [playbackSpeed:number] from [filePath:text] for [stack:itemstack]",
+    hint: "Set a persistent idle animation on the held 3D item model",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      handler: "anim.item", genericRender: true,
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: {
+        animName: { opcode: "text.literal", fields: { value: "" } },
+        playbackSpeed: { opcode: "number.literal", fields: { value: "1" } },
+        filePath: { opcode: "text.literal", fields: { value: "" } },
+        stack: { opcode: "itemstack.mainhand" },
+      },
+    },
+  },
+  {
+    opcode: "anim.item.pose.reset",
+    category: "Item", sub: "Item Animations",
+    isAction: true,
+    label: "Reset Item Pose for [stack:itemstack]",
+    hint: "Clear the item pose back to default (no animation)",
+    color: "#3a5c3a",
+    codegen: {
+      type: "action",
+      handler: "anim.item", genericRender: true,
+      imports: [
+        "net.ye6isu.yebisuRPG.animation.AnimationAPI",
+        "net.minecraft.world.entity.Entity",
+      ],
+      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+    },
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // DATA — Variables, Attributes, Data Components
   // ═══════════════════════════════════════════════════════════════════════════

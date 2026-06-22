@@ -873,7 +873,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   const isAoeEach=node.opcode.startsWith("aoe.each.") || node.opcode==="aoe.each";
   
   const _bdef = blockDefRegistry.get(node.opcode);
-  const _useGeneric = _bdef && !_bdef.codegen?.handler;
+  const _useGeneric = _bdef && (!_bdef.codegen?.handler || _bdef.codegen?.genericRender);
   const cc=node.linkType==="entity"?"#30e1b9":node.linkType==="number"?"#4d65b4":node.linkType==="logic"?"#6494a4":node.linkType==="text"?"#5ba558":node.linkType==="itemstack"?"#945d66":"#5a9a6a";
   const isAnimBlock = node.opcode.startsWith("anim.") || (node.opcode.startsWith("aoe.") && node.opcode !== "aoe.iterator.entity");
   const isLogicBlock = node.opcode.startsWith("logic.") || node.opcode==="entity.is_crouching" || isIf || isDelay || isAoeEach;
