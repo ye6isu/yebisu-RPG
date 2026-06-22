@@ -23,5 +23,7 @@
 
   "creativetab.yebisurpg.yebisurpg_tab": "yebisu RPG",
 
-  "key.categories.yebisurpg": "yebisu RPG"
+  "key.categories.yebisurpg": "yebisu RPG",
+
+  "effect.yebisurpg.test_effect": "Test Effect"
 }

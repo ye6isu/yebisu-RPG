@@ -16,6 +16,8 @@ public class ModEffects {
         DeferredRegister.create(BuiltInRegistries.MOB_EFFECT, yebisuRPG.MODID);
 
     //YCS_Effects_START
+    public static final Holder<MobEffect> TEST_EFFECT =
+        MOB_EFFECTS.register("test_effect", () -> new MobEffect(MobEffectCategory.NEUTRAL, 0x671a1a) {});
     //YCS_Effects_END
 
     private ModEffects() {}

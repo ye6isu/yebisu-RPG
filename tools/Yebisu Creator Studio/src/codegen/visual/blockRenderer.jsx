@@ -78,6 +78,17 @@ function Segments({ segments, def, node, nodes, methodKey, onDragStart, onFieldC
         onChange={v => onFieldChange && onFieldChange(nodeId, seg.key, v)}
         compact={fieldDef?.compact} transparent={transp} minWidth={fieldDef?.minWidth || 60} options={options}/>;
     }
+    if (seg.type === "checkbox") {
+      const fieldDef = def.fields?.[seg.key];
+      const checked = !!(node.fields?.[seg.key] ?? fieldDef?.default ?? false);
+      return <div key={i} onClick={e => { e.stopPropagation(); onFieldChange && onFieldChange(nodeId, seg.key, !checked); }}
+        onMouseDown={e => e.stopPropagation()}
+        style={{ width: 16, height: 16, border: `1px solid ${checked ? "#5a9fd4" : "rgba(255,255,255,0.3)"}`, borderRadius: 3,
+          background: checked ? "#5a9fd4" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", flexShrink: 0 }}>
+        {checked && <svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-5" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+      </div>;
+    }
     return null;
   });
 }
@@ -97,9 +108,9 @@ function RepeatableSlots({ def, node, nodes, methodKey, onDragStart, onFieldChan
   return <>{slots}</>;
 }
 
-export function GenericDataContent({ def, node, nodes, methodKey, onDragStart, onFieldChange, nodeId, onSelect, selectedNodeId, showSettings, setShowSettings, settingsAnchorRef }) {
+export function GenericDataContent({ def, node, nodes, methodKey, onDragStart, onFieldChange, nodeId, onSelect, selectedNodeId, showSettings, setShowSettings, settingsAnchorRef, inline }) {
   const segments = useMemo(() => parseLabel(def.label), [def.label]);
-  const isMultiline = node.fields?.multiline || def.multiline;
+  const isMultiline = !inline && (node.fields?.multiline || def.multiline);
   const hasSettings = def.settings && Object.keys(def.settings).length > 0;
   const segProps = { def, node, nodes, methodKey, onDragStart, onFieldChange, nodeId, onSelect, selectedNodeId };
 

@@ -174,7 +174,7 @@ export function compileActionNode(node, nodes, methodKey) {
     const dur = resolveSlotValue(node.slots?.duration, nodes, methodKey) ?? (node.fields?.duration ?? "200");
     const lvl = resolveSlotValue(node.slots?.level, nodes, methodKey) ?? (node.fields?.level ?? "1");
     const particles = node.fields?.showParticles !== false;
-    return ["if (" + ent + " instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1), false, " + particles + ")); }"];
+    return ["if (" + ent + " instanceof LivingEntity livingTarget) { livingTarget.addEffect(new MobEffectInstance(" + eff + ", (int)(" + dur + "), Math.max(0,(int)(" + lvl + ")-1), false, " + particles + ")); }"];
   }
   if (node.opcode === "entity.apply_motion") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -242,10 +242,10 @@ export function compileActionNode(node, nodes, methodKey) {
     }
 
     if (visExpr) lines.push(visExpr);
-    lines.push("    for (net.minecraft.world.entity.LivingEntity _iterEnt : " + queryExpr + ") {");
-    lines.push("      _iterEnt.setYRot(" + ent + ".getYRot());");
+    lines.push("    for (net.minecraft.world.entity.LivingEntity hitEntity : " + queryExpr + ") {");
+    lines.push("      hitEntity.setYRot(" + ent + ".getYRot());");
     if (node.fields?.copyPitch) {
-      lines.push("      _iterEnt.setXRot(" + ent + ".getXRot());");
+      lines.push("      hitEntity.setXRot(" + ent + ".getXRot());");
     }
     if (node.slots?.do0) {
       const body = compileChain(node.slots.do0, nodes, methodKey).map(l => "      " + l);
@@ -262,8 +262,8 @@ export function compileActionNode(node, nodes, methodKey) {
     const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f";
     const speedArg = typeof speed === "string" && !speed.endsWith("f") ? speed + "f" : speed;
     return [
-      "if (" + ent + " instanceof Entity _ae && !level.isClientSide()) {",
-      "    AnimationAPI.triggerAnimation(_ae,",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.triggerAnimation(animEntity,",
       "        AnimationCategory.ENTITY,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
@@ -274,16 +274,16 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.firstperson.stop") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _se && !level.isClientSide()) {",
-      "    AnimationAPI.stopFirstPersonAnimation(_se);",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.stopFirstPersonAnimation(animEntity);",
       "}",
     ];
   }
   if (node.opcode === "anim.firstperson.pause") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _pe && !level.isClientSide()) {",
-      "    AnimationAPI.pauseAnimation(_pe,",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.pauseAnimation(animEntity,",
       "        AnimationCategory.ENTITY);",
       "}",
     ];
@@ -291,8 +291,8 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.firstperson.resume") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _re && !level.isClientSide()) {",
-      "    AnimationAPI.resumeAnimation(_re,",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.resumeAnimation(animEntity,",
       "        AnimationCategory.ENTITY);",
       "}",
     ];
@@ -308,8 +308,8 @@ export function compileActionNode(node, nodes, methodKey) {
     const vanillaMoveMask = node.fields?.vanillaMoveMask || 0;
     const fpViewMask = node.fields?.fpViewMask || 0;
     return [
-      "if (" + ent + " instanceof Entity _tpa && !level.isClientSide()) {",
-      "    AnimationAPI.triggerAnimation(_tpa,",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.triggerAnimation(animEntity,",
       "        AnimationCategory.ENTITY_THIRD_PERSON,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
@@ -320,24 +320,24 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.thirdperson.stop") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _tps && !level.isClientSide()) {",
-      "    AnimationAPI.stopThirdPersonAnimation(_tps);",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.stopThirdPersonAnimation(animEntity);",
       "}",
     ];
   }
   if (node.opcode === "anim.thirdperson.pause") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _tpp && !level.isClientSide()) {",
-      "    AnimationAPI.pauseThirdPersonAnimation(_tpp);",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.pauseThirdPersonAnimation(animEntity);",
       "}",
     ];
   }
   if (node.opcode === "anim.thirdperson.resume") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _tpr && !level.isClientSide()) {",
-      "    AnimationAPI.resumeThirdPersonAnimation(_tpr);",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.resumeThirdPersonAnimation(animEntity);",
       "}",
     ];
   }
@@ -348,8 +348,8 @@ export function compileActionNode(node, nodes, methodKey) {
     const allowActions = !!node.fields?.allowVanillaActions;
     const keepPosScale = !!node.fields?.keepPosScale;
     return [
-      "if (" + ent + " instanceof Entity _hp && !level.isClientSide()) {",
-      "    AnimationAPI.setFirstPersonHandPose(_hp,",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.setFirstPersonHandPose(animEntity,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\", " + allowActions + ", " + keepPosScale + ");",
       "}",
@@ -358,8 +358,8 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.handpose.reset") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _hr && !level.isClientSide()) {",
-      "    AnimationAPI.resetFirstPersonHandPose(_hr);",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.resetFirstPersonHandPose(animEntity);",
       "}",
     ];
   }
@@ -374,8 +374,8 @@ export function compileActionNode(node, nodes, methodKey) {
     const keepPosScaleMask = node.fields?.keepPosScaleMask || 0;
     const fpViewMask2 = node.fields?.fpViewMask || 0;
     return [
-      "if (" + ent + " instanceof Entity _tps && !level.isClientSide()) {",
-      "    AnimationAPI.setThirdPersonPose(_tps,",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.setThirdPersonPose(animEntity,",
       "        \"" + animName.replace(/"/g, '\\"') + "\",",
       "        \"" + filePath.replace(/"/g, '\\"') + "\",",
       "        " + lookAtMask + ", " + vanillaMask + ", " + vanillaMoveMask + ", " + allowActionsMask + ", " + keepPosScaleMask + ", " + fpViewMask2 + ");",
@@ -385,8 +385,8 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "anim.tppose.reset") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
     return [
-      "if (" + ent + " instanceof Entity _tpr && !level.isClientSide()) {",
-      "    AnimationAPI.resetThirdPersonPose(_tpr);",
+      "if (" + ent + " instanceof Entity animEntity && !level.isClientSide()) {",
+      "    AnimationAPI.resetThirdPersonPose(animEntity);",
       "}",
     ];
   }
@@ -397,33 +397,33 @@ export function compileActionNode(node, nodes, methodKey) {
     const operation = node.fields?.operation || "flat";
     const attrRef = attrRegistryRef(attrId);
     if (operation === "base_set") return [
-      `if (${ent} instanceof LivingEntity _abset) {`,
-      `    var _absi = _abset.getAttribute(${attrRef});`,
-      `    if (_absi != null) _absi.setBaseValue((double)(${valueExpr}));`,
+      `if (${ent} instanceof LivingEntity livingTarget) {`,
+      `    var attrInstance = livingTarget.getAttribute(${attrRef});`,
+      `    if (attrInstance != null) attrInstance.setBaseValue((double)(${valueExpr}));`,
       `}`,
     ];
     if (operation === "base_add") return [
-      `if (${ent} instanceof LivingEntity _abadd) {`,
-      `    var _abai = _abadd.getAttribute(${attrRef});`,
-      `    if (_abai != null) _abai.setBaseValue(_abai.getBaseValue() + (double)(${valueExpr}));`,
+      `if (${ent} instanceof LivingEntity livingTarget) {`,
+      `    var attrInstance = livingTarget.getAttribute(${attrRef});`,
+      `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getBaseValue() + (double)(${valueExpr}));`,
       `}`,
     ];
     if (operation === "base_multiply") return [
-      `if (${ent} instanceof LivingEntity _abmul) {`,
-      `    var _abmi = _abmul.getAttribute(${attrRef});`,
-      `    if (_abmi != null) _abmi.setBaseValue(_abmi.getBaseValue() * (double)(${valueExpr}));`,
+      `if (${ent} instanceof LivingEntity livingTarget) {`,
+      `    var attrInstance = livingTarget.getAttribute(${attrRef});`,
+      `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getBaseValue() * (double)(${valueExpr}));`,
       `}`,
     ];
     const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
     const op = operation === "multiply" ? "ADD_MULTIPLIED_TOTAL" : "ADD_VALUE";
     return [
-      `if (${ent} instanceof LivingEntity _amet) {`,
-      `    var _ai = _amet.getAttribute(${attrRef});`,
-      `    if (_ai != null) {`,
-      `        var _amid = ResourceLocation.parse("yebisurpg:${modName}");`,
-      `        _ai.removeModifier(_amid);`,
-      `        _ai.addOrUpdateTransientModifier(new AttributeModifier(`,
-      `            _amid, (double)(${valueExpr}), AttributeModifier.Operation.${op}));`,
+      `if (${ent} instanceof LivingEntity livingTarget) {`,
+      `    var attrInstance = livingTarget.getAttribute(${attrRef});`,
+      `    if (attrInstance != null) {`,
+      `        var modifierId = ResourceLocation.parse("yebisurpg:${modName}");`,
+      `        attrInstance.removeModifier(modifierId);`,
+      `        attrInstance.addOrUpdateTransientModifier(new AttributeModifier(`,
+      `            modifierId, (double)(${valueExpr}), AttributeModifier.Operation.${op}));`,
       `    }`,
       `}`,
     ];
@@ -434,9 +434,9 @@ export function compileActionNode(node, nodes, methodKey) {
     const attrRef = attrRegistryRef(attrId);
     const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
     return [
-      `if (${ent} instanceof LivingEntity _armet) {`,
-      `    var _ari = _armet.getAttribute(${attrRef});`,
-      `    if (_ari != null) _ari.removeModifier(ResourceLocation.parse("yebisurpg:${modName}"));`,
+      `if (${ent} instanceof LivingEntity livingTarget) {`,
+      `    var attrInstance = livingTarget.getAttribute(${attrRef});`,
+      `    if (attrInstance != null) attrInstance.removeModifier(ResourceLocation.parse("yebisurpg:${modName}"));`,
       `}`,
     ];
   }
@@ -445,9 +445,9 @@ export function compileActionNode(node, nodes, methodKey) {
     const attrId = node.fields?.attrId;
     const attrRef = attrRegistryRef(attrId);
     return [
-      `if (${ent} instanceof LivingEntity _abrst) {`,
-      `    var _abrsti = _abrst.getAttribute(${attrRef});`,
-      `    if (_abrsti != null) _abrsti.setBaseValue(_abrsti.getAttribute().value().getDefaultValue());`,
+      `if (${ent} instanceof LivingEntity livingTarget) {`,
+      `    var attrInstance = livingTarget.getAttribute(${attrRef});`,
+      `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getAttribute().value().getDefaultValue());`,
       `}`,
     ];
   }
@@ -466,8 +466,8 @@ export function compileActionNode(node, nodes, methodKey) {
     };
     const combined = textParts.length > 0 ? textParts.map(t => `Component.literal(${wrapText(t)})`).join(".append(") + ")".repeat(Math.max(0, textParts.length - 1)) : `Component.literal("")`;
     return [
-      `if (${ent} instanceof Player _cp) {`,
-      `    _cp.sendSystemMessage(${combined});`,
+      `if (${ent} instanceof Player chatPlayer) {`,
+      `    chatPlayer.sendSystemMessage(${combined});`,
       `}`,
     ];
   }
@@ -493,7 +493,7 @@ export function compileActionNode(node, nodes, methodKey) {
     const ent = resolveEntityVar("entity.event", methodKey);
     const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
     const ticks = resolveSlotValue(node.slots?.ticks, nodes, methodKey) || "20";
-    return [`if (${ent} instanceof net.minecraft.world.entity.player.Player _cdp) { _cdp.getCooldowns().addCooldown(${stack}.getItem(), (int)((double)(${ticks}))); }`];
+    return [`if (${ent} instanceof net.minecraft.world.entity.player.Player cooldownPlayer) { cooldownPlayer.getCooldowns().addCooldown(${stack}.getItem(), (int)((double)(${ticks}))); }`];
   }
   if (node.opcode === "entity.dash") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
@@ -517,7 +517,7 @@ export function compileActionNode(node, nodes, methodKey) {
     const collisionBody = hasCollision ? compileChain(node.slots?.do0, nodes, methodKey).map(l => "    " + l) : [];
     const thenBody = hasThen ? compileChain(node.slots?.[hasCollision ? "do1" : "do0"], nodes, methodKey).map(l => "    " + l) : [];
     const collisionParam = hasCollision
-      ? `(_dashSrc, _iterEnt) -> {\n${collisionBody.length ? collisionBody.join("\n") : "    // collision"}\n}`
+      ? `(_dashSrc, hitEntity) -> {\n${collisionBody.length ? collisionBody.join("\n") : "    // collision"}\n}`
       : "null";
     const thenParam = hasThen
       ? `() -> {\n${thenBody.length ? thenBody.join("\n") : "    // then"}\n}`
@@ -560,7 +560,7 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     return `(${ent}.isCrouching())`;
   }
-  if (node.opcode === "aoe.iterator.entity") return "_iterEnt";
+  if (node.opcode === "aoe.iterator.entity") return "hitEntity";
   if (node.opcode === "entity.position") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const axis = node.fields?.axis || "x";
@@ -651,16 +651,16 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (node.opcode === "itemstack.is_on_cooldown") {
     const ent = resolveEntityVar("entity.event", methodKey);
     const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
-    return `(${ent} instanceof net.minecraft.world.entity.player.Player _cdq && _cdq.getCooldowns().isOnCooldown(${stack}.getItem()))`;
+    return `(${ent} instanceof net.minecraft.world.entity.player.Player cooldownPlayer && cooldownPlayer.getCooldowns().isOnCooldown(${stack}.getItem()))`;
   }
   if (node.opcode === "attribute.get") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const attrId = node.fields?.attrId;
     const attrRef = attrRegistryRef(attrId);
     const layer = node.fields?.layer || "total";
-    if (layer === "base") return `(${ent} instanceof LivingEntity _aget ? _aget.getAttributeBaseValue(${attrRef}) : 0.0)`;
-    if (layer === "bonus") return `(${ent} instanceof LivingEntity _aget ? (_aget.getAttributeValue(${attrRef}) - _aget.getAttributeBaseValue(${attrRef})) : 0.0)`;
-    return `(${ent} instanceof LivingEntity _aget ? _aget.getAttributeValue(${attrRef}) : 0.0)`;
+    if (layer === "base") return `(${ent} instanceof LivingEntity livingTarget ? livingTarget.getAttributeBaseValue(${attrRef}) : 0.0)`;
+    if (layer === "bonus") return `(${ent} instanceof LivingEntity livingTarget ? (livingTarget.getAttributeValue(${attrRef}) - livingTarget.getAttributeBaseValue(${attrRef})) : 0.0)`;
+    return `(${ent} instanceof LivingEntity livingTarget ? livingTarget.getAttributeValue(${attrRef}) : 0.0)`;
   }
   return null;
 }

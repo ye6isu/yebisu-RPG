@@ -200,15 +200,12 @@ export const BLOCK_DEFS = [
     opcode: "effect.apply",
     category: "Entity", sub: "actions",
     isAction: true,
-    label: "Add Effect [effect:dropdown.effects] to [entity:entity] with duration [duration:number] with level [level:number]",
+    label: "Add Effect [effect:dropdown.effects] to [entity:entity] with duration [duration:number] with level [level:number] particles [showParticles:checkbox]",
     hint: "Apply a potion effect",
     color: "#c46c94",
-    settings: {
-      showParticles: { type: "checkbox", label: "Show Particles", default: true },
-    },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof LivingEntity _et) { _et.addEffect(new MobEffectInstance({{effect}}, (int)({{duration}}), Math.max(0,(int)({{level}})-1), false, {{showParticles}})); }",
+      template: "if ({{entity}} instanceof LivingEntity livingTarget) { livingTarget.addEffect(new MobEffectInstance({{effect}}, (int)({{duration}}), Math.max(0,(int)({{level}})-1), false, {{showParticles}})); }",
       imports: [
         "net.minecraft.world.entity.LivingEntity",
         "net.minecraft.world.effect.MobEffectInstance",
@@ -225,7 +222,7 @@ export const BLOCK_DEFS = [
     },
     fields: {
       effect: { type: "dropdown", source: "effects", default: "MobEffects.REGENERATION" },
-      showParticles: { type: "hidden", default: true },
+      showParticles: { type: "checkbox", default: true },
     },
   },
   {
@@ -340,19 +337,19 @@ export const BLOCK_DEFS = [
     codegen: {
       type: "action",
       variants: {
-        "dmgType == 'mob'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().mobAttack({{attacker}} instanceof LivingEntity _da ? _da : null), (float)({{amount}})); }" },
-        "dmgType == 'player'": { template: "if ({{target}} instanceof LivingEntity _dt && {{attacker}} instanceof net.minecraft.world.entity.player.Player _dp) { _dt.hurt({{target}}.level().damageSources().playerAttack(_dp), (float)({{amount}})); }" },
-        "dmgType == 'magic'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().magic(), (float)({{amount}})); }" },
-        "dmgType == 'indirect_magic'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().indirectMagic({{attacker}}, {{attacker}}), (float)({{amount}})); }" },
-        "dmgType == 'thorns'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().thorns({{attacker}}), (float)({{amount}})); }" },
-        "dmgType == 'generic'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().generic(), (float)({{amount}})); }" },
-        "dmgType == 'fall'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().fall(), (float)({{amount}})); }" },
-        "dmgType == 'fire'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().onFire(), (float)({{amount}})); }" },
-        "dmgType == 'lava'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().lava(), (float)({{amount}})); }" },
-        "dmgType == 'drown'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().drown(), (float)({{amount}})); }" },
-        "dmgType == 'freeze'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().freeze(), (float)({{amount}})); }" },
-        "dmgType == 'wither'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().wither(), (float)({{amount}})); }" },
-        "dmgType == 'starve'": { template: "if ({{target}} instanceof LivingEntity _dt) { _dt.hurt({{target}}.level().damageSources().starve(), (float)({{amount}})); }" },
+        "dmgType == 'mob'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().mobAttack({{attacker}} instanceof LivingEntity livingAttacker ? livingAttacker : null), (float)({{amount}})); }" },
+        "dmgType == 'player'": { template: "if ({{target}} instanceof LivingEntity livingTarget && {{attacker}} instanceof net.minecraft.world.entity.player.Player playerAttacker) { livingTarget.hurt(livingTarget.level().damageSources().playerAttack(playerAttacker), (float)({{amount}})); }" },
+        "dmgType == 'magic'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().magic(), (float)({{amount}})); }" },
+        "dmgType == 'indirect_magic'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().indirectMagic({{attacker}}, {{attacker}}), (float)({{amount}})); }" },
+        "dmgType == 'thorns'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().thorns({{attacker}}), (float)({{amount}})); }" },
+        "dmgType == 'generic'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().generic(), (float)({{amount}})); }" },
+        "dmgType == 'fall'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().fall(), (float)({{amount}})); }" },
+        "dmgType == 'fire'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().onFire(), (float)({{amount}})); }" },
+        "dmgType == 'lava'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().lava(), (float)({{amount}})); }" },
+        "dmgType == 'drown'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().drown(), (float)({{amount}})); }" },
+        "dmgType == 'freeze'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().freeze(), (float)({{amount}})); }" },
+        "dmgType == 'wither'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().wither(), (float)({{amount}})); }" },
+        "dmgType == 'starve'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().starve(), (float)({{amount}})); }" },
       },
       imports: [
         "net.minecraft.world.entity.LivingEntity",
@@ -407,10 +404,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _ae && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(_ae,\n        AnimationCategory.ENTITY,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: {
@@ -430,10 +427,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _se && !level.isClientSide()) {\n    AnimationAPI.stopFirstPersonAnimation(_se);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.stopFirstPersonAnimation(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -448,10 +445,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _pe && !level.isClientSide()) {\n    AnimationAPI.pauseAnimation(_pe,\n        AnimationCategory.ENTITY);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.pauseAnimation(animEntity,\n        AnimationCategory.ENTITY);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -466,10 +463,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _re && !level.isClientSide()) {\n    AnimationAPI.resumeAnimation(_re,\n        AnimationCategory.ENTITY);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.resumeAnimation(animEntity,\n        AnimationCategory.ENTITY);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -487,7 +484,7 @@ export const BLOCK_DEFS = [
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _hp && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(_hp,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, false);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, false);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
@@ -508,7 +505,7 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _hr && !level.isClientSide()) {\n    AnimationAPI.resetFirstPersonHandPose(_hr);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.resetFirstPersonHandPose(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
@@ -536,10 +533,10 @@ export const BLOCK_DEFS = [
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _tpa && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(_tpa,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{fpViewMask}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: {
@@ -559,10 +556,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _tps && !level.isClientSide()) {\n    AnimationAPI.stopThirdPersonAnimation(_tps);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.stopThirdPersonAnimation(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -577,10 +574,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _tpp && !level.isClientSide()) {\n    AnimationAPI.pauseThirdPersonAnimation(_tpp);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.pauseThirdPersonAnimation(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -595,10 +592,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _tpr && !level.isClientSide()) {\n    AnimationAPI.resumeThirdPersonAnimation(_tpr);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.resumeThirdPersonAnimation(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -621,10 +618,10 @@ export const BLOCK_DEFS = [
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _tps && !level.isClientSide()) {\n    AnimationAPI.setThirdPersonPose(_tps,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{allowActionsMask}}, {{keepPosScaleMask}}, {{fpViewMask}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setThirdPersonPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{allowActionsMask}}, {{keepPosScaleMask}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: {
@@ -643,10 +640,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity _tpr && !level.isClientSide()) {\n    AnimationAPI.resetThirdPersonPose(_tpr);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.resetThirdPersonPose(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
+
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -947,10 +944,7 @@ export const BLOCK_DEFS = [
     codegen: {
       type: "action",
       template: "{{stack}}.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)({{frame}})) + 1));",
-      imports: [
-        "net.minecraft.core.component.DataComponents",
-        "net.minecraft.world.item.component.CustomModelData",
-      ],
+      imports: [],
       slotDefaults: {
         stack: { opcode: "itemstack.literal" },
         frame: { opcode: "number.literal", fields: { value: "0" } },
@@ -967,9 +961,7 @@ export const BLOCK_DEFS = [
     codegen: {
       type: "action",
       template: "{{stack}}.remove(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA);",
-      imports: [
-        "net.minecraft.core.component.DataComponents",
-      ],
+      imports: [],
       slotDefaults: {
         stack: { opcode: "itemstack.literal" },
       },
@@ -1310,7 +1302,7 @@ export const BLOCK_DEFS = [
     label: "Iterator Entity",
     hint: "Current entity in a For Each Entity loop",
     color: "#30e1b9",
-    codegen: { type: "value", expr: "_iterEnt" },
+    codegen: { type: "value", expr: "hitEntity" },
   },
   {
     opcode: "aoe.each",
@@ -1335,7 +1327,7 @@ export const BLOCK_DEFS = [
       los: { type: "hidden", default: false },
       losOrigin: { type: "hidden", default: "caller" },
       showParticles: { type: "hidden", default: false },
-      copyPitch: { type: "hidden", default: false },
+      copyPitch: { type: "hidden", default: true },
       multiline: { type: "hidden", default: false },
     },
     shapeSlots: {
@@ -1350,7 +1342,7 @@ export const BLOCK_DEFS = [
       los: { type: "checkbox", label: "Line of Sight", default: false },
       losOrigin: { type: "dropdown", label: "LOS Origin", options: [{ value: "caller", label: "Caller" }, { value: "center", label: "Shape Center" }], default: "caller", showIf: "los" },
       showParticles: { type: "checkbox", label: "Visual", default: false },
-      copyPitch: { type: "checkbox", label: "Copy Pitch", default: false },
+      copyPitch: { type: "checkbox", label: "Copy Pitch", default: true },
     },
     codegen: {
       type: "compound",

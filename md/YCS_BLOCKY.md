@@ -172,7 +172,7 @@ All new blocks are defined in `blockDefs.js` as a single JS object. No other fil
   // Fields (dropdowns, inputs — referenced from label tokens or settings)
   fields: {
     mode: {
-      type: "dropdown",         // "dropdown" | "input" | "hidden"
+      type: "dropdown",         // "dropdown" | "input" | "hidden" | "checkbox"
       options: [{value:"a",label:"A"},{value:"b",label:"B"}],
       default: "a",
       compact: false,           // if true, dropdown trigger has no ▾ arrow (for operator symbols)
@@ -180,6 +180,7 @@ All new blocks are defined in `blockDefs.js` as a single JS object. No other fil
       minWidth: 100,            // optional minimum width for dropdown trigger
     },
     count: { type: "hidden", default: 0 },  // hidden fields don't render but hold state
+    particles: { type: "checkbox", default: true },  // inline checkbox, renders as a clickable toggle on the block
   },
 
   // Settings (gear popup — portal-based, consistent style)
@@ -287,20 +288,10 @@ z2 [number]
 
 ### Multiline Inline Blocks
 
-When a multiline data block is slotted inline inside another block:
+Multiline mode only applies when a data block is **floating** on the canvas. When slotted inline inside another block, multiline is disabled — the block always renders as a single line. This keeps parent block heights predictable (always 50px for actions, 30px for inline data) and avoids layout complexity.
 
-**Single-line parent + multiline child:**
-- The inline multiline block gets `padding: 10px` top and bottom, matching the centering gap a single-line child gets in a 50px action row (30px child + 10px top + 10px bottom = 50px)
-- The parent row uses `minHeight` (not fixed `height`) so it grows to fit the multiline child
-- The inline block switches to `flexDirection: column` so its lines stack vertically
-
-**Multiline parent + multiline child:**
-- Each line row in the parent uses `minHeight` — when one line contains a multiline child, that specific row grows to fit it
-- Other lines remain at their normal height
-
-**Toggling off:**
-- When multiline is unchecked, the block shrinks back to single-line (30px inline, 50px floating)
-- All block header divs use `minHeight` instead of fixed `height` to support dynamic resizing
+- `GenericDataContent` receives an `inline` prop from `CanvasNode` and ignores `multiline` when `inline` is true
+- No special CSS handling needed for inline multiline — inline blocks always use `flexDirection: "row"`, `padding: "0 10px"`, `minHeight: 30`
 
 ### Height Rules
 - All block headers use `minHeight`, never fixed `height` — allows growth for multiline children
@@ -312,12 +303,11 @@ When a multiline data block is slotted inline inside another block:
 
 The layout system (`recalcLayout`) cannot know the exact rendered height of an action block when it contains a multiline inline child — the height depends on CSS flex layout, padding, and the child's slot count. Instead of estimating, the system uses **DOM measurement with a post-render correction pass**:
 
-1. **`getActionH(n, ns)`** — called by `getH` and `layoutChain` to determine how much vertical space an action block occupies. It first checks `measuredRef.current[n.id]` for a previously measured DOM height. If found (and > 50), it returns that. Otherwise it falls back to estimation (scanning label slots for multiline children).
-2. **`getInlineH(nodeId, ns)`** — estimates the height of a multiline data block when slotted inline: `slotCount * 40` pixels. Used as fallback when no DOM measurement exists yet.
-3. **Post-render `useEffect`** — after every render, measures `offsetHeight` of all action block DOM elements via `document.getElementById("node-" + n.id)`. If any measurement differs from the stored value by > 5px, it stores the new height in `measuredRef` and triggers `recalcLayout` once. The second layout uses the measured heights, producing pixel-perfect positioning. Subsequent renders find no mismatch and don't re-layout.
-4. **Snap logic (`onMU`)** — also calls `getActionH`, so drag-snap targets use the same measured heights.
+1. **`getActionH(n)`** — called by `getH`, `layoutChain`, and snap logic to determine how much vertical space a non-compound action block occupies. Checks `measuredRef.current[n.id]` for a DOM-measured height first. Falls back to 50px (or multiline slot count × 50 if the block itself is multiline).
+2. **Post-render `useEffect`** — after every render, measures `offsetHeight` of all non-compound action block DOM elements. If any measurement differs from stored value by > 5px, stores new height and triggers `recalcLayout` once. Since inline blocks are always single-line, parent heights are predictable and rarely need correction.
+3. **Snap logic (`onMU`)** — uses `getActionH(n)` for non-compound blocks; `n.height` for compound blocks.
 
-**When adding new blocks**: no extra work needed — the measurement system handles any block automatically. Just ensure action blocks have `id={"node-"+node.id}` on their root DOM element (already set in `CanvasNode`).
+**When adding new blocks**: no extra work needed. Non-compound blocks get automatic DOM measurement. Compound blocks calculate height via `getH` with gap heights. Just ensure action blocks have `id={"node-"+node.id}` on their root DOM element (already set in `CanvasNode`).
 
 ### Shape-Switching Blocks
 
@@ -360,6 +350,7 @@ The `label` string defines inline rendering. Tokens in `[key:type]` format:
 | `[key:dropdown.dataComponents]` | Search dropdown for data components |
 | `[key:input.number]` | Inline number input |
 | `[key:input.text]` | Inline text input |
+| `[key:checkbox]` | Inline checkbox toggle (boolean) |
 
 ### Codegen Templates
 
@@ -367,6 +358,21 @@ The `label` string defines inline rendering. Tokens in `[key:type]` format:
 - `{{fieldKey}}` — raw field value from node.fields
 - Use `\n` for multiline Java output
 - `variants` object maps `"field == 'value'"` conditions to alternative templates
+
+### Codegen Variable Naming
+
+All generated Java variable names must be **human-readable** and follow Minecraft modding conventions. Never use cryptic abbreviations like `_et`, `_dt`, `_ae`. Use descriptive names that make the generated code readable as if hand-written.
+
+| Context | Variable name | Example |
+|---|---|---|
+| `instanceof LivingEntity` target | `livingTarget` | `if (entity instanceof LivingEntity livingTarget)` |
+| `instanceof Player` | `chatPlayer`, `cooldownPlayer` | `if (entity instanceof Player chatPlayer)` |
+| `instanceof Entity` for animations | `animEntity` | `if (entity instanceof Entity animEntity)` |
+| `getAttribute()` result | `attrInstance` | `var attrInstance = livingTarget.getAttribute(...)` |
+| Attacker entity | `livingAttacker`, `playerAttacker` | `instanceof LivingEntity livingAttacker` |
+| AoE / collision iterator | `hitEntity` | Used by Iterator Entity block in For Each and Dash On Collision |
+
+**Rule**: if a variable appears in generated code that a user might read or debug, it must be self-documenting. The generated code should look like it was written by a competent Java developer, not obfuscated.
 
 ### Import Handling
 

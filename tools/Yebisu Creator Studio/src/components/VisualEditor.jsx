@@ -73,7 +73,7 @@ function AttrDropdown({nodeId,value,onChange}){
 }
 const VANILLA_EFFECT_LABELS={"MobEffects.MOVEMENT_SPEED":"Speed","MobEffects.MOVEMENT_SLOWDOWN":"Slowness","MobEffects.DIG_SPEED":"Haste","MobEffects.DIG_SLOWDOWN":"Mining Fatigue","MobEffects.DAMAGE_BOOST":"Strength","MobEffects.HEAL":"Instant Health","MobEffects.HARM":"Instant Damage","MobEffects.DAMAGE_RESISTANCE":"Resistance","MobEffects.JUMP":"Jump Boost","MobEffects.CONFUSION":"Nausea","MobEffects.REGENERATION":"Regeneration","MobEffects.FIRE_RESISTANCE":"Fire Resistance","MobEffects.WATER_BREATHING":"Water Breathing","MobEffects.INVISIBILITY":"Invisibility","MobEffects.BLINDNESS":"Blindness","MobEffects.NIGHT_VISION":"Night Vision","MobEffects.HUNGER":"Hunger","MobEffects.WEAKNESS":"Weakness","MobEffects.POISON":"Poison","MobEffects.WITHER":"Wither","MobEffects.HEALTH_BOOST":"Health Boost","MobEffects.ABSORPTION":"Absorption","MobEffects.SATURATION":"Saturation","MobEffects.GLOWING":"Glowing","MobEffects.LEVITATION":"Levitation","MobEffects.LUCK":"Luck","MobEffects.UNLUCK":"Bad Luck","MobEffects.SLOW_FALLING":"Slow Falling","MobEffects.CONDUIT_POWER":"Conduit Power","MobEffects.DOLPHINS_GRACE":"Dolphin's Grace","MobEffects.BAD_OMEN":"Bad Omen","MobEffects.HERO_OF_THE_VILLAGE":"Hero of the Village","MobEffects.DARKNESS":"Darkness","MobEffects.TRIAL_OMEN":"Trial Omen","MobEffects.RAID_OMEN":"Raid Omen","MobEffects.WIND_CHARGED":"Wind Charged","MobEffects.WEAVING":"Weaving","MobEffects.OOZING":"Oozing","MobEffects.INFESTED":"Infested"};
 function EffectDropdown({nodeId,value,onChange}){
-  const allEffects=[...VANILLA_EFFECTS.map(e=>({id:e,label:VANILLA_EFFECT_LABELS[e]||e})),...__modEffectsCache.map(e=>({id:`ModEffects.${e.constName}`,label:(e.titleText||e.id)+" (mod)"}))];
+  const allEffects=[...VANILLA_EFFECTS.map(e=>({id:e,label:VANILLA_EFFECT_LABELS[e]||e})),...__modEffectsCache.map(e=>({id:`ModEffects.${e.constName}`,label:e.titleText||e.id}))];
   const[open,setOpen]=useState(false);
   const[query,setQuery]=useState("");
   const[rect,setRect]=useState(null);
@@ -361,18 +361,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
   const ip=useRef(false),ps=useRef(null),dn=useRef(null);
   useEffect(()=>{F("methodBlocks",{...(form.methodBlocks||{}),[methodKey]:nodes});},[nodes]);
   const measuredRef = useRef({});
-  function getInlineH(nodeId, ns) {
-    if (!nodeId) return 0;
-    const n = ns.find(x => x.id === nodeId);
-    if (!n) return 0;
-    const bd = blockDefRegistry.get(n.opcode);
-    if (!bd || !n.fields?.multiline) return 0;
-    const allL = [bd.label || "", ...(bd.shapeSlots ? [bd.shapeSlots[n.fields?.shape] || ""] : []), bd.suffixLabel || ""].join(" ");
-    const slotCount = (allL.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
-    if (slotCount <= 1) return 0;
-    return slotCount * 40;
-  }
-  function getActionH(n, ns) {
+  function getActionH(n) {
       const measured = measuredRef.current[n.id];
       if (measured && measured > 50) return measured;
       const bd = blockDefRegistry.get(n.opcode);
@@ -381,15 +370,6 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
         const allL = [bd.label || "", ...(bd.shapeSlots ? [bd.shapeSlots[n.fields?.shape] || ""] : []), bd.suffixLabel || ""].join(" ");
         const sc = (allL.match(/\[\w+:\w+[.\w]*\]/g) || []).filter(t => t.match(/:(entity|number|text|logic|itemstack)\]/)).length;
         base = Math.max(50, sc * 50);
-      }
-      if (bd && n.slots && ns) {
-        const allL = [bd.label || "", ...(bd.shapeSlots ? Object.values(bd.shapeSlots) : []), bd.suffixLabel || ""].join(" ");
-        const slotKeys = (allL.match(/\[(\w+):(entity|number|text|logic|itemstack)\]/g) || []).map(t => t.match(/\[(\w+):/)[1]);
-        let maxChildH = 0;
-        for (const sk of slotKeys) {
-          if (n.slots[sk]) maxChildH = Math.max(maxChildH, getInlineH(n.slots[sk], ns));
-        }
-        if (maxChildH > 0) base = Math.max(base, maxChildH + 20);
       }
       return base;
   }
@@ -403,7 +383,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
         if(loops++ > 500) break;
         const n = nextNs.find(x=>x.id===cur);
         if(!n) break;
-        if (n.opcode === "entity.dash") {
+        if (n.opcode === "entity.dash" && (n.fields?.hasCollision || n.fields?.hasThen)) {
            let ih = 50;
            n.gapHeights = {};
            if (n.fields?.hasCollision) {
@@ -436,7 +416,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            }
            h += ih;
            n.height = ih;
-        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode === "aoe.each" || blockDefRegistry.get(n.opcode)?.body) {
+        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode === "aoe.each" || (blockDefRegistry.get(n.opcode)?.body && !(n.opcode === "entity.dash" && !n.fields?.hasCollision && !n.fields?.hasThen))) {
            const _bd = blockDefRegistry.get(n.opcode);
            let _hdrH = 50;
            if ((n.fields?.multiline || _bd?.multiline) && _bd) {
@@ -450,7 +430,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            h += ih;
            n.height = ih;
         } else {
-           h += getActionH(n, nextNs);
+           h += getActionH(n);
         }
         cur = n.nextId;
       }
@@ -463,7 +443,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
         const n = nextNs.find(x=>x.id===cur);
         if(!n) break;
         n.x = sx; n.y = cy; n.depth = depth;
-        if (n.opcode === "entity.dash") {
+        if (n.opcode === "entity.dash" && (n.fields?.hasCollision || n.fields?.hasThen)) {
            let innerY = cy + 50;
            if (n.fields?.hasCollision) {
              innerY += 50;
@@ -493,7 +473,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
              innerY += Math.max(0, getH(n.slots?.doElse));
            }
            cy = innerY;
-        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode === "aoe.each" || blockDefRegistry.get(n.opcode)?.body) {
+        } else if (n.opcode === "control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode === "aoe.each" || (blockDefRegistry.get(n.opcode)?.body && !(n.opcode === "entity.dash" && !n.fields?.hasCollision && !n.fields?.hasThen))) {
            const _bd2 = blockDefRegistry.get(n.opcode);
            let _hdrH2 = 50;
            if ((n.fields?.multiline || _bd2?.multiline) && _bd2) {
@@ -506,7 +486,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
            innerY += Math.max(0, getH(n.slots?.do0));
            cy = innerY;
         } else {
-           cy += getActionH(n, nextNs);
+           cy += getActionH(n);
         }
         cur = n.nextId;
       }
@@ -523,7 +503,7 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
     const newMeasured = {};
     for (const n of nodes) {
       if (!n.isAction && n.opcode !== "start") continue;
-      const _hasBody = n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || blockDefRegistry.get(n.opcode)?.body;
+      const _hasBody = n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || (blockDefRegistry.get(n.opcode)?.body && !(n.opcode === "entity.dash" && !n.fields?.hasCollision && !n.fields?.hasThen));
       if (_hasBody) continue;
       const el = document.getElementById("node-" + n.id);
       if (!el) continue;
@@ -687,8 +667,9 @@ function VisualEditorPanelInner({methodKey,form,F,onBack,className,isEffect}){
              for(const n of nextNs){
                  if(n.id===dragged.id || getDescendants(dragged.id, nextNs).includes(n.id)) continue;
                  if(n.isAction||n.id==="start"){
-                     const _hasBody = n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || blockDefRegistry.get(n.opcode)?.body;
-                     let h = _hasBody ? (n.height || 50) : getActionH(n, nextNs);
+                     const _dashActive = n.opcode === "entity.dash" && (n.fields?.hasCollision || n.fields?.hasThen);
+                     const _hasBody = _dashActive || n.opcode==="control.if" || n.opcode==="control.delay" || n.opcode.startsWith("aoe.each.") || n.opcode==="aoe.each" || (blockDefRegistry.get(n.opcode)?.body && n.opcode !== "entity.dash");
+                     let h = _hasBody ? (n.height || 50) : getActionH(n);
                      if(!_hasBody){
                        let snb={x:n.x+20,y:n.y+h};
                        let d=Math.hypot(mx-snb.x,my-snb.y);
@@ -956,7 +937,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
       </span>}
       {_useGeneric && isVal && <GenericDataContent def={_bdef} node={node} nodes={nodes} methodKey={methodKey}
         onDragStart={onDragStart} onFieldChange={onFieldChange} nodeId={node.id}
-        onSelect={onSelect} selectedNodeId={selected} showSettings={showSettings} setShowSettings={setShowSettings} settingsAnchorRef={settingsAnchorRef}/>}
+        onSelect={onSelect} selectedNodeId={selected} showSettings={showSettings} setShowSettings={setShowSettings} settingsAnchorRef={settingsAnchorRef} inline={inline}/>}
       {!_useGeneric && node.opcode==="number.literal"&&<input value={node.fields?.value??"0"} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
         style={{width:Math.max(50, ((node.fields?.value||"").length*10)+20),height:30,background:inline?"transparent":"rgba(0,0,0,0.3)",border:"none",borderRadius:0,padding:"5px 10px",color:"#fff",fontSize:16,fontFamily:"sans-serif",fontWeight:700,outline:"none",textAlign:"center",boxSizing:"border-box"}}/>}
       {!_useGeneric && node.opcode==="text.literal"&&<input value={node.fields?.value??""} onChange={e=>{e.stopPropagation();if(onFieldChange)onFieldChange(node.id,"value",e.target.value);}} onMouseDown={e=>e.stopPropagation()}
@@ -1013,9 +994,9 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
   );
 
   if(inline){
-     const _inlineMultiline = node.fields?.multiline && _bdef;
+
      return <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}
-       style={{display:"flex",flexDirection:_inlineMultiline?"column":"row",alignItems:_inlineMultiline?"stretch":"center",background:bg,borderRadius:0,padding:_inlineMultiline?"10px 10px":"0 10px",minHeight:30,minWidth:50,cursor:"grab",boxShadow:"0 2px 6px rgba(0,0,0,.3)",gap:_inlineMultiline?0:10, border:selected===node.id?"2px solid #fff":"2px solid transparent", boxSizing:"border-box"}}>
+       style={{display:"flex",flexDirection:"row",alignItems:"center",background:bg,borderRadius:0,padding:"0 10px",minHeight:30,minWidth:50,cursor:"grab",boxShadow:"0 2px 6px rgba(0,0,0,.3)",gap:10, border:selected===node.id?"2px solid #fff":"2px solid transparent", boxSizing:"border-box"}}>
         {valContent}
         {_useGeneric && _bdef?.settings && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
      </div>;
@@ -1248,7 +1229,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
             <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>
             <div style={{minHeight:50,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
             {_dashHasCol && <>
-              <div style={{minHeight:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,gap:10,borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
+              <div style={{minHeight:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,paddingRight:10,gap:10,width:"fit-content",alignSelf:"flex-start",borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
                 <span style={{fontFamily:"sans-serif",fontSize:16,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>On Collision</span>
                 <PortalSelect value={node.fields?.collisionShape||"sphere"} onChange={v=>onFieldChange&&onFieldChange(node.id,"collisionShape",v)} minWidth={80} options={[{value:"sphere",label:"Sphere"},{value:"box",label:"Box"}]}/>
                 {(node.fields?.collisionShape||"sphere")==="sphere"&&<>
@@ -1267,7 +1248,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
             </>}
             {_dashHasThen && <>
-              <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
+              <div style={{height:50,background:bg,borderRadius:"10px",display:"flex",alignItems:"center",paddingLeft:15,paddingRight:15,width:"fit-content",alignSelf:"flex-start",borderRight:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>
                 <span style={{fontFamily:"sans-serif",fontSize:16,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>Then</span>
               </div>
               <div style={{height:node.gapHeights?.[_dashThenSlot]||0,background:"transparent"}}/>
@@ -1535,9 +1516,9 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
       const visuallyOn=isOn&&!disabled;
       return<div key={m.key} style={{
         display:"flex",alignItems:"center",justifyContent:"space-between",
-        padding:"9px 11px",borderRadius:5,
-        background:visuallyOn?"#1a2438":C.card,
-        border:`1px solid ${visuallyOn?"#2a3f5a":C.inpB}`,
+        padding:"9px 11px",borderRadius:4,
+        background:C.inp,
+        border:`1px solid ${C.inpB}`,
         opacity:busy||disabled?0.6:1,transition:"all .15s",filter:disabled?"grayscale(1)":""}}>
         <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
           <div onClick={()=>!busy&&!disabled&&toggle(m.key,!isOn)} style={{
@@ -1549,7 +1530,6 @@ function SlotConn({sk,sc,connId,nodes,mk,onDragStart,onFieldChange,nodeId,onSele
           <div style={{minWidth:0}}>
             <div style={{fontSize:13,color:visuallyOn?C.text:C.dim,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
               {m.label}
-              {hasBlocks&&<span style={{fontSize:10,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
               {disabled&&<span style={{fontSize:10,color:"#e8a868",background:"#3a2010",padding:"1px 5px",borderRadius:3}}>requires Interaction</span>}
             </div>
             <div style={{fontSize:11,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>
