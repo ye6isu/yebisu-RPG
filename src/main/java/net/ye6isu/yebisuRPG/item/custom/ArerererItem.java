@@ -20,22 +20,25 @@ public class ArerererItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                if (player instanceof Entity animEntity && !level.isClientSide()) {
-            AnimationAPI.setFirstPersonHandPose(animEntity,
-                "testf",
-                "yebisurpg:animations/fplayer.animation.json", false, false);
-        }
-        if ((player.isCrouching())) {
+                if ((player.isCrouching())) {
           if (player instanceof Entity animEntity && !level.isClientSide()) {
-              AnimationAPI.resetThirdPersonPose(animEntity);
+              AnimationAPI.setFirstPersonHandPose(animEntity,
+                  "testf",
+                  "yebisurpg:animations/fplayer.animation.json", false, false);
           }
-        } else {
           if (player instanceof Entity animEntity && !level.isClientSide()) {
               AnimationAPI.setThirdPersonPose(animEntity,
                   "test",
                   "yebisurpg:animations/player.animation.json",
                   0, 0, 0, 0, 0);
           }
+        } else {
+          if (player instanceof Entity animEntity && !level.isClientSide()) {
+            AnimationAPI.triggerItemAnimation(animEntity,
+                "animation",
+                "yebisurpg:animations/axe.animation.json",
+                1f, true);
+        }
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

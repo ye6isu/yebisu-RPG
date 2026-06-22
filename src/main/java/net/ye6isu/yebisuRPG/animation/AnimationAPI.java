@@ -351,6 +351,55 @@ public final class AnimationAPI {
     }
 
     // -------------------------------------------------------------------------
+    // Item animation convenience wrappers
+    // -------------------------------------------------------------------------
+
+    public static void triggerItemAnimation(Entity entity, String animId, String filePath, float speed, boolean mainHand) {
+        AnimationCategory cat = mainHand ? AnimationCategory.ITEM_MAIN_HAND : AnimationCategory.ITEM_OFF_HAND;
+        triggerAnimation(entity, cat, animId, filePath, speed);
+    }
+
+    public static void triggerItemAnimation(Entity entity, String animId, String filePath, boolean mainHand) {
+        triggerItemAnimation(entity, animId, filePath, 1f, mainHand);
+    }
+
+    public static void stopItemAnimation(Entity entity, boolean mainHand) {
+        stopAnimation(entity, mainHand ? AnimationCategory.ITEM_MAIN_HAND : AnimationCategory.ITEM_OFF_HAND);
+    }
+
+    public static void pauseItemAnimation(Entity entity, boolean mainHand) {
+        pauseAnimation(entity, mainHand ? AnimationCategory.ITEM_MAIN_HAND : AnimationCategory.ITEM_OFF_HAND);
+    }
+
+    public static void resumeItemAnimation(Entity entity, boolean mainHand) {
+        resumeAnimation(entity, mainHand ? AnimationCategory.ITEM_MAIN_HAND : AnimationCategory.ITEM_OFF_HAND);
+    }
+
+    public static void setItemAnimPose(Entity entity, String animName, String filePath, float speed, boolean mainHand) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] setItemAnimPose called client-side for entity={}; ignoring.", entity.getId());
+            return;
+        }
+        var payload = net.ye6isu.yebisuRPG.network.animation.ItemAnimPosePayload.set(
+                entity.getId(), animName, filePath, speed, mainHand);
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+    }
+
+    public static void setItemAnimPose(Entity entity, String animName, String filePath, boolean mainHand) {
+        setItemAnimPose(entity, animName, filePath, 1f, mainHand);
+    }
+
+    public static void resetItemAnimPose(Entity entity, boolean mainHand) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            LOGGER.warn("[AnimationAPI] resetItemAnimPose called client-side for entity={}; ignoring.", entity.getId());
+            return;
+        }
+        var payload = net.ye6isu.yebisuRPG.network.animation.ItemAnimPosePayload.clear(
+                entity.getId(), mainHand);
+        NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
+    }
+
+    // -------------------------------------------------------------------------
     // stopAllAnimations
     // -------------------------------------------------------------------------
 

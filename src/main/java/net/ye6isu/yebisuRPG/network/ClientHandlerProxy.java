@@ -71,4 +71,13 @@ public final class ClientHandlerProxy {
         }
     }
 
+    public static void onItemAnimPose(net.ye6isu.yebisuRPG.network.animation.ItemAnimPosePayload payload,
+                                       IPayloadContext ctx) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            Runnable call = () ->
+                net.ye6isu.yebisuRPG.animation.client.AnimClientHandler.onItemAnimPose(payload, ctx);
+            call.run();
+        }
+    }
+
 }

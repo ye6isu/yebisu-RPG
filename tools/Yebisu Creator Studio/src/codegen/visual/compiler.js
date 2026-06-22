@@ -1,6 +1,9 @@
 import { blockDefRegistry } from './blockDefs.js';
 import { resolveFromDef, compileFromDef } from './blockCompiler.js';
 
+function quoteIfNeeded(v) { if (!v) return '""'; if (v.startsWith('"')) return v; return `"${v.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`; }
+function floatSuffix(v) { return String(v).endsWith('f') ? v : v + 'f'; }
+
 export const LINK_ENTITY = "entity";
 export const LINK_NUMBER = "number";
 export const LINK_LOGIC = "logic";
@@ -523,6 +526,39 @@ export function compileActionNode(node, nodes, methodKey) {
       ? `() -> {\n${thenBody.length ? thenBody.join("\n") : "    // then"}\n}`
       : "null";
     return [`DashUtil.start(${ent}, (double)(${x}), (double)(${y}), (double)(${z}), (double)(${distance}), (int)((double)(${ticks})), DashUtil.Easing.${easing}, ${collisionParam}, ${thenParam}, "${shape}", (double)(${colA}), (double)(${colB}), (double)(${colC}), ${particles});`];
+  }
+  if (node.opcode?.startsWith("anim.item.")) {
+    const stackNodeId = node.slots?.stack;
+    const stackNode = stackNodeId ? nodes.find(n => n.id === stackNodeId) : null;
+    const isMainHand = !stackNode || stackNode.opcode !== "itemstack.offhand";
+    const entitySlotId = stackNode?.slots?.entity;
+    const entityExpr = entitySlotId ? resolveSlotValue(entitySlotId, nodes, methodKey) : resolveEntityVar("entity.event", methodKey);
+
+    const guard = `if (${entityExpr} instanceof Entity animEntity && !level.isClientSide())`;
+    if (node.opcode === "anim.item.play") {
+      const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) || '""';
+      const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) || '""';
+      const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) || "1";
+      return [`${guard} {\n    AnimationAPI.triggerItemAnimation(animEntity,\n        ${quoteIfNeeded(animName)},\n        ${quoteIfNeeded(filePath)},\n        ${floatSuffix(speed)}, ${isMainHand});\n}`];
+    }
+    if (node.opcode === "anim.item.stop") {
+      return [`${guard} {\n    AnimationAPI.stopItemAnimation(animEntity, ${isMainHand});\n}`];
+    }
+    if (node.opcode === "anim.item.pause") {
+      return [`${guard} {\n    AnimationAPI.pauseItemAnimation(animEntity, ${isMainHand});\n}`];
+    }
+    if (node.opcode === "anim.item.resume") {
+      return [`${guard} {\n    AnimationAPI.resumeItemAnimation(animEntity, ${isMainHand});\n}`];
+    }
+    if (node.opcode === "anim.item.pose.set") {
+      const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) || '""';
+      const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) || '""';
+      const speed = resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) || "1";
+      return [`${guard} {\n    AnimationAPI.setItemAnimPose(animEntity,\n        ${quoteIfNeeded(animName)},\n        ${quoteIfNeeded(filePath)},\n        ${floatSuffix(speed)}, ${isMainHand});\n}`];
+    }
+    if (node.opcode === "anim.item.pose.reset") {
+      return [`${guard} {\n    AnimationAPI.resetItemAnimPose(animEntity, ${isMainHand});\n}`];
+    }
   }
   return ["// unknown: " + node.opcode];
 }
