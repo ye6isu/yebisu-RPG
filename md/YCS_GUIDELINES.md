@@ -134,6 +134,43 @@ Feature keys: `food`, `fuel`, `tooltip`
 
 ---
 
+## Import Management
+
+YCS generates Java imports via `ycsSyncImports` (items) and `ycsEffectSyncImports` (effects). The system follows strict rules to keep classes clean:
+
+### Only-what-you-use principle
+- **Base imports**: Only `net.minecraft.world.item.Item` is always included (the class extends it). Everything else — `ItemStack`, `Level`, `Player`, `LivingEntity` — is content-scanned.
+- **Method definition imports**: Only include imports required by the method **signature** (return type, parameter types not covered by content scan). Never include block-specific imports like `MobEffectInstance` or `AnimationAPI` — those are handled by the content scan.
+- **Content scan**: Runs on `codeBody` — the class source with the import block stripped out. This prevents self-referential loops where an import's own text triggers its re-inclusion.
+- **Block definition imports**: Each block in `blockDefs.js` declares its `codegen.imports`. These are injected into the compiled code, which the content scan then detects.
+
+### How it works
+1. Start with base imports (`Item` only)
+2. Add imports from enabled method definitions (signature-only imports)
+3. Add imports from enabled YCS features (`food`, `fuel`, `tooltip`)
+4. Strip the import block from the code → `codeBody`
+5. Content-scan `codeBody` for patterns (`MobEffectInstance`, `AnimationAPI`, `DashUtil.`, etc.)
+6. Rebuild the `//YCS_Import_START...END` block with only the needed imports
+7. Remove any stray imports outside the block
+
+### Rules for clean imports
+
+1. **No bundled imports**: Never add an import just because a related import is present. Each import must be independently justified by its own content-scan trigger. Example: `MobEffectInstance` does NOT auto-include `MobEffects` — they have separate triggers (`MobEffectInstance` and `MobEffects.`).
+2. **FQN-aware scanning**: When generated code uses fully qualified names (e.g. `net.minecraft.server.level.ServerLevel`), the content scan must NOT match the class name as a substring. Use negative lookbehind: `(?<!\.)ClassName\b` instead of `includes('ClassName')`. This prevents importing a class that's already referenced by FQN.
+3. **Block `codegen.imports`**: Only declare imports that the generated code uses as **short names**. If the template uses FQN (like `net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA`), set `imports: []` — no import needed.
+4. **Method definition imports**: Only signature-required imports (return type, parameter types). Never include block-specific imports like `MobEffectInstance`, `AnimationAPI`, `AnimationCategory` — the content scan handles those when they actually appear in compiled block code.
+5. **Total cleanup on save**: Every save rebuilds imports from scratch. When all blocks are removed from a method, all their imports disappear. When a method is disabled, its signature imports disappear. Only what the code body actually references survives.
+
+### Adding a new content-scan trigger
+When adding a new utility/API that blocks might use:
+1. Add the pattern check to both `ycsSyncImports` and `ycsEffectSyncImports` in `ycs.js`
+2. Scan `codeBody` (import block stripped), never raw `code`
+3. Use `(?<!\.)ClassName\b` regex if the class might appear as FQN in generated code; use `codeBody.includes('ClassName.')` (with dot) for mod-specific classes that are always short names
+4. Each class gets its own independent trigger — never bundle unrelated imports together
+5. Add corresponding `codegen.imports` to block definitions only if the template uses short class names
+
+---
+
 ## Visual Block Editor (Canvas)
 
 - Free-floating 2D canvas. Drag blocks from the left palette onto the canvas.
@@ -198,6 +235,7 @@ The key invariant: container blocks must appear in **every** place `control.if` 
 - A page that edits a single entry should mirror that two-panel editor layout instead of a single bordered box: a left panel with the form fields and a right panel with a live preview/info view, both same-size (`flex:1`) bordered boxes side by side. `KeybindsPage` follows this via `KeybindEditor` (left) + `KeybindPreviewPanel` (right).
 - Editor/preview header titles (`"Edit X"` / `"New X"`) are plain text — `fontSize:14,fontWeight:500`, no explicit `color` (defaults to `C.text`) — and carry no status pill next to them. Don't use `color:C.accent` on these titles or add an `editing` badge; that was tried for Items/Keybinds and reverted for being inconsistent with the rest of the app.
 - Preview-panel "current value" cards (e.g. `KeybindPreviewPanel`, `InterfacePreviewPanel`) use the same neutral card styling as everything else: `background:C.card`, `border:1px solid C.inpB`, and `Pill` color `C.inp`. Don't hardcode blue tints like `#1a2438`/`#0e2030`/`#2a3f5a` for these — those hex values are reserved for actual *selected/active-state* highlighting elsewhere in the app (drag targets, active list rows, selected texture swatches), not for a page's default chrome.
+- **Method list rows** (in the visual block editor's right panel) use input field styling — `background:C.inp`, `border:1px solid C.inpB`, `borderRadius:4` — matching normal form fields. Do not highlight active/enabled methods with blue tints or use `C.card` background. Do not show a "compiled" pill/badge next to the method name. The checkbox alone indicates enabled state. This applies to both `RightPaneShell.jsx` and `VisualEditor.jsx`'s `MethodListPanel`.
 - The top-level tab strip supports drag-to-reorder (each tab button is `draggable`, reordering writes the new id order to `tabOrder`) and mouse-wheel horizontal scrolling (the tab strip container listens for `onWheel` and applies `deltaY` to `scrollLeft`) for when there are more tabs than fit the window. Tab order is persisted across reloads via `useLS("ycs_tab_order", ...)`; new tabs are appended automatically by reconciling the canonical tab list against the saved order, so you don't need to touch this when adding a new top-level tab — just add it to the canonical list.
 
 ## Scope for New Feature Categories

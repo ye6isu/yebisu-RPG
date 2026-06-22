@@ -24,6 +24,8 @@ export function parseLabel(label) {
       segments.push({ type: "input", key, inputType: "number" });
     } else if (spec === "input.text") {
       segments.push({ type: "input", key, inputType: "text" });
+    } else if (spec === "checkbox") {
+      segments.push({ type: "checkbox", key });
     } else {
       segments.push({ type: "text", value: match[0] });
     }

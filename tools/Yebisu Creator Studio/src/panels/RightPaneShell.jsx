@@ -45,8 +45,9 @@ export function MethodListPanel({form,F,onEnterEditor,className}){
       return<div key={m.key} style={{
         display:"flex",alignItems:"center",justifyContent:"space-between",
         padding:"9px 11px",borderRadius:5,
-        background:visuallyOn?"#1a2438":C.card,
-        border:`1px solid ${visuallyOn?"#2a3f5a":C.inpB}`,
+        background:C.inp,
+        border:`1px solid ${C.inpB}`,
+        borderRadius:4,
         opacity:busy||disabled?0.6:1,transition:"all .15s",filter:disabled?"grayscale(1)":""}}>
         <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
           <div onClick={()=>!busy&&!disabled&&toggle(m.key,!isOn)} style={{
@@ -56,9 +57,8 @@ export function MethodListPanel({form,F,onEnterEditor,className}){
             {visuallyOn&&<svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 3.5l2 2 4-4" stroke="#04060c" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
           </div>
           <div style={{minWidth:0}}>
-            <div style={{fontSize:13,color:visuallyOn?C.text:C.dim,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+            <div style={{fontSize:13,color:C.text,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
               {m.label}
-              {hasBlocks&&<span style={{fontSize:10,color:C.accent,background:"#0e2030",padding:"1px 5px",borderRadius:3}}>● compiled</span>}
               {disabled&&<span style={{fontSize:10,color:"#e8a868",background:"#3a2010",padding:"1px 5px",borderRadius:3}}>requires Interaction</span>}
             </div>
             <div style={{fontSize:11,color:C.faint,fontFamily:"monospace",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:210}}>{m.sig}</div>

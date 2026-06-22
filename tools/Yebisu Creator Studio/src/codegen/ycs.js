@@ -2,9 +2,6 @@ import { ITEM_METHODS, EFFECT_METHODS } from './visual/methods.js';
 
 export const YCS_BASE_IMPORTS=[
   "net.minecraft.world.item.Item",
-  "net.minecraft.world.item.ItemStack",
-  "net.minecraft.world.level.Level",
-  "net.minecraft.world.entity.player.Player",
 ];
 
 export const YCS_FEATURES={
@@ -101,76 +98,93 @@ export function ycsSyncImports(code, enabledMethodKeys) {
     }
   }
 
-  if (code.includes('instanceof LivingEntity') || code.includes('LivingEntity ')) {
+  const codeBody = code.replace(/\/\/YCS_Import_START[\s\S]*?\/\/YCS_Import_END/g, '');
+  if (codeBody.includes('ItemStack')) {
+    needed.add('net.minecraft.world.item.ItemStack');
+  }
+  if (codeBody.includes('Level ') || codeBody.includes('Level,') || codeBody.includes('ServerLevel')) {
+    needed.add('net.minecraft.world.level.Level');
+  }
+  if (codeBody.includes('Player ') || codeBody.includes('Player,') || codeBody.includes('instanceof Player')) {
+    needed.add('net.minecraft.world.entity.player.Player');
+  }
+  if (codeBody.includes('InteractionHand')) {
+    needed.add('net.minecraft.world.InteractionHand');
+  }
+  if (/(?<!\.)LivingEntity\b/.test(codeBody)) {
     needed.add('net.minecraft.world.entity.LivingEntity');
   }
-  if (code.includes('instanceof Entity') || code.includes('Entity ')) {
+  if (/(?<!Living)(?<!Interaction)\bEntity\b(?!Var)/.test(codeBody)) {
     needed.add('net.minecraft.world.entity.Entity');
   }
-  if (code.includes('MobEffectInstance') || code.includes('.addEffect(')) {
+  if (codeBody.includes('MobEffectInstance') || codeBody.includes('.addEffect(')) {
     needed.add('net.minecraft.world.effect.MobEffectInstance');
+  }
+  if (codeBody.includes('MobEffects.')) {
     needed.add('net.minecraft.world.effect.MobEffects');
   }
-  if (code.includes('ModEffects.')) {
+  if (codeBody.includes('ModEffects.')) {
     needed.add('net.ye6isu.yebisuRPG.effect.ModEffects');
   }
-  if (code.includes('AnimationAPI') || code.includes('AnimationCategory')) {
+  if (codeBody.includes('AnimationAPI')) {
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationAPI');
+  }
+  if (codeBody.includes('AnimationCategory')) {
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationCategory');
   }
-  if (code.includes('TickScheduler')) {
+  if (codeBody.includes('TickScheduler')) {
     needed.add('net.ye6isu.yebisuRPG.util.TickScheduler');
   }
-  if (code.includes('AoeShapes')) {
+  if (codeBody.includes('AoeShapes')) {
     needed.add('net.ye6isu.yebisuRPG.util.AoeShapes');
   }
-  if (code.includes('EntityVarCapability') || code.includes('EntityVar.')) {
+  if (codeBody.includes('EntityVarCapability') || codeBody.includes('EntityVar.')) {
     needed.add('net.ye6isu.yebisuRPG.data.EntityVarCapability');
     needed.add('net.ye6isu.yebisuRPG.data.EntityVar');
   }
-  if (code.includes('AttributeModifier') || code.includes('getAttributeValue') || code.includes('getAttributeBaseValue')) {
+  if (codeBody.includes('AttributeModifier') || codeBody.includes('getAttributeValue') || codeBody.includes('getAttributeBaseValue')) {
     needed.add('net.minecraft.world.entity.ai.attributes.Attributes');
     needed.add('net.minecraft.world.entity.ai.attributes.AttributeModifier');
     needed.add('net.minecraft.resources.ResourceLocation');
   }
-  if (code.includes('ModAttributes.')) {
+  if (codeBody.includes('ModAttributes.')) {
     needed.add('net.ye6isu.yebisuRPG.attribute.ModAttributes');
   }
-  if (code.includes('InteractionResultHolder')) {
+  if (codeBody.includes('InteractionResultHolder')) {
     needed.add('net.minecraft.world.InteractionResultHolder');
   }
-  if (code.includes('UseAnim')) {
+  if (codeBody.includes('UseAnim')) {
     needed.add('net.minecraft.world.item.UseAnim');
   }
-  if (code.includes('FoodProperties')) {
+  if (codeBody.includes('FoodProperties')) {
     needed.add('net.minecraft.world.food.FoodProperties');
   }
-  if (code.includes('Screen.hasShiftDown')) {
+  if (codeBody.includes('Screen.hasShiftDown')) {
     needed.add('net.minecraft.client.gui.screens.Screen');
   }
-  if (code.includes('ChatFormatting')) {
+  if (codeBody.includes('ChatFormatting')) {
     needed.add('net.minecraft.ChatFormatting');
   }
-  if (code.includes('ResourceLocation')) {
+  if (codeBody.includes('ResourceLocation')) {
     needed.add('net.minecraft.resources.ResourceLocation');
   }
-  if (code.includes('Component.literal')) {
+  if (codeBody.includes('Component.literal')) {
     needed.add('net.minecraft.network.chat.Component');
   }
-  if (code.includes('ModDataComponents.')) {
+  if (codeBody.includes('ModDataComponents.')) {
     needed.add('net.ye6isu.yebisuRPG.component.ModDataComponents');
   }
-  if (code.includes('TextureServerEvents.')) {
+  if (codeBody.includes('TextureServerEvents.')) {
     needed.add('net.ye6isu.yebisuRPG.texture.TextureServerEvents');
   }
-  if (code.includes('CustomModelData')) {
+  if (/(?<!\.)CustomModelData/.test(codeBody)) {
     needed.add('net.minecraft.core.component.DataComponents');
     needed.add('net.minecraft.world.item.component.CustomModelData');
   }
-  if (code.includes('ItemStack.isSameItem')) {
+  if (codeBody.includes('ItemStack.isSameItem')) {
     needed.add('net.minecraft.world.item.ItemStack');
   }
-  if (code.includes('DashUtil.')) {
+  if (codeBody.includes('DashUtil.')) {
     needed.add('net.ye6isu.yebisuRPG.util.DashUtil');
   }
 
@@ -288,55 +302,60 @@ export function ycsEffectSyncImports(code, enabledMethodKeys) {
     'net.minecraft.world.effect.MobEffectCategory',
     'net.minecraft.world.entity.LivingEntity',
   ]);
-  if (code.includes('MobEffectInstance') || code.includes('.addEffect(')) {
+  const codeBody = code.replace(/\/\/YCS_Import_START[\s\S]*?\/\/YCS_Import_END/g, '');
+  if (codeBody.includes('MobEffectInstance') || codeBody.includes('.addEffect(')) {
     needed.add('net.minecraft.world.effect.MobEffectInstance');
+  }
+  if (codeBody.includes('MobEffects.')) {
     needed.add('net.minecraft.world.effect.MobEffects');
   }
-  if (code.includes('ModEffects.')) {
+  if (codeBody.includes('ModEffects.')) {
     needed.add('net.ye6isu.yebisuRPG.effect.ModEffects');
   }
-  if (code.includes('AnimationAPI') || code.includes('AnimationCategory')) {
+  if (codeBody.includes('AnimationAPI')) {
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationAPI');
+  }
+  if (codeBody.includes('AnimationCategory')) {
     needed.add('net.ye6isu.yebisuRPG.animation.AnimationCategory');
   }
-  if (code.includes('TickScheduler')) {
+  if (codeBody.includes('TickScheduler')) {
     needed.add('net.ye6isu.yebisuRPG.util.TickScheduler');
   }
-  if (code.includes('AoeShapes')) {
+  if (codeBody.includes('AoeShapes')) {
     needed.add('net.ye6isu.yebisuRPG.util.AoeShapes');
   }
-  if (code.includes('EntityVarCapability') || code.includes('EntityVar.')) {
+  if (codeBody.includes('EntityVarCapability') || codeBody.includes('EntityVar.')) {
     needed.add('net.ye6isu.yebisuRPG.data.EntityVarCapability');
     needed.add('net.ye6isu.yebisuRPG.data.EntityVar');
   }
-  if (code.includes('AttributeModifier') || code.includes('getAttributeValue') || code.includes('getAttributeBaseValue')) {
+  if (codeBody.includes('AttributeModifier') || codeBody.includes('getAttributeValue') || codeBody.includes('getAttributeBaseValue')) {
     needed.add('net.minecraft.world.entity.ai.attributes.Attributes');
     needed.add('net.minecraft.world.entity.ai.attributes.AttributeModifier');
     needed.add('net.minecraft.resources.ResourceLocation');
   }
-  if (code.includes('ModAttributes.')) {
+  if (codeBody.includes('ModAttributes.')) {
     needed.add('net.ye6isu.yebisuRPG.attribute.ModAttributes');
   }
-  if (code.includes('ResourceLocation')) {
+  if (codeBody.includes('ResourceLocation')) {
     needed.add('net.minecraft.resources.ResourceLocation');
   }
-  if (code.includes('Component.literal')) {
+  if (codeBody.includes('Component.literal')) {
     needed.add('net.minecraft.network.chat.Component');
   }
-  if (code.includes('ModDataComponents.')) {
+  if (codeBody.includes('ModDataComponents.')) {
     needed.add('net.ye6isu.yebisuRPG.component.ModDataComponents');
   }
-  if (code.includes('TextureServerEvents.')) {
+  if (codeBody.includes('TextureServerEvents.')) {
     needed.add('net.ye6isu.yebisuRPG.texture.TextureServerEvents');
   }
-  if (code.includes('CustomModelData')) {
+  if (/(?<!\.)CustomModelData/.test(codeBody)) {
     needed.add('net.minecraft.core.component.DataComponents');
     needed.add('net.minecraft.world.item.component.CustomModelData');
   }
-  if (code.includes('ItemStack.isSameItem')) {
+  if (codeBody.includes('ItemStack.isSameItem')) {
     needed.add('net.minecraft.world.item.ItemStack');
   }
-  if (code.includes('DashUtil.')) {
+  if (codeBody.includes('DashUtil.')) {
     needed.add('net.ye6isu.yebisuRPG.util.DashUtil');
   }
 
