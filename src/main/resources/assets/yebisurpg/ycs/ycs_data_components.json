@@ -1,6 +1,6 @@
 [
   {
-    "name": "itemcounter",
+    "name": "tester",
     "type": "double",
     "default": 0
   }

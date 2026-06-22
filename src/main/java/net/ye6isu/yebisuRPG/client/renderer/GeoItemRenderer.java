@@ -29,12 +29,14 @@ import org.joml.Vector3f;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.List;
 
 @OnlyIn(Dist.CLIENT)
 public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     private static final Map<Item, GeoItemEntry> REGISTRY = new HashMap<>();
     private final Map<Item, BakedGeoModel> models = new HashMap<>();
+    private final Map<Item, Integer> spritesheetFrameCounts = new HashMap<>();
 
     private static int currentRenderEntityId = -1;
 
@@ -51,7 +53,16 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
     }
 
     public static void register(Item item, ResourceLocation geoLocation, ResourceLocation textureLocation) {
-        REGISTRY.put(item, new GeoItemEntry(geoLocation, textureLocation));
+        REGISTRY.put(item, new GeoItemEntry(geoLocation, List.of(textureLocation), 0, false, 0));
+    }
+
+    public static void register(Item item, ResourceLocation geoLocation, ResourceLocation textureLocation,
+                                 int frames, boolean animated, int ticksPerFrame) {
+        REGISTRY.put(item, new GeoItemEntry(geoLocation, List.of(textureLocation), frames, animated, ticksPerFrame));
+    }
+
+    public static void register(Item item, ResourceLocation geoLocation, List<ResourceLocation> textureFrames) {
+        REGISTRY.put(item, new GeoItemEntry(geoLocation, textureFrames, 0, false, 0));
     }
 
     public static boolean hasEntry(Item item) {
@@ -61,12 +72,33 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
     @Override
     public void onResourceManagerReload(ResourceManager resourceManager) {
         models.clear();
+        spritesheetFrameCounts.clear();
         for (var entry : REGISTRY.entrySet()) {
             BakedGeoModel model = loadModel(resourceManager, entry.getValue().geoLocation());
             if (model != null) {
                 models.put(entry.getKey(), model);
+                if (entry.getValue().textures().size() == 1) {
+                    int frames = detectFrameCount(resourceManager, entry.getValue().textures().get(0), model.texHeight());
+                    if (frames > 1) {
+                        spritesheetFrameCounts.put(entry.getKey(), frames);
+                    }
+                }
             }
         }
+    }
+
+    private int detectFrameCount(ResourceManager mgr, ResourceLocation texLoc, int geoTexHeight) {
+        try (InputStream is = mgr.getResourceOrThrow(texLoc).open()) {
+            // PNG IHDR: 8-byte signature, 4-byte chunk length, 4-byte "IHDR", 4-byte width, 4-byte height
+            byte[] header = new byte[24];
+            if (is.read(header) < 24) return 1;
+            int pngHeight = ((header[20] & 0xFF) << 24) | ((header[21] & 0xFF) << 16)
+                    | ((header[22] & 0xFF) << 8) | (header[23] & 0xFF);
+            if (geoTexHeight > 0 && pngHeight > geoTexHeight && pngHeight % geoTexHeight == 0) {
+                return pngHeight / geoTexHeight;
+            }
+        } catch (Exception ignored) {}
+        return 1;
     }
 
     @Override
@@ -117,7 +149,42 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
             }
         }
 
-        RenderType renderType = RenderType.entityCutoutNoCull(entry.textureLocation());
+        int customModelData = stack.getOrDefault(
+                net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
+                new net.minecraft.world.item.component.CustomModelData(0)).value();
+
+        int resolvedFrameCount = entry.frames() > 1 ? entry.frames()
+                : (spritesheetFrameCounts.containsKey(item) ? spritesheetFrameCounts.get(item) : 0);
+
+        int frame;
+        if (entry.animated() && resolvedFrameCount > 1) {
+            int tpf = Math.max(1, entry.ticksPerFrame());
+            long tick = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
+            frame = (int)((tick / tpf) % resolvedFrameCount);
+        } else {
+            frame = Math.max(0, customModelData - 1);
+        }
+
+        ResourceLocation textureLoc;
+        float vFrameOffset = 0f;
+        int effectiveTexH;
+
+        if (entry.textures().size() > 1) {
+            int idx = Math.min(frame, entry.textures().size() - 1);
+            textureLoc = entry.textures().get(idx);
+            effectiveTexH = model.texHeight();
+        } else {
+            textureLoc = entry.textures().get(0);
+            if (resolvedFrameCount > 1) {
+                int clampedFrame = Math.min(frame, resolvedFrameCount - 1);
+                effectiveTexH = model.texHeight() * resolvedFrameCount;
+                vFrameOffset = (float)(clampedFrame * model.texHeight());
+            } else {
+                effectiveTexH = model.texHeight();
+            }
+        }
+
+        RenderType renderType = RenderType.entityCutoutNoCull(textureLoc);
         VertexConsumer vc = ItemRenderer.getFoilBufferDirect(buffer, renderType, false, stack.hasFoil());
 
         poseStack.pushPose();
@@ -125,14 +192,14 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.scale(1.0f / 16.0f, 1.0f / 16.0f, 1.0f / 16.0f);
 
         for (BakedBone bone : model.bones()) {
-            renderBone(bone, poseStack, vc, packedLight, packedOverlay, model.texWidth(), model.texHeight(), itemAnim, timeSecs);
+            renderBone(bone, poseStack, vc, packedLight, packedOverlay, model.texWidth(), effectiveTexH, vFrameOffset, itemAnim, timeSecs);
         }
 
         poseStack.popPose();
     }
 
     private void renderBone(BakedBone bone, PoseStack poseStack, VertexConsumer vc,
-                            int light, int overlay, int texW, int texH,
+                            int light, int overlay, int texW, int texH, float vFrameOffset,
                             net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim,
                             float timeSecs) {
         poseStack.pushPose();
@@ -174,18 +241,18 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.translate(-px, -py, -pz);
 
         for (BakedCube cube : bone.cubes()) {
-            renderCube(cube, poseStack, vc, light, overlay, texW, texH);
+            renderCube(cube, poseStack, vc, light, overlay, texW, texH, vFrameOffset);
         }
 
         for (BakedBone child : bone.children()) {
-            renderBone(child, poseStack, vc, light, overlay, texW, texH, anim, timeSecs);
+            renderBone(child, poseStack, vc, light, overlay, texW, texH, vFrameOffset, anim, timeSecs);
         }
 
         poseStack.popPose();
     }
 
     private void renderCube(BakedCube cube, PoseStack poseStack, VertexConsumer vc,
-                            int light, int overlay, int texW, int texH) {
+                            int light, int overlay, int texW, int texH, float vFrameOffset) {
         poseStack.pushPose();
 
         float px = cube.pivotX(), py = cube.pivotY(), pz = cube.pivotZ();
@@ -212,7 +279,7 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         float x0 = ox - inf, y0 = oy - inf, z0 = oz - inf;
         float x1 = ox + sx + inf, y1 = oy + sy + inf, z1 = oz + sz + inf;
 
-        float u = cube.uvX(), v = cube.uvY();
+        float u = cube.uvX(), v = cube.uvY() + vFrameOffset;
 
         // Bedrock box UV layout — Bedrock front = -Z, Java front = +Z, so swap front/back UVs
         // Bedrock "front": u+sz,       v+sz,       sx, sy  → maps to Java North (-Z)
@@ -244,7 +311,7 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
 
         // Top face (+Y) normal 0,1,0
         quad(mat, norm, vc, light, overlay, texW, texH,
-            x0, y1, z1,  x1, y1, z1,  x1, y1, z0,  x0, y1, z0,
+            x0, y1, z0,  x1, y1, z0,  x1, y1, z1,  x0, y1, z1,
             u + sz, v, sx, sz, 0, 1, 0);
 
         // Bottom face (-Y) normal 0,-1,0
@@ -367,7 +434,8 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     // ─── Data records ────────────────────────────────────────────────────────────
 
-    private record GeoItemEntry(ResourceLocation geoLocation, ResourceLocation textureLocation) {}
+    private record GeoItemEntry(ResourceLocation geoLocation, List<ResourceLocation> textures,
+                                    int frames, boolean animated, int ticksPerFrame) {}
     private record BakedGeoModel(int texWidth, int texHeight, List<BakedBone> bones) {}
     private record BakedBone(String name, float pivotX, float pivotY, float pivotZ,
                              float rotX, float rotY, float rotZ,

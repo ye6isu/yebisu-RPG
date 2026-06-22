@@ -18,7 +18,7 @@ public class ModItems {
 
     //Normal Items
     public static final DeferredItem<Item> PLANK = ITEMS.register("plank",
-                () -> new Item(new Item.Properties().stacksTo(1)));
+                () -> new PlankItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredItem<Item> YE6ISU = ITEMS.register("ye6isu",
                 () -> new Item(new Item.Properties()));
