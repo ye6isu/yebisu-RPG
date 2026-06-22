@@ -115,9 +115,10 @@ public final class AnimationEventHooks {
         if (!(event.getEntity() instanceof ServerPlayer observer)) return;
 
         Entity tracked = event.getTarget();
+
+        // Catch-up: animations
         Map<AnimationCategory, AnimationEntry> slots =
                 AnimationRegistry.get().getAll(tracked.getId());
-        if (slots.isEmpty()) return;
 
         long now = tracked.level().getGameTime();
 
@@ -134,6 +135,11 @@ public final class AnimationEventHooks {
             LOGGER.debug("[AnimHooks] StartTracking catch-up: observer={} entity={} cat={} anim={} progress={}t speed={} paused={}",
                     observer.getName().getString(), tracked.getId(),
                     entry.category(), entry.animId(), progressTicks, entry.playbackSpeed(), entry.isPaused());
+        }
+
+        // Catch-up: poses
+        for (var pose : PoseRegistry.get().getAllPoses(tracked.getId())) {
+            NetworkUtils.sendToPlayer(observer, pose);
         }
     }
 
@@ -161,9 +167,11 @@ public final class AnimationEventHooks {
         long now = overworld.getGameTime();
 
         for (Entity entity : overworld.getAllEntities()) {
+            int eid = entity.getId();
+
+            // Catch-up: animations
             Map<AnimationCategory, AnimationEntry> slots =
-                    AnimationRegistry.get().getAll(entity.getId());
-            if (slots.isEmpty()) continue;
+                    AnimationRegistry.get().getAll(eid);
 
             for (AnimationEntry entry : slots.values()) {
                 int progressTicks = (int) Math.min(entry.elapsedTicks(now), Integer.MAX_VALUE);
@@ -176,8 +184,13 @@ public final class AnimationEventHooks {
                     NetworkUtils.sendToPlayer(joining, AnimPausePayload.pause(entry.entityId(), entry.category(), frozenMs));
                 }
                 LOGGER.debug("[AnimHooks] Login catch-up: joining={} entity={} cat={} anim={} progress={}t speed={} paused={}",
-                        joining.getName().getString(), entity.getId(),
+                        joining.getName().getString(), eid,
                         entry.category(), entry.animId(), progressTicks, entry.playbackSpeed(), entry.isPaused());
+            }
+
+            // Catch-up: poses
+            for (var pose : PoseRegistry.get().getAllPoses(eid)) {
+                NetworkUtils.sendToPlayer(joining, pose);
             }
         }
     }
@@ -245,9 +258,13 @@ public final class AnimationEventHooks {
     @SubscribeEvent
     public static void onEntityLeavingLevel(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent event) {
         Entity entity = event.getEntity();
-        if (entity.level() instanceof ServerLevel && AnimationRegistry.get().hasAny(entity.getId())) {
-            AnimationRegistry.get().removeAll(entity.getId());
-            LOGGER.debug("[AnimHooks] Cleared registry for removed entity={}", entity.getId());
+        if (entity.level() instanceof ServerLevel) {
+            int eid = entity.getId();
+            if (AnimationRegistry.get().hasAny(eid)) {
+                AnimationRegistry.get().removeAll(eid);
+            }
+            PoseRegistry.get().removeAll(eid);
+            LOGGER.debug("[AnimHooks] Cleared registry for removed entity={}", eid);
         }
     }
 

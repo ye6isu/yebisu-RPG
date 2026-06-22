@@ -89,12 +89,14 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
     };
     const wtGeo=async()=>{
       if(form.holdingMode!=="3d")return;
-      if(form.geoModelJson||form.itemModelJson){
-        const jg=await api("/geo/save",{id:form.id,type:"item",geoJson:form.geoModelJson,itemModelJson:form.itemModelJson,constName:CN});
-        msgs.push({ok:jg.ok,label:"3d-model",msg:jg.ok?"ok":jg.reason});
-      }
       const tex3dId=(form.modelTexture3dId||"").startsWith("__direct__")?null:form.modelTexture3dId;
       const tex3d=textures.find(t=>t.id===tex3dId);
+      const texMeta=tex3d&&tex3d.isSpritesheet&&(tex3d.frames||1)>1?{isSpritesheet:true,isAnimated:!!tex3d.isAnimated,frames:tex3d.frames,ticksPerFrame:tex3d.ticksPerFrame||4}:null;
+      console.log('[wtGeo] tex3dId=%s tex3d=%o texMeta=%o', tex3dId, tex3d, texMeta);
+      if(form.geoModelJson||form.itemModelJson||texMeta){
+        const jg=await api("/geo/save",{id:form.id,type:"item",geoJson:form.geoModelJson||null,itemModelJson:form.itemModelJson||null,constName:CN,texMeta});
+        msgs.push({ok:jg.ok,label:"3d-model",msg:jg.ok?"ok":jg.reason});
+      }
       const d3dUrl=(form.modelTexture3dId||"").startsWith("__direct__")?(form.modelTexture3dId).split("__name__")[0].replace("__direct__",""):null;
       const tex3dData=d3dUrl||tex3d?.dataUrl;
       if(tex3dData){

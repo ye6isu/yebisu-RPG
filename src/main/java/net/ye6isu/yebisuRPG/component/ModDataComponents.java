@@ -53,7 +53,7 @@ public final class ModDataComponents {
     //YCS_DataComponents_START
 
 public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>
-        YCS_ITEMCOUNTER = COMPONENTS.register("ycs_itemcounter", () ->
+        YCS_TESTER = COMPONENTS.register("ycs_tester", () ->
             DataComponentType.<Double>builder()
                 .persistent(Codec.DOUBLE)
                 .networkSynchronized(ByteBufCodecs.DOUBLE)

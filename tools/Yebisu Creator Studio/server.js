@@ -560,7 +560,8 @@ app.post('/api/items/delete', (req, res) => {
 
 app.post('/api/geo/save', (req, res) => {
   try {
-    const { id, type, geoJson, itemModelJson, constName } = req.body
+    const { id, type, geoJson, itemModelJson, constName, texMeta } = req.body
+    console.log('[geo/save] id=%s constName=%s texMeta=%s', id, constName, JSON.stringify(texMeta))
     if (!id || !type) return res.json({ ok: false, reason: 'missing id or type' })
     const geoDir = jp(MOD_ROOT, 'assets', MODID, 'geo', type)
     if (!fs.existsSync(geoDir)) fs.mkdirSync(geoDir, { recursive: true })
@@ -585,15 +586,23 @@ app.post('/api/geo/save', (req, res) => {
         const ei = src.indexOf(endM)
         if (si !== -1 && ei !== -1) {
           const section = src.slice(si + startM.length, ei)
-          const line = `        tryRegister(items, ModItems.${constName}, "${id}");`
-          if (!section.includes(`ModItems.${constName}`)) {
-            const before = src.slice(0, si + startM.length)
-            const after = src.slice(ei)
-            const trimmed = section.replace(/^\n+|\n+$/g, '')
-            const newSection = trimmed ? '\n' + trimmed + '\n' + line + '\n' : '\n' + line + '\n'
-            src = before + newSection + after
-            wf(regFile, src)
+          let line
+          if (texMeta && texMeta.isSpritesheet && (texMeta.frames || 1) > 1) {
+            const frames = texMeta.frames || 1
+            const animated = !!texMeta.isAnimated
+            const tpf = texMeta.ticksPerFrame || 4
+            line = `        tryRegister(items, ModItems.${constName}, "${id}", ${frames}, ${animated}, ${tpf});`
+          } else {
+            line = `        tryRegister(items, ModItems.${constName}, "${id}");`
           }
+          // Remove existing line for this item before inserting (handles updates)
+          const cleanedSection = section.split('\n').filter(l => !l.includes(`ModItems.${constName}`)).join('\n')
+          const before = src.slice(0, si + startM.length)
+          const after = src.slice(ei)
+          const trimmed = cleanedSection.replace(/^\n+|\n+$/g, '')
+          const newSection = trimmed ? '\n' + trimmed + '\n' + line + '\n' : '\n' + line + '\n'
+          src = before + newSection + after
+          wf(regFile, src)
         }
       }
     }

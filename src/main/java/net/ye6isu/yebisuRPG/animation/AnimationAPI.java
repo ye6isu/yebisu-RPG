@@ -273,6 +273,7 @@ public final class AnimationAPI {
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.HandPosePayload.set(
                 entity.getId(), animName, filePath, allowVanillaActions, keepPosScale);
+        PoseRegistry.get().setHandPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 
@@ -323,6 +324,7 @@ public final class AnimationAPI {
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload.set(
                 entity.getId(), animName, filePath, lookAtMask, vanillaMask, vanillaMoveMask, allowActionsMask, keepPosScaleMask);
+        PoseRegistry.get().setThirdPersonPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 
@@ -335,6 +337,7 @@ public final class AnimationAPI {
             return;
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload.clear(entity.getId());
+        PoseRegistry.get().setThirdPersonPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 
@@ -347,6 +350,7 @@ public final class AnimationAPI {
             return;
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.HandPosePayload.clear(entity.getId());
+        PoseRegistry.get().setHandPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 
@@ -382,6 +386,7 @@ public final class AnimationAPI {
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.ItemAnimPosePayload.set(
                 entity.getId(), animName, filePath, speed, mainHand);
+        PoseRegistry.get().setItemPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 
@@ -396,6 +401,7 @@ public final class AnimationAPI {
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.ItemAnimPosePayload.clear(
                 entity.getId(), mainHand);
+        PoseRegistry.get().setItemPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }
 

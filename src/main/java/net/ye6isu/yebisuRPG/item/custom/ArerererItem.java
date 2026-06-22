@@ -7,9 +7,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.Entity;
-import net.ye6isu.yebisuRPG.animation.AnimationAPI;
-import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.component.ModDataComponents;
 //YCS_Import_END
 
 public class ArerererItem extends Item {
@@ -21,22 +19,12 @@ public class ArerererItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-                if ((player.isCrouching())) {
-          if (player instanceof Entity animEntity && !level.isClientSide()) {
-              AnimationAPI.setThirdPersonPose(animEntity,
-                  "pose",
-                  "yebisurpg:animations/player.animation.json",
-                  80, 51, 0, 0, 0);
-          }
+                if (((double)((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.YCS_TESTER.get(), 0.0)))<(double)(3))) {
+          player.getItemInHand(usedHand).set(ModDataComponents.YCS_TESTER.get(), (double)((((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.YCS_TESTER.get(), 0.0)))+(1))));
         } else {
-          if (player instanceof Entity animEntity && !level.isClientSide()) {
-              AnimationAPI.triggerAnimation(animEntity,
-                  AnimationCategory.ENTITY_THIRD_PERSON,
-                  "test",
-                  "yebisurpg:animations/player.animation.json",
-                  1f, 48, 51 | 1024, 0);
-          }
+          player.getItemInHand(usedHand).set(ModDataComponents.YCS_TESTER.get(), (double)(0));
         }
+        player.getItemInHand(usedHand).set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.YCS_TESTER.get(), 0.0)))) + 1));
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }
     //YCS:use:end

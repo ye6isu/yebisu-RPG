@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "yebisurpg:item/arererer_frame_1"
+  }
+}
