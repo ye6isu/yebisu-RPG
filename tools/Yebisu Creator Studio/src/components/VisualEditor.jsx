@@ -1305,7 +1305,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         <div id={"node-"+node.id} onMouseDown={e=>{if(e.button===2){e.stopPropagation();if(window.__showYcsCtx)window.__showYcsCtx(node.id,e.clientX,e.clientY);return;}if(e.button!==0)return;e.stopPropagation(); e.currentTarget.parentElement?.parentElement?.focus(); if(onSelect)onSelect(node.id);const r=e.currentTarget.getBoundingClientRect();if(onDragStart)onDragStart(node.id, e.clientX-r.left,e.clientY-r.top, e.clientX, e.clientY);}} style={{position:"absolute",left:node.x,top:node.y,minWidth:50,width:"fit-content",display:"flex",flexDirection:"column",alignItems:"stretch",zIndex:(!inChain?50:(node.depth||1)),opacity:(!inChain&&isAct&&!isSt)?0.6:1,userSelect:"none",filter:"drop-shadow(0 6px 16px rgba(0,0,0,.4))"}} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
             <div style={{minHeight:_headerH,background:bg,borderRadius:"10px",display:"flex",border:selected===node.id?"2px solid #fff":"2px solid transparent",boxSizing:"border-box",pointerEvents:"auto"}}>{commonHeader}</div>
             <div style={{height:node.gapHeights?.do0||0,background:"transparent"}}/>
-            {_useGeneric && !isHandPoseSet && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
+            {_useGeneric && !isAnimPlay && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
         </div>
       );
   }
@@ -1321,7 +1321,7 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
 
       
       {isVal ? valContent : commonHeader}
-      {_useGeneric && !isHandPoseSet && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
+      {_useGeneric && !isAnimPlay && !isAnimTPPlay && !isTPPoseSet && <GenericSettingsPopup def={_bdef} node={node} onFieldChange={onFieldChange} showSettings={showSettings} setShowSettings={setShowSettings} anchorRef={settingsAnchorRef}/>}
       {!_useGeneric && showSettings&&node.opcode==="effect.apply"&&<SettingsPortal open={showSettings} onClose={()=>setShowSettings(false)} anchorRef={settingsAnchorRef}>
           <label style={{display:"flex",alignItems:"center",gap:6,color:"#ccc",fontSize:12,cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"showParticles",node.fields?.showParticles===false);}}>
             <input type="checkbox" checked={node.fields?.showParticles!==false} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
@@ -1339,12 +1339,19 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
             Allow Vanilla Actions
           </label>
       </SettingsPortal>}
-      {showSettings&&(isAnimTPPlay||isTPPoseSet)&&(()=>{
+      {showSettings&&(isAnimPlay||isAnimTPPlay||isTPPoseSet)&&(()=>{
+        const handMask = node.fields?.handMask||0;
         const lookMask = node.fields?.lookAtMask||0;
         const vanMask  = node.fields?.vanillaMask||0;
         const actMask  = node.fields?.allowActionsMask||0;
         const keepMask = node.fields?.keepPosScaleMask||0;
+        const isFP = isAnimPlay;
         const _settingsClose = ()=>setShowSettings(false);
+        const HandCB = ({bit})=>(
+          <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"handMask",(handMask^bit));}}>
+            <input type="checkbox" checked={!(handMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
+          </label>
+        );
         const LookCB = ({bit})=>(
           <label style={{display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onFieldChange&&onFieldChange(node.id,"lookAtMask",(lookMask^bit));}}>
             <input type="checkbox" checked={!!(lookMask&bit)} onChange={()=>{}} style={{cursor:"pointer",margin:0}}/>
@@ -1392,12 +1399,27 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
         );
         const tdC = {textAlign:"center",padding:"1px 6px"};
         const hdC = {color:"#888",fontSize:11,padding:"0 6px",textAlign:"center"};
+        if (isFP) {
+          return <SettingsPortal open={showSettings} onClose={_settingsClose} anchorRef={settingsAnchorRef}>
+            <table style={{borderCollapse:"collapse",fontSize:12,color:"#ccc"}}>
+              <thead><tr>
+                <td style={{paddingRight:8,color:"#888",fontSize:11}}></td>
+                <td style={hdC}>Hand</td>
+              </tr></thead>
+              <tbody>
+                <tr><td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Right Arm</td><td style={tdC}><HandCB bit={512}/></td></tr>
+                <tr><td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Left Arm</td><td style={tdC}><HandCB bit={1024}/></td></tr>
+              </tbody>
+            </table>
+          </SettingsPortal>;
+        }
         return <SettingsPortal open={showSettings} onClose={_settingsClose} anchorRef={settingsAnchorRef}>
           <table style={{borderCollapse:"collapse",fontSize:12,color:"#ccc"}}>
             <thead><tr>
               <td style={{paddingRight:8,color:"#888",fontSize:11}}></td>
-              <td style={hdC}>Yaw</td>
-              <td style={hdC}>Pitch</td>
+              <td style={hdC}>Hand</td>
+              <td style={{...hdC,borderLeft:"1px solid #444"}}>Yaw</td>
+              <td style={{...hdC,borderLeft:"1px solid #444"}}>Pitch</td>
               <td style={{...hdC,borderLeft:"1px solid #444"}}>Animation</td>
               {isTPPoseSet&&<td style={{...hdC,borderLeft:"1px solid #444"}}>Allow Act</td>}
               {isTPPoseSet&&<td style={{...hdC,borderLeft:"1px solid #444"}}>Keep Pos</td>}
@@ -1406,8 +1428,9 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
             <tbody>
               <tr style={{borderBottom:"1px solid #333"}}>
                 <td style={{paddingRight:8,color:"#aaa",fontSize:12,fontWeight:700}}>Root (Face Cam)</td>
-                <td style={tdC}><LookCB bit={1<<12}/></td>
-                <td style={tdC}><LookCB bit={1<<13}/></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><LookCB bit={1<<12}/></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}><LookCB bit={1<<13}/></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
@@ -1416,8 +1439,9 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               {parts.map(({label,lookBase,vanBit})=>(
                 <tr key={label}>
                   <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>{label}</td>
-                  <td style={{...tdC,opacity:rootActive?0.35:1}}><LookCB bit={1<<lookBase}/></td>
-                  <td style={{...tdC,opacity:rootActive?0.35:1}}><LookCB bit={1<<(lookBase+1)}/></td>
+                  <td style={tdC}>{(vanBit===4||vanBit===8)?<HandCB bit={vanBit===4?512:1024}/>:null}</td>
+                  <td style={{...tdC,borderLeft:"1px solid #444",opacity:rootActive?0.35:1}}><LookCB bit={1<<lookBase}/></td>
+                  <td style={{...tdC,borderLeft:"1px solid #444",opacity:rootActive?0.35:1}}><LookCB bit={1<<(lookBase+1)}/></td>
                   <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={vanBit}/></td>
                   {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><ActCB bit={vanBit}/></td>}
                   {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><KeepCB bit={vanBit}/></td>}
@@ -1426,7 +1450,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               ))}
               <tr style={{borderTop:"1px solid #333"}}>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Head</td>
-                <td style={tdC}></td><td style={tdC}></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td><td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={1}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><ActCB bit={1}/></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><KeepCB bit={1}/></td>}
@@ -1434,7 +1459,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Torso</td>
-                <td style={tdC}></td><td style={tdC}></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td><td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><AnimCB bit={2}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><ActCB bit={2}/></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}><KeepCB bit={2}/></td>}
@@ -1442,7 +1468,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               </tr>
               <tr style={{borderTop:"1px solid #333"}}>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Crouch</td>
-                <td style={tdC}></td><td style={tdC}></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td><td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={64}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
@@ -1450,7 +1477,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Sitting</td>
-                <td style={tdC}></td><td style={tdC}></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td><td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={256}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
@@ -1458,7 +1486,8 @@ function CanvasNode({node,nodes,methodKey,inChain,onDragStart,onDelete,onFieldCh
               </tr>
               <tr>
                 <td style={{paddingRight:8,color:"#ddd",fontSize:12}}>Disable Prone</td>
-                <td style={tdC}></td><td style={tdC}></td>
+                <td style={tdC}></td>
+                <td style={{...tdC,borderLeft:"1px solid #444"}}></td><td style={{...tdC,borderLeft:"1px solid #444"}}></td>
                 <td style={{...tdC,borderLeft:"1px solid #444"}}><VanCB bit={128}/></td>
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}
                 {isTPPoseSet&&<td style={{...tdC,borderLeft:"1px solid #444"}}></td>}

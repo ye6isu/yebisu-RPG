@@ -56,6 +56,8 @@ public final class AnimationPlayhead {
     public static final int VAN_CROUCH    = 1 << 6;
     public static final int DISABLE_PRONE = 1 << 7;
     public static final int VAN_SITTING   = 1 << 8;
+    public static final int HAND_SKIP_RIGHT = 1 << 9;
+    public static final int HAND_SKIP_LEFT  = 1 << 10;
 
     // vanillaMoveMask — 2 bits per part controlling when vanilla is active: bit0=while moving, bit1=while still
     // If both bits set → always; if neither → never active regardless of vanillaMask

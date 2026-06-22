@@ -9,6 +9,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.Entity;
 import net.ye6isu.yebisuRPG.animation.AnimationAPI;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 //YCS_Import_END
 
 public class ArerererItem extends Item {
@@ -22,23 +23,19 @@ public class ArerererItem extends Item {
         player.startUsingItem(usedHand);
                 if ((player.isCrouching())) {
           if (player instanceof Entity animEntity && !level.isClientSide()) {
-              AnimationAPI.setFirstPersonHandPose(animEntity,
-                  "testf",
-                  "yebisurpg:animations/fplayer.animation.json", false, false);
-          }
-          if (player instanceof Entity animEntity && !level.isClientSide()) {
               AnimationAPI.setThirdPersonPose(animEntity,
-                  "test",
+                  "pose",
                   "yebisurpg:animations/player.animation.json",
-                  0, 0, 0, 0, 0);
+                  80, 51, 0, 0, 0);
           }
         } else {
           if (player instanceof Entity animEntity && !level.isClientSide()) {
-            AnimationAPI.triggerItemAnimation(animEntity,
-                "animation",
-                "yebisurpg:animations/axe.animation.json",
-                1f, true);
-        }
+              AnimationAPI.triggerAnimation(animEntity,
+                  AnimationCategory.ENTITY_THIRD_PERSON,
+                  "test",
+                  "yebisurpg:animations/player.animation.json",
+                  1f, 48, 51 | 1024, 0);
+          }
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

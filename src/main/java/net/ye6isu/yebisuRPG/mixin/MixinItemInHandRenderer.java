@@ -36,6 +36,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @OnlyIn(Dist.CLIENT)
 public abstract class MixinItemInHandRenderer {
 
+    @org.spongepowered.asm.mixin.Shadow private ItemStack mainHandItem;
+    @org.spongepowered.asm.mixin.Shadow private ItemStack offHandItem;
+    @org.spongepowered.asm.mixin.Shadow private float mainHandHeight;
+    @org.spongepowered.asm.mixin.Shadow private float oMainHandHeight;
+    @org.spongepowered.asm.mixin.Shadow private float offHandHeight;
+    @org.spongepowered.asm.mixin.Shadow private float oOffHandHeight;
+
+    @org.spongepowered.asm.mixin.gen.Invoker("renderArmWithItem")
+    abstract void invokeRenderArmWithItem(net.minecraft.client.player.AbstractClientPlayer player,
+        float partialTicks, float pitch, net.minecraft.world.InteractionHand hand,
+        float swingProgress, ItemStack stack, float equippedProgress,
+        PoseStack poseStack, MultiBufferSource buffer, int combinedLight);
+
     // Smoothed look-lag offsets — yaw and pitch lag that decays toward zero each frame.
     private static float yebisu$lagYaw   = 0f;
     private static float yebisu$lagPitch = 0f;
@@ -121,6 +134,7 @@ public abstract class MixinItemInHandRenderer {
         float leftLegPX  = 0f, leftLegPY  = 0f, leftLegPZ  = 0f;
         float rightLegSX = 1f, rightLegSY = 1f, rightLegSZ = 1f;
         float leftLegSX  = 1f, leftLegSY  = 1f, leftLegSZ  = 1f;
+        boolean rightVanilla = false, leftVanilla = false;
         if (HandDebugState.debugMode) {
             rightLegRX = HandDebugState.rightLegRX; rightLegRY = HandDebugState.rightLegRY; rightLegRZ = HandDebugState.rightLegRZ;
             leftLegRX  = HandDebugState.leftLegRX;  leftLegRY  = HandDebugState.leftLegRY;  leftLegRZ  = HandDebugState.leftLegRZ;
@@ -129,18 +143,17 @@ public abstract class MixinItemInHandRenderer {
             rightLegSX = HandDebugState.rightLegSX; rightLegSY = HandDebugState.rightLegSY; rightLegSZ = HandDebugState.rightLegSZ;
             leftLegSX  = HandDebugState.leftLegSX;  leftLegSY  = HandDebugState.leftLegSY;  leftLegSZ  = HandDebugState.leftLegSZ;
         } else {
+            // Hand filter: when an animation is playing with HAND_SKIP_RIGHT/LEFT,
+            // the skipped hand keeps the pose values instead of the animation values.
+            boolean skipRight = playhead != null && (playhead.vanillaMask() & AnimationPlayhead.HAND_SKIP_RIGHT) != 0;
+            boolean skipLeft  = playhead != null && (playhead.vanillaMask() & AnimationPlayhead.HAND_SKIP_LEFT)  != 0;
+
+            // First, read from the active source (animation or pose) for root + legs
             HandAnimationLoader.BonePose root = anim != null ? anim.bone("root") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
-            HandAnimationLoader.BonePose r    = anim != null ? anim.bone("right_arm") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
-            HandAnimationLoader.BonePose l    = anim != null ? anim.bone("left_arm")  : HandAnimationLoader.EMPTY_POSE_PUBLIC;
             rootRX = root.rotation().evalX(timeSecs); rootRY = root.rotation().evalY(timeSecs); rootRZ = root.rotation().evalZ(timeSecs);
             rootPX = root.position().evalX(timeSecs); rootPY = root.position().evalY(timeSecs); rootPZ = root.position().evalZ(timeSecs);
             rootSX = root.scale().evalX(timeSecs);    rootSY = root.scale().evalY(timeSecs);    rootSZ = root.scale().evalZ(timeSecs);
-            rightRX = r.rotation().evalX(timeSecs); rightRY = r.rotation().evalY(timeSecs); rightRZ = r.rotation().evalZ(timeSecs);
-            leftRX  = l.rotation().evalX(timeSecs); leftRY  = l.rotation().evalY(timeSecs); leftRZ  = l.rotation().evalZ(timeSecs);
-            rightPX = r.position().evalX(timeSecs); rightPY = r.position().evalY(timeSecs); rightPZ = r.position().evalZ(timeSecs);
-            leftPX  = l.position().evalX(timeSecs); leftPY  = l.position().evalY(timeSecs); leftPZ  = l.position().evalZ(timeSecs);
-            rightSX = r.scale().evalX(timeSecs);    rightSY = r.scale().evalY(timeSecs);    rightSZ = r.scale().evalZ(timeSecs);
-            leftSX  = l.scale().evalX(timeSecs);    leftSY  = l.scale().evalY(timeSecs);    leftSZ  = l.scale().evalZ(timeSecs);
+
             HandAnimationLoader.BonePose rl = anim != null ? anim.bone("right_leg") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
             HandAnimationLoader.BonePose ll = anim != null ? anim.bone("left_leg")  : HandAnimationLoader.EMPTY_POSE_PUBLIC;
             rightLegRX = rl.rotation().evalX(timeSecs); rightLegRY = rl.rotation().evalY(timeSecs); rightLegRZ = rl.rotation().evalZ(timeSecs);
@@ -149,10 +162,46 @@ public abstract class MixinItemInHandRenderer {
             leftLegPX  = ll.position().evalX(timeSecs); leftLegPY  = ll.position().evalY(timeSecs); leftLegPZ  = ll.position().evalZ(timeSecs);
             rightLegSX = rl.scale().evalX(timeSecs);    rightLegSY = rl.scale().evalY(timeSecs);    rightLegSZ = rl.scale().evalZ(timeSecs);
             leftLegSX  = ll.scale().evalX(timeSecs);    leftLegSY  = ll.scale().evalY(timeSecs);    leftLegSZ  = ll.scale().evalZ(timeSecs);
+
+            // For each hand: use animation values unless skipped, in which case fall back to pose.
+            // If skipped and no pose exists, that hand uses null source → won't be rendered.
+            HandAnimationLoader.AnimData rightSource = anim;
+            HandAnimationLoader.AnimData leftSource  = anim;
+            float rightT = timeSecs, leftT = timeSecs;
+            if (skipRight || skipLeft) {
+                HandAnimationLoader.AnimData poseAnim = handPoseAnim != null ? handPoseAnim
+                    : ClientAnimationEngine.INSTANCE.getHandPose(entityId);
+                float poseT = 0f;
+                if (poseAnim != null && poseAnim.loopMode() == AnimationLoopMode.LOOP && poseAnim.length() > 0f) {
+                    poseT = ClientAnimationEngine.INSTANCE.getPoseElapsedSecs(entityId, false) % poseAnim.length();
+                } else if (poseAnim != null) {
+                    poseT = poseAnim.length();
+                }
+                if (skipRight) {
+                    if (poseAnim != null) { rightSource = poseAnim; rightT = poseT; }
+                    else rightVanilla = true;
+                }
+                if (skipLeft) {
+                    if (poseAnim != null) { leftSource = poseAnim; leftT = poseT; }
+                    else leftVanilla = true;
+                }
+                // If both hands should be vanilla, don't take over — let vanilla render.
+                if (rightVanilla && leftVanilla) return;
+            }
+
+            HandAnimationLoader.BonePose r = rightSource != null ? rightSource.bone("right_arm") : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            HandAnimationLoader.BonePose l = leftSource  != null ? leftSource.bone("left_arm")   : HandAnimationLoader.EMPTY_POSE_PUBLIC;
+            rightRX = r.rotation().evalX(rightT); rightRY = r.rotation().evalY(rightT); rightRZ = r.rotation().evalZ(rightT);
+            leftRX  = l.rotation().evalX(leftT);  leftRY  = l.rotation().evalY(leftT);  leftRZ  = l.rotation().evalZ(leftT);
+            rightPX = r.position().evalX(rightT); rightPY = r.position().evalY(rightT); rightPZ = r.position().evalZ(rightT);
+            leftPX  = l.position().evalX(leftT);  leftPY  = l.position().evalY(leftT);  leftPZ  = l.position().evalZ(leftT);
+            rightSX = r.scale().evalX(rightT);    rightSY = r.scale().evalY(rightT);    rightSZ = r.scale().evalZ(rightT);
+            leftSX  = l.scale().evalX(leftT);     leftSY  = l.scale().evalY(leftT);     leftSZ  = l.scale().evalZ(leftT);
         }
 
         var window = mc.getWindow();
         float aspect = (float) window.getWidth() / (float) window.getHeight();
+        Matrix4f savedProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         RenderSystem.setProjectionMatrix(
             new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.001f, 100f),
             VertexSorting.DISTANCE_TO_ORIGIN);
@@ -228,12 +277,12 @@ public abstract class MixinItemInHandRenderer {
         float lTY = HandDebugState.BASE_LEFT_TY;
         float lTZ = HandDebugState.BASE_LEFT_TZ;
 
-        // Render arm skin + sleeve + emissive.
-        renderArmSkin(playerModel.rightArm, playerModel.rightSleeve,
+        // Render arm skin + sleeve + emissive (skip vanilla-owned hands).
+        if (!rightVanilla) renderArmSkin(playerModel.rightArm, playerModel.rightSleeve,
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
                 rightSX, rightSY, rightSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
-        renderArmSkin(playerModel.leftArm, playerModel.leftSleeve,
+        if (!leftVanilla) renderArmSkin(playerModel.leftArm, playerModel.leftSleeve,
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
                 leftSX, leftSY, leftSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
@@ -273,13 +322,13 @@ public abstract class MixinItemInHandRenderer {
         // Render held items using vanilla renderRightHand / renderLeftHand on our calibrated pose.
         // Set arm rotations first so the vanilla method sees our animation pose, then pass our
         // pose stack — vanilla internally calls arm.translateAndRotate + ItemInHandLayer.
-        renderHandWithItem(
+        if (!rightVanilla) renderHandWithItem(
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
                 rightSX, rightSY, rightSZ,
                 rightIPX, rightIPY, rightIPZ, rightIRX, rightIRY, rightIRZ,
                 rightISX, rightISY, rightISZ,
                 player, bufferSource, packedLight, true);
-        renderHandWithItem(
+        if (!leftVanilla) renderHandWithItem(
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
                 leftSX, leftSY, leftSZ,
                 leftIPX, leftIPY, leftIPZ, leftIRX, leftIRY, leftIRZ,
@@ -290,11 +339,44 @@ public abstract class MixinItemInHandRenderer {
 
         mvStack.popMatrix();
         RenderSystem.applyModelViewMatrix();
-        RenderSystem.setProjectionMatrix(
-            new Matrix4f().perspective((float) Math.toRadians(87.0), aspect, 0.05f, 100f),
-            VertexSorting.DISTANCE_TO_ORIGIN);
+        RenderSystem.setProjectionMatrix(savedProjection, VertexSorting.DISTANCE_TO_ORIGIN);
+
+        // If any hand should be vanilla, don't ci.cancel() — let vanilla render after us.
+        // Set flags so the per-hand inject (yebisurpg$cancelAnimatedHand) cancels only
+        // the hands we already rendered, letting vanilla render the rest.
+        if (rightVanilla || leftVanilla) {
+            yebisu$skipVanillaRight = !rightVanilla;  // skip vanilla right if WE rendered it
+            yebisu$skipVanillaLeft  = !leftVanilla;   // skip vanilla left if WE rendered it
+            // Don't ci.cancel() — vanilla renderHandsWithItems will run after us
+            return;
+        }
 
         ci.cancel();
+    }
+
+    // Per-hand flags: when true, the per-hand inject cancels vanilla for that hand
+    private static boolean yebisu$skipVanillaRight = false;
+    private static boolean yebisu$skipVanillaLeft  = false;
+
+    @Inject(
+        method = "renderArmWithItem",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void yebisurpg$cancelAnimatedHand(
+            net.minecraft.client.player.AbstractClientPlayer player,
+            float partialTicks, float pitch, net.minecraft.world.InteractionHand hand,
+            float swingProgress, ItemStack stack, float equippedProgress,
+            PoseStack poseStack, MultiBufferSource buffer, int combinedLight,
+            CallbackInfo ci) {
+        boolean isMain = (hand == net.minecraft.world.InteractionHand.MAIN_HAND);
+        if (isMain && yebisu$skipVanillaRight) {
+            yebisu$skipVanillaRight = false;
+            ci.cancel();
+        } else if (!isMain && yebisu$skipVanillaLeft) {
+            yebisu$skipVanillaLeft = false;
+            ci.cancel();
+        }
     }
 
     private static PoseStack buildArmPose(
@@ -416,7 +498,7 @@ public abstract class MixinItemInHandRenderer {
     // ── Slim model first-person item offset ──────────────────────────────────
     // Tune these to align the held item for slim (3px arm) skins.
     // Wide model uses: X = 1/16f, Y = 0.125f, Z = -0.625f
-    private static final float SLIM_ITEM_OFFSET_X = 0.1f / 16f;   // left/right
+    private static final float SLIM_ITEM_OFFSET_X = 0.5f / 16f;   // left/right
     private static final float SLIM_ITEM_OFFSET_Y = 0.125f;     // up/down
     private static final float SLIM_ITEM_OFFSET_Z = -0.625f;    // forward/back
 

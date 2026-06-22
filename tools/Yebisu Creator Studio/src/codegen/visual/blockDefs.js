@@ -402,18 +402,21 @@ export const BLOCK_DEFS = [
     label: "Play First Person Animation [animName:text] speed [playbackSpeed:number] from file [filePath:text] for [entity:entity]",
     hint: "Play first person animation for entity with playback speed from file",
     color: "#3a5c3a",
+    settings: {
+      handMask: { type: "hidden", default: 0 },
+    },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, 0, {{handMask}}, 0);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: {
         animName: { opcode: "text.literal", fields: { value: "" } },
         entity: { opcode: "entity.event" },
-        playbackSpeed: { opcode: "number.literal", fields: { value: "0" } },
+        playbackSpeed: { opcode: "number.literal", fields: { value: "1" } },
         filePath: { opcode: "text.literal", fields: { value: "" } },
       },
     },
@@ -430,7 +433,6 @@ export const BLOCK_DEFS = [
       template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.stopFirstPersonAnimation(animEntity);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -448,7 +450,7 @@ export const BLOCK_DEFS = [
       template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.pauseAnimation(animEntity,\n        AnimationCategory.ENTITY);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -466,7 +468,7 @@ export const BLOCK_DEFS = [
       template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.resumeAnimation(animEntity,\n        AnimationCategory.ENTITY);\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
-
+        "net.ye6isu.yebisuRPG.animation.AnimationCategory",
         "net.minecraft.world.entity.Entity",
       ],
       slotDefaults: { entity: { opcode: "entity.event" } },
@@ -526,6 +528,7 @@ export const BLOCK_DEFS = [
     hint: "Play third person animation for entity with playback speed from file",
     color: "#3a5c3a",
     settings: {
+      handMask: { type: "hidden", default: 0 },
       lookAtMask: { type: "hidden", default: 0 },
       vanillaMask: { type: "hidden", default: 0 },
       vanillaMoveMask: { type: "hidden", default: 0 },
@@ -533,7 +536,7 @@ export const BLOCK_DEFS = [
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}} | {{handMask}}, {{vanillaMoveMask}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
 

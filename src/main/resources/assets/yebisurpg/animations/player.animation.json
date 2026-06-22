@@ -17,26 +17,41 @@
 					},
 					"rotation": {
 						"0": {
-							"vector": [0, 0, 0]
+							"vector": [-90, 0, 0]
+						},
+						"0.083333": {
+							"vector": [-180, 0, 0],
+							"easing": "easeOutExpo"
 						},
 						"0.5": {
 							"vector": [-90, 0, 0],
 							"easing": "easeOutElastic"
 						}
 					}
-				},
-				"right_leg": {
+				}
+			}
+		},
+		"pose": {
+			"loop": "once",
+			"animation_length": 1,
+			"bones": {
+				"right_arm": {
 					"rotation": {
 						"0": {
-							"vector": [0, 0, 0]
+							"vector": [-90, 0, 0]
 						},
 						"1": {
-							"vector": [-170, 0, 0],
-							"easing": "easeOutExpo"
+							"vector": [-90, 0, 0]
+						}
+					}
+				},
+				"left_arm": {
+					"rotation": {
+						"0": {
+							"vector": [-90, 0, 0]
 						},
-						"1.41667": {
-							"vector": [-90, 0, 0],
-							"easing": "easeInExpo"
+						"1": {
+							"vector": [-90, 0, 0]
 						}
 					}
 				}
