@@ -27,7 +27,8 @@ const YCS_MARKERS = [
   ['//YCS_Mod_Creative_Tabs_START', '//YCS_Mod_Creative_Tabs_END'],
   ['//YCS_Mod_Keybinds_START', '//YCS_Mod_Keybinds_END'],
   ['//YCS_Mod_Keybinds_Register_START', '//YCS_Mod_Keybinds_Register_END'],
-  ['//YCS_DataComponents_START', '//YCS_DataComponents_END']
+  ['//YCS_DataComponents_START', '//YCS_DataComponents_END'],
+  ['//YCS_Geo_Collect_START', '//YCS_Geo_Collect_END']
 ]
 const wf = (f, s) => {
   if (typeof s === 'string') {
@@ -207,7 +208,9 @@ app.get('/api/blocks/read', (_req, res) => {
 app.post('/api/texture', (req, res) => {
   try {
     const { filename, dataUrl, folder='item' } = req.body
-    wf(jp(MOD_ROOT,'assets',MODID,'textures',folder,filename), Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/,''),'base64'))
+    const dir = jp(MOD_ROOT,'assets',MODID,'textures',folder)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    wf(jp(dir, filename), Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/,''),'base64'))
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
 })
@@ -553,6 +556,87 @@ app.post('/api/items/delete', (req, res) => {
     markDirty()
     res.json({ ok:true })
   } catch(e) { res.json({ ok:false, reason:e.message }) }
+})
+
+app.post('/api/geo/save', (req, res) => {
+  try {
+    const { id, type, geoJson, itemModelJson, constName } = req.body
+    if (!id || !type) return res.json({ ok: false, reason: 'missing id or type' })
+    const geoDir = jp(MOD_ROOT, 'assets', MODID, 'geo', type)
+    if (!fs.existsSync(geoDir)) fs.mkdirSync(geoDir, { recursive: true })
+    if (geoJson) {
+      const geoFile = jp(geoDir, `${id}.geo.json`)
+      wf(geoFile, JSON.stringify(geoJson, null, '\t'))
+    }
+    if (itemModelJson) {
+      const modelDir = jp(MOD_ROOT, 'assets', MODID, 'models', type)
+      if (!fs.existsSync(modelDir)) fs.mkdirSync(modelDir, { recursive: true })
+      const modelFile = jp(modelDir, `${id}.json`)
+      wf(modelFile, JSON.stringify(itemModelJson, null, 2))
+    }
+    // Inject into GeoItemRegistry.java if item type and constName provided
+    if (type === 'item' && constName) {
+      const regFile = jp(JAVA_ROOT, 'client', 'renderer', 'GeoItemRegistry.java')
+      if (fs.existsSync(regFile)) {
+        let src = rf(regFile)
+        const startM = '//YCS_Geo_Collect_START'
+        const endM = '//YCS_Geo_Collect_END'
+        const si = src.indexOf(startM)
+        const ei = src.indexOf(endM)
+        if (si !== -1 && ei !== -1) {
+          const section = src.slice(si + startM.length, ei)
+          const line = `        tryRegister(items, ModItems.${constName}, "${id}");`
+          if (!section.includes(`ModItems.${constName}`)) {
+            const before = src.slice(0, si + startM.length)
+            const after = src.slice(ei)
+            const trimmed = section.replace(/^\n+|\n+$/g, '')
+            const newSection = trimmed ? '\n' + trimmed + '\n' + line + '\n' : '\n' + line + '\n'
+            src = before + newSection + after
+            wf(regFile, src)
+          }
+        }
+      }
+    }
+    markDirty()
+    res.json({ ok: true })
+  } catch(e) { res.json({ ok: false, reason: e.message }) }
+})
+
+app.post('/api/geo/delete', (req, res) => {
+  try {
+    const { id, type, constName } = req.body
+    if (!id || !type) return res.json({ ok: false, reason: 'missing id or type' })
+    // Delete geo model file
+    const geoFile = jp(MOD_ROOT, 'assets', MODID, 'geo', type, `${id}.geo.json`)
+    if (fs.existsSync(geoFile)) { fs.unlinkSync(geoFile); triggerIdeaReload(geoFile) }
+    // Delete item model JSON (builtin/entity model)
+    const modelFile = jp(MOD_ROOT, 'assets', MODID, 'models', type, `${id}.json`)
+    if (fs.existsSync(modelFile)) { fs.unlinkSync(modelFile); triggerIdeaReload(modelFile) }
+    // Delete 3D texture
+    const texFile = jp(MOD_ROOT, 'assets', MODID, 'textures', 'geo', type, `${id}.png`)
+    if (fs.existsSync(texFile)) { fs.unlinkSync(texFile); triggerIdeaReload(texFile) }
+    // Remove from GeoItemRegistry.java sentinel
+    if (constName) {
+      const regFile = jp(JAVA_ROOT, 'client', 'renderer', 'GeoItemRegistry.java')
+      if (fs.existsSync(regFile)) {
+        let src = rf(regFile)
+        const startM = '//YCS_Geo_Collect_START'
+        const endM = '//YCS_Geo_Collect_END'
+        const si = src.indexOf(startM)
+        const ei = src.indexOf(endM)
+        if (si !== -1 && ei !== -1) {
+          const before = src.slice(0, si + startM.length)
+          const section = src.slice(si + startM.length, ei)
+          const after = src.slice(ei)
+          const cleaned = section.split('\n').filter(l => !l.includes(`ModItems.${constName}`) && !l.includes(`"${id}"`)).join('\n')
+          src = before + cleaned + after
+          wf(regFile, src)
+        }
+      }
+    }
+    markDirty()
+    res.json({ ok: true })
+  } catch(e) { res.json({ ok: false, reason: e.message }) }
 })
 
 app.post('/api/items/model', (req, res) => {

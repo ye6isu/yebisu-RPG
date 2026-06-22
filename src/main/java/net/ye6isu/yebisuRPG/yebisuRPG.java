@@ -60,6 +60,8 @@ public class yebisuRPG {
         // Client-only setup (keybinds, client-side registrations, etc.)
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(this::clientSetup);
+            modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.GeoItemRegistry::onRegisterClientExtensions);
+            modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.GeoItemRegistry::onRegisterReloadListeners);
         }
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
