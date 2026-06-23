@@ -35,8 +35,8 @@ import java.util.List;
 public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     private static final Map<Item, GeoItemEntry> REGISTRY = new HashMap<>();
-    private final Map<Item, BakedGeoModel> models = new HashMap<>();
-    private final Map<Item, Integer> spritesheetFrameCounts = new HashMap<>();
+    private final Map<Item, List<BakedGeoModel>> models = new HashMap<>();
+    private final Map<Item, Map<Integer, Integer>> spritesheetFrameCounts = new HashMap<>();
 
     private static int currentRenderEntityId = -1;
 
@@ -53,16 +53,29 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
     }
 
     public static void register(Item item, ResourceLocation geoLocation, ResourceLocation textureLocation) {
-        REGISTRY.put(item, new GeoItemEntry(geoLocation, List.of(textureLocation), 0, false, 0));
+        REGISTRY.put(item, new GeoItemEntry(List.of(geoLocation), List.of(textureLocation), List.of(StateAnim.NONE)));
     }
 
     public static void register(Item item, ResourceLocation geoLocation, ResourceLocation textureLocation,
                                  int frames, boolean animated, int ticksPerFrame) {
-        REGISTRY.put(item, new GeoItemEntry(geoLocation, List.of(textureLocation), frames, animated, ticksPerFrame));
+        REGISTRY.put(item, new GeoItemEntry(List.of(geoLocation), List.of(textureLocation), List.of(new StateAnim(frames, animated, ticksPerFrame))));
     }
 
     public static void register(Item item, ResourceLocation geoLocation, List<ResourceLocation> textureFrames) {
-        REGISTRY.put(item, new GeoItemEntry(geoLocation, textureFrames, 0, false, 0));
+        List<StateAnim> anims = new ArrayList<>();
+        for (int i = 0; i < textureFrames.size(); i++) anims.add(StateAnim.NONE);
+        REGISTRY.put(item, new GeoItemEntry(List.of(geoLocation), textureFrames, anims));
+    }
+
+    public static void register(Item item, List<ResourceLocation> geoLocations, List<ResourceLocation> textures) {
+        List<StateAnim> anims = new ArrayList<>();
+        for (int i = 0; i < textures.size(); i++) anims.add(StateAnim.NONE);
+        REGISTRY.put(item, new GeoItemEntry(geoLocations, textures, anims));
+    }
+
+    public static void register(Item item, List<ResourceLocation> geoLocations, List<ResourceLocation> textures,
+                                 List<StateAnim> stateAnims) {
+        REGISTRY.put(item, new GeoItemEntry(geoLocations, textures, stateAnims));
     }
 
     public static boolean hasEntry(Item item) {
@@ -74,28 +87,40 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         models.clear();
         spritesheetFrameCounts.clear();
         for (var entry : REGISTRY.entrySet()) {
-            BakedGeoModel model = loadModel(resourceManager, entry.getValue().geoLocation());
-            if (model != null) {
-                models.put(entry.getKey(), model);
-                if (entry.getValue().textures().size() == 1) {
-                    int frames = detectFrameCount(resourceManager, entry.getValue().textures().get(0), model.texHeight());
-                    if (frames > 1) {
-                        spritesheetFrameCounts.put(entry.getKey(), frames);
-                    }
+            List<BakedGeoModel> bakedModels = new ArrayList<>();
+            for (ResourceLocation geoLoc : entry.getValue().geoLocations()) {
+                BakedGeoModel model = loadModel(resourceManager, geoLoc);
+                if (model != null) bakedModels.add(model);
+            }
+            if (!bakedModels.isEmpty()) {
+                models.put(entry.getKey(), bakedModels);
+                List<ResourceLocation> textures = entry.getValue().textures();
+                Map<Integer, Integer> frameCounts = new HashMap<>();
+                for (int i = 0; i < textures.size(); i++) {
+                    BakedGeoModel modelForState = bakedModels.get(Math.min(i, bakedModels.size() - 1));
+                    int frames = detectFrameCount(resourceManager, textures.get(i), modelForState.texWidth(), modelForState.texHeight());
+                    if (frames > 1) frameCounts.put(i, frames);
                 }
+                if (!frameCounts.isEmpty()) spritesheetFrameCounts.put(entry.getKey(), frameCounts);
             }
         }
     }
 
-    private int detectFrameCount(ResourceManager mgr, ResourceLocation texLoc, int geoTexHeight) {
+    private int detectFrameCount(ResourceManager mgr, ResourceLocation texLoc, int geoTexWidth, int geoTexHeight) {
         try (InputStream is = mgr.getResourceOrThrow(texLoc).open()) {
-            // PNG IHDR: 8-byte signature, 4-byte chunk length, 4-byte "IHDR", 4-byte width, 4-byte height
             byte[] header = new byte[24];
             if (is.read(header) < 24) return 1;
+            int pngWidth = ((header[16] & 0xFF) << 24) | ((header[17] & 0xFF) << 16)
+                    | ((header[18] & 0xFF) << 8) | (header[19] & 0xFF);
             int pngHeight = ((header[20] & 0xFF) << 24) | ((header[21] & 0xFF) << 16)
                     | ((header[22] & 0xFF) << 8) | (header[23] & 0xFF);
-            if (geoTexHeight > 0 && pngHeight > geoTexHeight && pngHeight % geoTexHeight == 0) {
-                return pngHeight / geoTexHeight;
+            if (geoTexWidth <= 0 || geoTexHeight <= 0) return 1;
+            // Check aspect ratio: a spritesheet has the same width:geoWidth ratio
+            // but a taller height. A uniformly scaled texture has equal ratios.
+            int wScale = pngWidth / geoTexWidth;
+            int hScale = pngHeight / geoTexHeight;
+            if (wScale > 0 && hScale > wScale && pngWidth == geoTexWidth * wScale && pngHeight % (geoTexHeight * wScale) == 0) {
+                return pngHeight / (geoTexHeight * wScale);
             }
         } catch (Exception ignored) {}
         return 1;
@@ -108,8 +133,9 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         GeoItemEntry entry = REGISTRY.get(item);
         if (entry == null) return;
 
-        BakedGeoModel model = models.get(item);
-        if (model == null) return;
+        List<BakedGeoModel> modelList = models.get(item);
+        if (modelList == null || modelList.isEmpty()) return;
+        BakedGeoModel model = null; // resolved after itemState is computed
 
         // Resolve item animation data
         boolean isMainHand = displayContext == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
@@ -155,35 +181,37 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         int itemState = stack.getOrDefault(
                 net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get(), 0);
 
-        int resolvedFrameCount = entry.frames() > 1 ? entry.frames()
-                : (spritesheetFrameCounts.containsKey(item) ? spritesheetFrameCounts.get(item) : 0);
+        model = modelList.get(Math.min(itemState, modelList.size() - 1));
+
+        int texIdx = Math.min(itemState, entry.textures().size() - 1);
+        ResourceLocation textureLoc = entry.textures().get(texIdx);
+        StateAnim stateAnim = texIdx < entry.stateAnims().size() ? entry.stateAnims().get(texIdx) : StateAnim.NONE;
+
+        Map<Integer, Integer> frameCounts = spritesheetFrameCounts.get(item);
+        int detectedFrames = frameCounts != null && frameCounts.containsKey(texIdx) ? frameCounts.get(texIdx) : 0;
+        int resolvedFrameCount = stateAnim.frames() > 1 ? stateAnim.frames() : detectedFrames;
 
         int frame;
-        if (entry.animated() && resolvedFrameCount > 1) {
-            int tpf = Math.max(1, entry.ticksPerFrame());
-            long tick = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
-            frame = (int)((tick / tpf) % resolvedFrameCount);
+        if (resolvedFrameCount > 1) {
+            if (stateAnim.animated()) {
+                int tpf = Math.max(1, stateAnim.ticksPerFrame() > 0 ? stateAnim.ticksPerFrame() : 4);
+                long tick = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
+                frame = (int)((tick / tpf) % resolvedFrameCount);
+            } else {
+                frame = Math.max(0, customModelData - 1);
+            }
         } else {
-            frame = Math.max(0, customModelData - 1);
+            frame = 0;
         }
 
-        ResourceLocation textureLoc;
         float vFrameOffset = 0f;
         int effectiveTexH;
-
-        if (entry.textures().size() > 1) {
-            int idx = Math.min(itemState, entry.textures().size() - 1);
-            textureLoc = entry.textures().get(idx);
-            effectiveTexH = model.texHeight();
+        if (resolvedFrameCount > 1) {
+            int clampedFrame = Math.min(frame, resolvedFrameCount - 1);
+            effectiveTexH = model.texHeight() * resolvedFrameCount;
+            vFrameOffset = (float)(clampedFrame * model.texHeight());
         } else {
-            textureLoc = entry.textures().get(0);
-            if (resolvedFrameCount > 1) {
-                int clampedFrame = Math.min(frame, resolvedFrameCount - 1);
-                effectiveTexH = model.texHeight() * resolvedFrameCount;
-                vFrameOffset = (float)(clampedFrame * model.texHeight());
-            } else {
-                effectiveTexH = model.texHeight();
-            }
+            effectiveTexH = model.texHeight();
         }
 
         RenderType renderType = RenderType.entityCutoutNoCull(textureLoc);
@@ -281,45 +309,60 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         float x0 = ox - inf, y0 = oy - inf, z0 = oz - inf;
         float x1 = ox + sx + inf, y1 = oy + sy + inf, z1 = oz + sz + inf;
 
-        float u = cube.uvX(), v = cube.uvY() + vFrameOffset;
+        // Nudge coplanar faces apart to prevent z-fighting on zero-width axes
+        float eps = 0.001f;
+        if (sx == 0) { x0 -= eps; x1 += eps; }
+        if (sy == 0) { y0 -= eps; y1 += eps; }
+        if (sz == 0) { z0 -= eps; z1 += eps; }
 
-        // Bedrock box UV layout — Bedrock front = -Z, Java front = +Z, so swap front/back UVs
-        // Bedrock "front": u+sz,       v+sz,       sx, sy  → maps to Java North (-Z)
-        // Bedrock "back":  u+sz+sx+sz, v+sz,       sx, sy  → maps to Java South (+Z)
-        // Bedrock "left":  u,          v+sz,       sz, sy  → maps to Java East (+X)
-        // Bedrock "right": u+sz+sx,    v+sz,       sz, sy  → maps to Java West (-X)
-        // Top:             u+sz,       v,          sx, sz
-        // Bottom:          u+sz+sx,    v,          sx, sz
+        if (cube.hasPerFaceUV()) {
+            FaceUV[] pf = cube.perFaceUV();
+            // 0=south(+Z), 1=north(-Z), 2=west(-X), 3=east(+X), 4=up(+Y), 5=down(-Y)
+            emitPerFace(mat, norm, vc, light, overlay, texW, texH, vFrameOffset, pf[0],
+                x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1,  0, 0, 1);
+            emitPerFace(mat, norm, vc, light, overlay, texW, texH, vFrameOffset, pf[1],
+                x1, y0, z0,  x0, y0, z0,  x0, y1, z0,  x1, y1, z0,  0, 0, -1);
+            emitPerFace(mat, norm, vc, light, overlay, texW, texH, vFrameOffset, pf[2],
+                x0, y0, z0,  x0, y0, z1,  x0, y1, z1,  x0, y1, z0,  -1, 0, 0);
+            emitPerFace(mat, norm, vc, light, overlay, texW, texH, vFrameOffset, pf[3],
+                x1, y0, z1,  x1, y0, z0,  x1, y1, z0,  x1, y1, z1,  1, 0, 0);
+            emitPerFace(mat, norm, vc, light, overlay, texW, texH, vFrameOffset, pf[4],
+                x0, y1, z0,  x1, y1, z0,  x1, y1, z1,  x0, y1, z1,  0, 1, 0);
+            emitPerFace(mat, norm, vc, light, overlay, texW, texH, vFrameOffset, pf[5],
+                x0, y0, z1,  x1, y0, z1,  x1, y0, z0,  x0, y0, z0,  0, -1, 0);
+        } else {
+            float u = cube.uvX(), v = cube.uvY() + vFrameOffset;
 
-        // South face (+Z) — uses Bedrock "back" UV
-        quad(mat, norm, vc, light, overlay, texW, texH,
-            x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1,
-            u + sz + sx + sz, v + sz, sx, sy, 0, 0, 1);
+            // South face (+Z) — uses Bedrock "back" UV
+            quad(mat, norm, vc, light, overlay, texW, texH,
+                x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1,
+                u + sz + sx + sz, v + sz, sx, sy, 0, 0, 1);
 
-        // North face (-Z) — uses Bedrock "front" UV
-        quad(mat, norm, vc, light, overlay, texW, texH,
-            x1, y0, z0,  x0, y0, z0,  x0, y1, z0,  x1, y1, z0,
-            u + sz, v + sz, sx, sy, 0, 0, -1);
+            // North face (-Z) — uses Bedrock "front" UV
+            quad(mat, norm, vc, light, overlay, texW, texH,
+                x1, y0, z0,  x0, y0, z0,  x0, y1, z0,  x1, y1, z0,
+                u + sz, v + sz, sx, sy, 0, 0, -1);
 
-        // West face (-X) — uses Bedrock "right" UV
-        quad(mat, norm, vc, light, overlay, texW, texH,
-            x0, y0, z0,  x0, y0, z1,  x0, y1, z1,  x0, y1, z0,
-            u + sz + sx, v + sz, sz, sy, -1, 0, 0);
+            // West face (-X) — uses Bedrock "right" UV
+            quad(mat, norm, vc, light, overlay, texW, texH,
+                x0, y0, z0,  x0, y0, z1,  x0, y1, z1,  x0, y1, z0,
+                u + sz + sx, v + sz, sz, sy, -1, 0, 0);
 
-        // East face (+X) — uses Bedrock "left" UV
-        quad(mat, norm, vc, light, overlay, texW, texH,
-            x1, y0, z1,  x1, y0, z0,  x1, y1, z0,  x1, y1, z1,
-            u, v + sz, sz, sy, 1, 0, 0);
+            // East face (+X) — uses Bedrock "left" UV
+            quad(mat, norm, vc, light, overlay, texW, texH,
+                x1, y0, z1,  x1, y0, z0,  x1, y1, z0,  x1, y1, z1,
+                u, v + sz, sz, sy, 1, 0, 0);
 
-        // Top face (+Y) normal 0,1,0
-        quad(mat, norm, vc, light, overlay, texW, texH,
-            x0, y1, z0,  x1, y1, z0,  x1, y1, z1,  x0, y1, z1,
-            u + sz, v, sx, sz, 0, 1, 0);
+            // Top face (+Y)
+            quad(mat, norm, vc, light, overlay, texW, texH,
+                x0, y1, z0,  x1, y1, z0,  x1, y1, z1,  x0, y1, z1,
+                u + sz, v, sx, sz, 0, 1, 0);
 
-        // Bottom face (-Y) normal 0,-1,0
-        quad(mat, norm, vc, light, overlay, texW, texH,
-            x0, y0, z0,  x1, y0, z0,  x1, y0, z1,  x0, y0, z1,
-            u + sz + sx, v, sx, sz, 0, -1, 0);
+            // Bottom face (-Y)
+            quad(mat, norm, vc, light, overlay, texW, texH,
+                x0, y0, z0,  x1, y0, z0,  x1, y0, z1,  x0, y0, z1,
+                u + sz + sx, v, sx, sz, 0, -1, 0);
+        }
 
         poseStack.popPose();
     }
@@ -341,6 +384,19 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         vc.addVertex(mat, x1, y1, z1).setColor(1f, 1f, 1f, 1f).setUv(u1, v1).setOverlay(overlay).setLight(light).setNormal(n.x, n.y, n.z);
         vc.addVertex(mat, x2, y2, z2).setColor(1f, 1f, 1f, 1f).setUv(u1, v0).setOverlay(overlay).setLight(light).setNormal(n.x, n.y, n.z);
         vc.addVertex(mat, x3, y3, z3).setColor(1f, 1f, 1f, 1f).setUv(u0, v0).setOverlay(overlay).setLight(light).setNormal(n.x, n.y, n.z);
+    }
+
+    private void emitPerFace(Matrix4f mat, Matrix3f norm, VertexConsumer vc, int light, int overlay,
+                             int texW, int texH, float vFrameOffset, FaceUV face,
+                             float x0, float y0, float z0,
+                             float x1, float y1, float z1,
+                             float x2, float y2, float z2,
+                             float x3, float y3, float z3,
+                             float nx, float ny, float nz) {
+        if (face == null || (face.uSize() == 0 && face.vSize() == 0)) return;
+        quad(mat, norm, vc, light, overlay, texW, texH,
+            x0, y0, z0,  x1, y1, z1,  x2, y2, z2,  x3, y3, z3,
+            face.u(), face.v() + vFrameOffset, face.uSize(), face.vSize(), nx, ny, nz);
     }
 
     // ─── Model loading ───────────────────────────────────────────────────────────
@@ -382,12 +438,38 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
                         float inflate = c.has("inflate") ? c.get("inflate").getAsFloat() : 0;
 
                         float uvX = 0, uvY = 0;
+                        FaceUV[] perFaceUV = null;
                         if (c.has("uv")) {
                             JsonElement uvEl = c.get("uv");
                             if (uvEl.isJsonArray()) {
                                 JsonArray uvArr = uvEl.getAsJsonArray();
                                 uvX = uvArr.get(0).getAsFloat();
                                 uvY = uvArr.get(1).getAsFloat();
+                            } else if (uvEl.isJsonObject()) {
+                                JsonObject uvObj = uvEl.getAsJsonObject();
+                                perFaceUV = new FaceUV[6];
+                                String[] faces = {"south", "north", "west", "east", "up", "down"};
+                                float[][] defaultSizes = {
+                                    {size[0], size[1]}, {size[0], size[1]},
+                                    {size[2], size[1]}, {size[2], size[1]},
+                                    {size[0], size[2]}, {size[0], size[2]}
+                                };
+                                for (int fi = 0; fi < 6; fi++) {
+                                    if (uvObj.has(faces[fi])) {
+                                        JsonObject faceObj = uvObj.getAsJsonObject(faces[fi]);
+                                        JsonArray fUv = faceObj.getAsJsonArray("uv");
+                                        float fu = fUv.get(0).getAsFloat(), fv = fUv.get(1).getAsFloat();
+                                        float fuSize = defaultSizes[fi][0], fvSize = defaultSizes[fi][1];
+                                        if (faceObj.has("uv_size")) {
+                                            JsonArray fSize = faceObj.getAsJsonArray("uv_size");
+                                            fuSize = fSize.get(0).getAsFloat();
+                                            fvSize = fSize.get(1).getAsFloat();
+                                        }
+                                        perFaceUV[fi] = new FaceUV(fu, fv, fuSize, fvSize);
+                                    } else {
+                                        perFaceUV[fi] = new FaceUV(0, 0, 0, 0);
+                                    }
+                                }
                             }
                         }
 
@@ -396,7 +478,7 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
                             size[0], size[1], size[2],
                             cPivot[0], cPivot[1], cPivot[2],
                             cRot[0], cRot[1], cRot[2],
-                            inflate, uvX, uvY
+                            inflate, uvX, uvY, perFaceUV
                         ));
                     }
                 }
@@ -436,15 +518,22 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     // ─── Data records ────────────────────────────────────────────────────────────
 
-    private record GeoItemEntry(ResourceLocation geoLocation, List<ResourceLocation> textures,
-                                    int frames, boolean animated, int ticksPerFrame) {}
+    public record StateAnim(int frames, boolean animated, int ticksPerFrame) {
+        public static final StateAnim NONE = new StateAnim(0, false, 0);
+    }
+    private record GeoItemEntry(List<ResourceLocation> geoLocations, List<ResourceLocation> textures,
+                                    List<StateAnim> stateAnims) {}
     private record BakedGeoModel(int texWidth, int texHeight, List<BakedBone> bones) {}
     private record BakedBone(String name, float pivotX, float pivotY, float pivotZ,
                              float rotX, float rotY, float rotZ,
                              List<BakedCube> cubes, List<BakedBone> children) {}
+    private record FaceUV(float u, float v, float uSize, float vSize) {}
     private record BakedCube(float originX, float originY, float originZ,
                              float sizeX, float sizeY, float sizeZ,
                              float pivotX, float pivotY, float pivotZ,
                              float rotX, float rotY, float rotZ,
-                             float inflate, float uvX, float uvY) {}
+                             float inflate, float uvX, float uvY,
+                             FaceUV[] perFaceUV) {
+        boolean hasPerFaceUV() { return perFaceUV != null; }
+    }
 }

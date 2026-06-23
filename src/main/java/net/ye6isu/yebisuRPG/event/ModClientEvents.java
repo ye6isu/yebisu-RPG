@@ -47,6 +47,12 @@ public class ModClientEvents {
         while (ModKeybinds.OPEN_HAND_DEBUG.consumeClick()) {
             mc.setScreen(new HandDebugScreen());
         }
+        while (ModKeybinds.TESTER_DEBUG.consumeClick()) {
+            net.ye6isu.yebisuRPG.client.debug.DebugSkinOverride.cycle();
+            String modeName = net.ye6isu.yebisuRPG.client.debug.DebugSkinOverride.getMode().name();
+            mc.player.displayClientMessage(
+                net.minecraft.network.chat.Component.literal("Debug Skin: " + modeName), true);
+        }
     }
 
     @SubscribeEvent

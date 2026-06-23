@@ -363,9 +363,18 @@ app.post('/api/items/states-model', (req, res) => {
             const geoId = geoStates[0].geoId || id
             line = `        tryRegister(items, ModItems.${constName}, "${geoId}", ${tm.frames}, ${tm.animated}, ${tm.ticksPerFrame});`
           } else {
-            // Multiple 3D states or no animation — use tryRegisterStates
+            // Multiple 3D states — generate per-state animation params
             const geoIds = states.map((s, i) => s.mode === '3d' ? `${id}_state_${i}` : null).filter(Boolean)
-            line = `        tryRegisterStates(items, ModItems.${constName}, "${id}", new String[]{${geoIds.map(g => `"${g}"`).join(', ')}});`
+            const hasAnyAnim = geoStates.some(s => s.texMeta && (s.texMeta.animated || s.texMeta.frames > 1))
+            if (hasAnyAnim) {
+              const animParams = geoStates.map(s => {
+                const tm = s.texMeta || {}
+                return `{${tm.frames || 0}, ${tm.animated ? 1 : 0}, ${tm.ticksPerFrame || 0}}`
+              })
+              line = `        tryRegisterStates(items, ModItems.${constName}, "${id}", new String[]{${geoIds.map(g => `"${g}"`).join(', ')}}, new int[][]{${animParams.join(', ')}});`
+            } else {
+              line = `        tryRegisterStates(items, ModItems.${constName}, "${id}", new String[]{${geoIds.map(g => `"${g}"`).join(', ')}});`
+            }
           }
           const cleanedSection = section.split('\n').filter(l => !l.includes(`ModItems.${constName}`)).join('\n')
           const before = src.slice(0, si + startM.length)
@@ -1422,6 +1431,19 @@ app.post('/api/datacomponents/save', (req, res) => {
       if (!/^[a-z][a-z0-9_]*$/.test(c.name)) return res.json({ ok:false, reason:`invalid component name: ${c.name}` })
       if (!DC_TYPES.includes(c.type)) return res.json({ ok:false, reason:`invalid type for ${c.name}` })
     }
+
+    // Debug: log caller stack trace and diff
+    const caller = new Error().stack.split('\n').slice(1, 4).join(' | ')
+    const existing = readDataComponents()
+    const existingNames = existing.map(c => c.name)
+    const incomingNames = components.map(c => c.name)
+    const removed = existingNames.filter(n => !incomingNames.includes(n))
+    const added = incomingNames.filter(n => !existingNames.includes(n))
+    const kept = incomingNames.filter(n => existingNames.includes(n))
+    console.log(`[DC SAVE] incoming=${JSON.stringify(incomingNames)} existing=${JSON.stringify(existingNames)}`)
+    console.log(`[DC SAVE]   added=${JSON.stringify(added)} removed=${JSON.stringify(removed)} kept=${JSON.stringify(kept)}`)
+    console.log(`[DC SAVE]   caller=${req.body._caller || 'unknown'} referer=${req.headers.referer || 'none'}`)
+
     writeDataComponents(components)
     writeDataComponentsJava(components.filter(c => c.type !== 'item'))
     res.json({ ok:true })

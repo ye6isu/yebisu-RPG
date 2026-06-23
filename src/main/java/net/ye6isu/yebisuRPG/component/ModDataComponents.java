@@ -59,6 +59,20 @@ public final class ModDataComponents {
 
     //YCS_DataComponents_START
 
+public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>
+        YCS_AXE = COMPONENTS.register("ycs_axe", () ->
+            DataComponentType.<Double>builder()
+                .persistent(Codec.DOUBLE)
+                .networkSynchronized(ByteBufCodecs.DOUBLE)
+                .build());
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>>
+        YCS_SWORD = COMPONENTS.register("ycs_sword", () ->
+            DataComponentType.<Double>builder()
+                .persistent(Codec.DOUBLE)
+                .networkSynchronized(ByteBufCodecs.DOUBLE)
+                .build());
+
 //YCS_DataComponents_END
 
     private ModDataComponents() {}
