@@ -1,0 +1,44 @@
+.titlebar {
+  height: 28px;
+  background-color: var(--ycs-accent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+
+.logo-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* Tighter spacing between logo and menu */
+}
+
+.titlebar-menu {
+  position: relative;
+  -webkit-app-region: no-drag; /* CRITICAL: Allows button to be clickable */
+}
+
+.menu-button {
+  color: #cccccc;
+  font-size: 13px;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+  transition: background-color 0.1s;
+}
+
+.menu-button:hover, .menu-button.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
