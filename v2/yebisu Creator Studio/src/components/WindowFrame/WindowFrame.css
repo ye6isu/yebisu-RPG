@@ -1,0 +1,19 @@
+.window-frame {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--ycs-bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.window-content {
+  flex-grow: 1;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #888;
+  overflow: hidden;
+}
