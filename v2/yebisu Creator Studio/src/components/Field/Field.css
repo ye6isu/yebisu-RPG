@@ -1,0 +1,96 @@
+.ycs-field-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  min-height: 24px;
+}
+
+.ycs-field-label {
+  min-width: 140px;
+  width: auto;
+  padding-right: 16px;
+  font-size: 13px;
+  color: var(--ycs-text);
+  user-select: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ycs-field-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.ycs-string-input {
+  background: transparent;
+  border: 1px solid var(--ycs-foreground);
+  color: var(--ycs-text);
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.ycs-string-input:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ycs-foreground);
+}
+
+.ycs-string-input:focus {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ycs-highlight);
+}
+
+.ycs-color-preview {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--ycs-foreground);
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ycs-color-input-hidden {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 34px;
+  height: 34px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ycs-tiny-button {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+  color: var(--ycs-text);
+}
+
+.ycs-tiny-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--ycs-foreground);
+}
+
+.ycs-tiny-button:active {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ycs-tiny-button svg, .ycs-tiny-button img {
+  width: 16px;
+  height: 16px;
+}
