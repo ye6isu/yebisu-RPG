@@ -122,7 +122,21 @@ body {
   border: 1px solid var(--ycs-highlight);
 }
 
-.ycs-button.primary:hover {
+.ycs-button.active {
+  background-color: var(--ycs-highlight);
+  color: #ffffff;
+  border: 1px solid var(--ycs-highlight);
+}
+
+.ycs-button.inline {
+  height: 24px;
+  padding: 0 12px;
+  min-width: auto;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.ycs-button.primary:hover, .ycs-button.active:hover {
   filter: brightness(1.2);
 }
 
