@@ -1,0 +1,188 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "yebisurpg:item/plank"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "custom_model_data": 1
+      },
+      "model": "yebisurpg:item/plank_frame_0"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 2
+      },
+      "model": "yebisurpg:item/plank_frame_1"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 3
+      },
+      "model": "yebisurpg:item/plank_frame_2"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 4
+      },
+      "model": "yebisurpg:item/plank_frame_3"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 5
+      },
+      "model": "yebisurpg:item/plank_frame_4"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 6
+      },
+      "model": "yebisurpg:item/plank_frame_5"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 7
+      },
+      "model": "yebisurpg:item/plank_frame_6"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 8
+      },
+      "model": "yebisurpg:item/plank_frame_7"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 9
+      },
+      "model": "yebisurpg:item/plank_frame_8"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 10
+      },
+      "model": "yebisurpg:item/plank_frame_9"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 11
+      },
+      "model": "yebisurpg:item/plank_frame_10"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 12
+      },
+      "model": "yebisurpg:item/plank_frame_11"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 13
+      },
+      "model": "yebisurpg:item/plank_frame_12"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 14
+      },
+      "model": "yebisurpg:item/plank_frame_13"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 15
+      },
+      "model": "yebisurpg:item/plank_frame_14"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 16
+      },
+      "model": "yebisurpg:item/plank_frame_15"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 17
+      },
+      "model": "yebisurpg:item/plank_frame_16"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 18
+      },
+      "model": "yebisurpg:item/plank_frame_17"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 19
+      },
+      "model": "yebisurpg:item/plank_frame_18"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 20
+      },
+      "model": "yebisurpg:item/plank_frame_19"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 21
+      },
+      "model": "yebisurpg:item/plank_frame_20"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 22
+      },
+      "model": "yebisurpg:item/plank_frame_21"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 23
+      },
+      "model": "yebisurpg:item/plank_frame_22"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 24
+      },
+      "model": "yebisurpg:item/plank_frame_23"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 25
+      },
+      "model": "yebisurpg:item/plank_frame_24"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 26
+      },
+      "model": "yebisurpg:item/plank_frame_25"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 27
+      },
+      "model": "yebisurpg:item/plank_frame_26"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 28
+      },
+      "model": "yebisurpg:item/plank_frame_27"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 29
+      },
+      "model": "yebisurpg:item/plank_frame_28"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 30
+      },
+      "model": "yebisurpg:item/plank_frame_29"
+    }
+  ]
+}

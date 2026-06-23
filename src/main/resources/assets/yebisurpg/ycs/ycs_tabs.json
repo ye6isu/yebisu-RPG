@@ -16,5 +16,6 @@
   "block:crate_fence_gate": "yebisurpg_tab",
   "block:crate_wall": "yebisurpg_tab",
   "block:crate_door": "yebisurpg_tab",
-  "block:crate_trapdoor": "yebisurpg_tab"
+  "block:crate_trapdoor": "yebisurpg_tab",
+  "yasuo_katana": "yebisurpg_tab"
 }

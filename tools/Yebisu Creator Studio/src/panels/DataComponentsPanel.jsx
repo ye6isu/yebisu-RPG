@@ -31,30 +31,11 @@ export function useDataComponents() {
 export default function DataComponentsPanel() {
   const { form, F } = useContext(FormCtx);
   const comps = form.dataComponents || [];
-  const [dirty, setDirty] = useState(false);
   const [hov, setHov] = useState(null);
-  const saveRef = useRef(null);
 
   const update = (next) => {
     F("dataComponents", next);
-    setDirty(true);
   };
-
-  useEffect(() => {
-    if (comps.length > 0) {
-      api("/datacomponents/save", { components: comps });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!dirty) return;
-    clearTimeout(saveRef.current);
-    saveRef.current = setTimeout(async () => {
-      await api("/datacomponents/save", { components: comps });
-      setDirty(false);
-    }, 800);
-    return () => clearTimeout(saveRef.current);
-  }, [dirty, comps]);
 
   const add = (type) => {
     let name = "new_" + type, i = 1;

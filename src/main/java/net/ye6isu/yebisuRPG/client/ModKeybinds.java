@@ -64,6 +64,8 @@ public final class ModKeybinds {
 
     //YCS_Mod_Keybinds_START
 
+    public static final KeyMapping TESTER_DEBUG = bind("tester_debug", InputConstants.Type.MOUSE, GLFW.GLFW_MOUSE_BUTTON_4, KeyModifier.NONE, CATEGORY);
+
     //YCS_Mod_Keybinds_END
 
     // ---------------------------------------------------------------------------------
@@ -82,6 +84,8 @@ public final class ModKeybinds {
         event.register(OPEN_HAND_DEBUG);
 
         //YCS_Mod_Keybinds_Register_START
+
+        event.register(TESTER_DEBUG);
 
         //YCS_Mod_Keybinds_Register_END
     }

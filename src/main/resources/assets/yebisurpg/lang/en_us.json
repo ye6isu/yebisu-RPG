@@ -5,6 +5,7 @@
   "item.yebisurpg.plank_chestplate": "Plank Chestplate",
   "item.yebisurpg.plank_helmet": "Plank Helmet",
   "item.yebisurpg.plank_leggings": "Plank Leggings",
+  "item.yebisurpg.yasuo_katana": "Yasuo's Katana",
   "item.yebisurpg.ye6isu": "ye6isu",
 
   "block.yebisurpg.crate_block": "Crate Block",
@@ -24,6 +25,7 @@
   "creativetab.yebisurpg.yebisurpg_tab": "yebisu RPG",
 
   "key.categories.yebisurpg": "yebisu RPG",
+  "key.yebisurpg.tester_debug": "Tester/Debug",
 
   "effect.yebisurpg.test_effect": "Test Effect"
 }

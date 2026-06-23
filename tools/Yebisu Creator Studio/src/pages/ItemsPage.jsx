@@ -3,7 +3,7 @@ import { C, SI } from "../theme.js";
 import { FormCtx } from "../context.js";
 import { Lbl, Btn, Inp, Sel, Chk, Sbar, AImg, ConstField, FormActions, SearchSel, valId } from "../components/ui.jsx";
 import EditRow from "../components/EditRow.jsx";
-import { MODID, TIERS, TOOL_TYPES, VANILLA_EFFECTS, SMELT_TYPES } from "../constants.js";
+import { BASE, MODID, TIERS, TOOL_TYPES, VANILLA_EFFECTS, SMELT_TYPES } from "../constants.js";
 import { api, useCreativeTabs } from "../api.js";
 import { gItemCode, gRecipe, gTTKeys, idToClassName } from "../codegen/items.js";
 import { ycsInjectFeature, ycsRemoveFeature } from "../codegen/ycs.js";
@@ -223,16 +223,29 @@ export function ItemLeft({textures,initial,isEdit,onSave,onCancel,onDelete,modIt
       }
     }
     if(form.creativeTab){const jt=await api("/creativetab",{ref:`ModItems.${CN}`,itemId:form.id,tabConst:form.creativeTab});msgs.push({ok:jt.ok,label:"tab",msg:jt.ok?"ok":jt.reason});}
-    const allDC=[...(form.dataComponents||[])];
+    // Collect DCs from this item (form + visual blocks)
+    const thisDC=[...(form.dataComponents||[])];
     const allBlocks=Object.values(form.methodBlocks||{}).flat();
     for(const bn of allBlocks){
       if((bn.opcode==="datacomp.get"||bn.opcode==="datacomp.set")&&bn.fields?.compName){
         const name=bn.fields.compName;
         const type=bn.fields.compType||"double";
-        if(!allDC.some(d=>d.name===name))allDC.push({name,type});
+        if(!thisDC.some(d=>d.name===name))thisDC.push({name,type});
       }
     }
-    if(allDC.length){await api("/datacomponents/save",{components:allDC});}
+    // Collect DCs from ALL other items + this item's current state to compute correct global list
+    {
+      const globalDC=[];
+      const addUnique=(dc)=>{if(!globalDC.some(g=>g.name===dc.name))globalDC.push(dc);};
+      // Add DCs from all other items
+      for(const other of modItems){
+        if(other.id===form.id)continue;
+        for(const dc of (other.dataComponents||[]))addUnique(dc);
+      }
+      // Add this item's current DCs
+      for(const dc of thisDC)addUnique(dc);
+      await api("/datacomponents/save",{components:globalDC,_caller:"ItemsPage:"+form.id});
+    }
     await api("/models/sync",{});
     setStatus(msgs);setSaving(false);onSave({...form,constName:CN,savedAt:Date.now()},initial?.id);
   };
