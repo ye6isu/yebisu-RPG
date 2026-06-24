@@ -25,13 +25,7 @@ export function StringField({ value, onChange, placeholder, style = {} }) {
   );
 }
 
-export function TinyButton({ onClick, children, title }) {
-  return (
-    <div className="ycs-tiny-button" onClick={onClick} title={title}>
-      {children}
-    </div>
-  );
-}
+
 
 export function ColorField({ value, onChange }) {
   return (
@@ -46,7 +40,8 @@ export function ColorField({ value, onChange }) {
         />
       </div>
       {window.EyeDropper && (
-        <TinyButton 
+        <button 
+          className="ycs-button icon"
           onClick={async () => {
             try {
               const result = await new window.EyeDropper().open();
@@ -58,7 +53,7 @@ export function ColorField({ value, onChange }) {
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m2 22 1-1h3l9-9M3 21v-3l9-9M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
           </svg>
-        </TinyButton>
+        </button>
       )}
     </>
   );
@@ -162,9 +157,9 @@ export function DropdownField({ value, onChange, options }) {
           alignItems: 'center', 
           width: '100%',
           padding: '0 8px',
-          background: 'var(--ycs-bg)',
+          background: 'transparent',
           border: '1px solid var(--ycs-foreground)',
-          borderRadius: '4px',
+          borderRadius: 'var(--ycs-radius, 4px)',
           color: 'var(--ycs-text)',
           cursor: 'text',
           fontSize: '12px',
@@ -217,6 +212,69 @@ export function DropdownField({ value, onChange, options }) {
           )) : (
             <div className="dropdown-item" style={{ opacity: 0.5 }}>No results found</div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function StandardDropdownField({ value, onChange, options }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+  
+  const selectedOption = options.find(o => o.value === value);
+  const displayValue = selectedOption ? selectedOption.label : value;
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          width: '100%',
+          padding: '0 8px',
+          background: 'transparent',
+          border: '1px solid var(--ycs-foreground)',
+          borderRadius: 'var(--ycs-radius, 4px)',
+          color: 'var(--ycs-text)',
+          cursor: 'pointer',
+          fontSize: '12px',
+          boxSizing: 'border-box',
+          height: '24px'
+        }}
+      >
+        <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {displayValue}
+        </div>
+        <span style={{ fontSize: '8px', opacity: 0.7, padding: '4px' }}>▼</span>
+      </div>
+      
+      {isOpen && (
+        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100 }}>
+          {options.map((opt) => (
+            <div 
+              key={opt.label}
+              className="dropdown-item"
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
         </div>
       )}
     </div>
