@@ -3,10 +3,12 @@
   flex-grow: 1;
   background-color: transparent;
   overflow: hidden;
+  min-width: 0;
+  min-height: 0;
 }
 
 .preferences-sidebar {
-  background-color: var(--ycs-bg);
+  background-color: transparent;
   border-right: 1px solid var(--ycs-foreground); /* The vertical divider */
   display: flex;
   flex-direction: column;
@@ -57,18 +59,19 @@
   padding: 20px;
   background-color: transparent; /* Inherits var(--ycs-bg) from the parent */
   overflow-y: auto;
+  overflow-x: auto;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 /* Settings Row Styles */
 .setting-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  background-color: rgba(0, 0, 0, 0.2); /* Dynamically tints based on var(--ycs-bg) */
-  padding: 10px 15px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Soft, dynamic border */
+  justify-content: space-between;
+  margin-bottom: 15px;
+  background-color: transparent;
+  border-radius: var(--ycs-radius, 4px);
 }
 
 .setting-row label {
@@ -80,9 +83,10 @@
 input[type="color"] {
   -webkit-appearance: none;
   border: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
+  height: 28px;
+  border: none;
+  padding: 0;
+  border-radius: var(--ycs-radius, 4px);
   cursor: pointer;
   padding: 0;
   background: none;
@@ -93,6 +97,6 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 }
 
 input[type="color"]::-webkit-color-swatch {
-  border: 1px solid #555;
-  border-radius: 4px;
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius, 4px);
 }

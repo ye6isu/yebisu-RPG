@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu } = require('electron');
 const path = require('path');
 const windowStateKeeper = require('electron-window-state');
 
@@ -7,6 +7,9 @@ const isDev = process.env.NODE_ENV !== 'production';
 let mainWindow;
 
 function createWindow() {
+  // Force Windows DWM to use the dark variant of Mica/Acrylic
+  nativeTheme.themeSource = 'dark';
+
   let mainWindowState = windowStateKeeper({
     defaultWidth: 1000,
     defaultHeight: 700
@@ -22,12 +25,8 @@ function createWindow() {
     icon: isDev 
       ? path.join(__dirname, '../public/logo.png') 
       : path.join(__dirname, '../dist/logo.png'),
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#323233',
-      symbolColor: '#cccccc',
-      height: 28
-    },
+    frame: false,
+    backgroundMaterial: 'acrylic',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -47,7 +46,21 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   createWindow();
+
+  ipcMain.on('set-minimum-size', (event, width, height) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const currentBounds = mainWindow.getBounds();
+      mainWindow.setMinimumSize(Math.ceil(width), Math.ceil(height));
+      if (currentBounds.width < width || currentBounds.height < height) {
+         mainWindow.setSize(
+            Math.max(currentBounds.width, Math.ceil(width)),
+            Math.max(currentBounds.height, Math.ceil(height))
+         );
+      }
+    }
+  });
 
   ipcMain.on('window-control', (event, action) => {
     const win = BrowserWindow.getFocusedWindow();
@@ -63,9 +76,10 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('update-theme', (event, { accent, bg }) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (accent) mainWindow.setTitleBarOverlay({ color: accent });
-    }
+    // Titlebar overlay must stay transparent to allow acrylic to show through
+    // if (mainWindow && !mainWindow.isDestroyed()) {
+    //   if (accent) mainWindow.setTitleBarOverlay({ color: accent });
+    // }
   });
 
   ipcMain.on('open-preferences', () => {
@@ -88,6 +102,7 @@ app.whenReady().then(() => {
       maximizable: false,
       icon: isDev ? path.join(__dirname, '../public/logo.png') : path.join(__dirname, '../dist/logo.png'),
       frame: false,
+      backgroundMaterial: 'acrylic',
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,

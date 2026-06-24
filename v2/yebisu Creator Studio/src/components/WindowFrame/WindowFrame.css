@@ -1,7 +1,7 @@
 .window-frame {
   width: 100vw;
   height: 100vh;
-  background-color: var(--ycs-bg);
+  background-color: transparent;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -10,10 +10,9 @@
 
 .window-content {
   flex-grow: 1;
-  padding: 20px;
+  padding: 0;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
   color: #888;
   overflow: hidden;
 }
