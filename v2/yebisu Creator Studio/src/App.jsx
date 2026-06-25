@@ -171,7 +171,7 @@ function App() {
       const wsSize = getTreeMinSize(workspaceTree);
       const gap = parseInt(localStorage.getItem('ycs-gap') || '8', 10);
       const reservedSpace = wsSize.width + gap; // Minimum workspace width + right border
-      const maxWidth = window.innerWidth - reservedSpace;
+      const maxWidth = window.innerWidth - reservedSpace - 2; // Account for WindowFrame borders
       const newWidth = Math.min(Math.max(180, e.clientX), maxWidth);
       setSidebarWidth(newWidth);
     }
@@ -189,10 +189,10 @@ function App() {
   useEffect(() => {
     const wsSize = getTreeMinSize(workspaceTree);
     const gap = parseInt(localStorage.getItem('ycs-gap') || '8', 10);
-    // sidebarWidth + right-side border (gap) + workspace width
-    const totalMinWidth = sidebarWidth + wsSize.width + gap;
-    // top + bottom borders (gap) + workspace height + titlebar (40px)
-    const totalMinHeight = wsSize.height + (2 * gap) + 40;
+    // sidebarWidth + right border + workspace width + WindowFrame borders
+    const totalMinWidth = sidebarWidth + wsSize.width + gap + 2;
+    // bottom border + workspace height + titlebar (40px) + WindowFrame borders
+    const totalMinHeight = wsSize.height + gap + 40 + 2;
 
     if (window.electronAPI && window.electronAPI.setMinimumSize) {
        window.electronAPI.setMinimumSize(totalMinWidth, totalMinHeight);
@@ -338,38 +338,9 @@ function App() {
           }
         }}
       >
-        {/* Window Control Stoplights */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          width: '100%',
-          paddingTop: 'var(--ycs-gap)',
-          paddingLeft: 'var(--ycs-gap)',
-          paddingBottom: '10px',
-          WebkitAppRegion: 'no-drag'
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', width: '100%', padding: '0 8px', boxSizing: 'border-box' }}>
           <div 
-            title="Close"
-            onClick={() => window.electronAPI?.controlWindow('close')}
-            style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ff5f57', cursor: 'pointer' }} 
-          />
-          <div 
-            title="Maximize"
-            onClick={() => window.electronAPI?.controlWindow('maximize')}
-            style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#29c840', cursor: 'pointer' }} 
-          />
-          <div 
-            title="Minimize"
-            onClick={() => window.electronAPI?.controlWindow('minimize')}
-            style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#febb2e', cursor: 'pointer' }} 
-          />
-        </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', padding: '0 var(--ycs-gap)', boxSizing: 'border-box' }}>
-          <div 
-            className="ycs-button" 
+            className={`ycs-tab ${findTabId(workspaceTree, mainNodeId) === 'Tab 1' || (!findTabId(workspaceTree, mainNodeId) && findTabId(workspaceTree, 'root') === 'Tab 1') ? 'active' : ''}`} 
             onClick={() => handleTabClick('Tab 1')}
             draggable 
             onDragStart={(e) => { 
@@ -382,7 +353,7 @@ function App() {
             Tab 1
           </div>
           <div 
-            className="ycs-button" 
+            className={`ycs-tab ${findTabId(workspaceTree, mainNodeId) === 'Tab 2' || (!findTabId(workspaceTree, mainNodeId) && findTabId(workspaceTree, 'root') === 'Tab 2') ? 'active' : ''}`} 
             onClick={() => handleTabClick('Tab 2')}
             draggable 
             onDragStart={(e) => { 
@@ -395,7 +366,7 @@ function App() {
             Tab 2
           </div>
           <div 
-            className="ycs-button" 
+            className={`ycs-tab ${findTabId(workspaceTree, mainNodeId) === 'Tab 3' || (!findTabId(workspaceTree, mainNodeId) && findTabId(workspaceTree, 'root') === 'Tab 3') ? 'active' : ''}`} 
             onClick={() => handleTabClick('Tab 3')}
             draggable 
             onDragStart={(e) => { 
@@ -423,8 +394,8 @@ function App() {
         }}
         style={{
           position: 'absolute',
-          bottom: 'var(--ycs-gap)',
-          left: 'var(--ycs-gap)',
+          bottom: '8px',
+          left: '8px',
           WebkitAppRegion: 'no-drag',
           zIndex: 100
         }}
@@ -442,8 +413,8 @@ function App() {
         title="Clear Workspace"
         style={{
           position: 'absolute',
-          bottom: 'var(--ycs-gap)',
-          left: 'calc(var(--ycs-gap) + 36px)',
+          bottom: '8px',
+          left: 'calc(8px + 36px)',
           WebkitAppRegion: 'no-drag',
           zIndex: 100
         }}
@@ -471,16 +442,14 @@ function App() {
         {/* Right Workspace Container */}
         <div style={{ 
           flex: 1, 
-          minWidth: '300px',
           display: 'flex',
-          borderTop: 'var(--ycs-gap) solid var(--ycs-accent)',
           borderRight: 'var(--ycs-gap) solid var(--ycs-accent)',
           borderBottom: 'var(--ycs-gap) solid var(--ycs-accent)',
           backgroundClip: 'padding-box',
           overflow: 'hidden',
           boxSizing: 'border-box'
         }}>
-          <Workspace tree={workspaceTree} setTree={setWorkspaceTree} mainNodeId={mainNodeId} />
+          <Workspace tree={workspaceTree} setTree={setWorkspaceTree} mainNodeId={mainNodeId} setMainNodeId={setMainNodeId} />
         </div>
 
       </div>
@@ -507,7 +476,7 @@ function App() {
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <span>Set as Main Tab</span>
+            <span>Set as Active Tab</span>
             {mainNodeId === contextMenu.nodeId && <span style={{ opacity: 0.5 }}>✓</span>}
           </div>
           <div 
@@ -521,7 +490,7 @@ function App() {
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            Keep Main & Clear
+            Keep Active & Clear
           </div>
           <div 
             onClick={() => {

@@ -77,27 +77,19 @@ const WorkspaceNode = ({ node, onDropTab, onResizeStart, mainNodeId }) => {
 
   if (node.type === 'split') {
     return (
-      <div 
-        className="workspace-split" 
-        style={{ 
-          display: 'flex',
-          position: 'relative',
-          flexDirection: node.direction === 'horizontal' ? 'row' : 'column',
-          ...flexStyle
-        }}
-      >
+      <div className="workspace-split" style={{ ...flexStyle, display: 'flex', flexDirection: node.direction === 'horizontal' ? 'row' : 'column' }}>
         {node.children.map((child, index) => (
           <React.Fragment key={child.id}>
-            {index > 0 && (
+            <WorkspaceNode node={child} onDropTab={onDropTab} onResizeStart={onResizeStart} mainNodeId={mainNodeId} />
+            {index < node.children.length - 1 && (
               <WorkspaceDivider 
                 parentId={node.id} 
-                index={index} 
+                index={index + 1} 
                 onDropTab={onDropTab} 
                 direction={node.direction} 
                 onResizeStart={onResizeStart}
               />
             )}
-            <WorkspaceNode node={child} onDropTab={onDropTab} onResizeStart={onResizeStart} mainNodeId={mainNodeId} />
           </React.Fragment>
         ))}
       </div>
@@ -280,6 +272,21 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
       
       if (delta === 0 && resizing.hasSizes) return;
 
+      const getMinPx = (n, dir) => {
+        if (n.type === 'leaf') return dir === 'horizontal' ? 200 : 150;
+        if (n.type === 'split') {
+          const gap = parseInt(localStorage.getItem('ycs-gap') || '8', 10);
+          if (n.direction === dir) {
+            const sizes = n.children.map(c => getMinPx(c, dir));
+            return sizes.reduce((sum, s) => sum + s, 0) + gap * (sizes.length - 1);
+          } else {
+            const sizes = n.children.map(c => getMinPx(c, dir));
+            return Math.max(...sizes);
+          }
+        }
+        return dir === 'horizontal' ? 200 : 150;
+      };
+
       setTree(prevTree => {
         const updateSizes = (node) => {
           if (node.id === resizing.parentId && node.type === 'split') {
@@ -295,22 +302,24 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
             const newPrevSize = resizing.initialPrevSize + deltaSize;
             const newNextSize = resizing.initialNextSize - deltaSize;
 
-            const absoluteMinPx = resizing.direction === 'horizontal' ? 200 : 150;
-            const minSize = (absoluteMinPx / resizing.parentSize) * resizing.currentTotalSize;
+            const prevMinPx = getMinPx(newChildren[resizing.index - 1], resizing.direction);
+            const nextMinPx = getMinPx(newChildren[resizing.index], resizing.direction);
+            
+            const prevMinSize = (prevMinPx / resizing.parentSize) * resizing.currentTotalSize;
+            const nextMinSize = (nextMinPx / resizing.parentSize) * resizing.currentTotalSize;
 
-            if (newPrevSize > minSize && newNextSize > minSize) {
+            if (newPrevSize > prevMinSize && newNextSize > nextMinSize) {
                newChildren[resizing.index - 1] = { ...newChildren[resizing.index - 1], size: newPrevSize };
                newChildren[resizing.index] = { ...newChildren[resizing.index], size: newNextSize };
             } else {
-               if (newNextSize <= minSize) {
-                  newChildren[resizing.index] = { ...newChildren[resizing.index], size: minSize };
-                  newChildren[resizing.index - 1] = { ...newChildren[resizing.index - 1], size: resizing.initialPrevSize + resizing.initialNextSize - minSize };
-               } else if (newPrevSize <= minSize) {
-                  newChildren[resizing.index - 1] = { ...newChildren[resizing.index - 1], size: minSize };
-                  newChildren[resizing.index] = { ...newChildren[resizing.index], size: resizing.initialNextSize + resizing.initialPrevSize - minSize };
+               if (newNextSize <= nextMinSize) {
+                  newChildren[resizing.index] = { ...newChildren[resizing.index], size: nextMinSize };
+                  newChildren[resizing.index - 1] = { ...newChildren[resizing.index - 1], size: resizing.initialPrevSize + resizing.initialNextSize - nextMinSize };
+               } else if (newPrevSize <= prevMinSize) {
+                  newChildren[resizing.index - 1] = { ...newChildren[resizing.index - 1], size: prevMinSize };
+                  newChildren[resizing.index] = { ...newChildren[resizing.index], size: resizing.initialNextSize + resizing.initialPrevSize - prevMinSize };
                }
             }
-
             return { ...node, children: newChildren };
           }
           if (node.type === 'split') {
@@ -339,37 +348,7 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
 
   const splitNode = (node, targetId, tabId, zone, insertIndex) => {
     if (node.type === 'split') {
-      const childIndex = node.children.findIndex(c => c.id === targetId);
-      if (childIndex !== -1 && (zone === 'left' || zone === 'right' || zone === 'top' || zone === 'bottom')) {
-        const isHorizontal = zone === 'left' || zone === 'right';
-        const isVertical = zone === 'top' || zone === 'bottom';
-        if ((node.direction === 'horizontal' && isHorizontal) || (node.direction === 'vertical' && isVertical)) {
-          const newChildren = [...node.children];
-          const targetChild = newChildren[childIndex];
-          const newNode = {
-            id: Math.random().toString(36).substr(2, 9),
-            type: 'leaf',
-            tabId: tabId,
-            size: targetChild.size ? targetChild.size / 2 : undefined
-          };
-          
-          if (targetChild.size) {
-            newChildren[childIndex] = { ...targetChild, size: targetChild.size / 2 };
-          }
-
-          if (zone === 'left' || zone === 'top') {
-            newChildren.splice(childIndex, 0, newNode);
-          } else {
-            newChildren.splice(childIndex + 1, 0, newNode);
-          }
-          return { ...node, children: newChildren };
-        }
-      }
-      return { ...node, children: node.children.map(c => splitNode(c, targetId, tabId, zone, insertIndex)) };
-    }
-
-    if (node.id === targetId) {
-      if (zone === 'divider') {
+      if (node.id === targetId && zone === 'divider') {
         const newNode = {
           id: Math.random().toString(36).substr(2, 9),
           type: 'leaf',
@@ -387,6 +366,45 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
         return { ...node, children: newChildren };
       }
 
+      const childIndex = node.children.findIndex(c => c.id === targetId);
+      if (childIndex !== -1 && (zone === 'left' || zone === 'right' || zone === 'top' || zone === 'bottom')) {
+        const isHorizontal = zone === 'left' || zone === 'right';
+        const isVertical = zone === 'top' || zone === 'bottom';
+        if ((node.direction === 'horizontal' && isHorizontal) || (node.direction === 'vertical' && isVertical)) {
+          let newChildren = [...node.children];
+          
+          // Force all children to have explicit flex proportions
+          const totalExisting = newChildren.length;
+          newChildren = newChildren.map(c => ({
+            ...c,
+            size: c.size !== undefined ? c.size : (100 / totalExisting)
+          }));
+
+          const targetChild = newChildren[childIndex];
+          const splitSize = targetChild.size / 2;
+          
+          targetChild.size = splitSize;
+          
+          const newNode = {
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'leaf',
+            tabId: tabId,
+            size: splitSize
+          };
+
+          if (zone === 'left' || zone === 'top') {
+            newChildren.splice(childIndex, 0, newNode);
+          } else {
+            newChildren.splice(childIndex + 1, 0, newNode);
+          }
+          return { ...node, children: newChildren };
+        }
+      }
+
+      return { ...node, children: node.children.map(c => splitNode(c, targetId, tabId, zone, insertIndex)) };
+    }
+
+    if (node.id === targetId) {
       if (zone === 'center') {
         return { ...node, tabId };
       }

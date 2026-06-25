@@ -436,7 +436,7 @@ export default function PreferencesPage({ isTile }) {
       </div>
       {/* Footer */}
       <div style={{
-        padding: 'var(--ycs-gap, 6px)',
+        padding: '8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'flex-end',

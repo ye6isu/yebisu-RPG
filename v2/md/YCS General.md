@@ -62,7 +62,7 @@ Future AI agents MUST read this list to understand what already exists in the co
     - **Corner Rendering & Gap Illusion**: The 6px gaps between tiles are not transparent empty space; they are visual illusions. To prevent double-stacking alpha layers at the intersections of multiple tiles, the windows use a highly specific `backgroundClip: 'padding-box'` combined with a solid radial gradient (`radial-gradient(circle at center, var(--ycs-accent) 0%, var(--ycs-accent) 100%)`). 
     - **Alt-Key Drag Lock**: All tab reorganizing, dragging, and workspace splitting operations require the user to hold the `Alt` key. HTML5 drag-and-drop operations explicitly append a `ycs-tab` payload; the drop zones (side zones, gap dividers, global edges) will instantly abort if they don't detect `ycs-tab`, ensuring users can drag normal text/images inside the editor without triggering massive layout shifts.
     - **Drop Zone Separation**: To prevent overlapping, the system has three perfectly distinct drop zones: 1. A razor-thin `15px` "Global Edge" zone on the absolute outer perimeter of the app, 2. A massive `80px` "Side Zone" on the inner edges of each window tile, and 3. A `30px` "Divider Zone" located precisely in the gaps between tiles.
-    - **Main Node Priority**: The system uses a `mainNodeId` tracking system. Users can right-click any tab in the workspace to open a custom contextual menu to set it as the "Main Tab" (or Keep & Clear). All subsequent tab clicks from the sidebar will prioritize swapping into the designated "Main Tab" first, rather than overwriting the first active window.
+    - **Active Node Priority**: The system uses a `mainNodeId` tracking system. The "Active Tab" automatically updates to whichever tile the user last interacted with (e.g., by clicking on it, dragging a tab into it, or instantiating a new tile). All subsequent tab clicks from the sidebar will prioritize swapping into this newly designated "Active Tab" first.
     - **Global Keymaps**: A global event listener tracks mouse `X/Y` and parses custom string hotkeys (like `Alt+W` and `Alt+R`) from `localStorage`. `Alt+W` dynamically uses `document.elementFromPoint` to identify and instantly close the specific `.workspace-leaf` currently sitting under the cursor, bypassing the need for state-heavy React hover tracking.
 
 ## Master UI Component Library
@@ -74,6 +74,11 @@ Future AI agents MUST refer to this canonical list and reuse these systems rathe
 - **Active (`.active`)**: Locked highlight state for toggled tools/tabs.
 - **Inline (`.inline`)**: Squashed to a strict `24px` height so it sits perfectly flush with form fields.
 - **Icon (`.icon`)**: A perfectly calculated `28x28px` square designed exclusively to house small SVG icons (like the Eyedropper or Settings gear).
+
+### 2. Tabs (`.ycs-tab`)
+- **Standard**: A variant of `.ycs-button` specifically for tabs. Uses no border/outline and no border radius to sit flush against edges.
+- **Active (`.active`)**: Locked highlight state for toggled tabs.
+- **Icon (`.icon`)**: Expands to fill the container width, designed for sidebars.
 
 ### 2. Inline Form Controls (Strict 24px Baseline)
 - **Text Input (`.ycs-input.inline`)**: A clean, border-lined text box that glows with the highlight color on focus. Uses `background-color: transparent`.
@@ -88,7 +93,7 @@ Future AI agents MUST refer to this canonical list and reuse these systems rathe
 - **Dividers**: Strict `1px` high horizontal lines using `var(--ycs-foreground)` and `width: 100%`.
 
 ### 4. Spacing Standards
-- **Series Spacing**: Any tightly grouped series of adjacent, functionally related inline components (such as an OK/Cancel/Apply button row, the hex box + color preview + eyedropper cluster, or window controls) MUST strictly use gap: 8px for separation, while the outer padding of the group container should use `var(--ycs-gap, 6px)`. This ensures they scale perfectly alongside the rest of the workspace's tile sizing.
+- **Series Spacing**: Any tightly grouped series of adjacent, functionally related inline components (such as an OK/Cancel/Apply button row, the hex box + color preview + eyedropper cluster, or window controls) MUST strictly use gap: 8px for separation, while the outer padding of the group container should use a constant `8px`. This ensures UI padding is fully decoupled from the workspace's tile sizing, avoiding `var(--ycs-gap)`.
 
 
 
