@@ -50,6 +50,30 @@ export default function Titlebar() {
           )}
         </div>
       </div>
+
+      {/* Stoplights (Right side) */}
+      <div className="titlebar-right" style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        WebkitAppRegion: 'no-drag'
+      }}>
+        <div 
+          title="Minimize"
+          onClick={() => window.electronAPI?.controlWindow('minimize')}
+          style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#febb2e', cursor: 'pointer' }} 
+        />
+        <div 
+          title="Maximize"
+          onClick={() => window.electronAPI?.controlWindow('maximize')}
+          style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#29c840', cursor: 'pointer' }} 
+        />
+        <div 
+          title="Close"
+          onClick={() => window.electronAPI?.controlWindow('close')}
+          style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ff5f57', cursor: 'pointer' }} 
+        />
+      </div>
     </div>
   );
 }

@@ -246,6 +246,41 @@ body {
   padding: 0;
 }
 
+/* Global Tab Component */
+.ycs-tab {
+  background-color: transparent;
+  color: var(--ycs-text);
+  border: none;
+  outline: none;
+  border-radius: var(--ycs-radius, 4px);
+  padding: 6px 16px;
+  font-family: var(--ycs-font);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.1s ease-in-out;
+  min-width: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.ycs-tab:hover {
+  background-color: var(--ycs-highlight);
+}
+
+.ycs-tab.active {
+  background-color: var(--ycs-highlight);
+  color: var(--ycs-text);
+}
+
+.ycs-tab.icon {
+  width: 100%; /* Fill the sidebar width */
+  height: 48px; /* Taller for easier clicking */
+  min-width: 0;
+  padding: 0;
+}
+
 /* Global Slider Preset */
 input[type="range"] {
   -webkit-appearance: none;
