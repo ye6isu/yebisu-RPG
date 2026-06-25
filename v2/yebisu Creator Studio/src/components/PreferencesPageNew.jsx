@@ -76,7 +76,7 @@ const ShortcutInput = ({ value, onChange, defaultValue }) => {
   );
 };
 
-export default function PreferencesPage({ isTile }) {
+export default function PreferencesPageNew({ isTile = false, onClose }) {
   const [activeTab, setActiveTab] = useState('Appearance');
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     return parseInt(localStorage.getItem('ycs-prefs-sidebar-width')) || 160;
@@ -162,7 +162,7 @@ export default function PreferencesPage({ isTile }) {
   }, [accentColor, bgColor, fgColor, textColor, highlightColor, fontFamily, transparency, radius, gap, motd]);
 
   const applyVariables = (acc, bgC, fgC, txt, hl, font, trans, rad) => {
-    let alphaHex = Math.round((trans / 100) * 255).toString(16).padStart(2, '0');
+    let alphaHex = Math.round(((100 - trans) / 100) * 255).toString(16).padStart(2, '0');
     let a = acc; if (a.length === 7 && a.startsWith('#')) a += alphaHex; else if (a.length === 9) a = a.substring(0,7) + alphaHex;
     let b = bgC; if (b.length === 7 && b.startsWith('#')) b += alphaHex; else if (b.length === 9) b = b.substring(0,7) + alphaHex;
     let f = fgC; if (f.length === 9) f = f.substring(0,7);
@@ -227,6 +227,8 @@ export default function PreferencesPage({ isTile }) {
 
     if (!isTile) {
       window.electronAPI?.controlWindow('close');
+    } else if (onClose) {
+      onClose();
     }
   };
 
@@ -237,72 +239,35 @@ export default function PreferencesPage({ isTile }) {
     }
   };
 
-  const handleAccentChange = (val) => { setAccentColor(val); localStorage.setItem('ycs-accent', val); applyVariables(val, bgColor, fgColor, textColor, highlightColor, fontFamily, transparency, radius); };
-  const handleBgChange = (val) => { setBgColor(val); localStorage.setItem('ycs-bg', val); applyVariables(accentColor, val, fgColor, textColor, highlightColor, fontFamily, transparency, radius); };
-  const handleFgChange = (val) => { setFgColor(val); localStorage.setItem('ycs-foreground', val); applyVariables(accentColor, bgColor, val, textColor, highlightColor, fontFamily, transparency, radius); };
-  const handleTextChange = (val) => { setTextColor(val); localStorage.setItem('ycs-text', val); applyVariables(accentColor, bgColor, fgColor, val, highlightColor, fontFamily, transparency, radius); };
-  const handleHighlightChange = (val) => { setHighlightColor(val); localStorage.setItem('ycs-highlight', val); applyVariables(accentColor, bgColor, fgColor, textColor, val, fontFamily, transparency, radius); };
-  const handleFontChange = (val) => { setFontFamily(val); localStorage.setItem('ycs-font', val); applyVariables(accentColor, bgColor, fgColor, textColor, highlightColor, val, transparency, radius); };
-  const handleTransparencyChange = (val) => { setTransparency(val); localStorage.setItem('ycs-transparency', val); applyVariables(accentColor, bgColor, fgColor, textColor, highlightColor, fontFamily, val, radius); };
-  const handleRadiusChange = (val) => { setRadius(val); localStorage.setItem('ycs-radius', val); applyVariables(accentColor, bgColor, fgColor, textColor, highlightColor, fontFamily, transparency, val); };
-  const handleGapChange = (val) => { setGap(val); localStorage.setItem('ycs-gap', val); document.documentElement.style.setProperty('--ycs-gap', `${val}px`); };
-  const handleMotdChange = (val) => { 
-    setMotd(val); 
-    localStorage.setItem('ycs-motd', val); 
-    window.dispatchEvent(new Event('ycs-motd-changed')); 
-  };
+  const handleAccentChange = (val) => { setAccentColor(val); applyVariables(val, bgColor, fgColor, textColor, highlightColor, fontFamily, transparency, radius); };
+  const handleBgChange = (val) => { setBgColor(val); applyVariables(accentColor, val, fgColor, textColor, highlightColor, fontFamily, transparency, radius); };
+  const handleFgChange = (val) => { setFgColor(val); applyVariables(accentColor, bgColor, val, textColor, highlightColor, fontFamily, transparency, radius); };
+  const handleTextChange = (val) => { setTextColor(val); applyVariables(accentColor, bgColor, fgColor, val, highlightColor, fontFamily, transparency, radius); };
+  const handleHighlightChange = (val) => { setHighlightColor(val); applyVariables(accentColor, bgColor, fgColor, textColor, val, fontFamily, transparency, radius); };
+  const handleFontChange = (val) => { setFontFamily(val); applyVariables(accentColor, bgColor, fgColor, textColor, highlightColor, val, transparency, radius); };
+  const handleTransparencyChange = (val) => { setTransparency(val); applyVariables(accentColor, bgColor, fgColor, textColor, highlightColor, fontFamily, val, radius); };
+  const handleRadiusChange = (val) => { setRadius(val); applyVariables(accentColor, bgColor, fgColor, textColor, highlightColor, fontFamily, transparency, val); };
+  const handleGapChange = (val) => { setGap(val); document.documentElement.style.setProperty('--ycs-gap', `${val}px`); };
+  const handleMotdChange = (val) => { setMotd(val); };
 
 
   return (
     <div style={{ 
-      width: isTile ? '100%' : '100vw', 
-      height: isTile ? '100%' : '100vh', 
-      minWidth: 0,
-      minHeight: 0,
-      backgroundColor: isTile ? 'transparent' : 'var(--ycs-bg)', 
-      color: 'var(--ycs-text)', 
+      position: 'relative', 
+      width: '100%', 
+      height: '100%', 
       display: 'flex', 
-      flexDirection: 'column',
-      border: isTile ? 'none' : '1px solid #444',
-      boxSizing: 'border-box'
+      flexDirection: 'column', 
+      backgroundColor: 'transparent', 
+      color: 'var(--ycs-text)' 
     }}>
-      {!isTile && (
-        <div style={{ 
-          height: '28px', 
-          WebkitAppRegion: 'drag', 
-          backgroundColor: 'transparent', 
-          display: 'flex',  
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          paddingLeft: '10px', 
-          fontSize: '12px',
-          fontWeight: '500',
-          flexShrink: 0,
-          borderBottom: '1px solid var(--ycs-foreground)'
-        }}>
-          <span>Preferences</span>
-          <div 
-            onClick={() => window.electronAPI?.controlWindow('close')}
-            style={{
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              WebkitAppRegion: 'no-drag',
-              cursor: 'pointer',
-              transition: 'background-color 0.1s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ff5f57'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </div>
-        </div>
-      )}
+      {/* 
+        NOTE: Fake Titlebar was removed here.
+        PopoutWindow in App.jsx now universally provides the titlebar for all popouts.
+      */}
       
       {/* Content Layout */}
-      <div className="preferences-content">
+      <div className="preferences-content" style={{ flexGrow: 1, height: isTile ? '100%' : undefined }}>
         {/* Left Sidebar */}
         <div className="preferences-sidebar" style={{ width: `${sidebarWidth}px`, maxWidth: 'calc(100% - 50px)' }}>
           <div 
