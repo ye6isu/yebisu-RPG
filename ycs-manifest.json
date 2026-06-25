@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "modId": "yebisurpg",
+  "basePath": "src/main",
+  "entries": {
+    "yasuo_katana": {
+      "type": "item",
+      "displayName": "Yasuo's Katana",
+      "created": "2026-06-26T00:00:00Z",
+      "modified": "2026-06-26T00:00:00Z",
+      "injections": [
+        {
+          "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+          "marker": "YCS_Mod_Items",
+          "type": "java-marker",
+          "content": "    public static final DeferredItem<Item> YASUO_KATANA = ITEMS.register(\"yasuo_katana\",\n                () -> new YasuoKatanaItem(new Item.Properties()\n                        .attributes(SwordItem.createAttributes(Tiers.NETHERITE, 3f, -2.4f))));"
+        },
+        {
+          "file": "resources/assets/yebisurpg/models/item/yasuo_katana.json",
+          "type": "created-file"
+        },
+        {
+          "file": "resources/assets/yebisurpg/lang/en_us.json",
+          "key": "item.yebisurpg.yasuo_katana",
+          "type": "json-key"
+        }
+      ],
+      "assets": [],
+      "properties": {
+        "tier": "NETHERITE",
+        "attackDamage": 3.0,
+        "attackSpeed": -2.4,
+        "customClass": "YasuoKatanaItem"
+      }
+    },
+    "test_effect": {
+      "type": "effect",
+      "displayName": "Test Effect",
+      "created": "2026-06-26T00:00:00Z",
+      "modified": "2026-06-26T00:00:00Z",
+      "injections": [
+        {
+          "file": "java/net/ye6isu/yebisuRPG/effect/ModEffects.java",
+          "marker": "YCS_Effects",
+          "type": "java-marker",
+          "content": "    public static final Holder<MobEffect> TEST_EFFECT =\n        MOB_EFFECTS.register(\"test_effect\", () -> new MobEffect(MobEffectCategory.NEUTRAL, 0x671a1a) {});"
+        },
+        {
+          "file": "resources/assets/yebisurpg/lang/en_us.json",
+          "key": "effect.yebisurpg.test_effect",
+          "type": "json-key"
+        }
+      ],
+      "assets": [],
+      "properties": {
+        "category": "NEUTRAL",
+        "color": "0x671a1a"
+      }
+    }
+  },
+  "assets": {}
+}
