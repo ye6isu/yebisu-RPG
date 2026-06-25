@@ -1,7 +1,140 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Workspace.css';
 import { DropdownField, StandardDropdownField } from '../Field/Field';
-import PreferencesPage from '../PreferencesPage';
+
+import PreferencesPageNew from '../PreferencesPageNew';
+
+const Tab1Test = () => (
+  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'auto' }}>
+      <h2 style={{ fontSize: '14px', fontWeight: '500', marginBottom: '15px', color: 'var(--ycs-text)' }}>Inline Alignment Test</h2>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+        <input type="text" className="ycs-input inline" placeholder="Text input..." style={{ width: '120px' }} />
+        <div style={{ width: '120px' }}>
+          <StandardDropdownField 
+            options={[{label: 'Dropdown 1', value: '1'}, {label: 'Dropdown 2', value: '2'}]} 
+            value="1" 
+            onChange={() => {}} 
+          />
+        </div>
+        <div style={{ width: '140px' }}>
+          <DropdownField 
+            options={[{label: 'Dropdown 1', value: '1'}, {label: 'Dropdown 2', value: '2'}]} 
+            value="1" 
+            onChange={() => {}} 
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const Tab2Test = ({ nodeId, tree }) => {
+  const [direction, setDirection] = useState('right');
+
+  let child1Node = null;
+  let child2Node = null;
+  const checkOpen = (n) => {
+    if (!n) return;
+    if (n.type === 'leaf' && n.linkedParentId === nodeId) {
+      if (n.tabId === 'Texture Selector') child1Node = n;
+      if (n.tabId === 'Property Editor') child2Node = n;
+    }
+    if (n.type === 'split') n.children.forEach(checkOpen);
+  };
+  checkOpen(tree);
+
+  return (
+    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <h2 style={{ fontSize: '14px', color: 'var(--ycs-text)' }}>Parent/Child Tile Test</h2>
+      <div style={{ width: '150px' }}>
+        <StandardDropdownField 
+          options={[
+            {label: 'Split Right', value: 'right'},
+            {label: 'Split Left', value: 'left'},
+            {label: 'Split Bottom', value: 'bottom'},
+            {label: 'Split Top', value: 'top'}
+          ]} 
+          value={direction} 
+          onChange={setDirection} 
+        />
+      </div>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          className="ycs-btn" 
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
+              detail: {
+                parentId: nodeId,
+                targetNodeId: child2Node ? child2Node.id : nodeId,
+                childTabId: 'Texture Selector',
+                direction: child2Node ? (direction === 'top' || direction === 'bottom' ? 'right' : 'bottom') : direction,
+                isOpen: !child1Node
+              }
+            }));
+          }}
+          style={{ width: '150px' }}
+        >
+          {child1Node ? 'Close Texture' : 'Open Texture'}
+        </button>
+        <button 
+          className="ycs-btn" 
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
+              detail: {
+                parentId: nodeId,
+                targetNodeId: child1Node ? child1Node.id : nodeId,
+                childTabId: 'Property Editor',
+                direction: child1Node ? (direction === 'top' || direction === 'bottom' ? 'right' : 'bottom') : direction,
+                isOpen: !child2Node
+              }
+            }));
+          }}
+          style={{ width: '150px' }}
+        >
+          {child2Node ? 'Close Properties' : 'Open Properties'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const Tab3_3Test = ({ nodeId }) => {
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (!initialized.current) {
+      initialized.current = true;
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('ycs-replace-and-split', {
+          detail: {
+            nodeId,
+            replaceTabId: 'Tab 3.3.1',
+            splitTabId: 'Tab 3.3.2',
+            direction: 'bottom'
+          }
+        }));
+      }, 50);
+    }
+  }, [nodeId]);
+
+  return null;
+};
+
+export const COMPONENT_REGISTRY = {
+  'Preferences': PreferencesPageNew,
+  'Tab 1': Tab1Test,
+  'Tab 2': Tab2Test,
+  'Tab 3.3': Tab3_3Test
+};
+
+const renderTabContent = (tabId, onClose, nodeId, tree) => {
+  const Component = COMPONENT_REGISTRY[tabId];
+  if (Component) {
+    return <Component isTile={true} onClose={onClose} nodeId={nodeId} tree={tree} />;
+  }
+  return <div style={{ padding: '20px' }}>{tabId}</div>;
+};
 
 const WorkspaceDivider = ({ parentId, index, onDropTab, direction, onResizeStart }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -71,8 +204,7 @@ const WorkspaceDivider = ({ parentId, index, onDropTab, direction, onResizeStart
   );
 };
 
-// Recursive Workspace Node component
-const WorkspaceNode = ({ node, onDropTab, onResizeStart, mainNodeId }) => {
+const WorkspaceNode = ({ node, onDropTab, onResizeStart, activeNodeId, onCloseTab, selectedTiles, onTileSelect, tree }) => {
   const flexStyle = { flex: `${node.size || 1} 1 0%` };
 
   if (node.type === 'split') {
@@ -80,7 +212,7 @@ const WorkspaceNode = ({ node, onDropTab, onResizeStart, mainNodeId }) => {
       <div className="workspace-split" style={{ ...flexStyle, display: 'flex', flexDirection: node.direction === 'horizontal' ? 'row' : 'column' }}>
         {node.children.map((child, index) => (
           <React.Fragment key={child.id}>
-            <WorkspaceNode node={child} onDropTab={onDropTab} onResizeStart={onResizeStart} mainNodeId={mainNodeId} />
+            <WorkspaceNode node={child} onDropTab={onDropTab} onResizeStart={onResizeStart} activeNodeId={activeNodeId} onCloseTab={onCloseTab} selectedTiles={selectedTiles} onTileSelect={onTileSelect} tree={tree} />
             {index < node.children.length - 1 && (
               <WorkspaceDivider 
                 parentId={node.id} 
@@ -97,11 +229,12 @@ const WorkspaceNode = ({ node, onDropTab, onResizeStart, mainNodeId }) => {
   }
 
   // Leaf Node
-  return <WorkspaceLeaf node={node} onDropTab={onDropTab} flexStyle={flexStyle} mainNodeId={mainNodeId} />;
+  return <WorkspaceLeaf node={node} onDropTab={onDropTab} flexStyle={flexStyle} activeNodeId={activeNodeId} onCloseTab={onCloseTab} selectedTiles={selectedTiles} onTileSelect={onTileSelect} tree={tree} />;
 };
 
-const WorkspaceLeaf = ({ node, onDropTab, flexStyle, mainNodeId }) => {
+const WorkspaceLeaf = ({ node, onDropTab, flexStyle, activeNodeId, onCloseTab, selectedTiles, onTileSelect, tree }) => {
   const [hoverZone, setHoverZone] = useState(null);
+  const [isDraggable, setIsDraggable] = useState(false);
   const leafRef = useRef(null);
   const [motd, setMotd] = useState(localStorage.getItem('ycs-motd') || 'hello world');
 
@@ -130,6 +263,13 @@ const WorkspaceLeaf = ({ node, onDropTab, flexStyle, mainNodeId }) => {
 
   const handleDragOver = (e) => {
     if (!Array.from(e.dataTransfer.types).includes('ycs-tab')) return;
+    
+    // If it's a popout window dragging over us, only highlight/allow drop if Ctrl is pressed!
+    if (Array.from(e.dataTransfer.types).includes('ycs-popout') && !e.ctrlKey) {
+      setHoverZone(null);
+      return;
+    }
+
     e.preventDefault();
     const zone = getDropZone(e);
     if (hoverZone !== zone) setHoverZone(zone);
@@ -140,13 +280,32 @@ const WorkspaceLeaf = ({ node, onDropTab, flexStyle, mainNodeId }) => {
   };
 
   const handleDrop = (e) => {
+    const isPopout = Array.from(e.dataTransfer.types).includes('ycs-popout');
+    if (isPopout && !e.ctrlKey) {
+        return;
+    }
     e.preventDefault();
     setHoverZone(null);
+    setIsDraggable(false);
     const tabId = e.dataTransfer.getData('tabId');
     const sourceNodeId = e.dataTransfer.getData('sourceNodeId');
     if (!tabId) return;
     const finalZone = !node.tabId ? 'center' : (hoverZone || 'center');
+    
+    // SWAP LOGIC FOR POPOUTS & SETTINGS TABS
+    // If we are dropping into the center, and there's no sourceNodeId, it would normally overwrite the tile.
+    // To prevent "eating" the old tile, we "swap" it by popping the old tile out!
+    if (finalZone === 'center' && node.tabId && !sourceNodeId) {
+      if (window.electronAPI?.openPopout) {
+        window.electronAPI.openPopout(node.tabId);
+      }
+    }
+
     onDropTab(node.id, tabId, finalZone, null, sourceNodeId);
+    
+    if (isPopout) {
+        window.electronAPI?.broadcastDockSuccess(tabId);
+    }
   };
 
   return (
@@ -157,8 +316,17 @@ const WorkspaceLeaf = ({ node, onDropTab, flexStyle, mainNodeId }) => {
       style={flexStyle}
     >
       <div 
-        className="workspace-leaf-inner"
-        draggable={!!node.tabId}
+        className={`workspace-leaf-inner ${selectedTiles?.includes(node.id) ? 'selected-leaf' : ''}`}
+        onMouseDown={(e) => {
+          if (onTileSelect) onTileSelect(node.id, e);
+          if (e.ctrlKey && node.tabId) setIsDraggable(true);
+        }}
+        onMouseEnter={(e) => {
+          if (onTileSelect) onTileSelect(node.id, e);
+        }}
+        onMouseUp={() => setIsDraggable(false)}
+        onMouseLeave={() => setIsDraggable(false)}
+        draggable={isDraggable}
         onDragStart={(e) => {
           if (!e.ctrlKey) {
             e.preventDefault();
@@ -173,44 +341,18 @@ const WorkspaceLeaf = ({ node, onDropTab, flexStyle, mainNodeId }) => {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onDragEnd={(e) => {
+          setIsDraggable(false);
+          if (e.dataTransfer.dropEffect === 'none' && node.tabId) {
+            window.electronAPI?.openPopout(node.tabId);
+            if (onCloseTab) onCloseTab(node.id);
+          }
+        }}
       >
         <div className="workspace-leaf-content">
-          {node.tabId === 'Tab 1' ? (
-            <div className="tab-content-placeholder" style={{ padding: '20px', alignItems: 'flex-start' }}>
-              {mainNodeId === node.id && (
-                <div style={{ position: 'absolute', top: 5, right: 10, opacity: 0.5, fontSize: '12px' }}>(Main)</div>
-              )}
-              
-              <h2 style={{ fontSize: '14px', fontWeight: '500', marginBottom: '15px', color: 'var(--ycs-text)' }}>Inline Alignment Test</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input type="text" className="ycs-input inline" placeholder="Text input..." style={{ width: '120px' }} />
-                <div style={{ width: '120px' }}>
-                  <StandardDropdownField 
-                    options={[{label: 'Dropdown 1', value: '1'}, {label: 'Dropdown 2', value: '2'}]} 
-                    value="1" 
-                    onChange={() => {}} 
-                  />
-                </div>
-                <div style={{ width: '140px' }}>
-                  <DropdownField 
-                    options={[{label: 'Dropdown 1', value: '1'}, {label: 'Dropdown 2', value: '2'}]} 
-                    value="1" 
-                    onChange={() => {}} 
-                  />
-                </div>
-              </div>
-            </div>
-          ) : node.tabId ? (
-            <div className="tab-content-placeholder" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', boxSizing: 'border-box' }}>
-              {mainNodeId === node.id && (
-                <div style={{ position: 'absolute', top: 5, right: 10, opacity: 0.5, fontSize: '12px', zIndex: 10 }}>(Main)</div>
-              )}
-              
-              {node.tabId === 'Preferences' ? (
-                <PreferencesPage isTile={true} />
-              ) : (
-                <div style={{ padding: '20px' }}>{node.tabId}</div>
-              )}
+          {node.tabId ? (
+            <div className="tab-content-placeholder" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', boxSizing: 'border-box', minWidth: 0, minHeight: 0 }}>
+              {renderTabContent(node.tabId, onCloseTab ? () => onCloseTab(node.id) : null, node.id, tree)}
             </div>
           ) : (
             <span style={{ opacity: 0.3, userSelect: 'none' }}>{motd}</span>
@@ -237,9 +379,26 @@ const findNode = (node, id) => {
   return null;
 };
 
-export default function Workspace({ tree, setTree, mainNodeId }) {
+export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, onTileSelect }) {
   const [globalHoverZone, setGlobalHoverZone] = useState(null);
   const resizingRef = useRef(null);
+
+  const handleCloseTab = (nodeId) => {
+    setTree(prevTree => {
+      const removeNode = (n, tId) => {
+        if (n.id === tId) return null;
+        if (n.type === 'split') {
+          const newC = n.children.map(c => removeNode(c, tId)).filter(Boolean);
+          if (newC.length === 0) return null;
+          if (newC.length === 1) return { ...newC[0], size: n.size };
+          return { ...n, children: newC };
+        }
+        return n;
+      };
+      const finalTree = removeNode(prevTree, nodeId);
+      return finalTree || { id: 'root', type: 'leaf', tabId: null };
+    });
+  };
 
   const handleResizeStart = (data) => {
     const parentNode = findNode(tree, data.parentId);
@@ -346,13 +505,14 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
     };
   }, [setTree]);
 
-  const splitNode = (node, targetId, tabId, zone, insertIndex) => {
+  const splitNode = (node, targetId, tabId, zone, insertIndex, linkedParentId) => {
     if (node.type === 'split') {
       if (node.id === targetId && zone === 'divider') {
         const newNode = {
           id: Math.random().toString(36).substr(2, 9),
           type: 'leaf',
-          tabId: tabId
+          tabId: tabId,
+          linkedParentId: linkedParentId
         };
         const newChildren = [...node.children];
         
@@ -389,7 +549,8 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
             id: Math.random().toString(36).substr(2, 9),
             type: 'leaf',
             tabId: tabId,
-            size: splitSize
+            size: splitSize,
+            linkedParentId: linkedParentId
           };
 
           if (zone === 'left' || zone === 'top') {
@@ -401,7 +562,7 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
         }
       }
 
-      return { ...node, children: node.children.map(c => splitNode(c, targetId, tabId, zone, insertIndex)) };
+      return { ...node, children: node.children.map(c => splitNode(c, targetId, tabId, zone, insertIndex, linkedParentId)) };
     }
 
     if (node.id === targetId) {
@@ -413,7 +574,8 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
       const newNode = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'leaf',
-        tabId: tabId
+        tabId: tabId,
+        linkedParentId: linkedParentId
       };
       
       // Keep the original node's ID so it retains "Main" status
@@ -431,8 +593,75 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
     return node;
   };
 
-  const handleDropTab = (targetId, tabId, zone, insertIndex, sourceNodeId) => {
-    if (sourceNodeId === targetId && zone === 'center') return; // Do nothing on self-center drop
+  useEffect(() => {
+    const handleToggleChild = (e) => {
+      const { parentId, childTabId, direction, isOpen } = e.detail;
+      setTree(prevTree => {
+        if (isOpen) {
+          let isAlreadyOpen = false;
+          const checkOpen = (n) => {
+            if (n.type === 'leaf' && n.linkedParentId === parentId && n.tabId === childTabId) isAlreadyOpen = true;
+            if (n.type === 'split') n.children.forEach(checkOpen);
+          };
+          checkOpen(prevTree);
+          if (!isAlreadyOpen) {
+            const splitTargetId = e.detail.targetNodeId || parentId;
+            return splitNode(prevTree, splitTargetId, childTabId, direction, null, parentId);
+          }
+          return prevTree;
+        } else {
+          let childNodeId = null;
+          const checkOpen = (n) => {
+            if (n.type === 'leaf' && n.linkedParentId === parentId && n.tabId === childTabId) childNodeId = n.id;
+            if (n.type === 'split') n.children.forEach(checkOpen);
+          };
+          checkOpen(prevTree);
+          if (childNodeId) {
+             setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: childNodeId } }));
+             }, 0);
+          }
+          return prevTree;
+        }
+      });
+    };
+    window.addEventListener('ycs-toggle-child', handleToggleChild);
+    return () => window.removeEventListener('ycs-toggle-child', handleToggleChild);
+  }, [setTree]);
+
+  useEffect(() => {
+    const handleReplaceAndSplit = (e) => {
+      const { nodeId, replaceTabId, splitTabId, direction } = e.detail;
+      setTree(prevTree => {
+        const replaceNode = (n) => {
+          if (n.id === nodeId) return { ...n, tabId: replaceTabId };
+          if (n.type === 'split') return { ...n, children: n.children.map(replaceNode) };
+          return n;
+        };
+        const treeAfterReplace = replaceNode(prevTree);
+        return splitNode(treeAfterReplace, nodeId, splitTabId, direction, null, nodeId);
+      });
+    };
+    window.addEventListener('ycs-replace-and-split', handleReplaceAndSplit);
+    return () => window.removeEventListener('ycs-replace-and-split', handleReplaceAndSplit);
+  }, [setTree]);
+
+  useEffect(() => {
+    const handleNativeDock = (e) => {
+      const { targetId, tabId } = e.detail;
+      handleDropTab(targetId, tabId, 'center', null, null);
+      window.electronAPI?.broadcastDockSuccess(tabId);
+    };
+    window.addEventListener('ycs-native-dock', handleNativeDock);
+    return () => window.removeEventListener('ycs-native-dock', handleNativeDock);
+  }, []);
+
+  const handleDropTab = (targetId, tabId, zone, insertIndex, sourceNodeId, linkedParentId) => {
+    if (sourceNodeId === targetId) {
+      if (zone === 'center') return; // Do nothing on self-center drop
+      // If dragging a tile into its own split zone, do nothing to prevent duplication/deletion bugs
+      if (zone === 'left' || zone === 'right' || zone === 'top' || zone === 'bottom') return;
+    }
 
     if (zone === 'center' && sourceNodeId) {
       // SWAP TABS
@@ -456,7 +685,7 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
     }
 
     setTree(prevTree => {
-      const addedTree = splitNode(prevTree, targetId, tabId, zone, insertIndex);
+      const addedTree = splitNode(prevTree, targetId, tabId, zone, insertIndex, linkedParentId);
       
       // If moved from another tile to create a new split, remove the old tile
       if (sourceNodeId && zone !== 'center' && sourceNodeId !== targetId) {
@@ -600,7 +829,7 @@ export default function Workspace({ tree, setTree, mainNodeId }) {
       {renderGlobalDropZone('bottom')}
       {renderGlobalDropZone('left')}
       {renderGlobalDropZone('right')}
-      <WorkspaceNode node={tree} onDropTab={handleDropTab} onResizeStart={handleResizeStart} mainNodeId={mainNodeId} />
+      <WorkspaceNode node={tree} onDropTab={handleDropTab} onResizeStart={handleResizeStart} activeNodeId={activeNodeId} onCloseTab={handleCloseTab} selectedTiles={selectedTiles} onTileSelect={onTileSelect} tree={tree} />
     </div>
   );
 }

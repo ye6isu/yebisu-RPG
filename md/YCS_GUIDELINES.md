@@ -236,7 +236,38 @@ The key invariant: container blocks must appear in **every** place `control.if` 
 - Editor/preview header titles (`"Edit X"` / `"New X"`) are plain text — `fontSize:14,fontWeight:500`, no explicit `color` (defaults to `C.text`) — and carry no status pill next to them. Don't use `color:C.accent` on these titles or add an `editing` badge; that was tried for Items/Keybinds and reverted for being inconsistent with the rest of the app.
 - Preview-panel "current value" cards (e.g. `KeybindPreviewPanel`, `InterfacePreviewPanel`) use the same neutral card styling as everything else: `background:C.card`, `border:1px solid C.inpB`, and `Pill` color `C.inp`. Don't hardcode blue tints like `#1a2438`/`#0e2030`/`#2a3f5a` for these — those hex values are reserved for actual *selected/active-state* highlighting elsewhere in the app (drag targets, active list rows, selected texture swatches), not for a page's default chrome.
 - **Method list rows** (in the visual block editor's right panel) use input field styling — `background:C.inp`, `border:1px solid C.inpB`, `borderRadius:4` — matching normal form fields. Do not highlight active/enabled methods with blue tints or use `C.card` background. Do not show a "compiled" pill/badge next to the method name. The checkbox alone indicates enabled state. This applies to both `RightPaneShell.jsx` and `VisualEditor.jsx`'s `MethodListPanel`.
-- The top-level tab strip supports drag-to-reorder (each tab button is `draggable`, reordering writes the new id order to `tabOrder`) and mouse-wheel horizontal scrolling (the tab strip container listens for `onWheel` and applies `deltaY` to `scrollLeft`) for when there are more tabs than fit the window. Tab order is persisted across reloads via `useLS("ycs_tab_order", ...)`; new tabs are appended automatically by reconciling the canonical tab list against the saved order, so you don't need to touch this when adding a new top-level tab — just add it to the canonical list.
+- **Workspace Architecture:** The app uses a tiling workspace layout (`Workspace.jsx`) instead of a simple tab strip.
+  - **Sidebar Styling:** All sidebar tabs (whether grouped or not) are strictly left-aligned (`justifyContent: 'flex-start'`). For hierarchical tab groups, indentation is achieved by increasing `paddingLeft` directly on the `.ycs-tab` element (e.g. `16px`, `32px`, `48px`). Never use `paddingLeft` or `marginLeft` on a parent container `div`, as this shrinks the clickable width of the child tabs and ruins the full-width hover/active background highlight.
+  - **Tiles & Splitting:** The workspace is a recursive tree of `split` and `leaf` nodes. You can drag a tab to the edges of any tile (or the global window edges) to split the space horizontally or vertically.
+  - **Parent-Child Tile Linking:** When an editor tile (the "parent") spawns a supporting panel (like a texture selector), it spawns as a "child" tile.
+    - The child tile is tagged with a hidden `linkedParentId` pointing to the parent tile that spawned it.
+    - If the parent tile is closed (or overwritten), the workspace recursively scans the tree and automatically closes all of its linked children.
+    - **Orthogonal Stacking:** When multiple child tiles are spawned by the same parent, they intelligently stack orthogonally to the parent's split axis. (e.g. If the parent split them on the right, the two children stack vertically on the right instead of splitting the parent multiple times).
+  - **Macro Tabs (Auto-Spawners):** A tab component can act entirely as a macro by rendering `null` and instantly dispatching a `ycs-replace-and-split` event in a `useEffect`. This silently morphs the dragged tab into a different component (e.g. a Preview panel) and instantly splits it to spawn other components (e.g. a Timeline panel), effectively creating a multi-panel workspace layout from a single drag-and-drop action.
+  - **Tearing & Docking (Ctrl + Drag):** To move a tab, you must hold `Ctrl` while dragging it. This initiates an HTML5 "ghost tab" drag. Dropping it on a tile moves it.
+  - **Popout Windows:** If you drag a tab (while holding `Ctrl`) and drop it *outside* the YCS window (where `dropEffect === 'none'`), it spawns a native OS Popout Window for that tab. 
+  - **Native Window Dragging:** Dragging a Popout Window by its title bar (without `Ctrl`) performs a standard OS window move. It will *not* automatically dock back into YCS. To dock a popout back into the main workspace, you must hold `Ctrl` and drag its title bar to tear off the ghost tab, then drop it into the workspace.
+  - **Component Props:** Any component rendered in the workspace (via `COMPONENT_REGISTRY`) receives `nodeId` (its own tile ID), `tree` (the full workspace state tree), and `isTile=true`.
+  - **Workspace Event API:** To interact with the tiling system, dispatch custom window events:
+    - `ycs-toggle-child`: Spawns or closes a linked child panel.
+      ```javascript
+      window.dispatchEvent(new CustomEvent('ycs-toggle-child', { detail: { 
+        parentId: nodeId, 
+        targetNodeId: existingChildId || nodeId, // Set to an existing child's ID for Orthogonal Stacking
+        childTabId: 'Texture Selector', 
+        direction: 'right', // 'top', 'bottom', 'left', 'right'
+        isOpen: true // true to open, false to close
+      }}));
+      ```
+    - `ycs-replace-and-split`: Used by Macro Tabs to instantly morph and split.
+      ```javascript
+      window.dispatchEvent(new CustomEvent('ycs-replace-and-split', { detail: {
+        nodeId: nodeId,
+        replaceTabId: 'Tab 3.3.1', // The tab this tile becomes
+        splitTabId: 'Tab 3.3.2',   // The tab it concurrently spawns
+        direction: 'bottom'
+      }}));
+      ```
 
 ## Scope for New Feature Categories
 

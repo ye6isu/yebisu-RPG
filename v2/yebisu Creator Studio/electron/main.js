@@ -63,7 +63,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('window-control', (event, action) => {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
     
     if (action === 'minimize') {
@@ -111,12 +111,95 @@ app.whenReady().then(() => {
     });
 
     if (isDev) {
-      prefsWindow.loadURL('http://localhost:5174/?page=preferences');
+      prefsWindow.loadURL('http://localhost:5174/?page=popout&tabId=Preferences');
     } else {
-      prefsWindow.loadFile(path.join(__dirname, '../dist/index.html'), { search: 'page=preferences' });
+      prefsWindow.loadFile(path.join(__dirname, '../dist/index.html'), { search: 'page=popout&tabId=Preferences' });
     }
 
     prefsWindowState.manage(prefsWindow);
+  });
+
+  ipcMain.on('open-popout', (event, tabId) => {
+    let popoutWindowState = windowStateKeeper({
+      defaultWidth: 600,
+      defaultHeight: 450,
+      file: `popout-window-state-${tabId}.json`
+    });
+
+    const popoutWindow = new BrowserWindow({
+      x: popoutWindowState.x,
+      y: popoutWindowState.y,
+      width: popoutWindowState.width,
+      height: popoutWindowState.height,
+      minWidth: 400,
+      minHeight: 300,
+      parent: tabId === 'Preferences' ? mainWindow : undefined,
+      modal: false,
+      title: `YCS Popout - ${tabId}`,
+      icon: isDev ? path.join(__dirname, '../public/logo.png') : path.join(__dirname, '../dist/logo.png'),
+      frame: false,
+      backgroundMaterial: 'acrylic',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js')
+      }
+    });
+
+    if (isDev) {
+      popoutWindow.loadURL(`http://localhost:5174/?page=popout&tabId=${encodeURIComponent(tabId)}`);
+    } else {
+      popoutWindow.loadFile(path.join(__dirname, '../dist/index.html'), { search: `page=popout&tabId=${encodeURIComponent(tabId)}` });
+    }
+
+    popoutWindowState.manage(popoutWindow);
+
+  });
+
+  ipcMain.on('close-popout', (event, tabId) => {
+    const win = BrowserWindow.getAllWindows().find(w => w.title === `YCS Popout - ${tabId}`);
+    if (win) win.close();
+  });
+
+  ipcMain.on('broadcast-dock-success', (event, tabId) => {
+    BrowserWindow.getAllWindows().forEach(win => {
+      try {
+        if (win && !win.isDestroyed() && win.webContents) {
+          win.webContents.send('dock-success', tabId);
+        }
+      } catch (e) {
+        console.error('Failed to send dock-success to window', e);
+      }
+    });
+  });
+
+  let dragInitialBounds = {};
+
+  ipcMain.on('drag-start', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      dragInitialBounds[win.id] = win.getBounds();
+    }
+  });
+
+  ipcMain.on('drag-end', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      delete dragInitialBounds[win.id];
+    }
+  });
+
+  ipcMain.on('move-window-to', (event, x, y) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed() && dragInitialBounds[win.id]) {
+      const bounds = dragInitialBounds[win.id];
+      win.setBounds({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: bounds.width,
+        height: bounds.height
+      });
+    }
   });
 
   app.on('activate', function () {

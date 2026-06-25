@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import WindowFrame from './components/WindowFrame/WindowFrame';
-import PreferencesPage from './components/PreferencesPage';
+import { COMPONENT_REGISTRY } from './components/Workspace/Workspace';
 import Workspace from './components/Workspace/Workspace';
 
 const getTreeMinSize = (node) => {
@@ -22,6 +22,98 @@ const getTreeMinSize = (node) => {
   return { width: 200, height: 150 };
 };
 
+const PopoutWindow = ({ tabId }) => {
+  const Component = COMPONENT_REGISTRY[tabId];
+  const [isCtrlPressed, setIsCtrlPressed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => { if (e.key === 'Control') setIsCtrlPressed(true); };
+    const handleKeyUp = (e) => { if (e.key === 'Control') setIsCtrlPressed(false); };
+    const handleBlur = () => setIsCtrlPressed(false);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    
+    // Force the title so main.js can find and kill this exact window by title
+    document.title = `YCS Popout - ${tabId}`;
+
+    const unsubscribe = window.electronAPI?.onDockSuccess?.((dockedTabId) => {
+      if (dockedTabId === tabId) {
+        window.electronAPI?.controlWindow('close');
+      }
+    });
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      // IPC listeners in electron usually don't easily unsubscribe if not implemented, but it will be destroyed anyway when closed
+    };
+  }, [tabId]);
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--ycs-bg)', overflow: 'hidden' }}>
+      <div 
+        draggable={isCtrlPressed}
+        onDragStart={(e) => {
+          if (!isCtrlPressed) {
+            e.preventDefault();
+            return;
+          }
+          e.dataTransfer.setData('tabId', tabId);
+          e.dataTransfer.setData('ycs-tab', 'true');
+          e.dataTransfer.setData('ycs-popout', 'true');
+          // Important: We must not change WebkitAppRegion mid-drag!
+        }}
+        onDragEnd={(e) => {
+          setIsCtrlPressed(false); // Force reset state when drag ends
+        }}
+        style={{
+          height: '28px',
+          width: '100%',
+          backgroundColor: isCtrlPressed ? 'var(--ycs-accent)' : 'transparent',
+          WebkitAppRegion: isCtrlPressed ? 'no-drag' : 'drag', // OS drag normally, HTML drag when Ctrl is pressed
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingLeft: '10px',
+          fontSize: '12px',
+          fontWeight: '500',
+          flexShrink: 0,
+          borderBottom: '1px solid var(--ycs-foreground)',
+          color: 'var(--ycs-text)',
+          cursor: isCtrlPressed ? 'grab' : 'default',
+          transition: 'background-color 0.1s ease'
+        }}
+        title={isCtrlPressed ? "Drag to dock tab into workspace" : "Hold Ctrl to dock this window"}
+      >
+        <span>{tabId}</span>
+        <div 
+          onClick={() => window.electronAPI?.controlWindow('close')}
+          style={{
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            WebkitAppRegion: 'no-drag',
+            cursor: 'pointer',
+            transition: 'background-color 0.1s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ff5f57'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </div>
+      </div>
+      <div style={{ flexGrow: 1, minHeight: 0, position: 'relative' }}>
+        {Component ? <Component isTile={false} /> : <div style={{ padding: '20px' }}>{tabId}</div>}
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     return parseInt(localStorage.getItem('ycs-sidebar-width')) || 180;
@@ -33,8 +125,22 @@ function App() {
     tabId: null // Default open tab
   });
 
-  const [mainNodeId, setMainNodeId] = useState('root-node');
+  const [activeNodeId, setActiveNodeId] = useState('root-node');
   const [contextMenu, setContextMenu] = useState(null);
+  const [selectedTiles, setSelectedTiles] = useState([]);
+  const [isReferenceOpen, setIsReferenceOpen] = useState(true);
+  const [isTab3Open, setIsTab3Open] = useState(false);
+  const [isTab3_3Open, setIsTab3_3Open] = useState(false);
+
+  const handleTileSelect = (nodeId, e) => {
+    if (e.ctrlKey && e.type === 'mousedown') {
+      setSelectedTiles(prev => prev.filter(id => id !== nodeId));
+    } else if (e.shiftKey) {
+      if (e.type === 'mousedown' || e.type === 'mouseenter') {
+        setSelectedTiles(prev => prev.includes(nodeId) ? prev : [...prev, nodeId]);
+      }
+    }
+  };
 
   useEffect(() => {
     const findNodeById = (node, id) => {
@@ -47,7 +153,7 @@ function App() {
       }
       return null;
     };
-    const mainNode = findNodeById(workspaceTree, mainNodeId);
+    const mainNode = findNodeById(workspaceTree, activeNodeId);
     
     // If current main node doesn't exist or is empty, automatically assign main to the first populated tab
     if (!mainNode || !mainNode.tabId) {
@@ -63,15 +169,15 @@ function App() {
       };
       const first = findFirstPopulated(workspaceTree);
       if (first) {
-        setMainNodeId(first.id);
+        setActiveNodeId(first.id);
       }
     }
-  }, [workspaceTree, mainNodeId]);
+  }, [workspaceTree, activeNodeId]);
 
-  const removeNode = (node, targetId) => {
-    if (node.id === targetId) return null;
+  const removeNodes = (node, idsToRemove) => {
+    if (idsToRemove.includes(node.id)) return null;
     if (node.type === 'split') {
-      const newChildren = node.children.map(c => removeNode(c, targetId)).filter(Boolean);
+      const newChildren = node.children.map(c => removeNodes(c, idsToRemove)).filter(Boolean);
       if (newChildren.length === 0) return null;
       if (newChildren.length === 1) {
         return { ...newChildren[0], size: node.size };
@@ -83,18 +189,48 @@ function App() {
 
   const closeTab = (targetId) => {
     setWorkspaceTree(prevTree => {
-      if (prevTree.id === targetId) return { ...prevTree, tabId: null };
-      const newTree = removeNode(prevTree, targetId);
+      const idsToRemove = [targetId];
+      
+      const findChildren = (node) => {
+        if (node.type === 'leaf' && node.linkedParentId && idsToRemove.includes(node.linkedParentId)) {
+          if (!idsToRemove.includes(node.id)) {
+            idsToRemove.push(node.id);
+          }
+        }
+        if (node.type === 'split') node.children.forEach(findChildren);
+      };
+
+      let prevLen = 0;
+      while (idsToRemove.length > prevLen) {
+        prevLen = idsToRemove.length;
+        findChildren(prevTree);
+      }
+
+      if (idsToRemove.includes(prevTree.id)) {
+        return { id: 'root', type: 'leaf', tabId: null };
+      }
+
+      const newTree = removeNodes(prevTree, idsToRemove);
       return newTree || { id: 'root', type: 'leaf', tabId: null };
     });
   };
 
+  useEffect(() => {
+    const handleRecursiveClose = (e) => {
+      closeTab(e.detail.targetId);
+    };
+    window.addEventListener('ycs-close-tab-recursive', handleRecursiveClose);
+    return () => window.removeEventListener('ycs-close-tab-recursive', handleRecursiveClose);
+  }, []);
+
   const handleTabClick = (tabId) => {
+    if (workspaceTree.type === 'split') return; // Disable tab switching when multiple tiles are open
+
     let updated = false;
     let targetFound = false;
     
     const checkTarget = (node) => {
-      if (node.id === mainNodeId && node.type === 'leaf') targetFound = true;
+      if (node.id === activeNodeId && node.type === 'leaf') targetFound = true;
       if (node.type === 'split') node.children.forEach(checkTarget);
     };
     checkTarget(workspaceTree);
@@ -102,7 +238,7 @@ function App() {
     if (targetFound) {
       const updateTargetNode = (node) => {
         if (updated) return node;
-        if (node.id === mainNodeId && node.type === 'leaf') {
+        if (node.id === activeNodeId && node.type === 'leaf') {
           updated = true;
           return { ...node, tabId };
         }
@@ -111,7 +247,7 @@ function App() {
       };
       setWorkspaceTree(updateTargetNode(workspaceTree));
     } else {
-      let newMainId = mainNodeId;
+      let newMainId = activeNodeId;
       const updateFirstLeaf = (node) => {
         if (updated) return node;
         if (node.type === 'leaf') {
@@ -123,7 +259,7 @@ function App() {
         return node;
       };
       setWorkspaceTree(updateFirstLeaf(workspaceTree));
-      setMainNodeId(newMainId);
+      setActiveNodeId(newMainId);
     }
   };
 
@@ -136,9 +272,7 @@ function App() {
       }
     }
     return null;
-  };
-
-  const handleDragStart = (e, tabId) => {
+  };  const handleDragStart = (e, tabId) => {
     e.dataTransfer.setData('tabId', tabId);
     e.dataTransfer.effectAllowed = 'copy';
   };
@@ -246,8 +380,9 @@ function App() {
   }, []);
 
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('page') === 'preferences') {
-    return <PreferencesPage />;
+
+  if (urlParams.get('page') === 'popout') {
+    return <PopoutWindow tabId={urlParams.get('tabId')} />;
   }
 
   // Keymaps Listener
@@ -298,12 +433,39 @@ function App() {
       }
     };
 
-    const handleGlobalClick = () => setContextMenu(null);
+    const handleGlobalClick = (e) => {
+      setContextMenu(null);
+      if (!e.shiftKey && !e.ctrlKey && !e.target.closest('.workspace-leaf')) {
+        setSelectedTiles([]);
+      }
+    };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('click', handleGlobalClick);
+    
+    let removeNativeDropListener = null;
+    if (window.electronAPI?.onNativePopoutDropped) {
+      // Pass a function, returns an unsubscription function if implemented, otherwise nothing
+      // We can also just ignore unsubscription if it's not strictly necessary, but better to be safe.
+      window.electronAPI.onNativePopoutDropped((data) => {
+        const { tabId, x, y } = data;
+        const el = document.elementFromPoint(x, y);
+        if (el) {
+          const leaf = el.closest('.workspace-leaf');
+          if (leaf) {
+             const nodeId = leaf.getAttribute('data-node-id');
+             if (nodeId) {
+               // We need a way to dock the tab. handleTabClick expects a click, but we can't easily trigger it.
+               // We can dispatch a custom event and let the Workspace component handle it!
+               window.dispatchEvent(new CustomEvent('ycs-native-dock', { detail: { targetId: nodeId, tabId } }));
+             }
+          }
+        }
+      });
+    }
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('keydown', handleKeyDown);
@@ -321,62 +483,187 @@ function App() {
         style={{ 
           width: `${sidebarWidth}px`, 
           minWidth: '180px',
-          backgroundColor: 'var(--ycs-accent)', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          paddingTop: '0',
+          backgroundColor: 'var(--ycs-accent)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
           gap: '10px',
-          flexShrink: 0
+          flexShrink: 0,
+          position: 'relative'
         }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
+          const isPopout = Array.from(e.dataTransfer.types).includes('ycs-popout');
+          if (isPopout) return; // Already a popout, ignore
+          
           e.preventDefault();
           const sourceNodeId = e.dataTransfer.getData('sourceNodeId');
-          if (sourceNodeId) {
-            closeTab(sourceNodeId);
+          const tabId = e.dataTransfer.getData('tabId');
+          if (tabId) {
+            window.electronAPI?.openPopout(tabId);
+            if (sourceNodeId) closeTab(sourceNodeId);
           }
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', width: '100%', padding: '0 8px', boxSizing: 'border-box' }}>
-          <div 
-            className={`ycs-tab ${findTabId(workspaceTree, mainNodeId) === 'Tab 1' || (!findTabId(workspaceTree, mainNodeId) && findTabId(workspaceTree, 'root') === 'Tab 1') ? 'active' : ''}`} 
-            onClick={() => handleTabClick('Tab 1')}
-            draggable 
-            onDragStart={(e) => { 
-              if (!e.ctrlKey) { e.preventDefault(); return; }
-              e.dataTransfer.setData('tabId', 'Tab 1'); 
-              e.dataTransfer.setData('ycs-tab', 'true');
-            }}
-            style={{ cursor: 'grab', textAlign: 'center' }}
-          >
-            Tab 1
-          </div>
-          <div 
-            className={`ycs-tab ${findTabId(workspaceTree, mainNodeId) === 'Tab 2' || (!findTabId(workspaceTree, mainNodeId) && findTabId(workspaceTree, 'root') === 'Tab 2') ? 'active' : ''}`} 
-            onClick={() => handleTabClick('Tab 2')}
-            draggable 
-            onDragStart={(e) => { 
-              if (!e.ctrlKey) { e.preventDefault(); return; }
-              e.dataTransfer.setData('tabId', 'Tab 2'); 
-              e.dataTransfer.setData('ycs-tab', 'true');
-            }}
-            style={{ cursor: 'grab', textAlign: 'center' }}
-          >
-            Tab 2
-          </div>
-          <div 
-            className={`ycs-tab ${findTabId(workspaceTree, mainNodeId) === 'Tab 3' || (!findTabId(workspaceTree, mainNodeId) && findTabId(workspaceTree, 'root') === 'Tab 3') ? 'active' : ''}`} 
-            onClick={() => handleTabClick('Tab 3')}
-            draggable 
-            onDragStart={(e) => { 
-              if (!e.ctrlKey) { e.preventDefault(); return; }
-              e.dataTransfer.setData('tabId', 'Tab 3'); 
-              e.dataTransfer.setData('ycs-tab', 'true');
-            }}
-            style={{ cursor: 'grab', textAlign: 'center' }}
-          >
-            Tab 3
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', width: '100%', padding: '0 8px 44px 8px', boxSizing: 'border-box', overflowY: 'auto', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div 
+              className="ycs-tab" 
+              onClick={() => setIsReferenceOpen(!isReferenceOpen)}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '12px', userSelect: 'none' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isReferenceOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+              Reference
+            </div>
+            
+            {isReferenceOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                <div 
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 1' ? 'active' : ''}`} 
+                  onClick={() => handleTabClick('Tab 1')}
+                  draggable 
+                  onDragStart={(e) => { 
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Tab 1'); 
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Tab 1');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Tab 1
+                </div>
+                <div 
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 2' ? 'active' : ''}`} 
+                  onClick={() => handleTabClick('Tab 2')}
+                  draggable 
+                  onDragStart={(e) => { 
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Tab 2'); 
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Tab 2');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Tab 2
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div 
+                    className="ycs-tab" 
+                    onClick={() => setIsTab3Open(!isTab3Open)}
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px', userSelect: 'none' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isTab3Open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
+                      <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                    Tab 3 Group
+                  </div>
+                  {isTab3Open && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                      <div 
+                        className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 3.1' ? 'active' : ''}`} 
+                        onClick={() => handleTabClick('Tab 3.1')}
+                        draggable 
+                        onDragStart={(e) => { 
+                          if (!e.ctrlKey) { e.preventDefault(); return; }
+                          e.dataTransfer.setData('tabId', 'Tab 3.1'); 
+                          e.dataTransfer.setData('ycs-tab', 'true');
+                        }}
+                        onDragEnd={(e) => {
+                          if (e.dataTransfer.dropEffect === 'none') {
+                            window.electronAPI?.openPopout('Tab 3.1');
+                          }
+                        }}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '64px' }}
+                      >
+                        <div style={{ width: '14px', flexShrink: 0 }} />
+                        Tab 3.1
+                      </div>
+                      <div 
+                        className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 3.2' ? 'active' : ''}`} 
+                        onClick={() => handleTabClick('Tab 3.2')}
+                        draggable 
+                        onDragStart={(e) => { 
+                          if (!e.ctrlKey) { e.preventDefault(); return; }
+                          e.dataTransfer.setData('tabId', 'Tab 3.2'); 
+                          e.dataTransfer.setData('ycs-tab', 'true');
+                        }}
+                        onDragEnd={(e) => {
+                          if (e.dataTransfer.dropEffect === 'none') {
+                            window.electronAPI?.openPopout('Tab 3.2');
+                          }
+                        }}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '64px' }}
+                      >
+                        <div style={{ width: '14px', flexShrink: 0 }} />
+                        Tab 3.2
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div 
+                          className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 3.3' ? 'active' : ''}`} 
+                          onClick={() => setIsTab3_3Open(!isTab3_3Open)}
+                          draggable 
+                          onDragStart={(e) => { 
+                            if (!e.ctrlKey) { e.preventDefault(); return; }
+                            e.dataTransfer.setData('tabId', 'Tab 3.3'); 
+                            e.dataTransfer.setData('ycs-tab', 'true');
+                          }}
+                          onDragEnd={(e) => {
+                            if (e.dataTransfer.dropEffect === 'none') {
+                              window.electronAPI?.openPopout('Tab 3.3');
+                            }
+                          }}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '64px', userSelect: 'none' }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isTab3_3Open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
+                            <path d="M9 18l6-6-6-6"/>
+                          </svg>
+                          Tab 3.3
+                        </div>
+                        {isTab3_3Open && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                            {[1, 2, 3].map(num => (
+                              <div 
+                                key={`Tab 3.3.${num}`}
+                                className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === `Tab 3.3.${num}` ? 'active' : ''}`} 
+                                onClick={() => handleTabClick(`Tab 3.3.${num}`)}
+                                draggable 
+                                onDragStart={(e) => { 
+                                  if (!e.ctrlKey) { e.preventDefault(); return; }
+                                  e.dataTransfer.setData('tabId', `Tab 3.3.${num}`); 
+                                  e.dataTransfer.setData('ycs-tab', 'true');
+                                }}
+                                onDragEnd={(e) => {
+                                  if (e.dataTransfer.dropEffect === 'none') {
+                                    window.electronAPI?.openPopout(`Tab 3.3.${num}`);
+                                  }
+                                }}
+                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '90px' }}
+                              >
+                                <div style={{ width: '14px', flexShrink: 0 }} />
+                                Tab 3.3.{num}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -391,6 +678,11 @@ function App() {
         onDragStart={(e) => {
           e.dataTransfer.setData('tabId', 'Preferences');
           e.dataTransfer.setData('ycs-tab', 'true');
+        }}
+        onDragEnd={(e) => {
+          if (e.dataTransfer.dropEffect === 'none') {
+            window.electronAPI?.openPopout('Preferences');
+          }
         }}
         style={{
           position: 'absolute',
@@ -449,7 +741,7 @@ function App() {
           overflow: 'hidden',
           boxSizing: 'border-box'
         }}>
-          <Workspace tree={workspaceTree} setTree={setWorkspaceTree} mainNodeId={mainNodeId} setMainNodeId={setMainNodeId} />
+          <Workspace tree={workspaceTree} setTree={setWorkspaceTree} activeNodeId={activeNodeId} selectedTiles={selectedTiles} onTileSelect={handleTileSelect} />
         </div>
 
       </div>
@@ -471,38 +763,64 @@ function App() {
           fontSize: '13px'
         }}>
           <div 
-            onClick={() => setMainNodeId(contextMenu.nodeId)}
-            style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <span>Set as Active Tab</span>
-            {mainNodeId === contextMenu.nodeId && <span style={{ opacity: 0.5 }}>✓</span>}
-          </div>
-          <div 
             onClick={() => {
-              const tabId = findTabId(workspaceTree, mainNodeId);
-              if (tabId) {
-                setWorkspaceTree({ id: mainNodeId, type: 'leaf', tabId });
-              }
+              const targets = selectedTiles.includes(contextMenu.nodeId) ? selectedTiles : [contextMenu.nodeId];
+              targets.forEach(id => {
+                const tabId = findTabId(workspaceTree, id);
+                if (tabId) window.electronAPI?.openPopout(tabId);
+              });
+              targets.forEach(id => closeTab(id));
             }}
             style={{ padding: '8px 12px', cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            Keep Active & Clear
+            {selectedTiles.includes(contextMenu.nodeId) && selectedTiles.length > 1 ? 'Pop Selected Tiles' : 'Pop This Tile'}
           </div>
           <div 
             onClick={() => {
-              const tabId = findTabId(workspaceTree, contextMenu.nodeId);
-              setWorkspaceTree({ id: contextMenu.nodeId, type: 'leaf', tabId });
-              setMainNodeId(contextMenu.nodeId);
+              const targets = selectedTiles.includes(contextMenu.nodeId) ? selectedTiles : [contextMenu.nodeId];
+              targets.forEach(id => closeTab(id));
             }}
             style={{ padding: '8px 12px', cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            Keep This Tile & Clear
+            {selectedTiles.includes(contextMenu.nodeId) && selectedTiles.length > 1 ? 'Close Selected Tiles' : 'Close This Tile'}
+          </div>
+          <div 
+            onClick={() => {
+              const keepIds = selectedTiles.includes(contextMenu.nodeId) ? selectedTiles : [contextMenu.nodeId];
+              // Close all leaves NOT in keepIds
+              const closeNonKept = (node) => {
+                if (node.type === 'leaf' && !keepIds.includes(node.id)) {
+                  closeTab(node.id);
+                } else if (node.type === 'split') {
+                  node.children.forEach(closeNonKept);
+                }
+              };
+              // Need to pass the current tree, but state updates might queue, so we'll collect IDs first
+              const toClose = [];
+              const collectToClose = (node) => {
+                 if (node.type === 'leaf' && !keepIds.includes(node.id)) toClose.push(node.id);
+                 if (node.type === 'split') node.children.forEach(collectToClose);
+              };
+              collectToClose(workspaceTree);
+              toClose.forEach(id => closeTab(id));
+            }}
+            style={{ padding: '8px 12px', cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            {selectedTiles.includes(contextMenu.nodeId) && selectedTiles.length > 1 ? 'Keep Selected & Clear Others' : 'Keep This & Clear Others'}
+          </div>
+          <div 
+            onClick={() => resetWorkspace()}
+            style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--ycs-red, #ff5555)' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--ycs-highlight)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            Clear All Tiles
           </div>
         </div>
       )}
