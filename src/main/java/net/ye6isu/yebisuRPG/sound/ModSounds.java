@@ -16,6 +16,9 @@ public class ModSounds {
 
     public static final Supplier<SoundEvent> RAW_YE6ISU = registerSoundEvent("raw_ye6isu_use");
 
+    //YCS_Sounds_START
+    //YCS_Sounds_END
+
     private static Supplier<SoundEvent> registerSoundEvent(String name) {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, name);
         return SOUND_EVENTS.register(name, () -> SoundEvent.createVariableRangeEvent(id));

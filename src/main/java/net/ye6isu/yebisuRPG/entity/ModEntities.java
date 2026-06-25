@@ -19,6 +19,8 @@ public class ModEntities {
             ENTITY_TYPES.register("joe", () -> EntityType.Builder.of(JoeEntity::new, MobCategory.CREATURE)
                     .sized(0.75f, 0.35f).build("joe"));
 
+    //YCS_Entities_START
+    //YCS_Entities_END
 
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);

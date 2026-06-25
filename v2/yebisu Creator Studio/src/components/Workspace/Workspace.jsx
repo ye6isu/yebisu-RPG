@@ -3,6 +3,8 @@ import './Workspace.css';
 import { DropdownField, StandardDropdownField } from '../Field/Field';
 
 import PreferencesPageNew from '../PreferencesPageNew';
+import ItemPage from '../ItemPage';
+import ItemPageNew, { ItemTexturePlaceholder, ItemTagsPlaceholder, ItemRecipePlaceholder, ItemMethodsPlaceholder, ItemModelJsonPlaceholder, DataComponentsPlaceholder } from '../ItemPageNew';
 
 const Tab1Test = () => (
   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -125,13 +127,28 @@ export const COMPONENT_REGISTRY = {
   'Preferences': PreferencesPageNew,
   'Tab 1': Tab1Test,
   'Tab 2': Tab2Test,
-  'Tab 3.3': Tab3_3Test
+  'Tab 3.3': Tab3_3Test,
+  'Item (Old)': ItemPage,
+  'Item': ItemPageNew,
+  'Item Texture': ItemTexturePlaceholder,
+  'Item Tags': ItemTagsPlaceholder,
+  'Item Recipe': ItemRecipePlaceholder,
+  'Item Methods': ItemMethodsPlaceholder,
+  'Item Model JSON': ItemModelJsonPlaceholder,
+  'Data Components': DataComponentsPlaceholder,
+};
+
+export const resolveComponent = (tabId) => {
+  if (COMPONENT_REGISTRY[tabId]) return COMPONENT_REGISTRY[tabId];
+  const prefix = tabId.split('::')[0];
+  if (prefix !== tabId && COMPONENT_REGISTRY[prefix]) return COMPONENT_REGISTRY[prefix];
+  return null;
 };
 
 const renderTabContent = (tabId, onClose, nodeId, tree) => {
-  const Component = COMPONENT_REGISTRY[tabId];
+  const Component = resolveComponent(tabId);
   if (Component) {
-    return <Component isTile={true} onClose={onClose} nodeId={nodeId} tree={tree} />;
+    return <Component isTile={true} onClose={onClose} nodeId={nodeId} tree={tree} tabId={tabId} />;
   }
   return <div style={{ padding: '20px' }}>{tabId}</div>;
 };
@@ -606,6 +623,24 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
           checkOpen(prevTree);
           if (!isAlreadyOpen) {
             const splitTargetId = e.detail.targetNodeId || parentId;
+
+            // Find existing sibling children of the same parent on the same side
+            // If found, stack the new child alongside them in the perpendicular direction
+            let existingSiblingId = null;
+            const findSibling = (n) => {
+              if (n.type === 'leaf' && n.linkedParentId === parentId && !existingSiblingId) {
+                existingSiblingId = n.id;
+              }
+              if (n.type === 'split') n.children.forEach(findSibling);
+            };
+            findSibling(prevTree);
+
+            if (existingSiblingId) {
+              // Stack perpendicular: right/left children stack top-to-bottom, top/bottom children stack left-to-right
+              const stackDirection = (direction === 'right' || direction === 'left') ? 'bottom' : 'right';
+              return splitNode(prevTree, existingSiblingId, childTabId, stackDirection, null, parentId);
+            }
+
             return splitNode(prevTree, splitTargetId, childTabId, direction, null, parentId);
           }
           return prevTree;
@@ -664,7 +699,7 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
     }
 
     if (zone === 'center' && sourceNodeId) {
-      // SWAP TABS
+      // SWAP TABS — clear linkedParentId on both since user explicitly moved them
       setTree(prevTree => {
         let targetTabId = null;
         const findTarget = (n) => {
@@ -674,8 +709,8 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
         findTarget(prevTree);
 
         const swap = (n) => {
-          if (n.id === targetId) return { ...n, tabId };
-          if (n.id === sourceNodeId) return { ...n, tabId: targetTabId };
+          if (n.id === targetId) return { ...n, tabId, linkedParentId: undefined };
+          if (n.id === sourceNodeId) return { ...n, tabId: targetTabId, linkedParentId: undefined };
           if (n.type === 'split') return { ...n, children: n.children.map(swap) };
           return n;
         };

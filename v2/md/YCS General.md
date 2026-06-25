@@ -62,6 +62,7 @@ Future AI agents MUST read this list to understand what already exists in the co
     - **Corner Rendering & Gap Illusion**: The 6px gaps between tiles are not transparent empty space; they are visual illusions. To prevent double-stacking alpha layers at the intersections of multiple tiles, the windows use a highly specific `backgroundClip: 'padding-box'` combined with a solid radial gradient (`radial-gradient(circle at center, var(--ycs-accent) 0%, var(--ycs-accent) 100%)`). 
     - **Alt-Key Drag Lock**: All tab reorganizing, dragging, and workspace splitting operations require the user to hold the `Alt` key. HTML5 drag-and-drop operations explicitly append a `ycs-tab` payload; the drop zones (side zones, gap dividers, global edges) will instantly abort if they don't detect `ycs-tab`, ensuring users can drag normal text/images inside the editor without triggering massive layout shifts.
     - **Drop Zone Separation**: To prevent overlapping, the system has three perfectly distinct drop zones: 1. A razor-thin `15px` "Global Edge" zone on the absolute outer perimeter of the app, 2. A massive `80px` "Side Zone" on the inner edges of each window tile, and 3. A `30px` "Divider Zone" located precisely in the gaps between tiles.
+    - **Child Tile Unlinking on Move**: When a user manually drags a linked child tile to a new position, the `linkedParentId` is cleared. The swap (center-drop) path also clears `linkedParentId` on both tiles. However, the parent still tracks the child by scanning the **entire tree** for tiles with a matching `tabId` (not just linked children). Clicking "set/edit" will close any existing tile with that `tabId` anywhere in the tree, or open a fresh linked child if none exists. This prevents duplicate child tiles from accumulating regardless of where the user moved the original.
     - **Active Node Priority**: The system uses a `mainNodeId` tracking system. The "Active Tab" automatically updates to whichever tile the user last interacted with (e.g., by clicking on it, dragging a tab into it, or instantiating a new tile). All subsequent tab clicks from the sidebar will prioritize swapping into this newly designated "Active Tab" first.
     - **Global Keymaps**: A global event listener tracks mouse `X/Y` and parses custom string hotkeys (like `Alt+W` and `Alt+R`) from `localStorage`. `Alt+W` dynamically uses `document.elementFromPoint` to identify and instantly close the specific `.workspace-leaf` currently sitting under the cursor, bypassing the need for state-heavy React hover tracking.
 
@@ -111,5 +112,87 @@ To completely prevent flexbox "min-content bubbling" (which causes adjacent tile
 
 
 
-## ?? CRITICAL: Workspace & Flexbox Architecture
+## Manifest & Injection Engine
+YCS uses a **master manifest** (`ycs-manifest.json` in the mod root) to track every entry it creates, every file it touches, and every asset dependency. This is the backbone of the creation/deletion pipeline — it eliminates the need to manually specify cleanup steps.
+
+**Key principles:**
+- **Marker-based Java injection:** All registry classes use `//YCS_<Name>_START` / `//YCS_<Name>_END` comment markers. YCS injects between them and tracks the exact content for reliable removal.
+- **Asset dependency tracking:** Textures, models, and sounds register their consumers. Deletion of an in-use asset is blocked with a warning.
+- **Atomic operations:** Every create/delete updates both the mod files and the manifest in one pass.
+
+For the complete schema, injection types, marker format, and operation flows, refer to **[YCS_MANIFEST.md](./YCS_MANIFEST.md)**.
+
+## Sidebar Tab Groups & Component Registry
+
+The left sidebar organizes tabs into collapsible groups. Each group has an arrow chevron and a label; child tabs are indented underneath. To add a new tab:
+1. Create a React component (e.g., `ItemPageNew.jsx`).
+2. Register it in `COMPONENT_REGISTRY` in `Workspace.jsx` with a string key (e.g., `'Item': ItemPageNew`).
+3. Add a sidebar entry in `App.jsx` inside the appropriate group, following the existing `ycs-tab` pattern with Ctrl+Drag popout support.
+
+**Current groups:**
+- **Reference** — Test tabs (Tab 1, Tab 2, Tab 3 Group)
+- **Gameplay** — Item, Item (Old)
+
+## Form Layout Rules
+
+### Dual-Column Row Pattern
+Forms support two layout modes for field rows:
+
+- **Full-width row:** `[Label] [Control ────────────────────]` — Label on the left, control fills remaining width. Use `FieldRow` from `Field.jsx`.
+- **Dual-column row:** `[Label1] [Control1] [Label2] [Control2]` — Two label+control pairs on one line. The first control is capped at `40%` width; the second flexes to fill remaining space. Both second-column controls align vertically across rows.
+
+Use dual-column rows when a field has a related secondary option (e.g., ID + Custom Const Name). Do not use them for unrelated fields.
+
+### Form State Persistence Across Tree Changes
+When a tile splits (e.g., opening a child tile to the right), React may unmount and remount the parent component with the same `nodeId`. To prevent form state from resetting:
+- Store form state in a **module-level `Map`** keyed by `nodeId` (not in React `useState` alone).
+- On mount, read from the store; on every update, write back to the store.
+- See `usePersistedForm()` in `ItemPageNew.jsx` for the canonical pattern.
+
+### Minimum Content Width
+Form pages must set a `minWidth` on their scrollable content area (e.g., `450px`) so that inline controls never squish below their usable size. The tile provides horizontal scrollbars when narrower than the minimum — controls retain their designed dimensions.
+
+### Sub-Sections with Side Border
+When grouping related fields under a toggle or multi-state expansion, wrap them in a left-bordered container: `paddingLeft: 16px; borderLeft: 2px solid var(--ycs-foreground)`. Give each group a bold title label above it (e.g., "Default State", "State 2").
+
+### Texture Field Pattern
+Texture selection fields use a three-part inline layout: `[Preview Square] [Read-only Name] [set/edit Button]`. The preview is a 24x24 square with `imageRendering: pixelated`. The name area is a bordered read-only box styled like the keybind/shortcut input (not an editable text field). Clicking set/edit opens a child tile to the right using the `ycs-toggle-child` event pattern.
+
+### Child Tile Field Pattern
+For fields that open a child editor tile (Tags, Recipe, Methods, Data Components), use the `ChildTileField` component: `[Read-only bordered text] [set/edit Button]`. No preview square — only a bordered summary box and the action button. The set/edit button uses the `.active` class to stay highlighted while the child tile is open, reflecting toggle state.
+
+### Toggle State on Child Tile Buttons
+Any button that opens a child tile (TextureField, ChildTileField) must pass an `isOpen` prop. When `true`, the button receives the `.ycs-button.active` class to visually indicate the linked child tile is open. Use the `isChildOpen(prefix, key)` helper to check tree state.
+
+### Child Tile Stacking
+When multiple child tiles are opened from the same parent on the same side, they stack in the perpendicular direction:
+- **Right/Left children** stack **top-to-bottom** (vertical split).
+- **Top/Bottom children** stack **left-to-right** (horizontal split).
+
+The second child splits the first child tile (not the parent) in the perpendicular direction.
+
+### Child Tiles in Popout Mode
+When the parent component is in a popout window (no workspace tree available), clicking set/edit opens the child as a **new popout window** via `electronAPI.openPopout(tabId)`. Clicking again closes it via `electronAPI.closePopout(tabId)`. Open popout children are tracked in a module-level `Set`. The `resolveComponent()` function (exported from Workspace.jsx) handles `::` prefixed tab IDs for both workspace tiles and popout windows.
+
+### Number Inputs
+Use `type="text"` with `inputMode="numeric"` and manual regex validation (`/^-?\d*\.?\d*$/`) instead of `type="number"` to avoid browser-native spinner buttons. See `NumberInput` in `ItemPageNew.jsx`.
+
+### Item Form Section Order
+The item editor form follows this top-to-bottom structure:
+1. **Identity** — Display Name, ID + Custom Const
+2. **Appearance** — Multiple States toggle, Model, Texture
+3. **Properties** — Stack Size, Tool/Food/Fuel/Durability/Use Duration checkboxes with sub-fields, Tooltip with Hidden Text + Custom Shift Hint
+4. **Creative Tab** — Searchable dropdown for creative menu tab
+5. **Tags** — Child tile field (opens tag editor)
+6. **Recipe** — Child tile field (opens recipe editor)
+7. **Methods** — Child tile field (opens method editor)
+8. **Data Components** — Child tile field (opens data component editor, shared across item/block contexts)
+
+### Shared Components Across Editors
+Components like `Data Components` that serve the same conceptual purpose across different editors (items, blocks) should use a single registry key without an editor prefix (e.g., `'Data Components'` not `'Item Data Components'`). The child tile receives context from its scoped tab ID (`Data Components::${nodeId}::data-components`).
+
+### Form Footer
+Item editor forms include a pinned footer with three actions: `[Save & Close] [Cancel] [Save]`. The footer is `flexShrink: 0` with a `borderTop: 1px solid var(--ycs-foreground)` separator, matching the Preferences page footer pattern.
+
+## CRITICAL: Workspace & Flexbox Architecture
 It is ABSOLUTELY VITAL that you understand the underlying flexbox and native mathematical constraints that power the workspace tiles before editing any layouts. Please refer to **[YCS Workspace Architecture.md](./YCS%20Workspace%20Architecture.md)** for the complete set of rules preventing tile overlap, recursive resizing drift, and min-content bubbling.

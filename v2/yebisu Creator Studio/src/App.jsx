@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import WindowFrame from './components/WindowFrame/WindowFrame';
-import { COMPONENT_REGISTRY } from './components/Workspace/Workspace';
+import { COMPONENT_REGISTRY, resolveComponent } from './components/Workspace/Workspace';
 import Workspace from './components/Workspace/Workspace';
 
 const getTreeMinSize = (node) => {
@@ -23,7 +23,7 @@ const getTreeMinSize = (node) => {
 };
 
 const PopoutWindow = ({ tabId }) => {
-  const Component = COMPONENT_REGISTRY[tabId];
+  const Component = resolveComponent(tabId);
   const [isCtrlPressed, setIsCtrlPressed] = useState(false);
 
   useEffect(() => {
@@ -108,7 +108,7 @@ const PopoutWindow = ({ tabId }) => {
         </div>
       </div>
       <div style={{ flexGrow: 1, minHeight: 0, position: 'relative' }}>
-        {Component ? <Component isTile={false} /> : <div style={{ padding: '20px' }}>{tabId}</div>}
+        {Component ? <Component isTile={false} tabId={tabId} /> : <div style={{ padding: '20px' }}>{tabId}</div>}
       </div>
     </div>
   );
@@ -129,6 +129,7 @@ function App() {
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedTiles, setSelectedTiles] = useState([]);
   const [isReferenceOpen, setIsReferenceOpen] = useState(true);
+  const [isGameplayOpen, setIsGameplayOpen] = useState(true);
   const [isTab3Open, setIsTab3Open] = useState(false);
   const [isTab3_3Open, setIsTab3_3Open] = useState(false);
 
@@ -661,6 +662,63 @@ function App() {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Gameplay Group */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div
+              className="ycs-tab"
+              onClick={() => setIsGameplayOpen(!isGameplayOpen)}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '12px', userSelect: 'none' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isGameplayOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+              Gameplay
+            </div>
+
+            {isGameplayOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                <div
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Item' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('Item')}
+                  draggable
+                  onDragStart={(e) => {
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Item');
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Item');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Item
+                </div>
+                <div
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Item (Old)' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('Item (Old)')}
+                  draggable
+                  onDragStart={(e) => {
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Item (Old)');
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Item (Old)');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Item (Old)
                 </div>
               </div>
             )}

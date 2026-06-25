@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, nativeTheme, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const windowStateKeeper = require('electron-window-state');
+const { registerFileEngineIPC } = require('./engine/ipc-bridge');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -35,8 +36,8 @@ function createWindow() {
   });
 
   if (isDev) {
-    // Load Vite dev server
     mainWindow.loadURL('http://localhost:5174');
+    mainWindow.webContents.openDevTools({ mode: 'bottom' });
   } else {
     // Load built static files
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -48,6 +49,12 @@ function createWindow() {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   createWindow();
+  registerFileEngineIPC(ipcMain);
+
+  globalShortcut.register('F12', () => {
+    const focused = BrowserWindow.getFocusedWindow();
+    if (focused) focused.webContents.toggleDevTools();
+  });
 
   ipcMain.on('set-minimum-size', (event, width, height) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
