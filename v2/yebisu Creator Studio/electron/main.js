@@ -37,7 +37,6 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5174');
-    mainWindow.webContents.openDevTools({ mode: 'bottom' });
   } else {
     // Load built static files
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

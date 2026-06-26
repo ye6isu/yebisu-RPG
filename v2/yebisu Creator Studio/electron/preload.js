@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       list: (relativePath, pattern) => ipcRenderer.invoke('ycs:files:list', relativePath, pattern),
       exists: (relativePath) => ipcRenderer.invoke('ycs:files:exists', relativePath),
       pickDirectory: () => ipcRenderer.invoke('ycs:files:pickDirectory'),
+      pickFiles: (filters, multiSelections) => ipcRenderer.invoke('ycs:files:pickFiles', filters, multiSelections),
+      importFile: (absoluteSrc, relativeDest) => ipcRenderer.invoke('ycs:files:importFile', absoluteSrc, relativeDest),
     },
     json: {
       read: (relativePath) => ipcRenderer.invoke('ycs:json:read', relativePath),
@@ -42,6 +44,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       write: (relativePath, markerName, content) => ipcRenderer.invoke('ycs:markers:write', relativePath, markerName, content),
       append: (relativePath, markerName, content) => ipcRenderer.invoke('ycs:markers:append', relativePath, markerName, content),
       remove: (relativePath, markerName, content) => ipcRenderer.invoke('ycs:markers:remove', relativePath, markerName, content),
+    },
+    items: {
+      scanAll: () => ipcRenderer.invoke('ycs:items:scanAll'),
+    },
+    textures: {
+      scanAll: () => ipcRenderer.invoke('ycs:textures:scanAll'),
     },
     manifest: {
       load: () => ipcRenderer.invoke('ycs:manifest:load'),

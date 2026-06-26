@@ -2,6 +2,8 @@ const files = require('./files');
 const jsonOps = require('./json-ops');
 const markers = require('./markers');
 const manifest = require('./manifest');
+const itemsScanner = require('./items-scanner');
+const texturesScanner = require('./textures-scanner');
 
 function wrap(fn) {
   return async (event, ...args) => {
@@ -65,6 +67,16 @@ function registerFileEngineIPC(ipcMain) {
     const { BrowserWindow } = require('electron');
     const win = BrowserWindow.fromWebContents(event.sender);
     return await files.pickDirectory(win);
+  }));
+
+  ipcMain.handle('ycs:files:pickFiles', wrap(async (event, filters, multiSelections) => {
+    const { BrowserWindow } = require('electron');
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return await files.pickFiles(win, filters, multiSelections);
+  }));
+
+  ipcMain.handle('ycs:files:importFile', wrap((event, absoluteSrc, relativeDest) => {
+    files.importFile(absoluteSrc, relativeDest);
   }));
 
   // ── JSON ────────────────────────────────────────────────────────
@@ -181,6 +193,19 @@ function registerFileEngineIPC(ipcMain) {
     if (!modRoot) throw new Error('Mod root not configured');
     const m = manifest.loadManifest(modRoot);
     return manifest.getOrphanedAssets(m);
+  }));
+  // ── Items Scanner ───────────────────────────────────────────────
+  ipcMain.handle('ycs:items:scanAll', wrap(() => {
+    const modRoot = files.getModRoot();
+    if (!modRoot) throw new Error('Mod root not configured');
+    return itemsScanner.scanAllItems(modRoot);
+  }));
+
+  // ── Textures Scanner ──────────────────────────────────────────
+  ipcMain.handle('ycs:textures:scanAll', wrap(() => {
+    const modRoot = files.getModRoot();
+    if (!modRoot) throw new Error('Mod root not configured');
+    return texturesScanner.scanTextures(modRoot);
   }));
 }
 
