@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StringField, StandardDropdownField, DropdownField } from './Field/Field';
+import SpritePreview from './SpritePreview';
 
 const HOLDING_MODES = [
   { label: 'Default', value: 'none' },
@@ -40,17 +41,38 @@ const CheckboxRow = ({ label, checked, onChange }) => (
   </div>
 );
 
-const TextureField = ({ textureName, onClickSet, isOpen }) => (
+const TextureField = ({ textureName, onClickSet, isOpen }) => {
+  const tex = (() => {
+    if (!textureName) return null;
+    try {
+      const raw = localStorage.getItem('ycs-textures-list');
+      const list = raw ? JSON.parse(raw) : [];
+      return list.find(t => t.label === textureName) || null;
+    } catch { return null; }
+  })();
+
+  return (
   <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
     <div style={{
       width: 24,
       height: 24,
-      background: 'var(--ycs-foreground)',
+      background: tex ? 'transparent' : 'var(--ycs-foreground)',
       borderRadius: 'var(--ycs-radius, 4px)',
-      border: '1px dashed var(--ycs-foreground)',
+      border: tex ? 'none' : '1px dashed var(--ycs-foreground)',
       flexShrink: 0,
       imageRendering: 'pixelated',
-    }} />
+      overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {tex?.dataUrl && (
+        <SpritePreview
+          url={tex.dataUrl} size={24}
+          isSpritesheet={tex.isSpritesheet} frames={tex.frames}
+          isAnimated={tex.isAnimated} ticksPerFrame={tex.ticksPerFrame}
+          defaultFrame={tex.defaultFrame}
+        />
+      )}
+    </div>
     <div style={{
       flex: 1,
       padding: '4px 8px',
@@ -75,7 +97,8 @@ const TextureField = ({ textureName, onClickSet, isOpen }) => (
       {textureName ? 'edit' : 'set'}
     </button>
   </div>
-);
+  );
+};
 
 const ChildTileField = ({ summary, hasContent, onClickSet, isOpen }) => (
   <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
@@ -149,7 +172,7 @@ const SectionHeader = ({ title }) => (
   <h2 style={{ marginTop: 0, fontSize: '16px', fontWeight: '500', color: 'var(--ycs-text)', marginBottom: '15px' }}>{title}</h2>
 );
 
-const DEFAULT_FORM = {
+export const DEFAULT_FORM = {
   displayName: '',
   id: '',
   customConstName: false,
@@ -193,7 +216,7 @@ const DEFAULT_FORM = {
   dataComponents: [],
 };
 
-const FORM_STORAGE_PREFIX = 'ycs-form::';
+export const FORM_STORAGE_PREFIX = 'ycs-form::';
 const popoutChildren = new Set();
 
 function readFormFromStorage(nodeId) {
@@ -203,13 +226,29 @@ function readFormFromStorage(nodeId) {
   } catch { return null; }
 }
 
-function writeFormToStorage(nodeId, data) {
+export function writeFormToStorage(nodeId, data) {
   localStorage.setItem(FORM_STORAGE_PREFIX + nodeId, JSON.stringify(data));
 }
 
-function usePersistedForm(nodeId) {
+function usePersistedForm(nodeId, tabId) {
   const [form, setFormRaw] = useState(() => {
-    return readFormFromStorage(nodeId) || { ...DEFAULT_FORM, states: DEFAULT_FORM.states.map(s => ({ ...s })) };
+    const existing = readFormFromStorage(nodeId);
+    if (existing) return existing;
+
+    // Check if the landing page seeded data for this editor
+    try {
+      const seedRaw = localStorage.getItem('ycs-item-editor-seed');
+      if (seedRaw) {
+        const seed = JSON.parse(seedRaw);
+        if (seed.childTabId === tabId) {
+          localStorage.removeItem('ycs-item-editor-seed');
+          writeFormToStorage(nodeId, seed.form);
+          return seed.form;
+        }
+      }
+    } catch {}
+
+    return { ...DEFAULT_FORM, states: DEFAULT_FORM.states.map(s => ({ ...s })) };
   });
 
   const formRef = useRef(form);
@@ -248,7 +287,7 @@ function usePersistedForm(nodeId) {
 
 export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
   const formKey = tabId || nodeId || 'item-default';
-  const { form, F, setForm } = usePersistedForm(formKey);
+  const { form, F, setForm } = usePersistedForm(formKey, tabId);
 
   useEffect(() => {
     if (form.multipleStates) {
@@ -266,6 +305,53 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
   const updateState = (i, key, val) => {
     F('states', form.states.map((s, idx) => idx === i ? { ...s, [key]: val } : s));
   };
+
+  useEffect(() => {
+    const handler = (e) => {
+      const { selectorTabId, textureName } = e.detail || {};
+      if (!selectorTabId) return;
+      const tId = nodeId || formKey;
+      const prefix = `Item Texture::${tId}::`;
+      if (!selectorTabId.startsWith(prefix)) return;
+      const key = selectorTabId.slice(prefix.length);
+      if (key === 'main') {
+        F('textureName', textureName);
+        const texList = JSON.parse(localStorage.getItem('ycs-textures-list') || '[]');
+        const found = texList.find(t => t.label === textureName);
+        if (found?.dataUrl) {
+          const modelTabId = `Item Model JSON::${tId}::model-json`;
+          localStorage.setItem(`ycs-model-texture::${modelTabId}`, found.dataUrl);
+          window.dispatchEvent(new CustomEvent('ycs-model-texture-update', { detail: { modelTabId, textureUrl: found.dataUrl } }));
+        }
+      } else if (key.startsWith('state-')) {
+        const idx = parseInt(key.replace('state-', ''), 10);
+        if (!isNaN(idx)) updateState(idx, 'textureName', textureName);
+      }
+    };
+    window.addEventListener('ycs-texture-selected', handler);
+    return () => window.removeEventListener('ycs-texture-selected', handler);
+  }, [nodeId, formKey]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const { selectorTabId, geoModelJson, geoModelFileName, itemModelJson, itemModelFileName } = e.detail || {};
+      if (!selectorTabId) return;
+      const tId = nodeId || formKey;
+      const prefix = `Item Model JSON::${tId}::`;
+      if (!selectorTabId.startsWith(prefix)) return;
+      const key = selectorTabId.slice(prefix.length);
+      if (key === 'model-json') {
+        F('modelJson', JSON.stringify({ geoModelJson, geoModelFileName, itemModelJson, itemModelFileName }));
+      } else if (key.startsWith('state-')) {
+        const idx = parseInt(key.replace('state-', '').replace('-model-json', ''), 10);
+        if (!isNaN(idx)) {
+          updateState(idx, 'modelJson', JSON.stringify({ geoModelJson, geoModelFileName, itemModelJson, itemModelFileName }));
+        }
+      }
+    };
+    window.addEventListener('ycs-model-json-changed', handler);
+    return () => window.removeEventListener('ycs-model-json-changed', handler);
+  }, [nodeId, formKey]);
 
   const findNodeByTabId = (tabId) => {
     let found = null;
@@ -302,6 +388,16 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
         detail: { targetId: existing.id }
       }));
     } else {
+      if (prefix === 'Item Model JSON') {
+        const texName = key === 'model-json' ? form.textureName : form.states?.[parseInt(key.replace('state-', '').replace('-model-json', ''))]?.textureName;
+        if (texName) {
+          try {
+            const texList = JSON.parse(localStorage.getItem('ycs-textures-list') || '[]');
+            const found = texList.find(t => t.label === texName);
+            if (found?.dataUrl) localStorage.setItem(`ycs-model-texture::${tabId}`, found.dataUrl);
+          } catch {}
+        }
+      }
       window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
         detail: {
           parentId: nodeId,
@@ -380,7 +476,7 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
             {form.holdingMode === '3d' && (
               <FullWidthRow label="JSON">
                 <ChildTileField
-                  summary={form.modelJson || null}
+                  summary={(() => { try { const m = JSON.parse(form.modelJson); return [m.geoModelFileName, m.itemModelFileName].filter(Boolean).join(', ') || null; } catch { return null; } })()}
                   hasContent={!!form.modelJson}
                   onClickSet={() => toggleChildTile('Item Model JSON', 'model-json')}
                   isOpen={isChildOpen('Item Model JSON', 'model-json')}
@@ -411,7 +507,7 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
                 {st.holdingMode === '3d' && (
                   <FullWidthRow label="JSON">
                     <ChildTileField
-                      summary={st.modelJson || null}
+                      summary={(() => { try { const m = JSON.parse(st.modelJson); return [m.geoModelFileName, m.itemModelFileName].filter(Boolean).join(', ') || null; } catch { return null; } })()}
                       hasContent={!!st.modelJson}
                       onClickSet={() => toggleChildTile('Item Model JSON', `state-${i}-model-json`)}
                       isOpen={isChildOpen('Item Model JSON', `state-${i}-model-json`)}

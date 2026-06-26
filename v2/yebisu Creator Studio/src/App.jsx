@@ -130,6 +130,7 @@ function App() {
   const [selectedTiles, setSelectedTiles] = useState([]);
   const [isReferenceOpen, setIsReferenceOpen] = useState(true);
   const [isGameplayOpen, setIsGameplayOpen] = useState(true);
+  const [isAssetsOpen, setIsAssetsOpen] = useState(true);
   const [isTab3Open, setIsTab3Open] = useState(false);
   const [isTab3_3Open, setIsTab3_3Open] = useState(false);
 
@@ -424,6 +425,7 @@ function App() {
     };
 
     const handleContextMenu = (e) => {
+      if (e.defaultPrevented) return;
       const leafNode = e.target.closest('.workspace-leaf');
       if (leafNode) {
         e.preventDefault();
@@ -667,6 +669,44 @@ function App() {
             )}
           </div>
 
+          {/* Assets Group */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div
+              className="ycs-tab"
+              onClick={() => setIsAssetsOpen(!isAssetsOpen)}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '12px', userSelect: 'none' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isAssetsOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+              Assets
+            </div>
+
+            {isAssetsOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                <div
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Textures' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('Textures')}
+                  draggable
+                  onDragStart={(e) => {
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Textures');
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Textures');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Textures
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Gameplay Group */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div
@@ -683,23 +723,23 @@ function App() {
             {isGameplayOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
                 <div
-                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Item' ? 'active' : ''}`}
-                  onClick={() => handleTabClick('Item')}
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && (findTabId(workspaceTree, activeNodeId) === 'Items' || findTabId(workspaceTree, activeNodeId) === 'Item') ? 'active' : ''}`}
+                  onClick={() => handleTabClick('Items')}
                   draggable
                   onDragStart={(e) => {
                     if (!e.ctrlKey) { e.preventDefault(); return; }
-                    e.dataTransfer.setData('tabId', 'Item');
+                    e.dataTransfer.setData('tabId', 'Items');
                     e.dataTransfer.setData('ycs-tab', 'true');
                   }}
                   onDragEnd={(e) => {
                     if (e.dataTransfer.dropEffect === 'none') {
-                      window.electronAPI?.openPopout('Item');
+                      window.electronAPI?.openPopout('Items');
                     }
                   }}
                   style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
                 >
                   <div style={{ width: '14px', flexShrink: 0 }} />
-                  Item
+                  Items
                 </div>
                 <div
                   className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Item (Old)' ? 'active' : ''}`}
@@ -719,6 +759,25 @@ function App() {
                 >
                   <div style={{ width: '14px', flexShrink: 0 }} />
                   Item (Old)
+                </div>
+                <div
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Block Editor' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('Block Editor')}
+                  draggable
+                  onDragStart={(e) => {
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Block Editor');
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Block Editor');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Block Editor
                 </div>
               </div>
             )}

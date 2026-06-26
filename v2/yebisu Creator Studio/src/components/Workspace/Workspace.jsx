@@ -5,6 +5,17 @@ import { DropdownField, StandardDropdownField } from '../Field/Field';
 import PreferencesPageNew from '../PreferencesPageNew';
 import ItemPage from '../ItemPage';
 import ItemPageNew, { ItemTexturePlaceholder, ItemTagsPlaceholder, ItemRecipePlaceholder, ItemMethodsPlaceholder, ItemModelJsonPlaceholder, DataComponentsPlaceholder } from '../ItemPageNew';
+import ItemsLandingPage from '../ItemsLandingPage';
+import TextureManagerPage from '../TextureManagerPage';
+import TagEditorPage from '../TagEditorPage';
+import RecipeEditorPage from '../RecipeEditorPage';
+import MethodEditorPage from '../MethodEditorPage';
+import DataComponentEditorPage from '../DataComponentEditorPage';
+import TextureEditorPage from '../TextureEditorPage';
+import PreviewPane from '../PreviewPane';
+import TextureSelectorPage from '../TextureSelectorPage';
+import ModelJsonPage from '../ModelJsonPage';
+import BlockEditorPage, { BlockPalettePage } from '../BlockEditorPage';
 
 const Tab1Test = () => (
   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -128,14 +139,20 @@ export const COMPONENT_REGISTRY = {
   'Tab 1': Tab1Test,
   'Tab 2': Tab2Test,
   'Tab 3.3': Tab3_3Test,
+  'Items': ItemsLandingPage,
   'Item (Old)': ItemPage,
   'Item': ItemPageNew,
-  'Item Texture': ItemTexturePlaceholder,
-  'Item Tags': ItemTagsPlaceholder,
-  'Item Recipe': ItemRecipePlaceholder,
-  'Item Methods': ItemMethodsPlaceholder,
-  'Item Model JSON': ItemModelJsonPlaceholder,
-  'Data Components': DataComponentsPlaceholder,
+  'Item Texture': TextureSelectorPage,
+  'Item Tags': TagEditorPage,
+  'Item Recipe': RecipeEditorPage,
+  'Item Methods': MethodEditorPage,
+  'Item Model JSON': ModelJsonPage,
+  'Data Components': DataComponentEditorPage,
+  'Textures': TextureManagerPage,
+  'Texture Editor': TextureEditorPage,
+  'Preview': PreviewPane,
+  'Block Editor': BlockEditorPage,
+  'Block Palette': BlockPalettePage,
 };
 
 export const resolveComponent = (tabId) => {

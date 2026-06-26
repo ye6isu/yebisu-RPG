@@ -44,6 +44,9 @@ function resolveModRootPath(relativePath) {
 }
 
 function readFile(filePath, encoding = 'utf-8') {
+  if (encoding === 'base64') {
+    return fs.readFileSync(filePath).toString('base64');
+  }
   return fs.readFileSync(filePath, encoding);
 }
 
@@ -131,6 +134,26 @@ async function pickDirectory(parentWindow) {
   return result.filePaths[0];
 }
 
+async function pickFiles(parentWindow, filters, multiSelections) {
+  const properties = ['openFile'];
+  if (multiSelections) properties.push('multiSelections');
+  const result = await dialog.showOpenDialog(parentWindow || null, {
+    properties,
+    filters: filters || [],
+    title: 'Select Files'
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths;
+}
+
+function importFile(absoluteSrc, relativeDest) {
+  const modRoot = getModRoot();
+  if (!modRoot) throw new Error('Mod root not configured');
+  const destPath = resolveModPath(relativeDest);
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.copyFileSync(absoluteSrc, destPath);
+}
+
 module.exports = {
   getModRoot,
   setModRoot,
@@ -139,9 +162,11 @@ module.exports = {
   readFile,
   writeFile,
   copyFile,
+  importFile,
   deleteFile,
   deleteDir,
   listFiles,
   exists,
   pickDirectory,
+  pickFiles,
 };

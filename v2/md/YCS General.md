@@ -42,11 +42,13 @@ Future AI agents MUST read this list to understand what already exists in the co
 6. **Searchable Combobox Standard**: When building Dropdown menus for UI fields (not the Titlebar), the standard behavior is to implement a **Searchable Combobox**. Wrap an invisible `<input type="text">` inside the clickable control box so users can type to instantly filter the popup options.
 7. **Inline Control Alignment**: All inline form controls (Buttons, Previews, Dropdowns, Text Inputs, Checkboxes, Toggles) must be perfectly horizontally vertically-centered and aligned with each other. They MUST all share a strict fixed height (24px) using the `.inline` modifier (or equivalent height definition) so they sit perfectly flush on the same baseline. If a **checkbox** is used inline with other controls, it must ALWAYS be placed at the very front (the leftmost position) of the line.
 8. **Field Label Expansion**: All UI field labels must use `white-space: nowrap`. Do not use fixed widths that clip text. Instead, use a `min-width` (e.g. 140px) with `padding-right`. If a label is exceptionally long, it is perfectly acceptable for the label column to auto-expand and push the inline components further to the right.
-9. **Standard UI Dividers**: Whenever placing horizontal dividers between sections or action bars, they must be strictly uniform: `<div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%' }}></div>`. Do not add custom opacities or side margins; dividers should perfectly span the container block using the raw foreground color.
+9. **No Placeholder Text in Inputs**: Text input fields must NOT use `placeholder` attributes. Leave inputs empty when no value is set. The field label already communicates purpose — placeholder text is redundant and clutters the UI.
+10. **Standard UI Dividers**: Whenever placing horizontal dividers between sections or action bars, they must be strictly uniform: `<div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%' }}></div>`. Do not add custom opacities or side margins; dividers should perfectly span the container block using the raw foreground color.
 10. **Button System**: Always use the global CSS classes for buttons rather than hardcoding styles:
     - `.ycs-button`: Standard rectangular text button. Can be combined with `.primary` for the main call-to-action or `.active` for a lit-up toggle state.
     - `.ycs-button.inline`: A variation that locks the button to exactly 24px height with reduced padding, designed to sit perfectly inline alongside dropdowns and text fields.
     - `.ycs-tiny-button`: A perfect 24x24px square button designed exclusively to hold small 16x16px SVG icons (e.g., the eyedropper tool).
+    - All buttons enforce `white-space: nowrap` globally via CSS — button text must never wrap to a second line, even when tiles are shrunk very small.
 11. **Close Icon Asset**: We have a global `close-icon.svg` in `/public`. Always reuse it.
 12. **Transparent Style & Window Materials**: The application uses Windows 11 native `Acrylic` material (`backgroundMaterial: 'acrylic'`) for its background in frameless windows, forcing dark mode via `nativeTheme.themeSource = 'dark'` to suppress the bright luminosity layer. 
 13. **Opacity Stacking Rules**: To avoid double-stacking alpha channels and darkening the glass effect, UI containers, title bars, sidebars, action bars, inputs, and standard buttons must use `backgroundColor: 'transparent'`. The global `var(--ycs-bg)` and `var(--ycs-accent)` variables dynamically inherit alpha transparency from user preferences. The `var(--ycs-highlight)` and `var(--ycs-foreground)` variables **DO NOT** inherit transparency; they remain purely solid at all times. Primary buttons and active tabs use pure `var(--ycs-highlight)` to stand out.
@@ -131,7 +133,35 @@ The left sidebar organizes tabs into collapsible groups. Each group has an arrow
 
 **Current groups:**
 - **Reference** — Test tabs (Tab 1, Tab 2, Tab 3 Group)
-- **Gameplay** — Item, Item (Old)
+- **Gameplay** — Items, Item (Old)
+
+**Current `COMPONENT_REGISTRY` keys:** `Preferences`, `Tab 1`, `Tab 2`, `Tab 3.3`, `Items` (landing page), `Item (Old)`, `Item` (ItemPageNew), `Item Texture` (TextureSelectorPage), `Item Tags` (TagEditorPage), `Item Recipe` (RecipeEditorPage), `Item Methods` (MethodEditorPage), `Item Model JSON` (ModelJsonPage), `Data Components` (DataComponentEditorPage), `Textures` (TextureManagerPage), `Texture Editor` (TextureEditorPage), `Preview` (PreviewPane).
+
+## Registry Landing Pages
+
+Every entry type that produces a list of mod entries (Items, Blocks, etc.) uses a **Landing Page → Editor** flow powered by the reusable `RegistryLandingPage` component (`RegistryLandingPage.jsx`).
+
+**Architecture:**
+- `RegistryLandingPage` is a generic card-grid component. It receives props for: `title`, `loadEntries` (async data fetch), `filterEntry` (exclude irrelevant entries), `editorPrefix` (the `COMPONENT_REGISTRY` key for the editor, e.g. `'Item'`), `seedFormData` (maps a scanned entry to editor form state), and `entryKey` (unique ID extractor).
+- Each entry type creates a thin wrapper (e.g., `ItemsLandingPage.jsx`) that passes type-specific config to `RegistryLandingPage`.
+- The sidebar tab opens the **landing page** (e.g., `'Items'`), not the editor directly.
+
+**Card Layout:**
+Each card displays: `[64x64 Texture/3D Preview] [Display Name] [ID]`. Cards are arranged in a wrapping flex grid with `gap: 12px`. On hover, a **delete button** appears at the top-right corner — a white opaque circle with a transparent minus sign cut out via SVG mask.
+
+**Opening Editors:**
+- Clicking a **card** toggles its editor: if the editor for that entry is already open (matched by stable `tabId` using the entry's label/key), it closes; if not, it opens. The `tabId` for card-opened editors uses the entry's label as identifier (e.g., `Texture Editor::${nodeId}::${tex.label}`).
+- Clicking the **`+` button** always creates a new blank independent instance with a unique `tabId` using `Date.now()`. Multiple blank editors can coexist without affecting each other.
+- In **popout mode** (no workspace tree), the same toggle/new behavior applies via `electronAPI.openPopout/closePopout`.
+- Before opening, the landing page seeds the editor's form data into `localStorage` under the appropriate seed key so the form hook picks it up on mount.
+
+**Header Controls:**
+- Filter input (text search by ID and display name).
+- Refresh button: `.ycs-button icon` (28x28, 16x16 SVG refresh icon).
+- Add button: `.ycs-button icon` (28x28, 16x16 SVG plus icon).
+
+**Entry Filtering:**
+Landing pages may exclude certain item classes from display. For example, the Items landing page filters out `ArmorItem` and `SpawnEgg` since those will have dedicated tabs.
 
 ## Form Layout Rules
 
@@ -143,11 +173,15 @@ Forms support two layout modes for field rows:
 
 Use dual-column rows when a field has a related secondary option (e.g., ID + Custom Const Name). Do not use them for unrelated fields.
 
-### Form State Persistence Across Tree Changes
-When a tile splits (e.g., opening a child tile to the right), React may unmount and remount the parent component with the same `nodeId`. To prevent form state from resetting:
-- Store form state in a **module-level `Map`** keyed by `nodeId` (not in React `useState` alone).
-- On mount, read from the store; on every update, write back to the store.
-- See `usePersistedForm()` in `ItemPageNew.jsx` for the canonical pattern.
+### Tile Independence
+Every editor tile is an independent instance. Opening the same entry multiple times creates separate copies that do not affect each other. Users can fill out, move, and resize each instance freely. Moving a tile to a new position preserves its data — like moving a filled-out paper to a different desk.
+
+### Form State Persistence via `tabId`
+All form persistence must key on `tabId` (stable across moves), **not** `nodeId` (workspace UUID that changes when a tile is dragged to a new split position). When a tile is moved, the old node is destroyed and a new one is created with a fresh `nodeId`, but `tabId` stays the same. Keying localStorage on `tabId` ensures data survives repositioning.
+
+Pattern: `const stableId = tabId || nodeId;` then use `stableId` for all localStorage keys and event matching.
+
+See `usePersistedForm()` in `ItemPageNew.jsx` and `useTexForm()` in `TextureEditorPage.jsx` for the canonical patterns.
 
 ### Minimum Content Width
 Form pages must set a `minWidth` on their scrollable content area (e.g., `450px`) so that inline controls never squish below their usable size. The tile provides horizontal scrollbars when narrower than the minimum — controls retain their designed dimensions.
@@ -155,8 +189,48 @@ Form pages must set a `minWidth` on their scrollable content area (e.g., `450px`
 ### Sub-Sections with Side Border
 When grouping related fields under a toggle or multi-state expansion, wrap them in a left-bordered container: `paddingLeft: 16px; borderLeft: 2px solid var(--ycs-foreground)`. Give each group a bold title label above it (e.g., "Default State", "State 2").
 
+### SpritePreview Component
+`SpritePreview.jsx` is a shared component for rendering texture previews at any size. Props: `url`, `size`, `frames`, `isAnimated`, `isSpritesheet`, `ticksPerFrame`, `defaultFrame`. For spritesheets: animated ones cycle frames via `setInterval`; non-animated show `defaultFrame`. Uses CSS `translateY` on a vertically-stacked spritesheet image. Used in: landing page cards (64px), inline texture file rows (24px), and PreviewPane (panel-fit).
+
 ### Texture Field Pattern
-Texture selection fields use a three-part inline layout: `[Preview Square] [Read-only Name] [set/edit Button]`. The preview is a 24x24 square with `imageRendering: pixelated`. The name area is a bordered read-only box styled like the keybind/shortcut input (not an editable text field). Clicking set/edit opens a child tile to the right using the `ycs-toggle-child` event pattern.
+Texture selection fields use a single inline row: `[24x24 SpritePreview] [Read-only Name Box] [remove Button (if set)] [set/edit Button]`. The preview uses `SpritePreview` so spritesheets animate or show the default frame inline. The name area is a bordered read-only box — it displays the filename or `"none selected"` at 0.5 opacity. The remove button only appears when a file is set.
+
+For optional texture layers (Emissive, Shape), the row is checkbox-gated: `[Checkbox] [Label] [Preview] [Name] [Button]`. The checkbox comes first (per rule 7). When unchecked, the preview/name/button are dimmed (opacity 0.3) and non-interactive, and the file data is cleared. One row — no sub-sections.
+
+### Texture Editor Layout
+The Texture Editor child tile (`TextureEditorPage.jsx`) uses standard `FieldRow` layout for all fields:
+- **Name**: `FieldRow` with `ycs-string-input`
+- **Normal**: `TextureFileRow` with `showAnim` (uses SpritePreview, no checkbox)
+- **Emissive**: `TextureFileRow` with `checkboxKey` (checkbox-gated)
+- **Shape**: `TextureFileRow` with `checkboxKey` (checkbox-gated)
+- **Spritesheet Properties**: `CheckboxRow`, expands a bordered sub-section. Frames and Default Frame use `DualRow` (2-column). Animated: `[Checkbox] Animated [ticks/frame input] [ticks/frame label]` — single inline row.
+- **Footer**: Save & Close, Cancel, Save buttons. Save & Close and Cancel also close the Preview child tile.
+
+### Landing Page Card Previews
+Card previews in landing pages (Items, Textures) use `backgroundColor: 'transparent'` — no gray box behind the preview image, allowing texture transparency to show through. Spritesheet textures render animated or at default frame via `SpritePreview`.
+
+### Preview Pane
+`PreviewPane.jsx` is a reusable child tile for live asset preview. Supports two preview types determined by `d.type`:
+- **`'texture'`** (default): Uses `SpritePreview` sized to `min(containerWidth, containerHeight)` via `ResizeObserver`. Shows static, default-frame, or animated spritesheet textures.
+- **`'model'`**: Uses `ModelPreview3D` for interactive Three.js WebGL rendering of Blockbench geometry JSON. Supports left-click orbit, right-click/middle-click pan, and scroll zoom. Renders textured 3D models with proper bone hierarchy, per-face UV mapping, and zero-size axis z-fighting fix. A 3D wireframe grid (three intersecting grid planes at origin with X=red/Y=green/Z=blue axis lines) rotates with the model for spatial reference. Extracts elements from both Minecraft (`elements` with `from`/`to`) and Bedrock (`minecraft:geometry` with `bones[].cubes`) formats.
+
+Listens for `ycs-preview-update` events and reads from `localStorage` key `ycs-preview::${tabId}`. No text/labels — just the visual.
+
+Preview is **not auto-spawned**. The user toggles it via a "Preview" button in the editor footer. The button uses `.ycs-button.active` when open. Preview can be freely closed. Save & Close and Cancel also close the preview when closing the editor.
+
+### Model JSON Page
+`ModelJsonPage.jsx` is a child tile for importing 3D model files. It has two `JsonFileRow` fields:
+- **Geometry** (`.geo.json`) — the Blockbench geometry with elements/cubes/bones
+- **Item Model** (`.json`) — the Minecraft item model with `parent`, `display` transforms, `textures`, `overrides`
+
+Both fields support native file picker and drag-and-drop (the entire content area is a drop zone). Dropped `.geo.json` files auto-route to the Geometry field; other `.json` files go to Item Model.
+
+The footer has only a Preview toggle button (no Save/Cancel — this is a direct file importer). Changes dispatch `ycs-model-json-changed` to update the parent item editor. Preview pushes `type: 'model'` data to `PreviewPane` for 3D wireframe rendering.
+
+### Child Tile Repositioning
+All tiles are freely movable. Moving a tile does not lose its data (keyed on `tabId`) and does not affect other tiles. The `linkedParentId` is cleared on move, but communication continues via `tabId` matching. Preview tiles spawned by an editor stay connected via the editor's `tabId`-derived preview key, regardless of where either tile is dragged.
+
+When spawning a preview or companion tile, always check if one already exists in the tree (by `tabId`) before creating a new one — this prevents duplication when a tile remounts after being moved.
 
 ### Child Tile Field Pattern
 For fields that open a child editor tile (Tags, Recipe, Methods, Data Components), use the `ChildTileField` component: `[Read-only bordered text] [set/edit Button]`. No preview square — only a bordered summary box and the action button. The set/edit button uses the `.active` class to stay highlighted while the child tile is open, reflecting toggle state.
@@ -173,6 +247,33 @@ The second child splits the first child tile (not the parent) in the perpendicul
 
 ### Child Tiles in Popout Mode
 When the parent component is in a popout window (no workspace tree available), clicking set/edit opens the child as a **new popout window** via `electronAPI.openPopout(tabId)`. Clicking again closes it via `electronAPI.closePopout(tabId)`. Open popout children are tracked in a module-level `Set`. The `resolveComponent()` function (exported from Workspace.jsx) handles `::` prefixed tab IDs for both workspace tiles and popout windows.
+
+### Item Selector (Floating Popover)
+`ItemSelector.jsx` is a reusable floating panel for picking items, blocks, and tags. It appears anchored next to whatever element triggered it (via `anchorRect` prop) and auto-positions to avoid overflow. Contains the complete Minecraft 1.21.1 vanilla item registry, common item/block tags, and mod items from `fileEngine.items.scanAll()`. Features: search bar (type any `namespace:id` and press Enter), tab filters (All/Vanilla/Tags/Mod), click-outside/Escape to close. Used by `RecipeEditorPage` for slot filling.
+
+### Recipe Editor
+`RecipeEditorPage.jsx` is a child tile for defining recipes. The output is always the item being edited — no output slot is shown. Layout:
+- **Crafting**: Checkbox toggle → 3x3 ingredient grid (with brush painting: pick an item from the floating selector, hover other slots to paint, right-click to clear) + shape dropdown (Shaped/Shapeless).
+- **Smelting/Blasting/Smoking/Campfire Cooking**: Checkbox toggle → inline ingredient slot + cook time (ticks) + XP, all on one compact row.
+- **Stonecutting**: Checkbox toggle → full-size ingredient input slot + count (no XP, no cook time).
+
+Slots open the `ItemSelector` floating popover anchored to the clicked slot. Multiple recipe types can be enabled simultaneously (checkboxes, not exclusive dropdown).
+
+### Method Editor
+`MethodEditorPage.jsx` is a child tile for enabling Java method overrides on the item's custom class. Uses the same method definitions as the old YCS v1 visual block editor (`tools/Yebisu Creator Studio/src/codegen/visual/methods.js`). Each method is a checkbox with its label, Java signature, and description. Enabled methods: `useOn` (block interaction), `use` (right-click), `continuousUse` (onUseTick), `releaseUsing`, `finishUsingItem`, `inventoryTick`, `hurtEnemy` (combat), `interactLivingEntity` (entity right-click). Enabling a method generates the corresponding `@Override` stub in the custom item class.
+
+### Child Tile Space Reclamation
+When a child tile is closed, the workspace automatically collapses the split and the remaining sibling reclaims the full space. This is handled by `removeNodes` in `App.jsx` and `handleCloseTab` in `Workspace.jsx` — both collapse single-child splits: `if (newChildren.length === 1) return { ...newChildren[0], size: node.size }`.
+
+### Texture Selector (Item Texture)
+`TextureSelectorPage.jsx` is a child tile opened from the item editor's Texture field. It shows saved textures as a card grid (same style as the Textures landing page) without the `+` button. An **upload card** appears first — a dashed-border card with an upload icon that opens the native file explorer or accepts drag-and-drop from the desktop. Uploading saves the texture to `ycs-textures-list` and auto-selects it.
+
+Clicking a texture card dispatches `ycs-texture-selected` with `{ selectorTabId, textureName, textureData }`. The item editor listens for this event and maps the `selectorTabId` back to the correct field (`main` or `state-N`).
+
+The `TextureField` in `ItemPageNew.jsx` shows a 24x24 `SpritePreview` (animated if spritesheet) by looking up the texture data from `ycs-textures-list` by label.
+
+### Landing Page Card Delete
+Cards in landing pages show a **delete button** on hover at the top-right corner. The button is a white opaque circle (18x18) with a transparent minus sign cut out via SVG mask. Clicking it removes the entry from localStorage and dispatches the relevant change event. `stopPropagation()` prevents the card click handler from firing.
 
 ### Number Inputs
 Use `type="text"` with `inputMode="numeric"` and manual regex validation (`/^-?\d*\.?\d*$/`) instead of `type="number"` to avoid browser-native spinner buttons. See `NumberInput` in `ItemPageNew.jsx`.
@@ -192,7 +293,7 @@ The item editor form follows this top-to-bottom structure:
 Components like `Data Components` that serve the same conceptual purpose across different editors (items, blocks) should use a single registry key without an editor prefix (e.g., `'Data Components'` not `'Item Data Components'`). The child tile receives context from its scoped tab ID (`Data Components::${nodeId}::data-components`).
 
 ### Form Footer
-Item editor forms include a pinned footer with three actions: `[Save & Close] [Cancel] [Save]`. The footer is `flexShrink: 0` with a `borderTop: 1px solid var(--ycs-foreground)` separator, matching the Preferences page footer pattern.
+Editor forms include a pinned footer. Layout: `[Preview (toggle)] [spacer] [Save & Close] [Cancel] [Save]`. The Preview button sits on the left with `.active` class when preview is open; the save/cancel actions sit on the right. The footer is `flexShrink: 0` with a `borderTop: 1px solid var(--ycs-foreground)` separator. Footer buttons must never wrap text — `white-space: nowrap` is enforced globally on `.ycs-button`.
 
 ## CRITICAL: Workspace & Flexbox Architecture
 It is ABSOLUTELY VITAL that you understand the underlying flexbox and native mathematical constraints that power the workspace tiles before editing any layouts. Please refer to **[YCS Workspace Architecture.md](./YCS%20Workspace%20Architecture.md)** for the complete set of rules preventing tile overlap, recursive resizing drift, and min-content bubbling.
