@@ -1,51 +1,171 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FORM_STORAGE_PREFIX } from './ItemPageNew';
+import { StandardDropdownField } from './Field/Field';
 
-const STORAGE_PREFIX = 'ycs-methods::';
+const BLOCKY_PREFIX = 'ycs-blocky::';
 
-const ITEM_METHODS = [
-  { key: 'useOn', label: 'Block Interaction', sig: 'useOn(UseOnContext context)', desc: 'Called when the item is used on a block (right-click on block)' },
-  { key: 'use', label: 'Interaction', sig: 'use(Level, Player, InteractionHand)', desc: 'Called when the item is right-clicked (general use)' },
-  { key: 'continuousUse', label: 'Continuous Use', sig: 'onUseTick(Level, LivingEntity, ItemStack, int)', desc: 'Called every tick while the item is being used (held right-click)' },
-  { key: 'releaseUsing', label: 'Release Using', sig: 'releaseUsing(ItemStack, Level, LivingEntity, int)', desc: 'Called when the player stops using the item (release right-click)' },
-  { key: 'finishUsingItem', label: 'Finished Using', sig: 'finishUsingItem(ItemStack, Level, LivingEntity)', desc: 'Called when the use duration expires (e.g. eating finishes)' },
-  { key: 'inventoryTick', label: 'Inventory Tick', sig: 'inventoryTick(ItemStack, Level, Entity, int, boolean)', desc: 'Called every tick while the item is in inventory' },
-  { key: 'hurtEnemy', label: 'Combat / Hurt Entity', sig: 'hurtEnemy(ItemStack, LivingEntity, LivingEntity)', desc: 'Called when the item hits an entity' },
-  { key: 'interactLivingEntity', label: 'Entity Interaction', sig: 'interactLivingEntity(ItemStack, Player, LivingEntity, InteractionHand)', desc: 'Called when right-clicking an entity with the item' },
+const USE_ANIMATIONS = [
+  { value: 'NONE', label: 'None' },
+  { value: 'EAT', label: 'Eat' },
+  { value: 'DRINK', label: 'Drink' },
+  { value: 'BLOCK', label: 'Block' },
+  { value: 'BOW', label: 'Bow' },
+  { value: 'SPEAR', label: 'Spear' },
+  { value: 'CROSSBOW', label: 'Crossbow' },
+  { value: 'SPYGLASS', label: 'Spyglass' },
+  { value: 'TOOT_HORN', label: 'Horn' },
+  { value: 'BRUSH', label: 'Brush' },
 ];
 
-function readState(nodeId) {
+const ITEM_METHODS = [
+  { key: 'useOn', label: 'Block Interaction', sig: 'useOn(UseOnContext context)' },
+  { key: 'use', label: 'Interaction', sig: 'use(Level, Player, InteractionHand)' },
+  { key: 'continuousUse', label: 'Continuous Use', sig: 'onUseTick(Level, LivingEntity, ItemStack, int)', requires: 'use' },
+  { key: 'finishUsingItem', label: 'Finished Using', sig: 'finishUsingItem(ItemStack, Level, LivingEntity)' },
+  { key: 'inventoryTick', label: 'Inventory Tick', sig: 'inventoryTick(ItemStack, Level, Entity, int, boolean)' },
+  { key: 'hurtEnemy', label: 'Combat / Hurt Entity', sig: 'hurtEnemy(ItemStack, LivingEntity, LivingEntity)' },
+  { key: 'interactLivingEntity', label: 'Entity Interaction', sig: 'interactLivingEntity(ItemStack, Player, LivingEntity, InteractionHand)' },
+];
+
+export { ITEM_METHODS };
+
+function hasBlockData(blockEditorPrefix, methodKey) {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + nodeId);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function writeState(nodeId, data) {
-  localStorage.setItem(STORAGE_PREFIX + nodeId, JSON.stringify(data));
-}
-
-function makeDefault() {
-  const state = {};
-  ITEM_METHODS.forEach(m => { state[m.key] = false; });
-  return state;
+    const id = `${blockEditorPrefix}::${methodKey}`;
+    const raw = localStorage.getItem(BLOCKY_PREFIX + id);
+    if (!raw) return false;
+    const nodes = JSON.parse(raw);
+    return nodes.length > 1;
+  } catch { return false; }
 }
 
 export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) {
-  const stableId = tabId || nodeId;
-  const [state, setStateRaw] = useState(() => readState(stableId) || makeDefault());
+  const tileId = tabId || nodeId;
 
-  useEffect(() => {
-    const saved = readState(stableId);
-    if (saved) setStateRaw(saved);
-  }, [stableId]);
+  const parentItemTabId = useMemo(() => {
+    const parts = tileId.split('::');
+    return parts.slice(1, -1).join('::');
+  }, [tileId]);
 
-  const set = useCallback((key, value) => {
-    setStateRaw(prev => {
+  const [parentForm, setParentForm] = useState(() => {
+    try {
+      const raw = localStorage.getItem(FORM_STORAGE_PREFIX + parentItemTabId);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
+  const itemId = parentForm.id || '';
+  const stableMethodsKey = itemId ? `ycs-methods::item::${itemId}` : `ycs-methods-enabled::${tileId}`;
+
+  const [enabledMethods, setEnabledMethods] = useState(() => {
+    try {
+      const raw = localStorage.getItem(stableMethodsKey);
+      if (raw) return JSON.parse(raw);
+      const legacy = localStorage.getItem('ycs-methods-enabled::' + tileId);
+      return legacy ? JSON.parse(legacy) : [];
+    } catch { return []; }
+  });
+
+  const updateParentField = (key, value) => {
+    setParentForm(prev => {
       const next = { ...prev, [key]: value };
-      writeState(stableId, next);
+      localStorage.setItem(FORM_STORAGE_PREFIX + parentItemTabId, JSON.stringify(next));
       return next;
     });
-  }, [stableId]);
+  };
+
+  useEffect(() => {
+    localStorage.setItem(stableMethodsKey, JSON.stringify(enabledMethods));
+  }, [enabledMethods, stableMethodsKey]);
+
+  const findNodeByTabId = (searchTabId) => {
+    if (!tree) return null;
+    const search = (node) => {
+      if (node.tabId === searchTabId) return node;
+      if (node.children) for (const c of node.children) { const r = search(c); if (r) return r; }
+      return null;
+    };
+    return search(tree);
+  };
+
+  const stableBlockPrefix = itemId ? `item::${itemId}` : `Block Editor::${tileId}`;
+  const blockEditorPrefix = stableBlockPrefix;
+
+  const openEditor = (methodKey) => {
+    const childTabId = `Block Editor::${tileId}::${methodKey}`;
+    const existing = findNodeByTabId(childTabId);
+    if (existing) {
+      window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', {
+        detail: { targetId: existing.id }
+      }));
+    } else {
+      if (!enabledMethods.includes(methodKey)) {
+        setEnabledMethods(prev => [...prev, methodKey]);
+      }
+      const storageKey = `${blockEditorPrefix}::${methodKey}`;
+      localStorage.setItem('ycs-blocky-seed::' + childTabId, storageKey);
+      window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
+        detail: {
+          parentId: nodeId,
+          targetNodeId: nodeId,
+          childTabId,
+          direction: 'right',
+          isOpen: true,
+        }
+      }));
+    }
+  };
+
+  const isMethodOpen = (methodKey) => {
+    const childTabId = `Block Editor::${tileId}::${methodKey}`;
+    return !!findNodeByTabId(childTabId);
+  };
+
+  const closeBlockEditor = (methodKey) => {
+    const childTabId = `Block Editor::${tileId}::${methodKey}`;
+    const existing = findNodeByTabId(childTabId);
+    if (existing) {
+      window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: existing.id } }));
+    }
+  };
+
+  const closePalette = () => {
+    const paletteNode = findNodeByTabId('Block Palette');
+    if (paletteNode) {
+      window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: paletteNode.id } }));
+    }
+  };
+
+  const toggleMethod = (key, checked) => {
+    if (checked) {
+      setEnabledMethods(prev => [...prev, key]);
+      return;
+    }
+    const toRemove = [key];
+    if (key === 'use') toRemove.push('continuousUse', 'releaseUsing');
+    toRemove.forEach(k => closeBlockEditor(k));
+    setEnabledMethods(prev => {
+      const next = prev.filter(k => !toRemove.includes(k));
+      if (next.length === 0) closePalette();
+      return next;
+    });
+  };
+
+  const isEnabled = (key) => enabledMethods.includes(key);
+
+  const noSlowdown = (parentForm.tags || '').includes('yebisurpg:no_use_slowdown');
+
+  const toggleNoSlowdown = (checked) => {
+    const tags = parentForm.tags || '';
+    const tagArr = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+    if (checked) {
+      if (!tagArr.includes('yebisurpg:no_use_slowdown')) tagArr.push('yebisurpg:no_use_slowdown');
+    } else {
+      const idx = tagArr.indexOf('yebisurpg:no_use_slowdown');
+      if (idx >= 0) tagArr.splice(idx, 1);
+    }
+    updateParentField('tags', tagArr.join(', '));
+  };
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -60,27 +180,75 @@ export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree
 
         <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
 
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '12px 16px' }}>
-          <div style={{ fontSize: '11px', opacity: 0.4, marginBottom: '12px' }}>
-            Enable Java method overrides for this item. Each method generates a stub in the custom item class.
-          </div>
-          {ITEM_METHODS.map(m => (
-            <div key={m.key} style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={!!state[m.key]}
-                  onChange={e => set(m.key, e.target.checked)}
-                  style={{ accentColor: 'var(--ycs-highlight)', marginTop: '2px', flexShrink: 0 }}
-                />
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 500 }}>{m.label}</div>
-                  <div style={{ fontSize: '10px', opacity: 0.4, fontFamily: 'monospace' }}>{m.sig}</div>
-                  <div style={{ fontSize: '10px', opacity: 0.35, marginTop: '2px' }}>{m.desc}</div>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 16px' }}>
+          {ITEM_METHODS.map(m => {
+            const on = isEnabled(m.key);
+            const has = hasBlockData(blockEditorPrefix, m.key);
+            const gated = m.requires && !isEnabled(m.requires);
+            const isCont = m.key === 'continuousUse';
+
+            return (
+              <div key={m.key}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: on && !gated ? '0' : '15px', opacity: gated ? 0.35 : 1 }}>
+                  <input
+                    type="checkbox" className="ycs-checkbox"
+                    checked={on && !gated}
+                    disabled={gated}
+                    onChange={e => toggleMethod(m.key, e.target.checked)}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '13px', userSelect: 'none' }}>{m.label}</span>
+                    {gated && (
+                      <span style={{ fontSize: 10, color: '#e8a868', background: '#3a2010', padding: '1px 5px', borderRadius: 3, marginLeft: 6 }}>
+                        requires Interaction
+                      </span>
+                    )}
+                  </div>
+                  {on && !gated && !isCont && (
+                    <button
+                      className={`ycs-button inline${isMethodOpen(m.key) ? ' active' : ''}`}
+                      onClick={() => openEditor(m.key)}
+                      style={{ flexShrink: 0 }}
+                    >
+                      {has ? 'edit' : 'set'}
+                    </button>
+                  )}
                 </div>
-              </label>
-            </div>
-          ))}
+
+                {on && !gated && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <div style={{ paddingLeft: '16px', borderLeft: '2px solid var(--ycs-foreground)' }}>
+                      {!isCont ? (
+                        <div style={{ fontSize: '10px', opacity: 0.4, fontFamily: 'monospace', padding: '4px 0' }}>{m.sig}</div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                            <input type="checkbox" className="ycs-checkbox" checked={noSlowdown} onChange={e => toggleNoSlowdown(e.target.checked)} />
+                            <span style={{ fontSize: '13px', userSelect: 'none' }}>No Slowdown</span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 6, marginBottom: '10px' }}>
+                            <button
+                              className={`ycs-button inline${isMethodOpen('continuousUse') ? ' active' : ''}`}
+                              onClick={() => openEditor('continuousUse')}
+                            >
+                              {hasBlockData(blockEditorPrefix, 'continuousUse') ? 'edit' : 'set'} onUseTick
+                            </button>
+                            <button
+                              className={`ycs-button inline${isMethodOpen('releaseUsing') ? ' active' : ''}`}
+                              onClick={() => openEditor('releaseUsing')}
+                            >
+                              {hasBlockData(blockEditorPrefix, 'releaseUsing') ? 'edit' : 'set'} releaseUsing
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

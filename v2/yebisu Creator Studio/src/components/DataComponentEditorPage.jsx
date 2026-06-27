@@ -1,29 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StringField } from './Field/Field';
+import ReactDOM from 'react-dom';
+import { StringField, NumberInput } from './Field/Field';
 
 const STORAGE_PREFIX = 'ycs-data-components::';
 
 const COMPONENT_TYPES = [
   { label: 'Number', value: 'number', defaultValue: '0' },
-  { label: 'Decimal', value: 'decimal', defaultValue: '0.0' },
   { label: 'Logic', value: 'logic', defaultValue: false },
   { label: 'Text', value: 'text', defaultValue: '' },
   { label: 'ItemStack', value: 'itemstack', defaultValue: '' },
 ];
-
-const NumberInput = ({ value, onChange, style = {} }) => (
-  <input
-    className="ycs-string-input"
-    type="text"
-    inputMode="numeric"
-    value={value}
-    onChange={e => {
-      const v = e.target.value;
-      if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) onChange(v);
-    }}
-    style={{ width: '80px', ...style }}
-  />
-);
 
 function readState(nodeId) {
   try {
@@ -88,8 +74,6 @@ export default function DataComponentEditorPage({ isTile = false, onClose, nodeI
     switch (comp.type) {
       case 'number':
         return <NumberInput value={comp.defaultValue} onChange={v => updateComponent(index, 'defaultValue', v)} />;
-      case 'decimal':
-        return <NumberInput value={comp.defaultValue} onChange={v => updateComponent(index, 'defaultValue', v)} />;
       case 'logic':
         return (
           <input
@@ -144,22 +128,27 @@ export default function DataComponentEditorPage({ isTile = false, onClose, nodeI
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
-            {showAddMenu && (
-              <div className="dropdown" style={{
-                position: 'absolute', top: '32px', right: 0, zIndex: 1000,
-                minWidth: '140px',
-              }}>
-                {COMPONENT_TYPES.map(t => (
-                  <div
-                    key={t.value}
-                    className="dropdown-item"
-                    onClick={() => addComponent(t.value)}
-                  >
-                    {t.label}
-                  </div>
-                ))}
-              </div>
-            )}
+            {showAddMenu && (() => {
+              const r = addBtnRef.current?.getBoundingClientRect();
+              if (!r) return null;
+              return ReactDOM.createPortal(
+                <div className="dropdown" style={{
+                  position: 'fixed', top: r.bottom + 4, left: r.right, transform: 'translateX(-100%)',
+                  zIndex: 99999, minWidth: '140px',
+                }}>
+                  {COMPONENT_TYPES.map(t => (
+                    <div
+                      key={t.value}
+                      className="dropdown-item"
+                      onClick={() => addComponent(t.value)}
+                    >
+                      {t.label}
+                    </div>
+                  ))}
+                </div>,
+                document.body
+              );
+            })()}
           </div>
         </div>
 

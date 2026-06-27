@@ -16,6 +16,7 @@ import PreviewPane from '../PreviewPane';
 import TextureSelectorPage from '../TextureSelectorPage';
 import ModelJsonPage from '../ModelJsonPage';
 import BlockEditorPage, { BlockPalettePage } from '../BlockEditorPage';
+import CreativeTabsPage, { TabEditorPage, TabItemListPage } from '../CreativeTabsPage';
 
 const Tab1Test = () => (
   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -153,6 +154,9 @@ export const COMPONENT_REGISTRY = {
   'Preview': PreviewPane,
   'Block Editor': BlockEditorPage,
   'Block Palette': BlockPalettePage,
+  'Creative Tabs': CreativeTabsPage,
+  'Tab Editor': TabEditorPage,
+  'Tab Items': TabItemListPage,
 };
 
 export const resolveComponent = (tabId) => {
@@ -413,24 +417,102 @@ const findNode = (node, id) => {
   return null;
 };
 
+const getMinPxForNode = (node, dir) => {
+  if (node.type === 'leaf') return dir === 'horizontal' ? 200 : 150;
+  if (node.type === 'split') {
+    const gap = parseInt(localStorage.getItem('ycs-gap') || '8', 10);
+    if (node.direction === dir) {
+      return node.children.reduce((sum, c) => sum + getMinPxForNode(c, dir), 0) + gap * (node.children.length - 1);
+    }
+    return Math.max(...node.children.map(c => getMinPxForNode(c, dir)));
+  }
+  return dir === 'horizontal' ? 200 : 150;
+};
+
+const rebalanceSizes = (node, parentPx) => {
+  if (node.type !== 'split') return node;
+  const dir = node.direction;
+  const gap = parseInt(localStorage.getItem('ycs-gap') || '8', 10);
+  const totalSize = node.children.reduce((s, c) => s + (c.size || 1), 0);
+  const gapsPx = gap * (node.children.length - 1);
+  const availPx = (parentPx || 0) - gapsPx;
+  let children = node.children.map(c => {
+    if (c.type !== 'split') return c;
+    const childPx = availPx > 0 ? ((c.size || 1) / totalSize) * availPx : 0;
+    return rebalanceSizes(c, childPx);
+  });
+  if (!availPx || availPx <= 0) return { ...node, children };
+  const minPxs = children.map(c => getMinPxForNode(c, dir));
+  let deficit = 0;
+  const minSizeUnits = minPxs.map(px => (px / availPx) * totalSize);
+  for (let i = 0; i < children.length; i++) {
+    const cur = children[i].size || 1;
+    if (cur < minSizeUnits[i]) deficit += minSizeUnits[i] - cur;
+  }
+  if (deficit <= 0) return { ...node, children };
+  const donors = [];
+  for (let i = 0; i < children.length; i++) {
+    const cur = children[i].size || 1;
+    if (cur > minSizeUnits[i]) donors.push({ i, surplus: cur - minSizeUnits[i] });
+  }
+  const totalSurplus = donors.reduce((s, d) => s + d.surplus, 0);
+  if (totalSurplus <= 0) return { ...node, children };
+  const take = Math.min(deficit, totalSurplus);
+  children = children.map((c, i) => {
+    const cur = c.size || 1;
+    if (cur < minSizeUnits[i]) return { ...c, size: minSizeUnits[i] };
+    const donor = donors.find(d => d.i === i);
+    if (donor) return { ...c, size: cur - (donor.surplus / totalSurplus) * take };
+    return c;
+  });
+  return { ...node, children };
+};
+
 export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, onTileSelect }) {
   const [globalHoverZone, setGlobalHoverZone] = useState(null);
   const resizingRef = useRef(null);
+  const containerRef = useRef(null);
+
+  const getContainerPx = () => {
+    if (!containerRef.current) return 0;
+    const dir = tree?.direction;
+    return dir === 'vertical' ? containerRef.current.clientHeight : containerRef.current.clientWidth;
+  };
 
   const handleCloseTab = (nodeId) => {
     setTree(prevTree => {
-      const removeNode = (n, tId) => {
-        if (n.id === tId) return null;
+      const collectLinkedIds = (root, parentId) => {
+        const ids = new Set();
+        const walk = (n) => {
+          if (n.type === 'leaf' && n.linkedParentId === parentId) {
+            ids.add(n.id);
+            collectLinkedIds(root, n.id).forEach(id => ids.add(id));
+          }
+          if (n.type === 'split') n.children.forEach(walk);
+        };
+        walk(root);
+        return ids;
+      };
+      const toRemove = new Set([nodeId, ...collectLinkedIds(prevTree, nodeId)]);
+
+      const removeNodes = (n) => {
+        if (toRemove.has(n.id)) return null;
         if (n.type === 'split') {
-          const newC = n.children.map(c => removeNode(c, tId)).filter(Boolean);
+          const removedIndex = n.children.findIndex(c => toRemove.has(c.id) || (c.type === 'split' && c.children.some(gc => toRemove.has(gc.id))));
+          const removedChild = removedIndex !== -1 ? n.children[removedIndex] : null;
+          const newC = n.children.map(c => removeNodes(c)).filter(Boolean);
           if (newC.length === 0) return null;
           if (newC.length === 1) return { ...newC[0], size: n.size };
+          if (removedChild && toRemove.has(removedChild.id) && removedChild.size !== undefined && newC.length >= 2) {
+            const siblingIdx = Math.min(removedIndex, newC.length - 1);
+            newC[siblingIdx] = { ...newC[siblingIdx], size: (newC[siblingIdx].size || 1) + removedChild.size };
+          }
           return { ...n, children: newC };
         }
         return n;
       };
-      const finalTree = removeNode(prevTree, nodeId);
-      return finalTree || { id: 'root', type: 'leaf', tabId: null };
+      const finalTree = removeNodes(prevTree);
+      return finalTree ? rebalanceSizes(finalTree, getContainerPx()) : { id: 'root', type: 'leaf', tabId: null };
     });
   };
 
@@ -655,10 +737,10 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
             if (existingSiblingId) {
               // Stack perpendicular: right/left children stack top-to-bottom, top/bottom children stack left-to-right
               const stackDirection = (direction === 'right' || direction === 'left') ? 'bottom' : 'right';
-              return splitNode(prevTree, existingSiblingId, childTabId, stackDirection, null, parentId);
+              return rebalanceSizes(splitNode(prevTree, existingSiblingId, childTabId, stackDirection, null, parentId), getContainerPx());
             }
 
-            return splitNode(prevTree, splitTargetId, childTabId, direction, null, parentId);
+            return rebalanceSizes(splitNode(prevTree, splitTargetId, childTabId, direction, null, parentId), getContainerPx());
           }
           return prevTree;
         } else {
@@ -683,7 +765,7 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
 
   useEffect(() => {
     const handleReplaceAndSplit = (e) => {
-      const { nodeId, replaceTabId, splitTabId, direction } = e.detail;
+      const { nodeId, replaceTabId, splitTabId, direction, splitSize } = e.detail;
       setTree(prevTree => {
         const replaceNode = (n) => {
           if (n.id === nodeId) return { ...n, tabId: replaceTabId };
@@ -691,7 +773,22 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
           return n;
         };
         const treeAfterReplace = replaceNode(prevTree);
-        return splitNode(treeAfterReplace, nodeId, splitTabId, direction, null, nodeId);
+        let result = splitNode(treeAfterReplace, nodeId, splitTabId, direction, null, nodeId);
+        if (splitSize !== undefined) {
+          const applySizes = (n) => {
+            if (n.type === 'split' && n.children.some(c => c.id === nodeId || c.tabId === splitTabId)) {
+              return { ...n, children: n.children.map(c => {
+                if (c.tabId === splitTabId) return { ...c, size: splitSize };
+                if (c.id === nodeId || c.tabId === replaceTabId) return { ...c, size: 100 - splitSize };
+                return c;
+              })};
+            }
+            if (n.type === 'split') return { ...n, children: n.children.map(applySizes) };
+            return n;
+          };
+          result = applySizes(result);
+        }
+        return result;
       });
     };
     window.addEventListener('ycs-replace-and-split', handleReplaceAndSplit);
@@ -876,7 +973,7 @@ export default function Workspace({ tree, setTree, activeNodeId, selectedTiles, 
   };
 
   return (
-    <div className="workspace-container">
+    <div className="workspace-container" ref={containerRef}>
       {renderGlobalDropZone('top')}
       {renderGlobalDropZone('bottom')}
       {renderGlobalDropZone('left')}

@@ -70,7 +70,6 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
                 .unlockedBy("has_crate", has(ModItems.PLANK.get())).save(recipeOutput);
 
         //YCS_Mod_Recipe_Provider_START
-
         //YCS_Mod_Recipe_Provider_END
 
     }

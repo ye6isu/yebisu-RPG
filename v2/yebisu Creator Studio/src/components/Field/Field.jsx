@@ -12,6 +12,37 @@ export function FieldRow({ label, children }) {
   );
 }
 
+export function NumberInput({ value, onChange, style = {} }) {
+  return (
+    <input
+      className="ycs-string-input"
+      type="text"
+      inputMode="numeric"
+      value={value}
+      onChange={e => {
+        const v = e.target.value;
+        if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) onChange(v);
+      }}
+      style={{ width: '80px', ...style }}
+    />
+  );
+}
+
+export function Divider({ style = {} }) {
+  return <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', ...style }} />;
+}
+
+export function findNodeByTabId(tree, tabId) {
+  let found = null;
+  const search = (n) => {
+    if (!n) return;
+    if (n.type === 'leaf' && n.tabId === tabId) found = n;
+    if (n.type === 'split') n.children.forEach(search);
+  };
+  if (tree) search(tree);
+  return found;
+}
+
 export function StringField({ value, onChange, placeholder, style = {} }) {
   return (
     <input 

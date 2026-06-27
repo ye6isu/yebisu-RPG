@@ -1,6 +1,7 @@
 import React from 'react';
 import RegistryLandingPage from './RegistryLandingPage';
 import { DEFAULT_FORM } from './ItemPageNew';
+import { removeItem } from '../codegen/itemInjector';
 
 const EXCLUDED_CLASSES = ['ArmorItem', 'SpawnEgg'];
 
@@ -39,6 +40,32 @@ function loadItems() {
   return window.electronAPI?.fileEngine?.items?.scanAll();
 }
 
+function cleanupItemStorage(itemId) {
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (
+      key.startsWith(`ycs-blocky::item::${itemId}::`) ||
+      key === `ycs-methods::item::${itemId}` ||
+      (key.startsWith('ycs-blocky-seed::') && localStorage.getItem(key)?.startsWith(`item::${itemId}::`))
+    )) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+}
+
+async function handleDeleteEntry(itemId, reload) {
+  try {
+    await removeItem(itemId);
+    cleanupItemStorage(itemId);
+    reload();
+    window.dispatchEvent(new CustomEvent('ycs-item-changed'));
+  } catch (err) {
+    console.error('Failed to delete item:', err);
+  }
+}
+
 export default function ItemsLandingPage(props) {
   return (
     <RegistryLandingPage
@@ -49,6 +76,7 @@ export default function ItemsLandingPage(props) {
       editorPrefix="Item"
       seedFormData={seedFormData}
       entryKey={entry => entry.id}
+      onDeleteEntry={handleDeleteEntry}
     />
   );
 }

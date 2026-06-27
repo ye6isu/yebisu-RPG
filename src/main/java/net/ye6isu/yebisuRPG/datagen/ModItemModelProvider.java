@@ -90,6 +90,8 @@ basicItem(ModItems.YE6ISU.get());
 
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/yasuo_katana"),TEXTURE);
 
+
+        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/gun"),TEXTURE);
         //YCS_Mod_Item_Model_END
     }
 

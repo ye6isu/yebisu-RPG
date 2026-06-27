@@ -179,10 +179,17 @@ function App() {
   const removeNodes = (node, idsToRemove) => {
     if (idsToRemove.includes(node.id)) return null;
     if (node.type === 'split') {
+      const removedSizes = node.children
+        .filter(c => idsToRemove.includes(c.id) && c.size !== undefined)
+        .reduce((sum, c) => sum + c.size, 0);
       const newChildren = node.children.map(c => removeNodes(c, idsToRemove)).filter(Boolean);
       if (newChildren.length === 0) return null;
       if (newChildren.length === 1) {
         return { ...newChildren[0], size: node.size };
+      }
+      if (removedSizes > 0 && newChildren.length >= 2) {
+        const lastIdx = newChildren.length - 1;
+        newChildren[lastIdx] = { ...newChildren[lastIdx], size: (newChildren[lastIdx].size || 1) + removedSizes };
       }
       return { ...node, children: newChildren };
     }
@@ -778,6 +785,25 @@ function App() {
                 >
                   <div style={{ width: '14px', flexShrink: 0 }} />
                   Block Editor
+                </div>
+                <div
+                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Creative Tabs' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('Creative Tabs')}
+                  draggable
+                  onDragStart={(e) => {
+                    if (!e.ctrlKey) { e.preventDefault(); return; }
+                    e.dataTransfer.setData('tabId', 'Creative Tabs');
+                    e.dataTransfer.setData('ycs-tab', 'true');
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      window.electronAPI?.openPopout('Creative Tabs');
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
+                >
+                  <div style={{ width: '14px', flexShrink: 0 }} />
+                  Creative Tabs
                 </div>
               </div>
             )}

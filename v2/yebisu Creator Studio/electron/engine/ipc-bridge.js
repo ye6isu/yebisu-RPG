@@ -32,9 +32,18 @@ function registerFileEngineIPC(ipcMain) {
     return files.readFile(resolved, encoding);
   }));
 
+  ipcMain.handle('ycs:files:readAbsolute', wrap((event, absolutePath, encoding) => {
+    return files.readFile(absolutePath, encoding);
+  }));
+
   ipcMain.handle('ycs:files:write', wrap((event, relativePath, content) => {
     const resolved = files.resolveModPath(relativePath);
     files.writeFile(resolved, content);
+  }));
+
+  ipcMain.handle('ycs:files:writeBase64', wrap((event, relativePath, base64Data) => {
+    const resolved = files.resolveModPath(relativePath);
+    files.writeBase64(resolved, base64Data);
   }));
 
   ipcMain.handle('ycs:files:copy', wrap((event, srcRelative, destRelative) => {

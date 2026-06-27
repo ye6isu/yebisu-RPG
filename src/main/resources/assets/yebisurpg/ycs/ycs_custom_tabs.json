@@ -1,6 +1,9 @@
 [
   {
-    "key": "yebisurpg_tab",
-    "iconRef": "cycle:2000"
+    "key": "testtab",
+    "displayName": "Test Tab",
+    "iconRef": "cycle:2000",
+    "iconMode": "cycle",
+    "cycleMs": 2000
   }
 ]

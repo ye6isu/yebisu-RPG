@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StandardDropdownField } from './Field/Field';
+import { StandardDropdownField, NumberInput, Divider } from './Field/Field';
 import ItemSelector from './ItemSelector';
 
 const SHAPE_OPTIONS = [
@@ -13,6 +13,7 @@ function makeDefault() {
   return {
     craftingEnabled: true,
     craftingShape: 'shaped',
+    craftingCount: 1,
     slots: [null, null, null, null, null, null, null, null, null],
     smeltingEnabled: false, smeltingInput: null, smeltingXP: '0.1', smeltingTime: '200',
     blastingEnabled: false, blastingInput: null, blastingXP: '0.1', blastingTime: '100',
@@ -25,11 +26,6 @@ function makeDefault() {
 function readState(id) { try { const r = localStorage.getItem(STORAGE_PREFIX + id); return r ? JSON.parse(r) : null; } catch { return null; } }
 function writeState(id, d) { localStorage.setItem(STORAGE_PREFIX + id, JSON.stringify(d)); }
 
-const NumberInput = ({ value, onChange, style = {} }) => (
-  <input className="ycs-string-input" type="text" inputMode="numeric" value={value}
-    onChange={e => { const v = e.target.value; if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) onChange(v); }}
-    style={{ width: '60px', ...style }} />
-);
 
 const SlotSquare = React.forwardRef(({ item, selected, onClick, onMouseEnter, onContextMenu, size = 48 }, ref) => (
   <div ref={ref} onClick={onClick} onMouseEnter={onMouseEnter} onContextMenu={onContextMenu}
@@ -66,7 +62,6 @@ const SectionCheckbox = ({ label, checked, onChange }) => (
   </label>
 );
 
-const Divider = () => <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', margin: '12px 0' }} />;
 
 // Inline ingredient slot — smaller, used for cook/stonecutter rows
 const InlineSlot = React.forwardRef(({ item, selected, onClick, onContextMenu }, ref) => (
@@ -215,7 +210,17 @@ export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree
                       ref={el => slotRefs.current[i] = el}
                       item={slot}
                       selected={picker?.slot === i}
-                      onClick={() => openPicker(i, slotRefs.current[i])}
+                      onClick={() => {
+                        if (brushItem != null) {
+                          setRecipe(prev => {
+                            const slots = [...prev.slots];
+                            slots[i] = brushItem;
+                            return { ...prev, slots };
+                          });
+                        } else {
+                          openPicker(i, slotRefs.current[i]);
+                        }
+                      }}
                       onMouseEnter={() => handleSlotHover(i)}
                       onContextMenu={e => clearGridSlot(e, i)}
                     />
@@ -225,25 +230,34 @@ export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree
                   <div style={{ width: '120px' }}>
                     <StandardDropdownField value={recipe.craftingShape} onChange={v => R('craftingShape', v)} options={SHAPE_OPTIONS} />
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <NumberInput value={String(recipe.craftingCount || 1)} onChange={v => R('craftingCount', Math.max(1, parseInt(v) || 1))} />
+                    <span style={{ fontSize: '10px', opacity: 0.4 }}>count</span>
+                  </div>
                 </div>
               </div>
-              {brushItem && (
-                <div style={{ marginTop: '6px', fontSize: '10px', opacity: 0.5 }}>
-                  Brush: <strong>{brushItem.replace(/^[#]?[^:]+:/, '')}</strong> — hover slots to paint, right-click to clear
+              {brushItem != null && (
+                <div style={{ marginTop: '6px', fontSize: '10px', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>Brush: <strong>{brushItem.replace(/^[#]?[^:]+:/, '')}</strong> — click slots to paint, right-click to clear</span>
+                  <button className="ycs-button icon" onClick={() => setBrushItem(null)} title="Clear brush" style={{ width: '22px', height: '22px', minWidth: '22px', padding: 0, flexShrink: 0 }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
                 </div>
               )}
             </div>
           )}
 
-          <Divider />
+          <Divider style={{ margin: '12px 0' }} />
           {renderCookRow('smelting', 'Smelting')}
-          <Divider />
+          <Divider style={{ margin: '12px 0' }} />
           {renderCookRow('blasting', 'Blasting')}
-          <Divider />
+          <Divider style={{ margin: '12px 0' }} />
           {renderCookRow('smoking', 'Smoking')}
-          <Divider />
+          <Divider style={{ margin: '12px 0' }} />
           {renderCookRow('campfire', 'Campfire Cooking')}
-          <Divider />
+          <Divider style={{ margin: '12px 0' }} />
 
           {/* ── Stonecutting ───────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

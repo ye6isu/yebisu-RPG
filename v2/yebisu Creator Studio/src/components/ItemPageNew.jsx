@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StringField, StandardDropdownField, DropdownField } from './Field/Field';
+import { StringField, StandardDropdownField, DropdownField, NumberInput, findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
 import SpritePreview from './SpritePreview';
+import { injectItem, removeItem, isItemInjected } from '../codegen/itemInjector';
 
 const HOLDING_MODES = [
   { label: 'Default', value: 'none' },
@@ -154,19 +155,7 @@ const TOOL_TYPES = [
   { label: 'Hoe', value: 'Hoe' },
 ];
 
-const NumberInput = ({ value, onChange, style = {} }) => (
-  <input
-    className="ycs-string-input"
-    type="text"
-    inputMode="numeric"
-    value={value}
-    onChange={e => {
-      const v = e.target.value;
-      if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) onChange(v);
-    }}
-    style={{ width: '80px', ...style }}
-  />
-);
+
 
 const SectionHeader = ({ title }) => (
   <h2 style={{ marginTop: 0, fontSize: '16px', fontWeight: '500', color: 'var(--ycs-text)', marginBottom: '15px' }}>{title}</h2>
@@ -202,6 +191,7 @@ export const DEFAULT_FORM = {
   durability: '100',
   hasUseDuration: false,
   useDuration: '72000',
+  useAnimation: 'NONE',
   hasTooltip: false,
   tooltipNormal: '',
   hasHiddenTooltip: false,
@@ -285,9 +275,16 @@ function usePersistedForm(nodeId, tabId) {
   return { form, F, setForm };
 }
 
-export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
+export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tabId }) {
   const formKey = tabId || nodeId || 'item-default';
   const { form, F, setForm } = usePersistedForm(formKey, tabId);
+  const originalIdRef = useRef(form.id || '');
+
+  useEffect(() => {
+    if (nodeId && formKey !== nodeId) {
+      writeFormToStorage(nodeId, form);
+    }
+  }, [form, nodeId, formKey]);
 
   useEffect(() => {
     if (form.multipleStates) {
@@ -302,9 +299,12 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
     }
   }, [form.stateCount, form.multipleStates]);
 
-  const updateState = (i, key, val) => {
-    F('states', form.states.map((s, idx) => idx === i ? { ...s, [key]: val } : s));
-  };
+  const updateState = useCallback((i, key, val) => {
+    setForm(prev => ({
+      ...prev,
+      states: prev.states.map((s, idx) => idx === i ? { ...s, [key]: val } : s),
+    }));
+  }, [setForm]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -353,16 +353,7 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
     return () => window.removeEventListener('ycs-model-json-changed', handler);
   }, [nodeId, formKey]);
 
-  const findNodeByTabId = (tabId) => {
-    let found = null;
-    const search = (n) => {
-      if (!n) return;
-      if (n.type === 'leaf' && n.tabId === tabId) found = n;
-      if (n.type === 'split') n.children.forEach(search);
-    };
-    if (tree) search(tree);
-    return found;
-  };
+  const findNodeByTabId = (tabId) => findNodeByTabIdUtil(tree, tabId);
 
   const isPopout = !tree;
 
@@ -418,6 +409,104 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
 
   const toggleTextureSelector = (key) => toggleChildTile('Item Texture', key);
 
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
+  const [customTabs, setCustomTabs] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const fe = window.electronAPI?.fileEngine;
+        if (!fe) return;
+        const r = await fe.json.read('resources/assets/yebisurpg/ycs/ycs_custom_tabs.json');
+        if (r?.ok && Array.isArray(r.data)) setCustomTabs(r.data);
+      } catch {}
+    })();
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!form.id) { setSaveStatus({ ok: false, msg: 'Item ID is required' }); return; }
+    if (!form.displayName) { setSaveStatus({ ok: false, msg: 'Display Name is required' }); return; }
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+      const oldId = originalIdRef.current;
+      if (oldId && oldId !== form.id) {
+        const oldInjected = await isItemInjected(oldId);
+        if (oldInjected) await removeItem(oldId);
+      }
+      const alreadyInjected = await isItemInjected(form.id);
+      if (alreadyInjected) {
+        await removeItem(form.id);
+      }
+      // Augment form with method data for custom class generation
+      const stableMethodsKey = `ycs-methods::item::${form.id}`;
+      const enabledRaw = localStorage.getItem(stableMethodsKey)
+        || localStorage.getItem('ycs-methods-enabled::Item Methods::' + tileId + '::methods');
+      const enabledMethods = enabledRaw ? JSON.parse(enabledRaw) : [];
+      const hasCustomClass = enabledMethods.length > 0 || form.hasUseDuration || (form.useAnimation && form.useAnimation !== 'NONE');
+      // Read recipe data from localStorage
+      const recipeTabId = `Item Recipe::${tileId}::recipe`;
+      const recipeRaw = localStorage.getItem('ycs-recipe::' + recipeTabId);
+      const recipeData = recipeRaw ? JSON.parse(recipeRaw) : null;
+
+      // Read data component data from localStorage
+      const dcTabId = `Data Components::${tileId}::data-components`;
+      const dcRaw = localStorage.getItem('ycs-data-components::' + dcTabId);
+      const dataComponents = dcRaw ? JSON.parse(dcRaw) : [];
+
+      const augmented = {
+        ...form,
+        hasCustomClass,
+        enabledMethods,
+        blockEditorPrefix: `item::${form.id}`,
+        recipeData,
+        dataComponents,
+      };
+      const results = await injectItem(augmented);
+      const allOk = results.every(r => r.ok);
+      setSaveStatus({ ok: allOk, msg: allOk ? 'Saved & injected' : 'Partial failure', results });
+      if (allOk) {
+        originalIdRef.current = form.id;
+        window.dispatchEvent(new CustomEvent('ycs-item-changed'));
+      }
+    } catch (err) {
+      setSaveStatus({ ok: false, msg: err.message });
+    } finally {
+      setSaving(false);
+    }
+  }, [form]);
+
+  const cleanupItemStorage = useCallback((itemId) => {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.startsWith(`ycs-blocky::item::${itemId}::`) ||
+        key === `ycs-methods::item::${itemId}` ||
+        key.startsWith(`ycs-blocky-seed::`) && localStorage.getItem(key)?.startsWith(`item::${itemId}::`)
+      )) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  }, []);
+
+  const handleDelete = useCallback(async () => {
+    if (!form.id) return;
+    setSaving(true);
+    try {
+      await removeItem(form.id);
+      cleanupItemStorage(form.id);
+      setSaveStatus({ ok: true, msg: 'Removed from mod' });
+      window.dispatchEvent(new CustomEvent('ycs-item-changed'));
+    } catch (err) {
+      setSaveStatus({ ok: false, msg: err.message });
+    } finally {
+      setSaving(false);
+    }
+  }, [form.id]);
+
   const handleIdChange = (v) => {
     const sanitized = v.toLowerCase().replace(/[^a-z0-9_]/g, '');
     setForm(prev => ({
@@ -461,7 +550,25 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
 
         <SectionHeader title="Appearance" />
 
-        <CheckboxRow label="Multiple States" checked={form.multipleStates} onChange={v => { F('multipleStates', v); if (v && form.stateCount < 2) F('stateCount', 2); }} />
+        <CheckboxRow label="Multiple States" checked={form.multipleStates} onChange={v => {
+          if (v) {
+            // Switching to multistate: close single-state child tiles
+            const mainTex = findNodeByTabId(`Item Texture::${tileId}::main`);
+            if (mainTex) window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: mainTex.id } }));
+            const mainModel = findNodeByTabId(`Item Model JSON::${tileId}::model-json`);
+            if (mainModel) window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: mainModel.id } }));
+          } else {
+            // Switching from multistate: close all state child tiles
+            for (let i = 0; i < 16; i++) {
+              const stTex = findNodeByTabId(`Item Texture::${tileId}::state-${i}`);
+              if (stTex) window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: stTex.id } }));
+              const stModel = findNodeByTabId(`Item Model JSON::${tileId}::state-${i}-model-json`);
+              if (stModel) window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: stModel.id } }));
+            }
+          }
+          F('multipleStates', v);
+          if (v && form.stateCount < 2) F('stateCount', 2);
+        }} />
 
         {!form.multipleStates ? (
           <>
@@ -523,11 +630,7 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
 
         <SectionHeader title="Properties" />
 
-        <FullWidthRow label="Stack Size">
-          <NumberInput value={form.stackSize} onChange={v => F('stackSize', String(Math.max(1, Math.min(99, parseInt(v) || 64))))} />
-        </FullWidthRow>
-
-        <CheckboxRow label="Tool" checked={form.isTool} onChange={v => { F('isTool', v); if (v) { F('isFood', false); F('isFuel', false); if (form.holdingMode === 'none') F('holdingMode', 'handheld'); } }} />
+        <CheckboxRow label="Tool" checked={form.isTool} onChange={v => { F('isTool', v); if (v) { F('isFood', false); F('isFuel', false); } }} />
         {form.isTool && (
           <SubSection title="">
             <FullWidthRow label="Tool Type">
@@ -583,9 +686,25 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
         <CheckboxRow label="Use Duration" checked={form.hasUseDuration} onChange={v => F('hasUseDuration', v)} />
         {form.hasUseDuration && (
           <SubSection title="">
-            <FullWidthRow label="Duration (ticks)">
-              <NumberInput value={form.useDuration} onChange={v => F('useDuration', v)} />
-            </FullWidthRow>
+            <DualRow
+              label1="Duration (ticks)"
+              children1={<NumberInput value={form.useDuration} onChange={v => F('useDuration', v)} />}
+              label2="Animation"
+              children2={
+                <StandardDropdownField value={form.useAnimation} onChange={v => F('useAnimation', v)} options={[
+                  { label: 'None', value: 'NONE' },
+                  { label: 'Eat', value: 'EAT' },
+                  { label: 'Drink', value: 'DRINK' },
+                  { label: 'Block', value: 'BLOCK' },
+                  { label: 'Bow', value: 'BOW' },
+                  { label: 'Spear', value: 'SPEAR' },
+                  { label: 'Crossbow', value: 'CROSSBOW' },
+                  { label: 'Spyglass', value: 'SPYGLASS' },
+                  { label: 'Toot Horn', value: 'TOOT_HORN' },
+                  { label: 'Brush', value: 'BRUSH' },
+                ]} />
+              }
+            />
           </SubSection>
         )}
 
@@ -626,6 +745,12 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
           </SubSection>
         )}
 
+        {!form.isTool && (
+          <FullWidthRow label="Stack Size">
+            <NumberInput value={form.stackSize} onChange={v => F('stackSize', String(Math.max(1, Math.min(99, parseInt(v) || 64))))} />
+          </FullWidthRow>
+        )}
+
         <Separator />
 
         <SectionHeader title="Creative Tab" />
@@ -633,17 +758,19 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
         <FullWidthRow label="Tab">
           <DropdownField value={form.creativeTab} onChange={v => F('creativeTab', v)} options={[
             { label: 'None', value: '' },
-            { label: 'COMBAT', value: 'COMBAT' },
-            { label: 'TOOLS_AND_UTILITIES', value: 'TOOLS_AND_UTILITIES' },
-            { label: 'INGREDIENTS', value: 'INGREDIENTS' },
-            { label: 'FOOD_AND_DRINKS', value: 'FOOD_AND_DRINKS' },
-            { label: 'BUILDING_BLOCKS', value: 'BUILDING_BLOCKS' },
-            { label: 'NATURAL_BLOCKS', value: 'NATURAL_BLOCKS' },
-            { label: 'FUNCTIONAL_BLOCKS', value: 'FUNCTIONAL_BLOCKS' },
-            { label: 'REDSTONE_BLOCKS', value: 'REDSTONE_BLOCKS' },
-            { label: 'COLORED_BLOCKS', value: 'COLORED_BLOCKS' },
-            { label: 'SPAWN_EGGS', value: 'SPAWN_EGGS' },
-            { label: 'OP_BLOCKS', value: 'OP_BLOCKS' },
+            { label: 'yebisurpg_tab', value: 'yebisurpg_tab' },
+            { label: 'Combat', value: 'combat' },
+            { label: 'Tools & Utilities', value: 'tools_and_utilities' },
+            { label: 'Food & Drinks', value: 'food_and_drinks' },
+            { label: 'Ingredients', value: 'ingredients' },
+            { label: 'Building Blocks', value: 'building_blocks' },
+            { label: 'Natural Blocks', value: 'natural_blocks' },
+            { label: 'Functional Blocks', value: 'functional_blocks' },
+            { label: 'Redstone', value: 'redstone_blocks' },
+            { label: 'Colored Blocks', value: 'colored_blocks' },
+            { label: 'Spawn Eggs', value: 'spawn_eggs' },
+            { label: 'Operator', value: 'op_blocks' },
+            ...customTabs.map(t => ({ label: t.key, value: t.key })),
           ]} />
         </FullWidthRow>
 
@@ -666,8 +793,26 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
 
         <FullWidthRow label="Recipe">
           <ChildTileField
-            summary={form.hasRecipe ? form.recipeType : null}
-            hasContent={form.hasRecipe}
+            summary={(() => {
+              try {
+                const rd = JSON.parse(localStorage.getItem('ycs-recipe::Item Recipe::' + tileId + '::recipe') || 'null');
+                if (!rd) return null;
+                const parts = [];
+                if (rd.craftingEnabled && rd.slots?.some(s => s)) parts.push(rd.craftingShape || 'shaped');
+                if (rd.smeltingEnabled) parts.push('smelting');
+                if (rd.blastingEnabled) parts.push('blasting');
+                if (rd.smokingEnabled) parts.push('smoking');
+                if (rd.campfireEnabled) parts.push('campfire');
+                if (rd.stonecuttingEnabled) parts.push('stonecutting');
+                return parts.length ? parts.join(', ') : null;
+              } catch { return null; }
+            })()}
+            hasContent={(() => {
+              try {
+                const rd = JSON.parse(localStorage.getItem('ycs-recipe::Item Recipe::' + tileId + '::recipe') || 'null');
+                return rd && (rd.craftingEnabled || rd.smeltingEnabled || rd.blastingEnabled || rd.smokingEnabled || rd.campfireEnabled || rd.stonecuttingEnabled);
+              } catch { return false; }
+            })()}
             onClickSet={() => toggleChildTile('Item Recipe', 'recipe')}
             isOpen={isChildOpen('Item Recipe', 'recipe')}
           />
@@ -692,8 +837,18 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
 
         <FullWidthRow label="Components">
           <ChildTileField
-            summary={form.dataComponents.length > 0 ? `${form.dataComponents.length} component(s)` : null}
-            hasContent={form.dataComponents.length > 0}
+            summary={(() => {
+              try {
+                const dc = JSON.parse(localStorage.getItem('ycs-data-components::Data Components::' + tileId + '::data-components') || '[]');
+                return dc.length > 0 ? `${dc.length} component(s)` : null;
+              } catch { return null; }
+            })()}
+            hasContent={(() => {
+              try {
+                const dc = JSON.parse(localStorage.getItem('ycs-data-components::Data Components::' + tileId + '::data-components') || '[]');
+                return dc.length > 0;
+              } catch { return false; }
+            })()}
             onClickSet={() => toggleChildTile('Data Components', 'data-components')}
             isOpen={isChildOpen('Data Components', 'data-components')}
           />
@@ -711,9 +866,17 @@ export default function ItemPageNew({ isTile = false, nodeId, tree, tabId }) {
         backgroundColor: 'transparent',
         flexShrink: 0,
       }}>
-        <button className="ycs-button" onClick={() => {}}>Save & Close</button>
-        <button className="ycs-button" onClick={() => {}}>Cancel</button>
-        <button className="ycs-button" onClick={() => {}}>Save</button>
+        {saveStatus && (
+          <span style={{ fontSize: 11, color: saveStatus.ok ? '#5ba558' : '#e05252', marginRight: 'auto' }}>
+            {saveStatus.msg}
+          </span>
+        )}
+        <button className="ycs-button" onClick={handleDelete} disabled={saving}>Remove</button>
+        <button className="ycs-button" onClick={() => { if (onClose) onClose(); }} disabled={saving}>Cancel</button>
+        <button className="ycs-button" onClick={handleSave} disabled={saving}>Save</button>
+        <button className="ycs-button" onClick={async () => { await handleSave(); if (onClose) onClose(); }} disabled={saving}>
+          {saving ? 'Saving...' : 'Save & Close'}
+        </button>
       </div>
     </div>
   );
