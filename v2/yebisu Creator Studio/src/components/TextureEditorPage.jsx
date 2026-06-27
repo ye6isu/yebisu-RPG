@@ -73,7 +73,23 @@ function TextureFileRow({ label, form, F, urlKey, nameKey, checkboxKey, showAnim
   const hasFile = !!form[urlKey];
   const isEnabled = checkboxKey ? form[checkboxKey] : true;
 
-  const handleFile = () => {
+  const handleFile = async () => {
+    const fe = window.electronAPI?.fileEngine;
+    if (fe) {
+      const pickResult = await fe.files.pickFiles([{ name: 'Images', extensions: ['png'] }], false);
+      if (!pickResult?.ok || !pickResult.data || pickResult.data.length === 0) return;
+      const filePath = pickResult.data[0];
+      const fileName = filePath.split(/[\\/]/).pop();
+      const result = await fe.files.readAbsolute(filePath, 'base64');
+      if (!result?.ok || !result.data) return;
+      F(urlKey, `data:image/png;base64,${result.data}`);
+      F(nameKey, fileName);
+      if (urlKey === 'dataUrl' && !form.label) {
+        const base = fileName.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        if (base) F('label', base);
+      }
+      return;
+    }
     const f = ref.current.files[0];
     if (!f) return;
     const reader = new FileReader();

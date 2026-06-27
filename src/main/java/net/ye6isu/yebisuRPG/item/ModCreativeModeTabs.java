@@ -21,6 +21,11 @@ public class ModCreativeModeTabs {
             .title(Component.translatable("creativetab.yebisurpg.yebisurpg_tab"))
             .build());
 
+
+    public static final java.util.function.Supplier<CreativeModeTab> TESTTAB = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("testtab", () -> CreativeModeTab.builder()
+            .icon(() -> new ItemStack(ModItems.ITEMS.getEntries().iterator().next().get()))
+            .title(Component.translatable("creativetab.yebisurpg.testtab"))
+            .build());
     //YCS_Mod_Creative_Tabs_END
 
     public static void register(IEventBus eventBus) {

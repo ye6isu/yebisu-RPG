@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FieldRow, StringField, StandardDropdownField, DropdownField } from './Field/Field';
+import { FieldRow, StringField, StandardDropdownField, DropdownField, NumberInput } from './Field/Field';
 
 const TIERS = [
   { label: 'Wood', value: 'Wood' },
@@ -76,15 +76,6 @@ const SubSection = ({ children }) => (
   </div>
 );
 
-const NumberInput = ({ value, onChange, style = {} }) => (
-  <input
-    className="ycs-string-input"
-    type="number"
-    value={value}
-    onChange={e => onChange(e.target.value)}
-    style={{ width: '80px', ...style }}
-  />
-);
 
 export default function ItemPage({ isTile = false }) {
   const [displayName, setDisplayName] = useState('');

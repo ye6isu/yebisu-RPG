@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import SpritePreview from './SpritePreview';
+import { findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
 
 const CARD_SIZE = 120;
 const popoutChildren = new Set();
@@ -20,16 +21,7 @@ export default function TextureManagerPage({ isTile = false, onClose, nodeId, tr
     return () => window.removeEventListener('ycs-textures-changed', handler);
   }, [reload]);
 
-  const findNodeByTabId = (tabId) => {
-    let found = null;
-    const search = (n) => {
-      if (!n) return;
-      if (n.type === 'leaf' && n.tabId === tabId) found = n;
-      if (n.type === 'split') n.children.forEach(search);
-    };
-    if (tree) search(tree);
-    return found;
-  };
+  const findNodeByTabId = (tabId) => findNodeByTabIdUtil(tree, tabId);
 
   const isPopout = !tree;
 

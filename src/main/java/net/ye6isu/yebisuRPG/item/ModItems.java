@@ -52,6 +52,9 @@ public class ModItems {
                 () -> new YasuoKatanaItem(new Item.Properties()
                         .attributes(SwordItem.createAttributes(Tiers.NETHERITE, 3f, -2.4f))));
 
+
+    public static final DeferredItem<GunItem> GUN = ITEMS.register("gun",
+            () -> new GunItem(new Item.Properties().stacksTo(1)));
     //YCS_Mod_Items_END
 
     public static void register(IEventBus eventBus) {

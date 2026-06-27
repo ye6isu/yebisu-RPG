@@ -135,7 +135,7 @@ The left sidebar organizes tabs into collapsible groups. Each group has an arrow
 - **Reference** — Test tabs (Tab 1, Tab 2, Tab 3 Group)
 - **Gameplay** — Items, Item (Old)
 
-**Current `COMPONENT_REGISTRY` keys:** `Preferences`, `Tab 1`, `Tab 2`, `Tab 3.3`, `Items` (landing page), `Item (Old)`, `Item` (ItemPageNew), `Item Texture` (TextureSelectorPage), `Item Tags` (TagEditorPage), `Item Recipe` (RecipeEditorPage), `Item Methods` (MethodEditorPage), `Item Model JSON` (ModelJsonPage), `Data Components` (DataComponentEditorPage), `Textures` (TextureManagerPage), `Texture Editor` (TextureEditorPage), `Preview` (PreviewPane).
+**Current `COMPONENT_REGISTRY` keys:** `Preferences`, `Tab 1`, `Tab 2`, `Tab 3.3`, `Items` (landing page), `Item (Old)`, `Item` (ItemPageNew), `Item Texture` (TextureSelectorPage), `Item Tags` (TagEditorPage), `Item Recipe` (RecipeEditorPage), `Item Methods` (MethodEditorPage), `Item Model JSON` (ModelJsonPage), `Data Components` (DataComponentEditorPage), `Textures` (TextureManagerPage), `Texture Editor` (TextureEditorPage), `Preview` (PreviewPane), `Block Editor` (BlockEditorPage), `Block Palette` (BlockPalettePage).
 
 ## Registry Landing Pages
 
@@ -253,7 +253,7 @@ When the parent component is in a popout window (no workspace tree available), c
 
 ### Recipe Editor
 `RecipeEditorPage.jsx` is a child tile for defining recipes. The output is always the item being edited — no output slot is shown. Layout:
-- **Crafting**: Checkbox toggle → 3x3 ingredient grid (with brush painting: pick an item from the floating selector, hover other slots to paint, right-click to clear) + shape dropdown (Shaped/Shapeless).
+- **Crafting**: Checkbox toggle → 3x3 ingredient grid (with brush painting: pick an item from the floating selector, hover other slots to paint, right-click to clear) + shape dropdown (Shaped/Shapeless) + count (how many items the recipe produces).
 - **Smelting/Blasting/Smoking/Campfire Cooking**: Checkbox toggle → inline ingredient slot + cook time (ticks) + XP, all on one compact row.
 - **Stonecutting**: Checkbox toggle → full-size ingredient input slot + count (no XP, no cook time).
 
@@ -263,7 +263,19 @@ Slots open the `ItemSelector` floating popover anchored to the clicked slot. Mul
 `MethodEditorPage.jsx` is a child tile for enabling Java method overrides on the item's custom class. Uses the same method definitions as the old YCS v1 visual block editor (`tools/Yebisu Creator Studio/src/codegen/visual/methods.js`). Each method is a checkbox with its label, Java signature, and description. Enabled methods: `useOn` (block interaction), `use` (right-click), `continuousUse` (onUseTick), `releaseUsing`, `finishUsingItem`, `inventoryTick`, `hurtEnemy` (combat), `interactLivingEntity` (entity right-click). Enabling a method generates the corresponding `@Override` stub in the custom item class.
 
 ### Child Tile Space Reclamation
-When a child tile is closed, the workspace automatically collapses the split and the remaining sibling reclaims the full space. This is handled by `removeNodes` in `App.jsx` and `handleCloseTab` in `Workspace.jsx` — both collapse single-child splits: `if (newChildren.length === 1) return { ...newChildren[0], size: node.size }`.
+When a child tile is closed, the workspace automatically collapses the split and the remaining sibling reclaims the full space. This is handled by `removeNodes` in `App.jsx` and `handleCloseTab` in `Workspace.jsx` — both collapse single-child splits: `if (newChildren.length === 1) return { ...newChildren[0], size: node.size }`. In 3+ child splits, the closed tile's `size` is added to its nearest remaining sibling (not distributed proportionally across all siblings), so only the adjacent tile expands. After removal, `rebalanceSizes()` adjusts the parent split's proportions based on each child's minimum pixel requirements.
+
+### Automatic Split Rebalancing
+When child tiles are opened or closed, `rebalanceSizes(node, parentPx)` in `Workspace.jsx` walks the tree and adjusts split proportions so every child can fit its minimum pixel requirements. It uses the **actual container pixel width** (read from `containerRef`) — not a worst-case proportional estimate — so it only intervenes when a child genuinely cannot fit at the current window size.
+
+**How it works:**
+1. For each child in a split, compute `minSizeUnits = (childMinPx / availablePx) * totalSize` — the minimum size-units the child needs at the current container width.
+2. If every child's current size already exceeds its `minSizeUnits`, do nothing (the column is wide enough).
+3. Otherwise, bump under-sized children to exactly their `minSizeUnits` (one extra min-width, not more), taking the deficit proportionally from children that have surplus.
+
+**Key constraint:** Rebalancing never expands a child beyond its minimum requirement. A narrow palette column that gains one child tile expands by exactly one tile's worth of min-width — it does not snap to a proportional-of-total-min layout. If the column was manually resized wider and already fits the child, rebalancing is a no-op.
+
+The `ycs-replace-and-split` event also supports a `splitSize` parameter for custom initial proportions (e.g., the block palette uses `splitSize: 20` for a 20/80 split).
 
 ### Texture Selector (Item Texture)
 `TextureSelectorPage.jsx` is a child tile opened from the item editor's Texture field. It shows saved textures as a card grid (same style as the Textures landing page) without the `+` button. An **upload card** appears first — a dashed-border card with an upload icon that opens the native file explorer or accepts drag-and-drop from the desktop. Uploading saves the texture to `ycs-textures-list` and auto-selects it.
@@ -276,7 +288,13 @@ The `TextureField` in `ItemPageNew.jsx` shows a 24x24 `SpritePreview` (animated 
 Cards in landing pages show a **delete button** on hover at the top-right corner. The button is a white opaque circle (18x18) with a transparent minus sign cut out via SVG mask. Clicking it removes the entry from localStorage and dispatches the relevant change event. `stopPropagation()` prevents the card click handler from firing.
 
 ### Number Inputs
-Use `type="text"` with `inputMode="numeric"` and manual regex validation (`/^-?\d*\.?\d*$/`) instead of `type="number"` to avoid browser-native spinner buttons. See `NumberInput` in `ItemPageNew.jsx`.
+Use `type="text"` with `inputMode="numeric"` and manual regex validation (`/^-?\d*\.?\d*$/`) instead of `type="number"` to avoid browser-native spinner buttons. Use the shared `NumberInput` component exported from `Field.jsx`. Default width is `80px`, overridable via `style` prop.
+
+### Shared Utility Components (Field.jsx)
+`Field.jsx` exports all reusable form components and workspace utilities. Always import from here — never duplicate locally:
+- **`NumberInput`** — Numeric text input with regex validation (no browser spinners).
+- **`Divider`** — Standard 1px horizontal separator. Accepts optional `style` prop for margins.
+- **`findNodeByTabId(tree, tabId)`** — Searches the workspace tree for a leaf node matching the given `tabId`. Used by landing pages and editors to check if a child tile is already open (toggle behavior).
 
 ### Item Form Section Order
 The item editor form follows this top-to-bottom structure:

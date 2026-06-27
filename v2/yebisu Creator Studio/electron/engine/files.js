@@ -55,6 +55,12 @@ function writeFile(filePath, content) {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
+function writeBase64(filePath, base64Data) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const buf = Buffer.from(base64Data, 'base64');
+  fs.writeFileSync(filePath, buf);
+}
+
 function copyFile(src, dest) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
@@ -161,6 +167,7 @@ module.exports = {
   resolveModRootPath,
   readFile,
   writeFile,
+  writeBase64,
   copyFile,
   importFile,
   deleteFile,

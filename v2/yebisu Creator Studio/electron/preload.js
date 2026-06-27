@@ -21,7 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     files: {
       read: (relativePath, encoding) => ipcRenderer.invoke('ycs:files:read', relativePath, encoding),
+      readAbsolute: (absolutePath, encoding) => ipcRenderer.invoke('ycs:files:readAbsolute', absolutePath, encoding),
       write: (relativePath, content) => ipcRenderer.invoke('ycs:files:write', relativePath, content),
+      writeBase64: (relativePath, base64Data) => ipcRenderer.invoke('ycs:files:writeBase64', relativePath, base64Data),
       copy: (src, dest) => ipcRenderer.invoke('ycs:files:copy', src, dest),
       delete: (relativePath) => ipcRenderer.invoke('ycs:files:delete', relativePath),
       deleteDir: (relativePath) => ipcRenderer.invoke('ycs:files:deleteDir', relativePath),

@@ -1,193 +1,334 @@
-# YCS Blocky Editor — Complete Guide
+# YCS Blocky Editor — v2 Implementation Guide
 
 ---
 
-## 1. The Visual Canvas (Background & Navigation)
-- **Background Dots**: CSS `radial-gradient(circle, #1a1a1e 1px, transparent 1px)`, spaced `24px`.
-- **Zoom**: Mouse wheel, `0.4x`–`2.0x`. Recalculates pan using cursor as `transformOrigin` anchor.
-- **Pan**: Click-drag on `.canvas-bg`.
-- **Empty State**: When only the "Start" node exists with no children, a faded watermark displays `</>`, "drag blocks here", and "connect to Start to run".
+## 1. Architecture Overview
+
+The v2 block editor lives in a single file: `src/components/BlockEditorPage.jsx`. It exports two components:
+- `BlockEditorPage` (default) — the main canvas tile
+- `BlockPalettePage` — the palette sidebar tile
+
+Block definitions come from `src/codegen/visual/blockDefs.js` via `BLOCK_DEFS` array and `blockDefRegistry` Map. Label parsing via `src/codegen/visual/labelParser.js` (`parseLabel`, `extractSlotDefs`).
+
+No separate renderer file — all rendering, drag/drop, snapping, settings, and palette are in `BlockEditorPage.jsx`.
 
 ---
 
-## 2. Block Colors
+## 2. Key Constants
 
-Colors signal category at a glance. All blocks in the same category share one color — never add per-opcode overrides.
-
-| Category | Opcode pattern | Hex | Description |
-|---|---|---|---|
-| Start | `isSt` | `#1e293b` | Dark Blue |
-| Animation | `anim.*` | `#3a5c3a` | All FP anim blocks (play, stop, pause, resume, handpose) |
-| Logic / Control | `logic.*`, `entity.is_crouching`, `control.if` | `#6494a4` | Conditionals and boolean values |
-| Effects | `effect.apply` | `#c46c94` | Potion / mob effect blocks |
-| Text value | `linkType === "text"` | `#5ba558` | Text literal nodes |
-| Entity value | `linkType === "entity"` | `#30e1b9` | Entity reference nodes |
-| Number value | `linkType === "number"` | `#4d65b4` | Number literal and number link nodes |
-| Item Stack value | `linkType === "itemstack"` | `#945d66` | Item stack reference nodes |
-| Disconnected | — | `#4a4a5a` | Dimmed Grey, opacity `0.6` |
-
-### Block Color Rule — Return Type Determines Color
-
-Data blocks (getters) use the color of the **type they return**, not the category they operate on. For example, a block that reads an item stack property but returns a number uses the number color (`#4d65b4`), not the item stack color (`#945d66`). The block's `color` field in `blockDefs.js` must match its `linkType`.
-
-### Dynamic Block Colors
-
-Blocks with `dynamicLinkType` (variable.get/set, datacomp.get/set) change their color based on the selected type field. The `_typeColor` helper maps: `bool`/`logic` → `#6494a4`, `string`/`text` → `#5ba558`, `entity` → `#30e1b9`, `itemstack` → `#945d66`, default → `#4d65b4`. This is resolved automatically for JSON-defined blocks via `dynamicLinkType.field`.
-
-### Dropdown Selection Must Not Disconnect Valid Slots
-
-When a dropdown selection changes a block's type (e.g. picking a different variable or data component), only clear connected slots if the type actually changed. Never unconditionally clear slots — check `oldType !== newType` before calling `__clearSlot`.
-
-### Dropdown Style
-
-All dropdowns in block rendering use `PortalSelect` — a portal-based dropdown matching the search dropdown style (dark trigger button with `▾`, portaled list with hover highlighting). Never use native `<select>` elements in blocks. For dropdowns that need search, use `AttrDropdown`/`EffectDropdown`/`VarDropdown`/`DataCompDropdown`. For simple option lists, use `PortalSelect` with an `options` array.
-
-When adding a new block:
-- For JSON blocks, set `color` in the block definition. For dynamic-color blocks, use `dynamicLinkType`.
-- For hardcoded blocks, add to the `_dynColor` check or `isAnimBlock`/`isLogicBlock` group in `CanvasNode`.
-
----
-
-## 3. Block Width
-
-Action blocks use `width: "fit-content"` with `minWidth: 50` — they shrink to their content. Never set a large fixed `minWidth` (e.g. 300) as it adds empty right padding on blocks with few slots.
-
----
-
-## 4. Shape Dimensions & Inline Variable Injection
-
-### Action Blocks (Sequential Control Flow)
-- **Height**: Base `50px`. Border radius `10px`.
-- **Z-Index**: Connected blocks use `node.depth`; disconnected at `z-index: 50`; value blocks at `z-index: 100`.
-- **Visual Warning**: Floating action blocks get opacity `0.6` and a red warning badge (`#e11d48`).
-
-### Value / Link Blocks (Inline Variables & Data)
-- **Floating**: Auto height, `10px` border radius, `8px 10px` padding.
-- **Inline (Slotted)**: Height collapses to `30px`, no border radius, no padding, `box-shadow: 0 2px 6px rgba(0,0,0,.3)`.
-- **Render Delegation**: Slotted value blocks skip main canvas rendering — `SlotConn` renders them inline.
-
----
-
-## 5. The "Puzzle Nub" System & Text Spacing
-
-### Key (On the Value Block)
-- `10px` wide, `20px` high, center-left, `border-radius: 10px 0 0 10px`.
-
-### Lock (On the Target Slot)
-- `30px` high, min `50px` wide, `marginLeft: 10px`.
-- Cutout half-circle at `left: -8px` — fits inside the `10px` margin, leaving a `2px` visual gap.
-
----
-
-## 6. Advanced Control Flow (C-Shapes)
-- `If` block header: `50px` row with condition slot.
-- **Gap Spacers**: Transparent `<div>` with height bound to `node.gapHeights?.do0`, pushing content down.
-
-### Settings Popups
-
-All settings popups use `SettingsPortal` — a portal-based overlay that:
-- Uses `ReactDOM.createPortal` with `position:"fixed"` to escape the block's stacking context
-- Matches dropdown visual style: `#1e1e1e` background, `1px solid #3a3a3c` border, `boxShadow: "0 4px 16px rgba(0,0,0,0.8)"`
-- Positions above the gear icon that triggered it (anchored via `settingsAnchorRef`)
-- Has a fixed close button (✕) in the top-right of the header
-- Closes on outside click (mousedown listener on document)
-- Never use `position: "absolute"` with hardcoded `top` offsets for settings — always use `SettingsPortal`
-
----
-
-## 7. Drag & Drop Architecture
-- **Sequential Snapping**: Distance to other block bottoms, threshold `60px`.
-- **Value Snapping**: `document.querySelectorAll('.slot-conn')`, bounding rect hypotenuse, threshold `50px`, type-matched.
-- **Hover Flags**: `window.__hoveredSlot = { nodeId, sk }`.
-- **Context Menu**: Right-click → `window.__showYcsCtx(node.id, e.clientX, e.clientY)`.
-
----
-
-## 8. Scroll Behavior — Canvas Zoom vs. Panel Scroll
-
-Stop wheel propagation on any scrollable element over the canvas:
 ```js
-onWheel={e => e.stopPropagation()}
+const BLOCK_H = 50;         // action block minHeight
+const BLOCK_RADIUS = 10;    // border-radius for all blocks
+const SNAP_THRESHOLD = 60;  // px distance for chain and body-slot snapping
 ```
-Apply to: palette sidebar, `AttrDropdown` list, any scrollable panel/popover.
 
 ---
 
-## 9. Dropdown Portaling — Escaping Block Stacking Contexts
+## 3. Core Helper Functions
 
-Use `ReactDOM.createPortal` to render dropdown lists under `document.body`:
-```js
-const rect = anchorRef.current.getBoundingClientRect();
-ReactDOM.createPortal(
-  <div style={{ position:"fixed", top: rect.bottom+2, left: rect.left, zIndex: 99999 }}>
-    {/* list items */}
-  </div>,
-  document.body
-)
-```
-- Use `position: fixed`, capture `rect` at open time.
-- Close on outside `mousedown`; `stopPropagation` on the portaled list itself.
-- `AttrDropdown` is the reference implementation.
+### `evalCondition(cond, fields)`
+Evaluates `showIf` expressions on fields and settings. Supports:
+- `"fieldName"` — bare field check (truthy)
+- `"field == 'value'"` — equality
+- `"field != 'value'"` — inequality
+
+### `getBodyKeys(node, bdef)`
+Returns all body slot keys for a node. Centralized logic — use this everywhere instead of ad-hoc `bdef.body`/`bdef.bodyConfig` checks.
+- `bdef.body` → keys from body object (e.g. `['do0']`)
+- `bdef.bodyConfig` → adds `'do0'` if not already present
+- `entity.dash` → conditional `do0` (collision) and `do1` (then) based on toggle fields
+- `control.if` → dynamic `do1..doN` (else-if) and `doElse` based on `elseIfCount` and `hasElse`
+
+### `isBodyBlock(node, bdef)`
+Returns `true` if the node has `body` or `bodyConfig`. Used for chain tracking, slotted ID computation, and rendering decisions.
+
+### `getDynamicAccepts(bdef, node, slotKey)`
+Resolves dynamic slot acceptance type for blocks with `dynamicAccepts`. Returns the resolved type string or null.
+
+### `getDescendants(nId, nodes)`
+Recursively collects all descendant node IDs (via `nextId` chains and slot connections).
 
 ---
 
-## 10. Typography & Form Inputs
-- **Font**: Sans-serif, `16px`, bold (`700`).
-- **Inputs**: Floating bg `rgba(0,0,0,0.3)`, inline bg `transparent`. Width: `Math.max(50, text.length * 10 + 20)`. No borders, `5px 10px` padding.
+## 4. Block Colors
 
----
+Defined in `BLOCK_COLORS` object. Color is resolved by `getBlockColor(node, bdef, inChain)`:
 
-## 11. Palette Sidebar Structure
-
-Rendered by `PaletteSidebar`. Each category is collapsible. Two subcategories per category:
-
-| Subcategory | Contains | Shape |
+| Priority | Condition | Color |
 |---|---|---|
-| **DATA** | Link/value blocks with a `linkType` | No `isAction` flag |
-| **ACTIONS** | Action blocks in the execution chain | `isAction: true` |
+| 1 | `node.id === 'start'` | `#1e293b` |
+| 2 | Disconnected action | `#4a4a5a` (opacity 0.6) |
+| 3 | `bdef.color` set | Use it directly |
+| 4 | `node.linkType` | entity=`#30e1b9`, number=`#4d65b4`, text=`#5ba558`, logic=`#6494a4`, itemstack=`#945d66` |
+| 5 | Fallback | `#5a9a6a` |
 
-`PALETTE_BLOCKS` entries use `{ category, data: [...], actions: [...] }`.
+**Rule**: data blocks use the color of the **type they return**, not the category. Set `color` in blockDef to match `linkType`.
 
 ---
 
-## 12. Adding a New Block (JSON-Driven)
+## 5. Block Dimensions
 
-All new blocks are defined in `blockDefs.js` as a single JS object. No other files need editing for simple blocks.
+### Action Blocks
+- `minHeight: 50px`, `width: fit-content`, `border-radius: 10px`
+- Z-index: connected = `node.depth || 1`, disconnected = `50`, value = `100`
+- Disconnected: opacity `0.6` + red `!` badge (`#e11d48`)
 
-### Block Definition Schema
+### Value / Link Blocks
+- **Floating**: auto height, `10px` radius, `8px 10px` padding
+- **Inline (slotted)**: `minHeight: 30px`, no radius, `0 10px` padding, `box-shadow: 0 2px 6px rgba(0,0,0,.3)`
+- Slotted blocks are rendered inline by `SlotConn`, skipped in main canvas render via `slottedIds` Set
+
+### Puzzle Nub
+- **Key** (on value block): `10px` wide, `20px` high, left side, `radius: 10px 0 0 10px`
+- **Lock** (on slot): `30px` high, `min-width: 50px`, cutout at `left: -8px`, `8px × 16px`
+
+---
+
+## 6. Component Hierarchy
+
+### `CanvasBlock`
+Main block renderer. Receives `node, nodes, inChain, selected, onSelect, onBlockMouseDown, onFieldChange, inline, bodyInline`. Four rendering paths:
+
+1. **`inline`** — value block slotted inside a parent's `SlotConn`. Minimal wrapper, 30px height.
+2. **`showBody && !bodyInline`** — compound C-shape block (if/delay/dash/forEach). Renders header + body slots + bottom cap. Mouse guard: `if (e.target.closest('[data-bodyslotkey]')) return;` prevents parent drag when clicking inside body.
+3. **`bodyInline`** — action block rendered inside a `BodySlot`. No absolute positioning, just flows in DOM.
+4. **Standard** — normal action or value block, absolutely positioned.
+
+### `BlockContent`
+Renders the label segments + settings gear + repeatable slots. Handles multiline mode. Props: `bdef, node, nodes, onFieldChange, nodeId, onSelect, selected, onBlockMouseDown, settingsGear, inline`.
+
+### `SegmentItem`
+Renders a single parsed label segment. Types: `text`, `slot` (→ `SlotConn`), `input`, `dropdown` (→ `PortalDropdown`), `checkbox`. Respects `bdef.transparent` for input backgrounds and `showIf` on field definitions.
+
+### `SlotConn`
+Scratch-like value slot connector. If `connId` exists, renders the connected block inline via `CanvasBlock inline`. Otherwise renders the empty slot with cutout nub. Has `.slot-conn` class + `data-nodeid` + `data-sk` for snap detection.
+
+### `BodySlot`
+Indented body region for compound blocks. Walks the `slotId → nextId` chain to render all children as `CanvasBlock bodyInline`. Has `data-bodyslotkey` and `data-parentid` attributes for snap detection.
+
+### `PortalDropdown`
+Portal-based dropdown that escapes the zoom transform. Dark trigger with `▾`, portaled list at `position: fixed`. Supports `compact` (no arrow) and `transparent` (no dark bg) modes.
+
+### `SettingsPortal`
+Portal-based popup for block settings. Renders via `createPortal(document.body)` at `position: fixed`, positioned above the gear icon. `var(--ycs-accent-solid)` background, `var(--ycs-foreground)` border. Closes on outside mousedown. Header with "Settings" label and ✕ close button.
+
+### `BlockSettingsPopup`
+Generic settings renderer. Iterates `bdef.settings` entries (skipping `_`-prefixed and `hidden` type). Renders:
+- `checkbox` — `ycs-checkbox` class, click toggles value
+- `number` — `ycs-input inline` class, min/max
+- `dropdown` — `ycs-select inline` class
+- `_actions` — button array with increment/decrement/toggle logic. Toggle labels: `cur ? labelOn : labelOff`
+
+### `AnimationSettingsPopup`
+Custom bitmask table for animation blocks. Triggered by `ANIM_OPCODES` set:
+```js
+const ANIM_OPCODES = new Set([
+  'anim.firstperson.play',    // FP play: handMask table (2 rows)
+  'anim.thirdperson.play',    // TP play: full table (Hand/Yaw/Pitch/Animation/FP View)
+  'anim.tppose.set',          // TP pose: full table + Allow Act + Keep Pos columns
+  'anim.handpose.set',        // Hand pose: single "Allow Vanilla Actions" checkbox
+]);
+```
+
+**IMPORTANT**: The opcodes in `ANIM_OPCODES` must exactly match the `opcode` strings in `blockDefs.js`. If they don't match, settings won't show.
+
+---
+
+## 7. Drag & Drop System
+
+### Palette Drag
+`onItemMouseDown` creates a ghost div on `mousemove`, fires `ycs-blocky-drop` CustomEvent on `mouseup`. `BlockEditorPage` listens for this event and calls `addBlock()`.
+
+### Canvas Drag
+`handleBlockMouseDown` → `setDragging({ id, offX, offY })`. Also auto-detaches the block from any parent `nextId` or `slots`. If the block was slotted inline, computes world position from mouse coords.
+
+`handleCanvasMouseMove` updates the dragged block's position (and all descendants).
+
+### Snap Logic (`handleCanvasMouseUp`)
+
+Three snap types, checked in priority order:
+
+#### 1. Body-slot snapping
+Queries all `[data-bodyslotkey]` DOM elements. Uses **edge distance** (0 if mouse is inside the rect, otherwise distance to nearest edge). Threshold: `SNAP_THRESHOLD`. If the slot already has a child chain, snaps to the end of that chain instead.
+
+#### 2. Chain snapping
+Loops all action blocks with no `nextId`. Measures distance from mouse to block's bottom edge. Threshold: `SNAP_THRESHOLD`. Snaps the dragged block below the target, repositioning the entire dragged subtree.
+
+#### 3. Value-slot snapping
+Queries all `.slot-conn` DOM elements. Distance from mouse to slot center. Threshold: `50px`. Type-matched: `accepts === dragNode.linkType`. Acceptance is resolved from:
+- `getDynamicAccepts()` for dynamic slots
+- Regex `condition\d+` → `'logic'`
+- Regex `col(Radius|Width|Height|Depth)` → `'number'`
+- `repeatableSlots` key match → `repeatableSlots.accepts`
+- `parseLabel` segments (including `shapeSlots` and `suffixLabel`)
+
+### Chain Relayout (`relayoutChains`)
+Called after field changes and after snaps via `requestAnimationFrame`. Walks chains from `start`, measures each block's DOM height via `getBoundingClientRect`, and repositions following blocks to `prevRect.bottom + 4px`. Also walks body-slot sub-chains via `getBodyKeys`.
+
+---
+
+## 8. State Management
+
+All block state is in a single `nodes` array (React state). Each node:
+```js
+{
+  id: 'n...',           // unique ID ('start' for the start node)
+  opcode: 'entity.dash',
+  x: 100, y: 200,       // world position (for absolutely positioned blocks)
+  nextId: 'n...',        // next action in chain, or null
+  linkType: 'number',    // for data blocks, null for actions
+  isAction: true,
+  fields: { ... },       // field values (dropdowns, inputs, hidden state)
+  slots: { ... },        // slot connections: { slotKey: childNodeId }
+}
+```
+
+### Special field keys
+- `'__linkType'` — changes `node.linkType` (for dynamic-type blocks)
+- `'__clearSlot'` — clears `node.slots[value]` (when type changes invalidate connected blocks)
+
+### Persistence
+Saved to `localStorage` under `'ycs-blocky::' + stableId` on every change.
+
+### `slottedIds` (useMemo)
+Determines which nodes render inline vs standalone. Walks all nodes' slots. Body-slot children (identified via `getBodyKeys`) are added as chains. Non-body slot children are added directly. Any node in `slottedIds` is skipped in the main canvas render — it's rendered inline by its parent's `SlotConn` or `BodySlot`.
+
+### `chain` / `getChain`
+Tracks which blocks are reachable from `start` via `nextId` + body-slot children. Connected blocks render at full opacity; disconnected action blocks at opacity 0.6.
+
+---
+
+## 9. Compound / Body Blocks (C-Shapes)
+
+### How body blocks work
+A block is a body block if `bdef.body` or `bdef.bodyConfig` is defined. The `showBody` flag also checks toggle fields — for blocks like `entity.dash`, the body only renders when at least one toggle (`hasCollision`/`hasThen`) is active.
+
+### Rendering structure
+```
+┌─ Header (minHeight: 50, rounded top corners) ─┐
+│  ⚙ [label segments]                           │
+├─ Body Wrap (semi-transparent bg, 3px borders) ─┤
+│  BodySlot (paddingLeft: 30, minHeight: 36)     │
+│    └─ [bodyInline children chain]              │
+├─ [Additional sections: Else If / Else / Then] ─┤
+│  ... more BodySlots ...                        │
+└─ Bottom cap (height: 12, rounded bottom) ──────┘
+```
+
+### Dash-specific rendering
+When `hasCollision` is toggled on:
+- "On Collision" header row with `collisionShape` dropdown (Sphere/Box) and shape-conditional slots:
+  - Sphere: `colRadius` slot
+  - Box: `colWidth`, `colHeight`, `colDepth` slots
+- Body slot `do0` for collision actions
+
+When `hasThen` is toggled on:
+- "Then" header row
+- Body slot `do1` (if collision active) or `do0` (if collision inactive)
+
+### If-specific rendering
+- Primary body slot `do0`
+- Dynamic else-if branches: `condition{i+1}` slot + `do{i+1}` body slot, for `i` in `0..elseIfCount-1`
+- Optional else branch: `doElse` body slot
+
+### Mouse guard
+All compound blocks share the same mouseDown guard:
+```js
+if (e.target.closest('[data-bodyslotkey]')) return;
+```
+This prevents dragging the parent when clicking inside a body slot. Children inside body slots handle their own drag via `onBlockMouseDown`.
+
+---
+
+## 10. Block Content Rendering
+
+### Label Parsing
+`parseLabel(bdef.label)` produces segments: `text`, `slot`, `input`, `dropdown`, `checkbox`.
+
+### Shape Slots
+If `bdef.shapeSlots` exists, additional segments from `bdef.shapeSlots[node.fields?.shape]` are appended after the main label segments. `bdef.suffixLabel` segments are appended after shape slots.
+
+### Repeatable Slots
+If `bdef.repeatableSlots` exists, renders `key0`, `key1`, ... `key{count-1}` slots with optional separator between them. Count is from `node.fields[countField]`.
+
+### Multiline Mode
+When `node.fields?.multiline || bdef.multiline` is true (and NOT inline), segments are split into lines after each slot connector. Each line gets `minHeight: 30px`. Multiline is **disabled** when a block is rendered inline (slotted inside another block).
+
+### Transparent Mode
+When `bdef.transparent` is true, inline inputs and dropdowns use `background: transparent` instead of `rgba(0,0,0,0.3)`. Used for math/comparator blocks.
+
+---
+
+## 11. Settings System
+
+### When the gear icon shows
+```js
+const isAnimBlock = ANIM_OPCODES.has(node.opcode);
+const hasSettings = isAnimBlock || (bdef?.settings && Object.keys(bdef.settings).some(
+  k => !k.startsWith('_') ? bdef.settings[k].type !== 'hidden' : k === '_actions'
+));
+```
+
+The gear shows if: the block is an animation block, OR its settings contain at least one non-hidden field or `_actions`.
+
+### Settings popup dispatch
+- Animation blocks → `AnimationSettingsPopup` (custom bitmask table)
+- All others → `BlockSettingsPopup` (generic from `bdef.settings`)
+
+### Settings `showIf`
+Settings entries support `showIf` expressions evaluated by `evalCondition`. Example: `showIf: "operation != 'base_set'"` hides the field when operation equals base_set.
+
+### Toggle labels in _actions
+When `action === 'toggle'`:
+- Field is truthy (on) → show `labelOn` (e.g. "− Else")
+- Field is falsy (off) → show `labelOff` (e.g. "+ Else")
+
+---
+
+## 12. Palette Structure
+
+`buildPaletteFromDefs()` groups `BLOCK_DEFS` by `category` and `sub`:
+- `sub: "actions"` → **ACTIONS** subcategory
+- `sub: "data"` or starting with "data" → **DATA** subcategory
+- Any other `sub` value → custom named subcategory (e.g. "Third Person Animations")
+
+Each palette entry uses `paletteLabel` if set, otherwise `stripBrackets(label)` to remove `[key:type]` tokens.
+
+---
+
+## 13. Block Definition Schema
+
+All blocks are defined in `blockDefs.js`. The full schema:
 
 ```js
 {
-  opcode: "my.block",           // unique identifier
+  opcode: "my.block",           // unique ID — MUST match any hardcoded references
   category: "Effects",          // palette sidebar category
-  sub: "actions",               // "data" or "actions"
-  linkType: "number",           // for data blocks: "entity"|"number"|"text"|"logic". null for actions
-  isAction: true,               // true for action blocks
-  paletteLabel: "My Block",     // optional — overrides label for palette sidebar display
-  label: "Do thing to [entity:entity] with [amount:number]",  // inline label format
+  sub: "actions",               // "data", "actions", or custom subcategory name
+  linkType: "number",           // data blocks: "entity"|"number"|"text"|"logic"|"itemstack". null for actions
+  isAction: true,               // true for action blocks (sequential chain)
+  paletteLabel: "My Block",     // optional — overrides label for palette display
+  label: "Do thing to [entity:entity] with [amount:number]",
   hint: "Tooltip text",
-  color: "#c46c94",             // block color hex
-  transparent: false,           // if true, dropdowns/inputs between slots have no dark bg (for math/comparators)
+  color: "#c46c94",             // block color hex — match linkType for data blocks
+  transparent: false,           // inputs/dropdowns use transparent bg (math/comparators)
 
-  // Fields (dropdowns, inputs — referenced from label tokens or settings)
   fields: {
     mode: {
       type: "dropdown",         // "dropdown" | "input" | "hidden" | "checkbox"
       options: [{value:"a",label:"A"},{value:"b",label:"B"}],
       default: "a",
-      compact: false,           // if true, dropdown trigger has no ▾ arrow (for operator symbols)
-      showIf: "other != 'x'",   // conditional visibility based on another field value
-      minWidth: 100,            // optional minimum width for dropdown trigger
+      compact: false,           // no ▾ arrow on dropdown trigger
+      showIf: "other != 'x'",  // conditional visibility
+      minWidth: 100,
     },
-    count: { type: "hidden", default: 0 },  // hidden fields don't render but hold state
-    particles: { type: "checkbox", default: true },  // inline checkbox, renders as a clickable toggle on the block
+    count: { type: "hidden", default: 0 },
+    particles: { type: "checkbox", default: true },
   },
 
-  // Settings (gear popup — portal-based, consistent style)
   settings: {
     los: { type: "checkbox", label: "Line of Sight", default: true, showIf: "..." },
     losOrigin: { type: "dropdown", label: "Origin", options: [...], default: "caller" },
-    // Action buttons (add/remove operations)
     _actions: [
       { label: "+ Item", onClick: { field: "count", action: "increment", max: 10 } },
       { label: "− Item", onClick: { field: "count", action: "decrement", min: 0 } },
@@ -196,340 +337,159 @@ All new blocks are defined in `blockDefs.js` as a single JS object. No other fil
     ],
   },
 
-  // Code generation
   codegen: {
     type: "value",              // "value" | "action" | "compound"
-    expr: "({{entity}}.getX())",     // for value blocks — expression to return
-    template: "...",            // for action blocks — Java code (\n for multiline)
-
-    // Context-sensitive expressions (value blocks that resolve differently per method)
-    methodVariants: {
-      "useOn": "context.getPlayer()",
-      "hurtEnemy": "attacker",
-      "*": "player",            // fallback
-    },
-
-    // Conditional codegen based on field values
-    variants: {
-      "mode == 'set'": { template: "..." },
-      "mode == 'add'": { template: "..." },
-    },
-
-    // Compound blocks (C-shape with body)
-    compoundTemplate: {
-      before: "TickScheduler.INSTANCE.schedule((int)({{ticks}}), () -> {",
-      after: "});",
-    },
-
+    expr: "({{entity}}.getX())",
+    template: "...",
+    methodVariants: { "useOn": "context.getPlayer()", "*": "player" },
+    variants: { "mode == 'set'": { template: "..." } },
+    compoundTemplate: { before: "...", after: "..." },
     imports: ["net.minecraft.world.entity.LivingEntity"],
-    // Conditional imports based on field values
-    conditionalImports: {
-      "effect contains 'ModEffects.'": ["net.ye6isu.yebisuRPG.effect.ModEffects"],
-    },
+    conditionalImports: { "effect contains 'ModEffects.'": ["..."] },
     slotDefaults: { entity: { opcode: "entity.event" } },
-
-    handler: "control.if",      // falls through to hardcoded compiler (rare)
+    handler: "control.if",      // falls through to hardcoded compiler
   },
 
-  // Dynamic link type (output type changes based on a field)
   dynamicLinkType: { field: "varType", map: { bool: "logic", string: "text", "*": "number" } },
-
-  // Dynamic slot acceptance (input slot type changes based on a field)
   dynamicAccepts: {
     value: { field: "varType", map: { bool: "logic", string: "text", "*": "number" } },
   },
 
-  // Repeatable slots (dynamically add/remove slot instances)
   repeatableSlots: {
-    key: "text",              // base key — creates text0, text1, text2...
-    accepts: "text",          // link type each slot accepts
-    countField: "textCount",  // field that tracks count
-    default: 1, min: 1, max: 10,
-    separator: "+",           // text shown between repeated slots
+    key: "text", accepts: "text", countField: "textCount",
+    default: 1, min: 1, max: 10, separator: "+",
   },
 
-  // Compound block bodies (C-shapes)
-  body: { do0: { label: null } },   // simple body
-  bodyConfig: { type: "if" },       // complex body (If block with else-if/else)
+  body: { do0: { label: null } },
+  bodyConfig: { type: "if" },
 
-  // Multiline rendering — wraps each line after a slot connector
-  multiline: false,              // default; if true, block renders one slot per line
-  // fields.multiline can be a hidden field with default true, combined with
-  // settings.multiline as a checkbox to let users toggle it per instance
-
-  // Shape-switching slots (e.g., AoE block changes slots based on shape dropdown)
+  multiline: false,
   shapeSlots: {
     sphere: "radius [radius:number]",
     box: "width [width:number] height [height:number] depth [depth:number]",
   },
-  suffixLabel: "offset x [offX:number] y [offY:number] z [offZ:number]",  // always appended after shapeSlots
+  suffixLabel: "offset x [offX:number] y [offY:number] z [offZ:number]",
 }
 ```
 
-### Multiline Mode
-
-When `multiline: true` (or toggled via settings), the block renders one line per slot connector:
-- Each line ends AFTER a slot link
-- Each line ends AFTER a slot connector — line breaks come after links, not before
-- Each line uses `minHeight: 50` (action blocks) or `minHeight: 30` (data blocks) — grows if a child is taller
-- Layout system (`recalcLayout`) accounts for the taller header when positioning child blocks in compound bodies
-- Use `fields.multiline: { type: "hidden", default: false }` and `settings.multiline: { type: "checkbox", label: "New Line per Link" }` to let users toggle it
-- Default to `false` unless the block is unwieldy in single-line (6+ slots)
-
-Example: A block with 6 slots toggled to multiline renders as:
-```
-⚙ Dir X from x1 [number]
-y1 [number]
-z1 [number]
-to x2 [number]
-y2 [number]
-z2 [number]
-```
-
-### Multiline Inline Blocks
-
-Multiline mode only applies when a data block is **floating** on the canvas. When slotted inline inside another block, multiline is disabled — the block always renders as a single line. This keeps parent block heights predictable (always 50px for actions, 30px for inline data) and avoids layout complexity.
-
-- `GenericDataContent` receives an `inline` prop from `CanvasNode` and ignores `multiline` when `inline` is true
-- No special CSS handling needed for inline multiline — inline blocks always use `flexDirection: "row"`, `padding: "0 10px"`, `minHeight: 30`
-
-### Height Rules
-- All block headers use `minHeight`, never fixed `height` — allows growth for multiline children
-- `commonHeader` uses `minHeight: 50` instead of `height: 100%`
-- Compound block (C-shape) headers use `minHeight: _headerH` where `_headerH` accounts for the block's own multiline state
-- Normal action blocks use `minHeight: 50` with `display: flex` so flex children push the height
-
-### Layout Height Measurement (DOM-based)
-
-The layout system (`recalcLayout`) cannot know the exact rendered height of an action block when it contains a multiline inline child — the height depends on CSS flex layout, padding, and the child's slot count. Instead of estimating, the system uses **DOM measurement with a post-render correction pass**:
-
-1. **`getActionH(n)`** — called by `getH`, `layoutChain`, and snap logic to determine how much vertical space a non-compound action block occupies. Checks `measuredRef.current[n.id]` for a DOM-measured height first. Falls back to 50px (or multiline slot count × 50 if the block itself is multiline).
-2. **Post-render `useEffect`** — after every render, measures `offsetHeight` of all non-compound action block DOM elements. If any measurement differs from stored value by > 5px, stores new height and triggers `recalcLayout` once. Since inline blocks are always single-line, parent heights are predictable and rarely need correction.
-3. **Snap logic (`onMU`)** — uses `getActionH(n)` for non-compound blocks; `n.height` for compound blocks.
-
-**When adding new blocks**: no extra work needed. Non-compound blocks get automatic DOM measurement. Compound blocks calculate height via `getH` with gap heights. Just ensure action blocks have `id={"node-"+node.id}` on their root DOM element (already set in `CanvasNode`).
-
-### Shape-Switching Blocks
-
-For blocks that change their slots based on a dropdown (like AoE's shape selector):
-- `shapeSlots` maps dropdown values to label format strings with slot tokens
-- `suffixLabel` is always appended after the shape-specific slots
-- All possible slot keys from all shapes should be listed in `codegen.slotDefaults`
-- When the shape changes, only the relevant slots render; others stay in the node data but are hidden
-```
-
-### Template Interpolation
-
-| Token | Result |
-|---|---|
-| `{{key}}` | Resolved slot value or field value |
-| `{{quote:key}}` | Value wrapped in Java string quotes with escaping |
-| `{{float:key}}` | Value with `f` suffix if not already present |
-| `{{attr:key}}` | Attribute registry reference via `attrRegistryRef()` |
-| `{{stack}}` | Stack expression for the current method context |
-| `{{modName:key}}` | Modifier name sanitized to lowercase `[a-z0-9_]` |
-| `{{dcConst:key}}` | Data component constant name `YCS_UPPER_CASE` |
-| `{{varGet:_}}` | Full variable getter expression |
-| `{{varSet:_}}` | Full variable setter statement |
-
 ### Label Format Tokens
-
-The `label` string defines inline rendering. Tokens in `[key:type]` format:
 
 | Token | Renders as |
 |---|---|
-| `plain text` | Bold white label span |
-| `[key:entity]` | Entity slot connector (cyan) |
-| `[key:number]` | Number slot connector (blue) |
-| `[key:text]` | Text slot connector (green) |
-| `[key:logic]` | Logic slot connector (steel blue) |
-| `[key:dropdown]` | Simple dropdown from `fields[key].options` |
+| `plain text` | Bold white label span (14px) |
+| `[key:entity]` | Entity slot connector |
+| `[key:number]` | Number slot connector |
+| `[key:text]` | Text slot connector |
+| `[key:logic]` | Logic slot connector |
+| `[key:dropdown]` | Dropdown from `fields[key].options` |
 | `[key:dropdown.effects]` | Search dropdown for mob effects |
 | `[key:dropdown.attributes]` | Search dropdown for attributes |
 | `[key:dropdown.variables]` | Search dropdown for variables |
 | `[key:dropdown.dataComponents]` | Search dropdown for data components |
 | `[key:input.number]` | Inline number input |
 | `[key:input.text]` | Inline text input |
-| `[key:checkbox]` | Inline checkbox toggle (boolean) |
+| `[key:checkbox]` | Inline checkbox toggle |
 
-### Codegen Templates
+### Template Interpolation
 
-- `{{slotKey}}` — resolved slot value (calls resolveSlotValue for connected blocks)
-- `{{fieldKey}}` — raw field value from node.fields
-- Use `\n` for multiline Java output
-- `variants` object maps `"field == 'value'"` conditions to alternative templates
+| Token | Result |
+|---|---|
+| `{{key}}` | Resolved slot value or field value |
+| `{{quote:key}}` | Java string quotes with escaping |
+| `{{float:key}}` | Value with `f` suffix |
+| `{{attr:key}}` | Attribute registry reference |
+| `{{stack}}` | Stack expression for method context |
+| `{{modName:key}}` | Sanitized to `[a-z0-9_]` |
+| `{{dcConst:key}}` | `YCS_UPPER_CASE` constant name |
+| `{{varGet:_}}` | Variable getter expression |
+| `{{varSet:_}}` | Variable setter statement |
 
-### Codegen Variable Naming
+---
 
-All generated Java variable names must be **human-readable** and follow Minecraft modding conventions. Never use cryptic abbreviations like `_et`, `_dt`, `_ae`. Use descriptive names that make the generated code readable as if hand-written.
+## 14. Adding a New Block
 
-| Context | Variable name | Example |
-|---|---|---|
-| `instanceof LivingEntity` target | `livingTarget` | `if (entity instanceof LivingEntity livingTarget)` |
-| `instanceof Player` | `chatPlayer`, `cooldownPlayer` | `if (entity instanceof Player chatPlayer)` |
-| `instanceof Entity` for animations | `animEntity` | `if (entity instanceof Entity animEntity)` |
-| `getAttribute()` result | `attrInstance` | `var attrInstance = livingTarget.getAttribute(...)` |
-| Attacker entity | `livingAttacker`, `playerAttacker` | `instanceof LivingEntity livingAttacker` |
-| AoE / collision iterator | `hitEntity` | Used by Iterator Entity block in For Each and Dash On Collision |
-
-**Rule**: if a variable appears in generated code that a user might read or debug, it must be self-documenting. The generated code should look like it was written by a competent Java developer, not obfuscated.
-
-### Import Handling
-
-Each block declares its required imports in `codegen.imports`. The existing content-scan system in `ycsSyncImports` also covers imports by detecting patterns in generated code. Both systems work together — declare imports in the block def for clarity, and content-scanning acts as a safety net.
-
-### Adding a Basic Block
-
-Only 1 file needed:
+### Simple block (1 file)
 
 1. Open `src/codegen/visual/blockDefs.js`
-2. Add an object to `BLOCK_DEFS` array
-3. Set `opcode`, `category`, `sub`, `label` with inline tokens, `color`
-4. Set `codegen.expr` (data blocks) or `codegen.template` (action blocks) with `{{key}}` interpolation
-5. Set `codegen.imports` for any Java imports the generated code needs
-6. Set `codegen.slotDefaults` for slots that should auto-populate when dragged from palette
-7. Done — the block auto-appears in the palette, renders, and compiles generically
+2. Add object to `BLOCK_DEFS` array with `opcode`, `category`, `sub`, `label`, `color`
+3. Set `codegen.expr` (data) or `codegen.template` (action)
+4. Set `codegen.imports` and `codegen.slotDefaults`
+5. Done — auto-appears in palette, renders, and compiles
 
-Example — simple data block:
-```js
-{
-  opcode: "entity.pos_x",
-  category: "Numbers", sub: "data",
-  linkType: "number",
-  label: "Pos X of [entity:entity]",
-  color: "#4d65b4",
-  codegen: {
-    type: "value",
-    expr: "({{entity}}.getX())",
-    slotDefaults: { entity: { opcode: "entity.event" } },
-  },
-}
-```
+### Block with settings
 
-Example — action block with dropdown variant:
-```js
-{
-  opcode: "entity.apply_motion",
-  category: "Effects", sub: "actions",
-  isAction: true,
-  label: "Apply Motion to [entity:entity] X [x:number] Y [y:number] Z [z:number] [mode:dropdown]",
-  color: "#c46c94",
-  fields: {
-    mode: { type: "dropdown", options: [{value:"add",label:"Add"},{value:"set",label:"Set"}], default: "add" },
-  },
-  codegen: {
-    type: "action",
-    variants: {
-      "mode == 'set'": { template: "{{entity}}.setDeltaMovement((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
-      "mode == 'add'": { template: "{{entity}}.push((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
-    },
-    slotDefaults: { entity: { opcode: "entity.event" }, x: { opcode: "number.literal", fields: { value: "0" } }, y: { opcode: "number.literal", fields: { value: "0" } }, z: { opcode: "number.literal", fields: { value: "0" } } },
-  },
-}
-```
+Add `settings` object to the block definition. The `BlockSettingsPopup` renders it automatically. For `_actions` with toggle behavior, add corresponding `type: "hidden"` fields.
 
-### Adding an Advanced Block
+### Block with body (compound / C-shape)
 
-For blocks with complex codegen that can't be expressed as a simple template (e.g., context-sensitive expressions, complex Java patterns, dynamic body management):
+Add `body: { do0: { label: null } }` for a simple body. The rendering, body-slot snapping, and chain tracking are all automatic via `getBodyKeys` and `isBodyBlock`.
 
-**Files needed:**
+For complex body behavior (like if/dash), add `bodyConfig` or toggle-conditional body display. The compound rendering in `CanvasBlock` handles if and dash as special cases.
 
-| File | What to add | When needed |
-|---|---|---|
-| `src/codegen/visual/blockDefs.js` | Block definition object | Always |
-| `src/codegen/visual/compiler.js` | Handler in `compileActionNode()` or `resolveSlotValue()` | When codegen can't be a template |
-| `src/components/VisualEditor.jsx` | Custom settings UI (e.g., animation mask table) | When settings need custom UI beyond checkboxes/dropdowns |
+### Block with custom settings UI
 
-**Steps:**
+If `BlockSettingsPopup` isn't enough (e.g. animation bitmask tables):
+1. Add the opcode to the relevant opcode set (e.g. `ANIM_OPCODES`)
+2. Add rendering logic in the custom popup component
+3. The `CanvasBlock` dispatches to the custom popup when the opcode matches
 
-1. Add the block definition in `blockDefs.js` with `codegen.handler: "my.opcode"` (or no `expr`/`template` — the generic compiler returns null and falls through)
-2. Add a handler in `compiler.js`:
-   - For data blocks: add `if (node.opcode === "my.opcode") { ... return expr; }` in `resolveSlotValue()`
-   - For action blocks: add `if (node.opcode === "my.opcode") { ... return [lines]; }` in `compileActionNode()`
-3. If the block needs custom settings UI (beyond what `GenericSettingsPopup` handles), add the settings popup in `VisualEditor.jsx` with `showSettings && node.opcode === "my.opcode"` — the gear icon is already rendered by `GenericActionContent`/`GenericDataContent`
+**Critical**: opcode strings in the Set must **exactly match** the `opcode` field in `blockDefs.js`.
 
-**The rendering is still generic** even for advanced blocks — the JSON label format drives the block's visual layout. Only the codegen and optionally the settings UI are hardcoded.
+### Block with shape slots
 
-### All Files Reference
+Add `shapeSlots` mapping dropdown values to label strings with slot tokens. Add `suffixLabel` for always-visible suffix. All possible slot keys should be in `codegen.slotDefaults`.
+
+### Block with repeatable slots
+
+Add `repeatableSlots` config. Add `_actions` in settings for increment/decrement buttons. The decrement action auto-clears removed slots.
+
+---
+
+## 15. Codegen
+
+### Strategy
+
+- `blockDefRegistry.has(opcode)` + has `expr`/`template` → fully generic (JSON-driven)
+- `blockDefRegistry.has(opcode)` + has `handler` → generic rendering, hardcoded codegen
+- Not in registry → fully hardcoded (legacy)
+
+### Import injection (`ycsSyncImports`)
+
+Rebuilds `//YCS_Import_START` / `//YCS_Import_END` from:
+1. `YCS_BASE_IMPORTS`
+2. Method-specific imports
+3. Feature imports
+4. Content-scan pattern matching
+5. Block definition `codegen.imports`
+
+---
+
+## 16. All Files Reference
 
 | File | Path | Purpose |
 |---|---|---|
-| **blockDefs.js** | `src/codegen/visual/blockDefs.js` | All block definitions — the single source of truth for block schema, labels, fields, settings, codegen, colors, categories |
-| **labelParser.js** | `src/codegen/visual/labelParser.js` | `parseLabel()` tokenizer — converts label format strings into renderable segment arrays |
-| **blockCompiler.js** | `src/codegen/visual/blockCompiler.js` | Generic compiler — `resolveFromDef()` for data blocks, `compileFromDef()` for action blocks, template interpolation, variant selection |
-| **blockRenderer.jsx** | `src/codegen/visual/blockRenderer.jsx` | Generic renderer — `GenericDataContent`, `GenericActionContent`, `GenericSettingsPopup`, `RepeatableSlots`, `Segments` |
-| **compiler.js** | `src/codegen/visual/compiler.js` | Hardcoded codegen handlers — `compileActionNode()`, `resolveSlotValue()`, link types, variable/attribute helpers. Entry point checks `blockDefRegistry` first, falls through to hardcoded |
-| **VisualEditor.jsx** | `src/components/VisualEditor.jsx` | Block canvas renderer — `CanvasNode`, `SlotConn`, `PortalSelect`, `SettingsPortal`, palette sidebar, drag/drop, C-shape layout. Checks `_useGeneric` flag to choose between generic and hardcoded rendering |
-| **palette.js** | `src/codegen/visual/palette.js` | `buildPalette()` — merges block definitions into palette categories. `PALETTE_BLOCKS` is empty; all blocks come from `blockDefs.js` |
-| **ycs.js** | `src/codegen/ycs.js` | `ycsSyncImports()` — content-scan import injection. Blocks declare imports in `codegen.imports`; content-scanning acts as safety net |
-| **methods.js** | `src/codegen/visual/methods.js` | `ITEM_METHODS` and `EFFECT_METHODS` — method definitions with signatures, stubs, and imports |
-| **YCS_BLOCKY.md** | `md/YCS_BLOCKY.md` | This file — complete reference for the block system |
+| **BlockEditorPage.jsx** | `src/components/BlockEditorPage.jsx` | All rendering, drag/drop, snapping, settings, palette |
+| **blockDefs.js** | `src/codegen/visual/blockDefs.js` | All block definitions — single source of truth |
+| **labelParser.js** | `src/codegen/visual/labelParser.js` | `parseLabel()` tokenizer |
+| **MethodEditorPage.jsx** | `src/components/MethodEditorPage.jsx` | Method enable/disable, gating, opens Block Editor tiles |
+| **YCS_BLOCKY.md** | `md/YCS_BLOCKY.md` | This file |
+
+> **Not yet ported to v2:** `blockCompiler.js`, `compiler.js`, `ycs.js`, `methods.js` — these exist in old v1 (`tools/Yebisu Creator Studio/src/codegen/`) but have no v2 equivalents yet. Codegen will be wired up as part of the injection/manifest system.
 
 ---
 
-## 13. Legacy Block System (Hardcoded)
+## 17. Common Pitfalls
 
-Some blocks still use hardcoded codegen handlers because their Java output is too complex for templates (AoE shape queries, variable/attribute API calls, data component naming). Their rendering is fully generic — only the codegen falls through to `compiler.js`.
+1. **Opcode mismatch**: If `ANIM_OPCODES` or any hardcoded check uses a different string than the `opcode` in `blockDefs.js`, the feature silently fails. Always verify exact opcode strings.
 
-The coexistence strategy:
+2. **Body blocks need both `body`/`bodyConfig` AND proper `getBodyKeys` coverage**: If a new body block type is added, `getBodyKeys` must return its slot keys. Currently handles: `bdef.body` keys, `bdef.bodyConfig` → `do0`, `entity.dash` conditional keys, `control.if` dynamic else-if/else keys.
 
-- `blockDefRegistry.has(opcode)` + no `handler` + has `expr`/`template` → fully generic (JSON-driven)
-- `blockDefRegistry.has(opcode)` + has `handler` → generic palette/rendering, hardcoded codegen
-- Not in registry → fully hardcoded (legacy)
+3. **Snap distance for body slots uses edge distance, not center distance**: A body slot 300px tall would fail center-distance checks. The edge-distance algorithm returns 0 when the mouse is inside the rect.
 
----
+4. **`relayoutChains` must be called after snaps**: Body slot content changes the compound block's height, which shifts blocks chained below it. The `relayoutChains` function walks from `start` and also enters body-slot sub-chains via `getBodyKeys`.
 
-## 14. Backend Code Generation
+5. **Multiline disabled when inline**: `isMultiline = !inline && (node.fields?.multiline || bdef?.multiline)`. This prevents inline data blocks from expanding their parent's height unpredictably.
 
-### Import Injection (`ycsSyncImports`)
+6. **Toggle labels**: `cur ? labelOn : labelOff`. When the toggle is active (on), show `labelOn` (usually "− Remove"). When inactive (off), show `labelOff` (usually "+ Add").
 
-Imports live in `//YCS_Import_START` / `//YCS_Import_END`. Rebuilt on every save/toggle from:
-1. `YCS_BASE_IMPORTS` — always-on (Item, ItemStack, Level, Player)
-2. Each enabled method's `imports` array in `ITEM_METHODS`
-3. Each active YCS feature's `imports` array in `YCS_FEATURES`
-4. **Content scan** — pattern-matched imports from compiled code
-5. **Block definitions** — `codegen.imports` from JSON block defs (via content-scan of generated code)
-
-**Rule:** any function that writes Java to disk must call `ycsSyncImports` before writing.
-
-**Content-scan triggers:**
-
-| Detected pattern | Imports added |
-|---|---|
-| `instanceof LivingEntity` or `LivingEntity ` | `LivingEntity` |
-| `instanceof Entity` or `Entity ` | `Entity` |
-| `MobEffectInstance` or `.addEffect(` | `MobEffectInstance`, `MobEffects` |
-| `AnimationAPI` or `AnimationCategory` | `AnimationAPI`, `AnimationCategory` |
-| `EntityVarCapability` or `EntityVar.` | `EntityVarCapability`, `EntityVar` |
-| `AttributeModifier` or `getAttributeValue` or `getAttributeBaseValue` | `Attributes`, `AttributeModifier`, `ResourceLocation` |
-| `ModAttributes.` | `ModAttributes` |
-| `Component.literal` | `Component` |
-| `ModDataComponents.` | `ModDataComponents` |
-
----
-
-## 15. Variable Blocks — Generic Picker
-
-One generic `Get Variable` (data) and one `Set Variable` (action) — not one per variable. Selection via `VarDropdown` (portal combo like `AttrDropdown`).
-
-On pick: `fields.varName`, `fields.varType`, `fields.varDefault` are updated. `node.linkType` updated via `__linkType` field key.
-
-`__variablesCache` is a module-level array for `VarDropdown`.
-
----
-
-## 16. Attribute Base Reset Block
-
-`attribute.base.reset` renders `AttrDropdown` + entity slot. Codegen:
-```java
-if (<ent> instanceof LivingEntity _abrst) {
-    var _abrsti = _abrst.getAttribute(<attrRef>);
-    if (_abrsti != null) _abrsti.setBaseValue(_abrsti.getAttribute().getDefaultValue());
-}
-```
-
----
-
-## 17. Modpack Compatibility
-
-No runtime dependencies, but assume modpack usage. Design for `ResourceLocation`-based lookups (registry IDs) rather than hardcoded `MobEffects.*` / `Attributes.*` constants. Vanilla constants are fine as defaults, never the only path.
+7. **`showIf` on settings uses `evalCondition`**, not just boolean field check. This supports expressions like `"operation != 'base_set'"`.

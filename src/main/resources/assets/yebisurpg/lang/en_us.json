@@ -1,13 +1,4 @@
 {
-  "item.yebisurpg.joe_spawn_egg": "Joe Spawn Egg",
-  "item.yebisurpg.plank": "Plank",
-  "item.yebisurpg.plank_boots": "Plank Boots",
-  "item.yebisurpg.plank_chestplate": "Plank Chestplate",
-  "item.yebisurpg.plank_helmet": "Plank Helmet",
-  "item.yebisurpg.plank_leggings": "Plank Leggings",
-  "item.yebisurpg.yasuo_katana": "Yasuo's Katana",
-  "item.yebisurpg.ye6isu": "ye6isu",
-
   "block.yebisurpg.crate_block": "Crate Block",
   "block.yebisurpg.crate_button": "Crate Button",
   "block.yebisurpg.crate_door": "Crate Door",
@@ -19,13 +10,18 @@
   "block.yebisurpg.crate_trapdoor": "Crate Trapdoor",
   "block.yebisurpg.crate_wall": "Crate Wall",
   "block.yebisurpg.ye6isu_block": "ye6isu Block",
-
-  "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info",
-
-  "creativetab.yebisurpg.yebisurpg_tab": "yebisu RPG",
-
+  "creativetab.yebisurpg.testtab": "Test Tab",
+  "effect.yebisurpg.test_effect": "Test Effect",
+  "item.yebisurpg.gun": "Gun",
+  "item.yebisurpg.joe_spawn_egg": "Joe Spawn Egg",
+  "item.yebisurpg.plank": "Plank",
+  "item.yebisurpg.plank_boots": "Plank Boots",
+  "item.yebisurpg.plank_chestplate": "Plank Chestplate",
+  "item.yebisurpg.plank_helmet": "Plank Helmet",
+  "item.yebisurpg.plank_leggings": "Plank Leggings",
+  "item.yebisurpg.yasuo_katana": "Yasuo's Katana",
+  "item.yebisurpg.ye6isu": "ye6isu",
   "key.categories.yebisurpg": "yebisu RPG",
   "key.yebisurpg.tester_debug": "Tester/Debug",
-
-  "effect.yebisurpg.test_effect": "Test Effect"
+  "tooltip.yebisurpg.shift_to_see": "Hold SHIFT for more info"
 }

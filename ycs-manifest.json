@@ -28,7 +28,7 @@
       "assets": [],
       "properties": {
         "tier": "NETHERITE",
-        "attackDamage": 3.0,
+        "attackDamage": 3,
         "attackSpeed": -2.4,
         "customClass": "YasuoKatanaItem"
       }
@@ -56,7 +56,84 @@
         "category": "NEUTRAL",
         "color": "0x671a1a"
       }
+    },
+    "gun": {
+      "type": "item",
+      "displayName": "Gun",
+      "injections": [
+        {
+          "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+          "marker": "YCS_Mod_Items",
+          "type": "java-marker",
+          "content": "    public static final DeferredItem<GunItem> GUN = ITEMS.register(\"gun\",\n            () -> new GunItem(new Item.Properties().stacksTo(1)));"
+        },
+        {
+          "file": "resources/assets/yebisurpg/lang/en_us.json",
+          "key": "item.yebisurpg.gun",
+          "type": "json-key"
+        },
+        {
+          "file": "resources/assets/yebisurpg/models/item/gun.json",
+          "type": "created-file"
+        },
+        {
+          "file": "resources/assets/yebisurpg/textures/item/gun.png",
+          "type": "created-file"
+        },
+        {
+          "file": "resources/assets/yebisurpg/textures/geo/item/gun.png",
+          "type": "created-file"
+        },
+        {
+          "file": "resources/assets/yebisurpg/geo/item/gun.geo.json",
+          "type": "created-file"
+        },
+        {
+          "file": "resources/assets/yebisurpg/models/item/gun.json",
+          "type": "created-file"
+        },
+        {
+          "file": "java/net/ye6isu/yebisuRPG/client/renderer/GeoItemRegistry.java",
+          "marker": "YCS_Geo_Collect",
+          "type": "java-marker",
+          "content": "        tryRegister(items, ModItems.GUN, \"gun\");"
+        },
+        {
+          "file": "java/net/ye6isu/yebisuRPG/datagen/ModItemModelProvider.java",
+          "marker": "YCS_Mod_Item_Model",
+          "type": "java-marker",
+          "content": "        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,\"item/gun\"),TEXTURE);"
+        },
+        {
+          "file": "resources/assets/yebisurpg/ycs/ycs_tabs.json",
+          "key": "gun",
+          "type": "json-key"
+        },
+        {
+          "file": "java/net/ye6isu/yebisuRPG/item/custom/GunItem.java",
+          "type": "created-file"
+        },
+        {
+          "file": "java/net/ye6isu/yebisuRPG/item/custom/GunItem.java",
+          "marker": "YCS:releaseUsing:body",
+          "type": "java-marker",
+          "content": "        DashUtil.start(livingEntity, (double)((livingEntity.getLookAngle().x)), (double)((livingEntity.getLookAngle().y)), (double)((livingEntity.getLookAngle().z)), (double)(10), (int)((double)(5)), DashUtil.Easing.EASE_OUT, null, null, \"sphere\", (double)(1.5), (double)(0), (double)(0), false);"
+        }
+      ],
+      "assets": [],
+      "properties": {
+        "constName": "GUN",
+        "isTool": false,
+        "toolType": "Sword",
+        "tier": "Iron",
+        "holdingMode": "3d",
+        "multipleStates": false,
+        "stateCount": 2
+      },
+      "created": "2026-06-27T17:52:40.113Z",
+      "modified": "2026-06-27T17:52:40.113Z"
     }
   },
-  "assets": {}
+  "assets": {},
+  "modified": "2026-06-27T17:52:40.113Z"
 }

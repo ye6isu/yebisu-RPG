@@ -355,10 +355,12 @@ For any new feature/file category not already in this table, YCS does not assume
 
 ---
 
-## UI Component Standards
+## UI Component Standards (v1 Only)
+
+> **Note:** This entire section describes the **v1** YCS architecture (`tools/Yebisu Creator Studio/`). The v2 rewrite (`v2/yebisu Creator Studio/`) uses a completely different component library, workspace tiling system, and design language documented in [`v2/md/YCS General.md`](../v2/md/YCS%20General.md). The sections above (Sentinels, Item Architecture, Methods, Import Management, Naming, Cleanup Rules) remain accurate for both versions.
 
 ### Module Structure
-YCS is split into modules under `tools/Yebisu Creator Studio/src/`:
+YCS v1 is split into modules under `tools/Yebisu Creator Studio/src/`:
 - `constants.js` / `theme.js` / `context.js` / `api.js` — foundation
 - `components/ui.jsx` — shared primitives (Lbl, Btn, Inp, Sel, Chk, SearchSel, AImg, FormActions, etc.)
 - `components/` — shared complex components (TexSel, ItemPicker, CardGrid, EditRow, IngredientPicker, VisualEditor)
@@ -422,6 +424,11 @@ For fields that open a right-side panel (Texture, Methods, Tags, Tooltip, Recipe
 ### Creative Tabs
 - Built-in tabs (yebisu RPG Items/Blocks) were removed. Only custom tabs (via Tabs editor) and vanilla tabs remain.
 - Category labels in keybinds: "yebisu RPG" (no "(this mod)" suffix).
+- **Landing page** (`CreativeTabsPage`): card-based grid showing all custom tabs from `ycs_custom_tabs.json`. Uses the standard `card-delete` pattern (circle-minus SVG). Clicking a card or + opens a **Tab Editor** child tile to the right (not an in-page view change).
+- **Tab Editor** (`TabEditorPage`, registered as `'Tab Editor'`): child tile with 4 fields — Display Name, ID, Icon Mode (Item/Cycle dropdown), Icon Item (uses `ItemSelector`). Footer has "Edit Item List" (spawns item arrangement child tile below), Cancel (closes without saving), Save (writes to `ycs_custom_tabs.json`, `en_us.json`, and injects into `ModCreativeModeTabs.java`).
+- **Item Arrangement** (`TabItemListPage`, registered as `'Tab Items'`): child tile spawned below the tab editor. Reads items assigned to this tab from `ycs_tabs.json` and displays them as draggable rows. Drag-to-reorder writes directly to `ycs_tabs.json` immediately — the key order in the JSON determines in-game item order. No add/remove buttons; items are assigned via the item editor's creative tab dropdown.
+- **Storage:** Tab definitions in `ycs_custom_tabs.json`, item→tab assignments in `ycs_tabs.json` (key order = in-game order). Tab editor form state uses localStorage key `ycs-tab-form::<tabId>`.
+- **Events:** `ycs-tabs-changed` is dispatched after save/delete to refresh the landing page and item list.
 
 ### Keybind Mouse Buttons
 - Dropdown includes Mouse 1-5. Labels: "Mouse 1", "Mouse 2", "Mouse 3", "Mouse 4", "Mouse 5".

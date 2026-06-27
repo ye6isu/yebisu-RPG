@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
 
 const CARD_SIZE = 120;
 const popoutChildren = new Set();
@@ -11,6 +12,7 @@ export default function RegistryLandingPage({
   editorPrefix,
   seedFormData,
   entryKey,
+  onDeleteEntry,
 }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,12 @@ export default function RegistryLandingPage({
 
   useEffect(() => { reload(); }, [reload]);
 
+  useEffect(() => {
+    const handler = () => reload();
+    window.addEventListener('ycs-item-changed', handler);
+    return () => window.removeEventListener('ycs-item-changed', handler);
+  }, [reload]);
+
   const textFiltered = entries.filter(entry => {
     if (!filter) return true;
     const q = filter.toLowerCase();
@@ -43,33 +51,38 @@ export default function RegistryLandingPage({
     return id.includes(q) || (entry.displayName || '').toLowerCase().includes(q);
   });
 
-  const findNodeByTabId = (tabId) => {
-    let found = null;
-    const search = (n) => {
-      if (!n) return;
-      if (n.type === 'leaf' && n.tabId === tabId) found = n;
-      if (n.type === 'split') n.children.forEach(search);
-    };
-    if (tree) search(tree);
-    return found;
-  };
+  const findNodeByTabId = (tabId) => findNodeByTabIdUtil(tree, tabId);
 
   const isPopout = !tree;
 
   const openEditor = (entry) => {
-    const childTabId = `${editorPrefix}::${nodeId}::${Date.now()}`;
-
-    if (seedFormData) {
-      localStorage.setItem('ycs-item-editor-seed', JSON.stringify({
-        childTabId,
-        form: seedFormData(entry),
-      }));
-    }
+    const key = entry ? entryKey(entry) : null;
+    const childTabId = key
+      ? `${editorPrefix}::${nodeId}::${key}`
+      : `${editorPrefix}::${nodeId}::${Date.now()}`;
 
     if (isPopout) {
+      if (key && popoutChildren.has(childTabId)) {
+        window.electronAPI?.closePopout(childTabId);
+        popoutChildren.delete(childTabId);
+        return;
+      }
+      if (seedFormData && entry) {
+        localStorage.setItem('ycs-item-editor-seed', JSON.stringify({ childTabId, form: seedFormData(entry) }));
+      }
       window.electronAPI?.openPopout(childTabId);
       popoutChildren.add(childTabId);
       return;
+    }
+
+    const existing = findNodeByTabId(childTabId);
+    if (existing) {
+      window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: existing.id } }));
+      return;
+    }
+
+    if (seedFormData && entry) {
+      localStorage.setItem('ycs-item-editor-seed', JSON.stringify({ childTabId, form: seedFormData(entry) }));
     }
 
     window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
@@ -151,16 +164,43 @@ export default function RegistryLandingPage({
                     border: '1px solid var(--ycs-foreground)',
                     backgroundColor: 'transparent',
                     transition: 'border-color 0.1s, background-color 0.1s',
+                    position: 'relative',
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.borderColor = 'var(--ycs-highlight)';
                     e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
+                    const del = e.currentTarget.querySelector('.card-delete');
+                    if (del) del.style.opacity = '1';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.borderColor = 'var(--ycs-foreground)';
                     e.currentTarget.style.backgroundColor = 'transparent';
+                    const del = e.currentTarget.querySelector('.card-delete');
+                    if (del) del.style.opacity = '0';
                   }}
                 >
+                  {onDeleteEntry && (
+                    <div
+                      className="card-delete"
+                      onClick={e => { e.stopPropagation(); onDeleteEntry(entryKey(entry), reload); }}
+                      title="Delete"
+                      style={{
+                        position: 'absolute', top: 4, right: 4,
+                        width: 18, height: 18,
+                        cursor: 'pointer', opacity: 0, transition: 'opacity 0.1s',
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18">
+                        <defs>
+                          <mask id={`del-${entryKey(entry)}`}>
+                            <circle cx="9" cy="9" r="9" fill="white"/>
+                            <line x1="5" y1="9" x2="13" y2="9" stroke="black" strokeWidth="2" strokeLinecap="round"/>
+                          </mask>
+                        </defs>
+                        <circle cx="9" cy="9" r="9" fill="white" mask={`url(#del-${entryKey(entry)})`}/>
+                      </svg>
+                    </div>
+                  )}
                   {/* Texture / 3D Preview */}
                   <div style={{
                     width: '64px', height: '64px',
