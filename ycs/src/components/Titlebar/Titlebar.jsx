@@ -1,0 +1,140 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import './Titlebar.css';
+
+export default function Titlebar({ openPreferences, isSubwindow, title }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close menu if clicked outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+    if (!isSubwindow) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      if (!isSubwindow) {
+        document.removeEventListener('mousedown', handleClickOutside);
+      }
+    };
+  }, [isSubwindow]);
+
+  return (
+    <div className="titlebar">
+      <div className="titlebar-left">
+        {!isSubwindow ? (
+          <>
+            <img src="/yebisu.png" alt="YCS Logo" className="logo-icon" />
+            <div className="titlebar-menu" ref={menuRef}>
+              <div 
+                className={`menu-button ${menuOpen ? 'active' : ''}`}
+                onClick={() => setMenuOpen(!menuOpen)}
+              >
+                File
+              </div>
+              {menuOpen && (
+                <div className="dropdown">
+                  <div 
+                    className="dropdown-item" 
+                    onClick={() => {
+                      WebviewWindow.getByLabel('preferences').then(existing => {
+                        if (existing) {
+                          existing.setFocus();
+                        } else {
+                          new WebviewWindow('preferences', {
+                            url: '/?page=preferences',
+                            title: 'Preferences',
+                            width: 600,
+                            height: 500,
+                            decorations: false
+                          });
+                        }
+                      }).catch(console.error);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Preferences
+                  </div>
+                  <div className="dropdown-separator"></div>
+                  <div 
+                    className="dropdown-item" 
+                    onClick={() => {
+                      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().close());
+                    }}
+                  >
+                    Exit
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div style={{ color: 'var(--ycs-text)', fontSize: '12px', paddingLeft: '4px', opacity: 0.8, userSelect: 'none' }}>
+            {title}
+          </div>
+        )}
+      </div>
+
+      {/* Draggable Area Spacer */}
+      <div 
+        data-tauri-drag-region 
+        style={{ flexGrow: 1, height: '100%' }}
+        onPointerDown={() => {
+          import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+            getCurrentWindow().startDragging();
+          });
+        }}
+      ></div>
+
+      {/* Window Controls (Right side) */}
+      <div className="titlebar-right" style={{
+        display: 'flex',
+        height: '100%',
+        alignItems: 'center'
+      }}>
+        {!isSubwindow && (
+          <>
+            <div 
+              className="titlebar-button"
+              title="Minimize"
+              onClick={() => {
+                import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().minimize());
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="1" y="4" width="8" height="1" fill="currentColor"/>
+              </svg>
+            </div>
+            <div 
+              className="titlebar-button"
+              title="Maximize"
+              onClick={() => {
+                import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize());
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="1.5" y="1.5" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
+              </svg>
+            </div>
+          </>
+        )}
+        <div 
+          className="titlebar-button titlebar-close"
+          title="Close"
+          onClick={() => {
+            import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().close());
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}

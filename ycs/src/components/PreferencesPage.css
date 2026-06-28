@@ -1,0 +1,102 @@
+.preferences-content {
+  display: flex;
+  flex-grow: 1;
+  background-color: transparent;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+.preferences-sidebar {
+  background-color: transparent;
+  border-right: 1px solid var(--ycs-foreground); /* The vertical divider */
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.sidebar-resizer {
+  width: 4px;
+  margin-left: -2px;
+  margin-right: -2px;
+  background-color: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background-color 0.2s;
+}
+
+.sidebar-resizer:hover, .sidebar-resizer:active {
+  background-color: transparent;
+}
+
+/* Styled identically to the File dropdown items */
+.preferences-tab {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  color: var(--ycs-text);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+  box-sizing: border-box;
+}
+
+.preferences-tab:hover {
+  background-color: var(--ycs-highlight);
+  color: var(--ycs-text);
+}
+
+.preferences-tab.active {
+  background-color: var(--ycs-highlight);
+  color: var(--ycs-text);
+}
+
+.preferences-main {
+  flex-grow: 1;
+  padding: 20px;
+  background-color: transparent; /* Inherits var(--ycs-bg) from the parent */
+  overflow-y: auto;
+  overflow-x: auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Settings Row Styles */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  background-color: transparent;
+  border-radius: var(--ycs-radius, 4px);
+}
+
+.setting-row label {
+  font-size: 13px;
+  color: var(--ycs-text);
+  user-select: none;
+}
+
+input[type="color"] {
+  -webkit-appearance: none;
+  border: none;
+  height: 28px;
+  border: none;
+  padding: 0;
+  border-radius: var(--ycs-radius, 4px);
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius, 4px);
+}
