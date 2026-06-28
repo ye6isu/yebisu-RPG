@@ -128,11 +128,8 @@ function App() {
   const [activeNodeId, setActiveNodeId] = useState('root-node');
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedTiles, setSelectedTiles] = useState([]);
-  const [isReferenceOpen, setIsReferenceOpen] = useState(true);
   const [isGameplayOpen, setIsGameplayOpen] = useState(true);
   const [isAssetsOpen, setIsAssetsOpen] = useState(true);
-  const [isTab3Open, setIsTab3Open] = useState(false);
-  const [isTab3_3Open, setIsTab3_3Open] = useState(false);
 
   const handleTileSelect = (nodeId, e) => {
     if (e.ctrlKey && e.type === 'mousedown') {
@@ -516,166 +513,6 @@ function App() {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', width: '100%', padding: '0 8px 44px 8px', boxSizing: 'border-box', overflowY: 'auto', flex: 1 }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div 
-              className="ycs-tab" 
-              onClick={() => setIsReferenceOpen(!isReferenceOpen)}
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '12px', userSelect: 'none' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isReferenceOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-              Reference
-            </div>
-            
-            {isReferenceOpen && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                <div 
-                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 1' ? 'active' : ''}`} 
-                  onClick={() => handleTabClick('Tab 1')}
-                  draggable 
-                  onDragStart={(e) => { 
-                    if (!e.ctrlKey) { e.preventDefault(); return; }
-                    e.dataTransfer.setData('tabId', 'Tab 1'); 
-                    e.dataTransfer.setData('ycs-tab', 'true');
-                  }}
-                  onDragEnd={(e) => {
-                    if (e.dataTransfer.dropEffect === 'none') {
-                      window.electronAPI?.openPopout('Tab 1');
-                    }
-                  }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
-                >
-                  <div style={{ width: '14px', flexShrink: 0 }} />
-                  Tab 1
-                </div>
-                <div 
-                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 2' ? 'active' : ''}`} 
-                  onClick={() => handleTabClick('Tab 2')}
-                  draggable 
-                  onDragStart={(e) => { 
-                    if (!e.ctrlKey) { e.preventDefault(); return; }
-                    e.dataTransfer.setData('tabId', 'Tab 2'); 
-                    e.dataTransfer.setData('ycs-tab', 'true');
-                  }}
-                  onDragEnd={(e) => {
-                    if (e.dataTransfer.dropEffect === 'none') {
-                      window.electronAPI?.openPopout('Tab 2');
-                    }
-                  }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
-                >
-                  <div style={{ width: '14px', flexShrink: 0 }} />
-                  Tab 2
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div 
-                    className="ycs-tab" 
-                    onClick={() => setIsTab3Open(!isTab3Open)}
-                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px', userSelect: 'none' }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isTab3Open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
-                      <path d="M9 18l6-6-6-6"/>
-                    </svg>
-                    Tab 3 Group
-                  </div>
-                  {isTab3Open && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                      <div 
-                        className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 3.1' ? 'active' : ''}`} 
-                        onClick={() => handleTabClick('Tab 3.1')}
-                        draggable 
-                        onDragStart={(e) => { 
-                          if (!e.ctrlKey) { e.preventDefault(); return; }
-                          e.dataTransfer.setData('tabId', 'Tab 3.1'); 
-                          e.dataTransfer.setData('ycs-tab', 'true');
-                        }}
-                        onDragEnd={(e) => {
-                          if (e.dataTransfer.dropEffect === 'none') {
-                            window.electronAPI?.openPopout('Tab 3.1');
-                          }
-                        }}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '64px' }}
-                      >
-                        <div style={{ width: '14px', flexShrink: 0 }} />
-                        Tab 3.1
-                      </div>
-                      <div 
-                        className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 3.2' ? 'active' : ''}`} 
-                        onClick={() => handleTabClick('Tab 3.2')}
-                        draggable 
-                        onDragStart={(e) => { 
-                          if (!e.ctrlKey) { e.preventDefault(); return; }
-                          e.dataTransfer.setData('tabId', 'Tab 3.2'); 
-                          e.dataTransfer.setData('ycs-tab', 'true');
-                        }}
-                        onDragEnd={(e) => {
-                          if (e.dataTransfer.dropEffect === 'none') {
-                            window.electronAPI?.openPopout('Tab 3.2');
-                          }
-                        }}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '64px' }}
-                      >
-                        <div style={{ width: '14px', flexShrink: 0 }} />
-                        Tab 3.2
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div 
-                          className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Tab 3.3' ? 'active' : ''}`} 
-                          onClick={() => setIsTab3_3Open(!isTab3_3Open)}
-                          draggable 
-                          onDragStart={(e) => { 
-                            if (!e.ctrlKey) { e.preventDefault(); return; }
-                            e.dataTransfer.setData('tabId', 'Tab 3.3'); 
-                            e.dataTransfer.setData('ycs-tab', 'true');
-                          }}
-                          onDragEnd={(e) => {
-                            if (e.dataTransfer.dropEffect === 'none') {
-                              window.electronAPI?.openPopout('Tab 3.3');
-                            }
-                          }}
-                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '64px', userSelect: 'none' }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isTab3_3Open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
-                            <path d="M9 18l6-6-6-6"/>
-                          </svg>
-                          Tab 3.3
-                        </div>
-                        {isTab3_3Open && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                            {[1, 2, 3].map(num => (
-                              <div 
-                                key={`Tab 3.3.${num}`}
-                                className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === `Tab 3.3.${num}` ? 'active' : ''}`} 
-                                onClick={() => handleTabClick(`Tab 3.3.${num}`)}
-                                draggable 
-                                onDragStart={(e) => { 
-                                  if (!e.ctrlKey) { e.preventDefault(); return; }
-                                  e.dataTransfer.setData('tabId', `Tab 3.3.${num}`); 
-                                  e.dataTransfer.setData('ycs-tab', 'true');
-                                }}
-                                onDragEnd={(e) => {
-                                  if (e.dataTransfer.dropEffect === 'none') {
-                                    window.electronAPI?.openPopout(`Tab 3.3.${num}`);
-                                  }
-                                }}
-                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '90px' }}
-                              >
-                                <div style={{ width: '14px', flexShrink: 0 }} />
-                                Tab 3.3.{num}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Assets Group */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div
@@ -747,44 +584,6 @@ function App() {
                 >
                   <div style={{ width: '14px', flexShrink: 0 }} />
                   Items
-                </div>
-                <div
-                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Item (Old)' ? 'active' : ''}`}
-                  onClick={() => handleTabClick('Item (Old)')}
-                  draggable
-                  onDragStart={(e) => {
-                    if (!e.ctrlKey) { e.preventDefault(); return; }
-                    e.dataTransfer.setData('tabId', 'Item (Old)');
-                    e.dataTransfer.setData('ycs-tab', 'true');
-                  }}
-                  onDragEnd={(e) => {
-                    if (e.dataTransfer.dropEffect === 'none') {
-                      window.electronAPI?.openPopout('Item (Old)');
-                    }
-                  }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
-                >
-                  <div style={{ width: '14px', flexShrink: 0 }} />
-                  Item (Old)
-                </div>
-                <div
-                  className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Block Editor' ? 'active' : ''}`}
-                  onClick={() => handleTabClick('Block Editor')}
-                  draggable
-                  onDragStart={(e) => {
-                    if (!e.ctrlKey) { e.preventDefault(); return; }
-                    e.dataTransfer.setData('tabId', 'Block Editor');
-                    e.dataTransfer.setData('ycs-tab', 'true');
-                  }}
-                  onDragEnd={(e) => {
-                    if (e.dataTransfer.dropEffect === 'none') {
-                      window.electronAPI?.openPopout('Block Editor');
-                    }
-                  }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px', paddingLeft: '38px' }}
-                >
-                  <div style={{ width: '14px', flexShrink: 0 }} />
-                  Block Editor
                 </div>
                 <div
                   className={`ycs-tab ${workspaceTree.type !== 'split' && findTabId(workspaceTree, activeNodeId) === 'Creative Tabs' ? 'active' : ''}`}

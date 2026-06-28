@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StringField, StandardDropdownField, DropdownField, NumberInput, findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
 import SpritePreview from './SpritePreview';
 import { injectItem, removeItem, isItemInjected } from '../codegen/itemInjector';
+import * as itemStore from '../store/itemStore';
+import { getCached as getCachedTextures } from '../store/textureStore';
 
 const HOLDING_MODES = [
   { label: 'Default', value: 'none' },
@@ -45,11 +47,8 @@ const CheckboxRow = ({ label, checked, onChange }) => (
 const TextureField = ({ textureName, onClickSet, isOpen }) => {
   const tex = (() => {
     if (!textureName) return null;
-    try {
-      const raw = localStorage.getItem('ycs-textures-list');
-      const list = raw ? JSON.parse(raw) : [];
-      return list.find(t => t.label === textureName) || null;
-    } catch { return null; }
+    const list = getCachedTextures();
+    return list.find(t => t.label === textureName) || null;
   })();
 
   return (
@@ -192,6 +191,7 @@ export const DEFAULT_FORM = {
   hasUseDuration: false,
   useDuration: '72000',
   useAnimation: 'NONE',
+  noSlowdown: false,
   hasTooltip: false,
   tooltipNormal: '',
   hasHiddenTooltip: false,
@@ -209,67 +209,95 @@ export const DEFAULT_FORM = {
 export const FORM_STORAGE_PREFIX = 'ycs-form::';
 const popoutChildren = new Set();
 
-function readFormFromStorage(nodeId) {
-  try {
-    const raw = localStorage.getItem(FORM_STORAGE_PREFIX + nodeId);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-export function writeFormToStorage(nodeId, data) {
-  localStorage.setItem(FORM_STORAGE_PREFIX + nodeId, JSON.stringify(data));
+function seedChildLocalStorage(tileId, entityData) {
+  if (!entityData || !tileId) return;
+  // Flat structure: form fields are at top level alongside recipe, dataComponents, etc.
+  const itemId = entityData.id || '';
+  // Seed form for legacy localStorage consumers
+  const { recipe, dataComponents, enabledMethods, blockGraphs, modelJsonData, ...formFields } = entityData;
+  if (Object.keys(formFields).length > 0) {
+    localStorage.setItem(FORM_STORAGE_PREFIX + tileId, JSON.stringify(formFields));
+  }
+  if (recipe) {
+    const recipeTabId = `Item Recipe::${tileId}::recipe`;
+    localStorage.setItem('ycs-recipe::' + recipeTabId, JSON.stringify(recipe));
+  }
+  if (dataComponents) {
+    const dcTabId = `Data Components::${tileId}::data-components`;
+    localStorage.setItem('ycs-data-components::' + dcTabId, JSON.stringify(dataComponents));
+  }
+  if (enabledMethods) {
+    const methodsKey = `ycs-methods::item::${itemId}`;
+    localStorage.setItem(methodsKey, JSON.stringify(enabledMethods));
+    const methodsTabId = `Item Methods::${tileId}::methods`;
+    localStorage.setItem('ycs-methods-enabled::' + methodsTabId, JSON.stringify(enabledMethods));
+  }
+  if (blockGraphs && itemId) {
+    for (const [key, val] of Object.entries(blockGraphs)) {
+      localStorage.setItem(`ycs-blocky::item::${itemId}::${key}`, typeof val === 'string' ? val : JSON.stringify(val));
+    }
+  }
 }
 
 function usePersistedForm(nodeId, tabId) {
   const [form, setFormRaw] = useState(() => {
-    const existing = readFormFromStorage(nodeId);
-    if (existing) return existing;
-
-    // Check if the landing page seeded data for this editor
     try {
       const seedRaw = localStorage.getItem('ycs-item-editor-seed');
       if (seedRaw) {
         const seed = JSON.parse(seedRaw);
         if (seed.childTabId === tabId) {
           localStorage.removeItem('ycs-item-editor-seed');
-          writeFormToStorage(nodeId, seed.form);
-          return seed.form;
+          const seedForm = seed.form || { ...DEFAULT_FORM, states: DEFAULT_FORM.states.map(s => ({ ...s })) };
+          // Check in-memory cache for full data from prior session
+          if (seedForm.id) {
+            const cached = itemStore.getCached(seedForm.id);
+            if (cached?.id) return cached;
+          }
+          return seedForm;
         }
       }
     } catch {}
-
     return { ...DEFAULT_FORM, states: DEFAULT_FORM.states.map(s => ({ ...s })) };
   });
 
-  const formRef = useRef(form);
-  formRef.current = form;
+  const entityLoadedRef = useRef(false);
 
   useEffect(() => {
-    const saved = readFormFromStorage(nodeId);
-    if (saved) setFormRaw(saved);
-
-    const handleStorage = (e) => {
-      if (e.key === FORM_STORAGE_PREFIX + nodeId && e.newValue) {
-        try { setFormRaw(JSON.parse(e.newValue)); } catch {}
+    if (entityLoadedRef.current) return;
+    const itemId = form.id;
+    if (!itemId) return;
+    entityLoadedRef.current = true;
+    itemStore.loadItem(itemId).then(data => {
+      if (!data) {
+        itemStore.setCached(itemId, { ...form });
+        return;
       }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [nodeId]);
+      // data is flat: all form fields + recipe + dataComponents + enabledMethods + blockGraphs + modelJsonData
+      const { recipe, dataComponents, enabledMethods, blockGraphs, modelJsonData, ...formFields } = data;
+      if (Object.keys(formFields).length > 0) setFormRaw(prev => ({ ...prev, ...formFields }));
+      const tileId = nodeId || tabId;
+      seedChildLocalStorage(tileId, data);
+      itemStore.setCached(itemId, data);
+    });
+  }, [form.id, nodeId, tabId]);
 
   const setForm = useCallback((updater) => {
     setFormRaw(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      writeFormToStorage(nodeId, next);
+      // Update itemStore cache — merge form fields while preserving child sections
+      if (next.id) {
+        const cached = itemStore.getCached(next.id) || {};
+        itemStore.setCached(next.id, { ...cached, ...next });
+      }
+      // Bridge: keep localStorage in sync for child editors not yet migrated
+      const tileId = nodeId || tabId;
+      if (tileId) localStorage.setItem(FORM_STORAGE_PREFIX + tileId, JSON.stringify(next));
       return next;
     });
-  }, [nodeId]);
+  }, [nodeId, tabId]);
 
   const F = useCallback((key, value) => {
-    setForm(prev => {
-      const next = { ...prev, [key]: value };
-      return next;
-    });
+    setForm(prev => ({ ...prev, [key]: value }));
   }, [setForm]);
 
   return { form, F, setForm };
@@ -279,12 +307,6 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
   const formKey = tabId || nodeId || 'item-default';
   const { form, F, setForm } = usePersistedForm(formKey, tabId);
   const originalIdRef = useRef(form.id || '');
-
-  useEffect(() => {
-    if (nodeId && formKey !== nodeId) {
-      writeFormToStorage(nodeId, form);
-    }
-  }, [form, nodeId, formKey]);
 
   useEffect(() => {
     if (form.multipleStates) {
@@ -316,7 +338,7 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
       const key = selectorTabId.slice(prefix.length);
       if (key === 'main') {
         F('textureName', textureName);
-        const texList = JSON.parse(localStorage.getItem('ycs-textures-list') || '[]');
+        const texList = getCachedTextures();
         const found = texList.find(t => t.label === textureName);
         if (found?.dataUrl) {
           const modelTabId = `Item Model JSON::${tId}::model-json`;
@@ -367,6 +389,7 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
         window.electronAPI?.closePopout(tabId);
         popoutChildren.delete(tabId);
       } else {
+        if (form.id) localStorage.setItem('ycs-child-item-id::' + tabId, form.id);
         window.electronAPI?.openPopout(tabId);
         popoutChildren.add(tabId);
       }
@@ -379,14 +402,24 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
         detail: { targetId: existing.id }
       }));
     } else {
+      // Seed the item ID for child editors to resolve
+      if (form.id) {
+        localStorage.setItem('ycs-child-item-id::' + tabId, form.id);
+      }
       if (prefix === 'Item Model JSON') {
+        // Seed existing model data so the child tile shows current values
+        const modelJsonStr = key === 'model-json' ? form.modelJson : form.states?.[parseInt(key.replace('state-', '').replace('-model-json', ''))]?.modelJson;
+        if (modelJsonStr) {
+          try {
+            const parsed = JSON.parse(modelJsonStr);
+            localStorage.setItem(`ycs-model-json::${tabId}`, JSON.stringify(parsed));
+          } catch {}
+        }
         const texName = key === 'model-json' ? form.textureName : form.states?.[parseInt(key.replace('state-', '').replace('-model-json', ''))]?.textureName;
         if (texName) {
-          try {
-            const texList = JSON.parse(localStorage.getItem('ycs-textures-list') || '[]');
-            const found = texList.find(t => t.label === texName);
-            if (found?.dataUrl) localStorage.setItem(`ycs-model-texture::${tabId}`, found.dataUrl);
-          } catch {}
+          const texList = getCachedTextures();
+          const found = texList.find(t => t.label === texName);
+          if (found?.dataUrl) localStorage.setItem(`ycs-model-texture::${tabId}`, found.dataUrl);
         }
       }
       window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
@@ -413,16 +446,22 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
   const [saveStatus, setSaveStatus] = useState(null);
   const [customTabs, setCustomTabs] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const fe = window.electronAPI?.fileEngine;
-        if (!fe) return;
-        const r = await fe.json.read('resources/assets/yebisurpg/ycs/ycs_custom_tabs.json');
-        if (r?.ok && Array.isArray(r.data)) setCustomTabs(r.data);
-      } catch {}
-    })();
+  const loadCustomTabs = useCallback(async () => {
+    try {
+      const fe = window.electronAPI?.fileEngine;
+      if (!fe) return;
+      const r = await fe.json.read('resources/assets/yebisurpg/ycs/ycs_custom_tabs.json');
+      if (r?.ok && Array.isArray(r.data)) setCustomTabs(r.data);
+    } catch {}
   }, []);
+
+  useEffect(() => { loadCustomTabs(); }, [loadCustomTabs]);
+
+  useEffect(() => {
+    const handler = () => loadCustomTabs();
+    window.addEventListener('ycs-tabs-changed', handler);
+    return () => window.removeEventListener('ycs-tabs-changed', handler);
+  }, [loadCustomTabs]);
 
   const handleSave = useCallback(async () => {
     if (!form.id) { setSaveStatus({ ok: false, msg: 'Item ID is required' }); return; }
@@ -434,26 +473,52 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
       if (oldId && oldId !== form.id) {
         const oldInjected = await isItemInjected(oldId);
         if (oldInjected) await removeItem(oldId);
+        await itemStore.deleteItemFile(oldId);
       }
       const alreadyInjected = await isItemInjected(form.id);
       if (alreadyInjected) {
         await removeItem(form.id);
       }
-      // Augment form with method data for custom class generation
+
+      // Read child data from itemStore cache first, fall back to localStorage
+      const cached = itemStore.getCached(form.id) || {};
+
       const stableMethodsKey = `ycs-methods::item::${form.id}`;
       const enabledRaw = localStorage.getItem(stableMethodsKey)
         || localStorage.getItem('ycs-methods-enabled::Item Methods::' + tileId + '::methods');
-      const enabledMethods = enabledRaw ? JSON.parse(enabledRaw) : [];
+      const enabledMethods = cached.enabledMethods || (enabledRaw ? JSON.parse(enabledRaw) : []);
       const hasCustomClass = enabledMethods.length > 0 || form.hasUseDuration || (form.useAnimation && form.useAnimation !== 'NONE');
-      // Read recipe data from localStorage
+
       const recipeTabId = `Item Recipe::${tileId}::recipe`;
       const recipeRaw = localStorage.getItem('ycs-recipe::' + recipeTabId);
-      const recipeData = recipeRaw ? JSON.parse(recipeRaw) : null;
+      const recipeData = cached.recipe || (recipeRaw ? JSON.parse(recipeRaw) : null);
 
-      // Read data component data from localStorage
       const dcTabId = `Data Components::${tileId}::data-components`;
       const dcRaw = localStorage.getItem('ycs-data-components::' + dcTabId);
-      const dataComponents = dcRaw ? JSON.parse(dcRaw) : [];
+      const dataComponents = cached.dataComponents || (dcRaw ? JSON.parse(dcRaw) : []);
+
+      // Collect blocky data from cache or localStorage
+      let blocky = cached.blockGraphs || {};
+      if (Object.keys(blocky).length === 0) {
+        const blockyPrefix = `ycs-blocky::item::${form.id}::`;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(blockyPrefix)) {
+            blocky[key.slice(blockyPrefix.length)] = localStorage.getItem(key);
+          }
+        }
+      }
+
+      // Save entity JSON file (single source of truth)
+      const entityData = {
+        ...form,
+        recipe: recipeData,
+        dataComponents,
+        enabledMethods,
+        blockGraphs: Object.keys(blocky).length > 0 ? blocky : {},
+        modelJsonData: cached.modelJsonData || {},
+      };
+      await itemStore.saveItem(form.id, entityData);
 
       const augmented = {
         ...form,
@@ -498,6 +563,7 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
     try {
       await removeItem(form.id);
       cleanupItemStorage(form.id);
+      await itemStore.deleteItemFile(form.id);
       setSaveStatus({ ok: true, msg: 'Removed from mod' });
       window.dispatchEvent(new CustomEvent('ycs-item-changed'));
     } catch (err) {
@@ -705,6 +771,7 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
                 ]} />
               }
             />
+            <CheckboxRow label="No Slowdown" checked={form.noSlowdown} onChange={v => F('noSlowdown', v)} />
           </SubSection>
         )}
 
@@ -758,7 +825,7 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
         <FullWidthRow label="Tab">
           <DropdownField value={form.creativeTab} onChange={v => F('creativeTab', v)} options={[
             { label: 'None', value: '' },
-            { label: 'yebisurpg_tab', value: 'yebisurpg_tab' },
+            { label: 'Yebisu RPG', value: 'yebisurpg_tab' },
             { label: 'Combat', value: 'combat' },
             { label: 'Tools & Utilities', value: 'tools_and_utilities' },
             { label: 'Food & Drinks', value: 'food_and_drinks' },
@@ -770,7 +837,7 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
             { label: 'Colored Blocks', value: 'colored_blocks' },
             { label: 'Spawn Eggs', value: 'spawn_eggs' },
             { label: 'Operator', value: 'op_blocks' },
-            ...customTabs.map(t => ({ label: t.key, value: t.key })),
+            ...customTabs.map(t => ({ label: t.displayName || t.key, value: t.key })),
           ]} />
         </FullWidthRow>
 
@@ -780,8 +847,13 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
 
         <FullWidthRow label="Item Tags">
           <ChildTileField
-            summary={form.tags || null}
-            hasContent={!!form.tags}
+            summary={(() => {
+              const parts = [];
+              if (form.tags) parts.push(form.tags);
+              if (form.hasUseDuration && form.noSlowdown) parts.push('no_slowdown');
+              return parts.length ? parts.join(', ') : null;
+            })()}
+            hasContent={!!form.tags || (form.hasUseDuration && form.noSlowdown)}
             onClickSet={() => toggleChildTile('Item Tags', 'tags')}
             isOpen={isChildOpen('Item Tags', 'tags')}
           />
@@ -794,24 +866,22 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
         <FullWidthRow label="Recipe">
           <ChildTileField
             summary={(() => {
-              try {
-                const rd = JSON.parse(localStorage.getItem('ycs-recipe::Item Recipe::' + tileId + '::recipe') || 'null');
-                if (!rd) return null;
-                const parts = [];
-                if (rd.craftingEnabled && rd.slots?.some(s => s)) parts.push(rd.craftingShape || 'shaped');
-                if (rd.smeltingEnabled) parts.push('smelting');
-                if (rd.blastingEnabled) parts.push('blasting');
-                if (rd.smokingEnabled) parts.push('smoking');
-                if (rd.campfireEnabled) parts.push('campfire');
-                if (rd.stonecuttingEnabled) parts.push('stonecutting');
-                return parts.length ? parts.join(', ') : null;
-              } catch { return null; }
+              const cached = form.id ? itemStore.getCached(form.id) : null;
+              const rd = cached?.recipe || null;
+              if (!rd) return null;
+              const parts = [];
+              if (rd.craftingEnabled && rd.slots?.some(s => s)) parts.push(rd.craftingShape || 'shaped');
+              if (rd.smeltingEnabled) parts.push('smelting');
+              if (rd.blastingEnabled) parts.push('blasting');
+              if (rd.smokingEnabled) parts.push('smoking');
+              if (rd.campfireEnabled) parts.push('campfire');
+              if (rd.stonecuttingEnabled) parts.push('stonecutting');
+              return parts.length ? parts.join(', ') : null;
             })()}
             hasContent={(() => {
-              try {
-                const rd = JSON.parse(localStorage.getItem('ycs-recipe::Item Recipe::' + tileId + '::recipe') || 'null');
-                return rd && (rd.craftingEnabled || rd.smeltingEnabled || rd.blastingEnabled || rd.smokingEnabled || rd.campfireEnabled || rd.stonecuttingEnabled);
-              } catch { return false; }
+              const cached = form.id ? itemStore.getCached(form.id) : null;
+              const rd = cached?.recipe || null;
+              return rd && (rd.craftingEnabled || rd.smeltingEnabled || rd.blastingEnabled || rd.smokingEnabled || rd.campfireEnabled || rd.stonecuttingEnabled);
             })()}
             onClickSet={() => toggleChildTile('Item Recipe', 'recipe')}
             isOpen={isChildOpen('Item Recipe', 'recipe')}
@@ -824,8 +894,15 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
 
         <FullWidthRow label="Methods">
           <ChildTileField
-            summary={null}
-            hasContent={false}
+            summary={(() => {
+              const cached = form.id ? itemStore.getCached(form.id) : null;
+              const em = cached?.enabledMethods || [];
+              return em.length > 0 ? `${em.length} method(s)` : null;
+            })()}
+            hasContent={(() => {
+              const cached = form.id ? itemStore.getCached(form.id) : null;
+              return (cached?.enabledMethods || []).length > 0;
+            })()}
             onClickSet={() => toggleChildTile('Item Methods', 'methods')}
             isOpen={isChildOpen('Item Methods', 'methods')}
           />
@@ -838,16 +915,14 @@ export default function ItemPageNew({ isTile = false, onClose, nodeId, tree, tab
         <FullWidthRow label="Components">
           <ChildTileField
             summary={(() => {
-              try {
-                const dc = JSON.parse(localStorage.getItem('ycs-data-components::Data Components::' + tileId + '::data-components') || '[]');
-                return dc.length > 0 ? `${dc.length} component(s)` : null;
-              } catch { return null; }
+              const cached = form.id ? itemStore.getCached(form.id) : null;
+              const dc = cached?.dataComponents || [];
+              return dc.length > 0 ? `${dc.length} component(s)` : null;
             })()}
             hasContent={(() => {
-              try {
-                const dc = JSON.parse(localStorage.getItem('ycs-data-components::Data Components::' + tileId + '::data-components') || '[]');
-                return dc.length > 0;
-              } catch { return false; }
+              const cached = form.id ? itemStore.getCached(form.id) : null;
+              const dc = cached?.dataComponents || [];
+              return dc.length > 0;
             })()}
             onClickSet={() => toggleChildTile('Data Components', 'data-components')}
             isOpen={isChildOpen('Data Components', 'data-components')}

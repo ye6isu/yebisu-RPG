@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import SpritePreview from './SpritePreview';
+import { loadTexturesFile, saveTexturesFile } from '../entityFiles';
 
 const TEX_DEFAULT = {
   label: '',
@@ -153,7 +154,11 @@ function TextureFileRow({ label, form, F, urlKey, nameKey, checkboxKey, showAnim
           remove
         </button>
       )}
-      <button className="ycs-button inline" onClick={() => isEnabled && ref.current.click()} style={{ flexShrink: 0, opacity: isEnabled ? 1 : 0.3, pointerEvents: isEnabled ? 'auto' : 'none' }}>
+      <button className="ycs-button inline" onClick={() => {
+        if (!isEnabled) return;
+        if (window.electronAPI?.fileEngine) handleFile();
+        else ref.current.click();
+      }} style={{ flexShrink: 0, opacity: isEnabled ? 1 : 0.3, pointerEvents: isEnabled ? 'auto' : 'none' }}>
         {hasFile && isEnabled ? 'edit' : 'set'}
       </button>
       <input ref={ref} type="file" accept="image/png" style={{ display: 'none' }} onChange={handleFile} />
@@ -161,17 +166,15 @@ function TextureFileRow({ label, form, F, urlKey, nameKey, checkboxKey, showAnim
   );
 }
 
-function saveTextureToList(form) {
-  const raw = localStorage.getItem('ycs-textures-list');
-  let list = [];
-  try { list = raw ? JSON.parse(raw) : []; } catch {}
+async function saveTextureToList(form) {
+  const list = await loadTexturesFile();
   const idx = list.findIndex(t => t.label === form.label);
   if (idx >= 0) {
     list[idx] = { ...form };
   } else {
     list.push({ ...form });
   }
-  localStorage.setItem('ycs-textures-list', JSON.stringify(list));
+  await saveTexturesFile(list);
   window.dispatchEvent(new CustomEvent('ycs-textures-changed'));
 }
 
@@ -182,9 +185,9 @@ export default function TextureEditorPage({ isTile = false, onClose, nodeId, tre
 
   const canSave = !!(form.label.trim() && form.dataUrl);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave) return;
-    saveTextureToList(form);
+    await saveTextureToList(form);
   };
 
   const closePreview = () => {
@@ -203,9 +206,9 @@ export default function TextureEditorPage({ isTile = false, onClose, nodeId, tre
     }
   };
 
-  const handleSaveAndClose = () => {
+  const handleSaveAndClose = async () => {
     if (!canSave) return;
-    saveTextureToList(form);
+    await saveTextureToList(form);
     closePreview();
     if (onClose) onClose();
   };

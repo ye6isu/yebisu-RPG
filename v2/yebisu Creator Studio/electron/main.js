@@ -42,6 +42,12 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  mainWindow.on('close', () => {
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (win !== mainWindow && !win.isDestroyed()) win.close();
+    });
+  });
+
   mainWindowState.manage(mainWindow);
 }
 

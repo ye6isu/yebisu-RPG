@@ -3,36 +3,6 @@
   "modId": "yebisurpg",
   "basePath": "src/main",
   "entries": {
-    "yasuo_katana": {
-      "type": "item",
-      "displayName": "Yasuo's Katana",
-      "created": "2026-06-26T00:00:00Z",
-      "modified": "2026-06-26T00:00:00Z",
-      "injections": [
-        {
-          "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
-          "marker": "YCS_Mod_Items",
-          "type": "java-marker",
-          "content": "    public static final DeferredItem<Item> YASUO_KATANA = ITEMS.register(\"yasuo_katana\",\n                () -> new YasuoKatanaItem(new Item.Properties()\n                        .attributes(SwordItem.createAttributes(Tiers.NETHERITE, 3f, -2.4f))));"
-        },
-        {
-          "file": "resources/assets/yebisurpg/models/item/yasuo_katana.json",
-          "type": "created-file"
-        },
-        {
-          "file": "resources/assets/yebisurpg/lang/en_us.json",
-          "key": "item.yebisurpg.yasuo_katana",
-          "type": "json-key"
-        }
-      ],
-      "assets": [],
-      "properties": {
-        "tier": "NETHERITE",
-        "attackDamage": 3,
-        "attackSpeed": -2.4,
-        "customClass": "YasuoKatanaItem"
-      }
-    },
     "test_effect": {
       "type": "effect",
       "displayName": "Test Effect",
@@ -65,7 +35,7 @@
           "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
           "marker": "YCS_Mod_Items",
           "type": "java-marker",
-          "content": "    public static final DeferredItem<GunItem> GUN = ITEMS.register(\"gun\",\n            () -> new GunItem(new Item.Properties().stacksTo(1)));"
+          "content": "    public static final DeferredItem<Item> GUN = ITEMS.register(\"gun\",\n            () -> new Item(new Item.Properties().stacksTo(1)));"
         },
         {
           "file": "resources/assets/yebisurpg/lang/en_us.json",
@@ -108,16 +78,6 @@
           "file": "resources/assets/yebisurpg/ycs/ycs_tabs.json",
           "key": "gun",
           "type": "json-key"
-        },
-        {
-          "file": "java/net/ye6isu/yebisuRPG/item/custom/GunItem.java",
-          "type": "created-file"
-        },
-        {
-          "file": "java/net/ye6isu/yebisuRPG/item/custom/GunItem.java",
-          "marker": "YCS:releaseUsing:body",
-          "type": "java-marker",
-          "content": "        DashUtil.start(livingEntity, (double)((livingEntity.getLookAngle().x)), (double)((livingEntity.getLookAngle().y)), (double)((livingEntity.getLookAngle().z)), (double)(10), (int)((double)(5)), DashUtil.Easing.EASE_OUT, null, null, \"sphere\", (double)(1.5), (double)(0), (double)(0), false);"
         }
       ],
       "assets": [],
@@ -130,10 +90,10 @@
         "multipleStates": false,
         "stateCount": 2
       },
-      "created": "2026-06-27T17:52:40.113Z",
-      "modified": "2026-06-27T17:52:40.113Z"
+      "created": "2026-06-28T13:39:06.824Z",
+      "modified": "2026-06-28T13:39:06.824Z"
     }
   },
   "assets": {},
-  "modified": "2026-06-27T17:52:40.113Z"
+  "modified": "2026-06-28T13:39:06.824Z"
 }

@@ -58,10 +58,6 @@ public class GeoItemRegistry {
         List<Item> items = new ArrayList<>();
 
         //YCS_Geo_Collect_START
-
-tryRegisterStates(items, ModItems.YASUO_KATANA, "yasuo_katana", new String[]{"yasuo_katana_state_0", "yasuo_katana_state_1"}, new int[][]{{3, 1, 4}, {4, 0, 4}});
-
-
         tryRegister(items, ModItems.GUN, "gun");
 //YCS_Geo_Collect_END
 

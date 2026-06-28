@@ -1,4 +1,5 @@
 import { generateCustomClass, idToClassName } from './classGenerator.js';
+import { loadTexturesFile } from '../entityFiles.js';
 
 const MODID = 'yebisurpg';
 
@@ -88,8 +89,8 @@ function buildRecipeCode(id, CN, recipe) {
 }
 
 function buildDataComponentLine(dc) {
-  const constName = 'YCS_' + dc.name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  const regId = 'ycs_' + dc.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const regId = dc.id || dc.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const constName = (dc.name || regId).toUpperCase().replace(/[^A-Z0-9_]/g, '_');
 
   if (dc.type === 'logic') {
     return `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>>\n` +
@@ -229,15 +230,26 @@ function buildStateModelJsons(form) {
     }
   }
 
-  // Main model with overrides
-  const mainModel = {
-    parent: 'minecraft:item/generated',
-    textures: { layer0: `${MODID}:item/${form.id}` },
+  // Main model uses state 0's configuration as the default appearance
+  const st0 = form.states?.[0] || {};
+  const st0Handheld = st0.holdingMode === 'handheld';
+  const st0Is3d = st0.holdingMode === '3d';
+  const mainModel = st0Is3d ? {
+    parent: 'builtin/entity',
+    textures: { particle: `${MODID}:geo/item/${form.id}_state_0` },
+    display: {
+      thirdperson_righthand: { rotation: [0, 0, 0], translation: [0, 3, 1], scale: [0.55, 0.55, 0.55] },
+      firstperson_righthand: { rotation: [0, -90, 25], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] },
+    },
+    overrides: [],
+  } : {
+    parent: st0Handheld ? 'minecraft:item/handheld' : 'minecraft:item/generated',
+    textures: { layer0: `${MODID}:item/${form.id}_state_0` },
     overrides: [],
   };
-  for (let i = 0; i < count; i++) {
+  for (let i = 1; i < count; i++) {
     mainModel.overrides.push({
-      predicate: { custom_model_data: i + 1 },
+      predicate: { custom_model_data: i },
       model: `${MODID}:item/${form.id}_state_${i}`,
     });
   }
@@ -327,7 +339,7 @@ export async function injectItem(form) {
   }
 
   // 4b. Copy texture PNG(s) to resources
-  const texList = JSON.parse(localStorage.getItem('ycs-textures-list') || '[]');
+  const texList = await loadTexturesFile();
   const copyTexture = async (texName, destName) => {
     const tex = texList.find(t => t.label === texName);
     if (!tex?.dataUrl) return;
@@ -412,7 +424,7 @@ export async function injectItem(form) {
   }
 
   // 4e. Write 3D geo model files and register in GeoItemRegistry
-  const writeGeoModels = async (modelJsonStr, modelId, cn) => {
+  const writeGeoModels = async (modelJsonStr, modelId, cn, texName) => {
     if (!modelJsonStr) return;
     let parsed;
     try { parsed = JSON.parse(modelJsonStr); } catch { return; }
@@ -427,7 +439,8 @@ export async function injectItem(form) {
       injections.push({ file: modelPath, type: 'created-file' });
     }
     if (cn) {
-      const tex = form.textureName ? texList.find(t => t.label === form.textureName) : null;
+      const useTex = texName || form.textureName;
+      const tex = useTex ? texList.find(t => t.label === useTex) : null;
       let geoLine;
       if (tex?.isSpritesheet && (tex.frames || 1) > 1) {
         geoLine = `        tryRegister(items, ModItems.${cn}, "${modelId}", ${tex.frames}, ${!!tex.isAnimated}, ${tex.ticksPerFrame || 4});`;
@@ -451,18 +464,21 @@ export async function injectItem(form) {
   };
   const is3d = form.holdingMode === '3d';
   if (hasStates) {
+    const st0 = form.states?.[0];
     for (let i = 0; i < (form.stateCount || 2); i++) {
       const st = form.states?.[i];
       if (st?.holdingMode === '3d' && st.modelJson) {
-        await writeGeoModels(st.modelJson, `${id}_state_${i}`, null);
+        await writeGeoModels(st.modelJson, `${id}_state_${i}`, i === 0 ? CN : null, st.textureName);
       }
     }
     if (is3d && form.modelJson) {
-      await writeGeoModels(form.modelJson, id, CN);
+      if (!(st0?.holdingMode === '3d')) {
+        await writeGeoModels(form.modelJson, id, CN, form.textureName);
+      }
     }
     results.push({ label: '3D models', ok: true });
   } else if (is3d && form.modelJson) {
-    await writeGeoModels(form.modelJson, id, CN);
+    await writeGeoModels(form.modelJson, id, CN, form.textureName);
     results.push({ label: '3D model', ok: true });
   }
 
@@ -526,15 +542,14 @@ export async function injectItem(form) {
         'YCS_Mod_Recipe_Provider',
         recipeCode
       );
-      if (recipeResult.ok) {
-        injections.push({
-          file: `${JAVA_BASE}/datagen/ModRecipeProvider.java`,
-          marker: 'YCS_Mod_Recipe_Provider',
-          type: 'java-marker',
-          content: recipeCode,
-        });
-        results.push({ label: 'Recipe', ok: true });
-      }
+      if (!recipeResult.ok) throw new Error(`Recipe injection failed: ${recipeResult.error}`);
+      injections.push({
+        file: `${JAVA_BASE}/datagen/ModRecipeProvider.java`,
+        marker: 'YCS_Mod_Recipe_Provider',
+        type: 'java-marker',
+        content: recipeCode,
+      });
+      results.push({ label: 'Recipe', ok: true });
     }
   }
 
@@ -548,15 +563,14 @@ export async function injectItem(form) {
         'YCS_DataComponents',
         dcLines
       );
-      if (dcResult.ok) {
-        injections.push({
-          file: `${JAVA_BASE}/component/ModDataComponents.java`,
-          marker: 'YCS_DataComponents',
-          type: 'java-marker',
-          content: dcLines,
-        });
-        results.push({ label: 'Data Components', ok: true });
-      }
+      if (!dcResult.ok) throw new Error(`Data component injection failed: ${dcResult.error}`);
+      injections.push({
+        file: `${JAVA_BASE}/component/ModDataComponents.java`,
+        marker: 'YCS_DataComponents',
+        type: 'java-marker',
+        content: dcLines,
+      });
+      results.push({ label: 'Data Components', ok: true });
     }
   }
 

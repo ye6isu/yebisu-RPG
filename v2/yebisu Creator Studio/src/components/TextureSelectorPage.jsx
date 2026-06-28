@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import SpritePreview from './SpritePreview';
+import { loadTexturesFile, saveTexturesFile } from '../entityFiles';
 
 const CARD_SIZE = 120;
 
@@ -9,9 +10,9 @@ export default function TextureSelectorPage({ isTile = false, onClose, nodeId, t
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
-  const reload = useCallback(() => {
-    const raw = localStorage.getItem('ycs-textures-list');
-    try { setTextures(raw ? JSON.parse(raw) : []); } catch { setTextures([]); }
+  const reload = useCallback(async () => {
+    const list = await loadTexturesFile();
+    setTextures(list);
   }, []);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function TextureSelectorPage({ isTile = false, onClose, nodeId, t
     }));
   };
 
-  const saveAndSelect = (name, dataUrl) => {
+  const saveAndSelect = async (name, dataUrl) => {
     const label = name.replace(/\.[^.]+$/, '');
     const tex = {
       label, dataUrl, dataFileName: name,
@@ -36,13 +37,11 @@ export default function TextureSelectorPage({ isTile = false, onClose, nodeId, t
       isSpritesheet: false, frames: 4, defaultFrame: 0,
       isAnimated: false, ticksPerFrame: 4,
     };
-    const raw = localStorage.getItem('ycs-textures-list');
-    let list = [];
-    try { list = raw ? JSON.parse(raw) : []; } catch {}
+    const list = await loadTexturesFile();
     const idx = list.findIndex(t => t.label === label);
     if (idx >= 0) list[idx] = tex;
     else list.push(tex);
-    localStorage.setItem('ycs-textures-list', JSON.stringify(list));
+    await saveTexturesFile(list);
     window.dispatchEvent(new CustomEvent('ycs-textures-changed'));
     selectTexture(tex);
   };

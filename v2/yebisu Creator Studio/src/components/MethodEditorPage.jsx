@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FORM_STORAGE_PREFIX } from './ItemPageNew';
 import { StandardDropdownField } from './Field/Field';
-
-const BLOCKY_PREFIX = 'ycs-blocky::';
+import * as itemStore from '../store/itemStore';
 
 const USE_ANIMATIONS = [
   { value: 'NONE', label: 'None' },
@@ -29,54 +27,66 @@ const ITEM_METHODS = [
 
 export { ITEM_METHODS };
 
-function hasBlockData(blockEditorPrefix, methodKey) {
-  try {
-    const id = `${blockEditorPrefix}::${methodKey}`;
-    const raw = localStorage.getItem(BLOCKY_PREFIX + id);
-    if (!raw) return false;
-    const nodes = JSON.parse(raw);
-    return nodes.length > 1;
-  } catch { return false; }
+function resolveItemId(tabId, nodeId) {
+  const stableId = tabId || nodeId;
+  const seeded = localStorage.getItem('ycs-child-item-id::' + stableId);
+  if (seeded) return seeded;
+  const parts = (stableId || '').split('::');
+  if (parts.length >= 3) {
+    return parts[parts.length - 2];
+  }
+  return '';
+}
+
+function hasBlockData(itemId, methodKey) {
+  const graphs = itemStore.getSection(itemId, 'blockGraphs');
+  if (!graphs) return false;
+  const data = graphs[methodKey];
+  if (!data) return false;
+  return Array.isArray(data) ? data.length > 1 : !!data;
 }
 
 export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) {
   const tileId = tabId || nodeId;
-
-  const parentItemTabId = useMemo(() => {
-    const parts = tileId.split('::');
-    return parts.slice(1, -1).join('::');
-  }, [tileId]);
+  const itemId = resolveItemId(tabId, nodeId);
 
   const [parentForm, setParentForm] = useState(() => {
-    try {
-      const raw = localStorage.getItem(FORM_STORAGE_PREFIX + parentItemTabId);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
+    if (itemId) {
+      const cached = itemStore.getCached(itemId);
+      if (cached) return cached;
+    }
+    return {};
   });
-
-  const itemId = parentForm.id || '';
-  const stableMethodsKey = itemId ? `ycs-methods::item::${itemId}` : `ycs-methods-enabled::${tileId}`;
 
   const [enabledMethods, setEnabledMethods] = useState(() => {
-    try {
-      const raw = localStorage.getItem(stableMethodsKey);
-      if (raw) return JSON.parse(raw);
-      const legacy = localStorage.getItem('ycs-methods-enabled::' + tileId);
-      return legacy ? JSON.parse(legacy) : [];
-    } catch { return []; }
+    if (itemId) {
+      const stored = itemStore.getSection(itemId, 'enabledMethods');
+      if (stored) return stored;
+    }
+    return [];
   });
+
+  useEffect(() => {
+    if (!itemId) return;
+    return itemStore.subscribe(itemId, (data) => {
+      if (data) {
+        setParentForm(data);
+        if (data.enabledMethods) setEnabledMethods(data.enabledMethods);
+      }
+    });
+  }, [itemId]);
 
   const updateParentField = (key, value) => {
     setParentForm(prev => {
       const next = { ...prev, [key]: value };
-      localStorage.setItem(FORM_STORAGE_PREFIX + parentItemTabId, JSON.stringify(next));
+      if (itemId) itemStore.setCached(itemId, next);
       return next;
     });
   };
 
   useEffect(() => {
-    localStorage.setItem(stableMethodsKey, JSON.stringify(enabledMethods));
-  }, [enabledMethods, stableMethodsKey]);
+    if (itemId) itemStore.updateSection(itemId, 'enabledMethods', enabledMethods);
+  }, [enabledMethods, itemId]);
 
   const findNodeByTabId = (searchTabId) => {
     if (!tree) return null;
@@ -88,8 +98,7 @@ export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree
     return search(tree);
   };
 
-  const stableBlockPrefix = itemId ? `item::${itemId}` : `Block Editor::${tileId}`;
-  const blockEditorPrefix = stableBlockPrefix;
+  const blockEditorPrefix = itemId ? `item::${itemId}` : `Block Editor::${tileId}`;
 
   const openEditor = (methodKey) => {
     const childTabId = `Block Editor::${tileId}::${methodKey}`;
@@ -104,6 +113,7 @@ export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree
       }
       const storageKey = `${blockEditorPrefix}::${methodKey}`;
       localStorage.setItem('ycs-blocky-seed::' + childTabId, storageKey);
+      if (itemId) localStorage.setItem('ycs-child-item-id::' + childTabId, itemId);
       window.dispatchEvent(new CustomEvent('ycs-toggle-child', {
         detail: {
           parentId: nodeId,
@@ -183,7 +193,7 @@ export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 16px' }}>
           {ITEM_METHODS.map(m => {
             const on = isEnabled(m.key);
-            const has = hasBlockData(blockEditorPrefix, m.key);
+            const has = hasBlockData(itemId, m.key);
             const gated = m.requires && !isEnabled(m.requires);
             const isCont = m.key === 'continuousUse';
 
@@ -232,13 +242,13 @@ export default function MethodEditorPage({ isTile = false, onClose, nodeId, tree
                               className={`ycs-button inline${isMethodOpen('continuousUse') ? ' active' : ''}`}
                               onClick={() => openEditor('continuousUse')}
                             >
-                              {hasBlockData(blockEditorPrefix, 'continuousUse') ? 'edit' : 'set'} onUseTick
+                              {hasBlockData(itemId, 'continuousUse') ? 'edit' : 'set'} onUseTick
                             </button>
                             <button
                               className={`ycs-button inline${isMethodOpen('releaseUsing') ? ' active' : ''}`}
                               onClick={() => openEditor('releaseUsing')}
                             >
-                              {hasBlockData(blockEditorPrefix, 'releaseUsing') ? 'edit' : 'set'} releaseUsing
+                              {hasBlockData(itemId, 'releaseUsing') ? 'edit' : 'set'} releaseUsing
                             </button>
                           </div>
                         </>

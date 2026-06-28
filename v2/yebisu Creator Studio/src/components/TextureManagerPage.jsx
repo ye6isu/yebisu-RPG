@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import SpritePreview from './SpritePreview';
 import { findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
+import { loadTexturesFile, saveTexturesFile } from '../entityFiles';
 
 const CARD_SIZE = 120;
 const popoutChildren = new Set();
@@ -9,9 +10,9 @@ export default function TextureManagerPage({ isTile = false, onClose, nodeId, tr
   const [filter, setFilter] = useState('');
   const [textures, setTextures] = useState([]);
 
-  const reload = useCallback(() => {
-    const raw = localStorage.getItem('ycs-textures-list');
-    try { setTextures(raw ? JSON.parse(raw) : []); } catch { setTextures([]); }
+  const reload = useCallback(async () => {
+    const list = await loadTexturesFile();
+    setTextures(list);
   }, []);
 
   useEffect(() => {
@@ -57,13 +58,12 @@ export default function TextureManagerPage({ isTile = false, onClose, nodeId, tr
     }));
   };
 
-  const deleteTexture = (tex, e) => {
+  const deleteTexture = async (tex, e) => {
     e.stopPropagation();
-    const raw = localStorage.getItem('ycs-textures-list');
-    let list = [];
-    try { list = raw ? JSON.parse(raw) : []; } catch {}
-    list = list.filter(t => t.label !== tex.label);
-    localStorage.setItem('ycs-textures-list', JSON.stringify(list));
+    const list = await loadTexturesFile();
+    const filtered = list.filter(t => t.label !== tex.label);
+    await saveTexturesFile(filtered);
+    setTextures(filtered);
     window.dispatchEvent(new CustomEvent('ycs-textures-changed'));
   };
 

@@ -252,7 +252,7 @@ export function DropdownField({ value, onChange, options }) {
 export function StandardDropdownField({ value, onChange, options }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
-  
+
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : value;
 
@@ -268,12 +268,12 @@ export function StandardDropdownField({ value, onChange, options }) {
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           width: '100%',
           padding: '0 8px',
           background: 'transparent',
@@ -291,11 +291,11 @@ export function StandardDropdownField({ value, onChange, options }) {
         </div>
         <span style={{ fontSize: '8px', opacity: 0.7, padding: '4px' }}>▼</span>
       </div>
-      
+
       {isOpen && (
         <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100 }}>
           {options.map((opt) => (
-            <div 
+            <div
               key={opt.label}
               className="dropdown-item"
               onClick={() => {
@@ -308,6 +308,23 @@ export function StandardDropdownField({ value, onChange, options }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+export function EditorFooter({ status, onCancel, onSave, onSaveAndClose, onRemove, saving, children }) {
+  return (
+    <div style={{
+      padding: '8px',
+      display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px',
+      borderTop: '1px solid var(--ycs-foreground)', flexShrink: 0,
+    }}>
+      {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252', marginRight: 'auto' }}>{status.msg}</span>}
+      {children}
+      {onRemove && <button className="ycs-button" onClick={onRemove} style={{ color: '#e05252' }}>Remove</button>}
+      {onCancel && <button className="ycs-button" onClick={onCancel}>Cancel</button>}
+      {onSave && <button className="ycs-button" onClick={onSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>}
+      {onSaveAndClose && <button className="ycs-button" onClick={onSaveAndClose} disabled={saving}>Save & Close</button>}
     </div>
   );
 }

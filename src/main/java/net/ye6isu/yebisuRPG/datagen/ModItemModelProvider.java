@@ -84,12 +84,9 @@ public class ModItemModelProvider extends ItemModelProvider {
 
         //YCS_Mod_Item_Model_START
 
-basicItem(ModItems.YE6ISU.get());
-
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/plank"),TEXTURE);
-
-        existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/yasuo_katana"),TEXTURE);
-
+        basicItem(ModItems.YE6ISU.get());
+        basicItem(ModItems.PLANK.get());
+        
 
         existingFileHelper.trackGenerated(ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID,"item/gun"),TEXTURE);
         //YCS_Mod_Item_Model_END

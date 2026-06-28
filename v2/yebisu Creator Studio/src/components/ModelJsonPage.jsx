@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as itemStore from '../store/itemStore';
 
 function JsonFileRow({ label, jsonData, fileName, onSet, onRemove }) {
   const hasFile = !!jsonData;
@@ -35,17 +36,21 @@ function JsonFileRow({ label, jsonData, fileName, onSet, onRemove }) {
   );
 }
 
-const STORAGE_PREFIX = 'ycs-model-json::';
-
-function readState(stableId) {
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + stableId);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+function resolveItemId(tabId, nodeId) {
+  const stableId = tabId || nodeId;
+  const seeded = localStorage.getItem('ycs-child-item-id::' + stableId);
+  if (seeded) return seeded;
+  const parts = (stableId || '').split('::');
+  if (parts.length >= 3) {
+    return parts[parts.length - 2];
+  }
+  return '';
 }
 
-function writeState(stableId, data) {
-  localStorage.setItem(STORAGE_PREFIX + stableId, JSON.stringify(data));
+function resolveModelKey(tabId, nodeId) {
+  const stableId = tabId || nodeId;
+  const parts = (stableId || '').split('::');
+  return parts[parts.length - 1] || 'model-json';
 }
 
 const DEFAULT_STATE = {
@@ -55,21 +60,34 @@ const DEFAULT_STATE = {
 
 export default function ModelJsonPage({ isTile = false, onClose, nodeId, tree, tabId }) {
   const stableId = tabId || nodeId;
-  const [state, setStateRaw] = useState(() => readState(stableId) || { ...DEFAULT_STATE });
+  const itemId = resolveItemId(tabId, nodeId);
+  const modelKey = resolveModelKey(tabId, nodeId);
+
+  const [state, setStateRaw] = useState(() => {
+    if (itemId) {
+      const allModels = itemStore.getSection(itemId, 'modelJsonData');
+      if (allModels && allModels[modelKey]) return allModels[modelKey];
+    }
+    return { ...DEFAULT_STATE };
+  });
   const [previewOpen, setPreviewOpen] = useState(false);
   const geoRef = useRef(null);
   const itemRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    const saved = readState(stableId);
-    if (saved) setStateRaw(saved);
-  }, [stableId]);
+    if (!itemId) return;
+    const allModels = itemStore.getSection(itemId, 'modelJsonData');
+    if (allModels && allModels[modelKey]) setStateRaw(allModels[modelKey]);
+  }, [itemId, modelKey]);
 
   const set = (updates) => {
     setStateRaw(prev => {
       const next = { ...prev, ...updates };
-      writeState(stableId, next);
+      if (itemId) {
+        const allModels = itemStore.getSection(itemId, 'modelJsonData') || {};
+        itemStore.updateSection(itemId, 'modelJsonData', { ...allModels, [modelKey]: next });
+      }
       return next;
     });
   };
@@ -94,6 +112,8 @@ export default function ModelJsonPage({ isTile = false, onClose, nodeId, tree, t
 
     return () => window.removeEventListener('ycs-model-texture-update', handler);
   }, [stableId]);
+
+  const previewChildTabId = `Preview::${stableId}::model-preview`;
 
   useEffect(() => {
     if (!state.geoModelJson) return;
@@ -144,8 +164,6 @@ export default function ModelJsonPage({ isTile = false, onClose, nodeId, tree, t
       }
     }
   };
-
-  const previewChildTabId = `Preview::${stableId}::model-preview`;
 
   const findNode = (n, tid) => {
     if (!n) return null;
