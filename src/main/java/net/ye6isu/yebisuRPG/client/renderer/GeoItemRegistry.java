@@ -57,10 +57,6 @@ public class GeoItemRegistry {
     private static List<Item> collectGeoItems() {
         List<Item> items = new ArrayList<>();
 
-        //YCS_Geo_Collect_START
-        tryRegister(items, ModItems.GUN, "gun");
-//YCS_Geo_Collect_END
-
         return items;
     }
 

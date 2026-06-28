@@ -15,7 +15,6 @@
     "MixinScaleAttributes$ThrownScale"
   ],
   "client": [
-    "MixinAbstractClientPlayer",
     "AccessorElytraModel",
     "MixinElytraLayer",
     "MixinGameRenderer",

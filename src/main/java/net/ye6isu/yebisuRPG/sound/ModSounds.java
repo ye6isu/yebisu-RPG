@@ -11,13 +11,7 @@ import java.util.function.Supplier;
 
 public class ModSounds {
 
-    public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
-            DeferredRegister.create(BuiltInRegistries.SOUND_EVENT, yebisuRPG.MODID);
-
-    public static final Supplier<SoundEvent> RAW_YE6ISU = registerSoundEvent("raw_ye6isu_use");
-
-    //YCS_Sounds_START
-    //YCS_Sounds_END
+    public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(BuiltInRegistries.SOUND_EVENT, yebisuRPG.MODID);
 
     private static Supplier<SoundEvent> registerSoundEvent(String name) {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, name);

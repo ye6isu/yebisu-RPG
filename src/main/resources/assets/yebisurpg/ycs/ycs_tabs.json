@@ -1,21 +1,2 @@
 {
-  "plank": "testtab",
-  "ye6isu": "testtab",
-  "plank_helmet": "testtab",
-  "plank_chestplate": "testtab",
-  "plank_leggings": "testtab",
-  "plank_boots": "testtab",
-  "joe_spawn_egg": "testtab",
-  "block:ye6isu_block": "testtab",
-  "block:crate_block": "testtab",
-  "block:crate_stairs": "testtab",
-  "block:crate_slab": "testtab",
-  "block:crate_pressure_plate": "testtab",
-  "block:crate_button": "testtab",
-  "block:crate_fence": "testtab",
-  "block:crate_fence_gate": "testtab",
-  "block:crate_wall": "testtab",
-  "block:crate_door": "testtab",
-  "block:crate_trapdoor": "testtab",
-  "gun": "testtab"
 }

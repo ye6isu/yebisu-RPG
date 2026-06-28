@@ -1,16 +1,12 @@
 package net.ye6isu.yebisuRPG.attribute;
 
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.RangedAttribute;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.ye6isu.yebisuRPG.yebisuRPG;
-
-//YCS_Attributes_IMPORTS_START
-//YCS_Attributes_IMPORTS_END
 
 public final class ModAttributes {
 
@@ -48,8 +44,6 @@ public final class ModAttributes {
     public static final DeferredHolder<Attribute, Attribute> SCALE_PROJECTILES      = reg("scale.projectiles",      "Scale (Projectiles)",           0.0, Double.MAX_VALUE,  1.0);
     public static final DeferredHolder<Attribute, Attribute> SCALE_EXPLOSIONS       = reg("scale.explosions",       "Scale (Explosions)",            0.0, Double.MAX_VALUE,  1.0);
 
-    //YCS_Attributes_START
-    //YCS_Attributes_END
 
     private static DeferredHolder<Attribute, Attribute> reg(String path, String descKey, double min, double max, double def) {
         return ATTRIBUTES.register(path, () -> new RangedAttribute(descKey, def, min, max).setSyncable(true));
