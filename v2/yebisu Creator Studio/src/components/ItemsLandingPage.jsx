@@ -2,6 +2,7 @@ import React from 'react';
 import RegistryLandingPage from './RegistryLandingPage';
 import { DEFAULT_FORM } from './ItemPageNew';
 import { removeItem } from '../codegen/itemInjector';
+import * as itemStore from '../store/itemStore';
 
 const EXCLUDED_CLASSES = ['ArmorItem', 'SpawnEgg'];
 
@@ -13,7 +14,12 @@ function seedFormData(item) {
   if (!item) {
     return { ...DEFAULT_FORM, states: DEFAULT_FORM.states.map(s => ({ ...s })) };
   }
-  const p = item.properties;
+  // If item was loaded from JSON, _fullData holds the complete form
+  if (item._fullData) {
+    return { ...item._fullData };
+  }
+  // Fallback: sparse mapping for Java-scanned items (migration path)
+  const p = item.properties || {};
   const form = {
     ...DEFAULT_FORM,
     states: DEFAULT_FORM.states.map(s => ({ ...s })),
@@ -36,29 +42,41 @@ function seedFormData(item) {
   return form;
 }
 
-function loadItems() {
-  return window.electronAPI?.fileEngine?.items?.scanAll();
-}
-
-function cleanupItemStorage(itemId) {
-  const keysToRemove = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (
-      key.startsWith(`ycs-blocky::item::${itemId}::`) ||
-      key === `ycs-methods::item::${itemId}` ||
-      (key.startsWith('ycs-blocky-seed::') && localStorage.getItem(key)?.startsWith(`item::${itemId}::`))
-    )) {
-      keysToRemove.push(key);
+async function loadItems() {
+  const ids = await itemStore.listItems();
+  if (ids.length > 0) {
+    const items = [];
+    for (const id of ids) {
+      const data = await itemStore.loadItem(id);
+      if (data) {
+        items.push({
+          id: data.id || id,
+          displayName: data.displayName || id,
+          constName: data.constName || id.toUpperCase(),
+          itemClass: data.customClass || 'Item',
+          properties: {
+            stackSize: data.stackSize,
+            isTool: data.isTool,
+            tier: data.tier,
+            damage: data.damage,
+            speed: data.speed,
+            durability: data.durability,
+            isFood: data.isFood,
+          },
+          _fullData: data,
+        });
+      }
     }
+    return { ok: true, data: items };
   }
-  keysToRemove.forEach(k => localStorage.removeItem(k));
+  // Fallback: scan Java files for items not yet saved as JSON
+  return window.electronAPI?.fileEngine?.items?.scanAll();
 }
 
 async function handleDeleteEntry(itemId, reload) {
   try {
     await removeItem(itemId);
-    cleanupItemStorage(itemId);
+    await itemStore.deleteItemFile(itemId);
     reload();
     window.dispatchEvent(new CustomEvent('ycs-item-changed'));
   } catch (err) {

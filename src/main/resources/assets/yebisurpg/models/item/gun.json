@@ -1,37 +1,33 @@
 {
   "credit": "Made with Blockbench",
   "parent": "builtin/entity",
-  "texture_size": [
-    32,
-    32
-  ],
   "display": {
     "thirdperson_righthand": {
       "translation": [
         0,
-        -4.5,
-        1
+        -5.25,
+        1.25
       ]
     },
     "thirdperson_lefthand": {
       "translation": [
         0,
-        -4.5,
-        1
+        -5.25,
+        1.25
       ]
     },
     "firstperson_righthand": {
       "translation": [
-        2,
-        -0.75,
-        -0.75
+        5,
+        -8,
+        0
       ]
     },
     "firstperson_lefthand": {
       "translation": [
-        2,
-        -0.75,
-        -0.75
+        5,
+        -8,
+        0
       ]
     },
     "gui": {
@@ -41,9 +37,14 @@
         0
       ],
       "translation": [
-        -2,
-        -3.75,
+        0,
+        -9.75,
         0
+      ],
+      "scale": [
+        1,
+        0.6,
+        0.6
       ]
     },
     "fixed": {
@@ -53,9 +54,14 @@
         0
       ],
       "translation": [
-        2,
-        -3.75,
+        0,
+        -9.75,
         0
+      ],
+      "scale": [
+        1,
+        0.6,
+        0.6
       ]
     },
     "on_shelf": {
@@ -65,13 +71,18 @@
         0
       ],
       "translation": [
-        -2,
-        -3.75,
+        0,
+        -9.75,
         0
+      ],
+      "scale": [
+        1,
+        0.6,
+        0.6
       ]
     }
   },
   "textures": {
-    "particle": "texture"
+    "particle": "yasuo_texture"
   }
 }

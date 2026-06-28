@@ -393,7 +393,9 @@ const WorkspaceLeaf = ({ node, onDropTab, flexStyle, activeNodeId, onCloseTab, s
               {renderTabContent(node.tabId, onCloseTab ? () => onCloseTab(node.id) : null, node.id, tree)}
             </div>
           ) : (
-            <span style={{ opacity: 0.3, userSelect: 'none' }}>{motd}</span>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ opacity: 0.3, userSelect: 'none' }}>{motd}</span>
+            </div>
           )}
         </div>
 

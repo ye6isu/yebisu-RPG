@@ -128,9 +128,18 @@ export default function PreferencesPageNew({ isTile = false, onClose }) {
   const [highlightColor, setHighlightColor] = useState(localStorage.getItem('ycs-highlight') || '#007ACC');
   const [fontFamily, setFontFamily] = useState(localStorage.getItem('ycs-font') || "'Inter', system-ui, sans-serif");
   
-  const [transparency, setTransparency] = useState(parseInt(localStorage.getItem('ycs-transparency')) || 55);
-  const [radius, setRadius] = useState(parseInt(localStorage.getItem('ycs-radius')) || 4);
-  const [gap, setGap] = useState(parseInt(localStorage.getItem('ycs-gap')) || 6);
+  const [transparency, setTransparency] = useState(() => {
+    const stored = localStorage.getItem('ycs-transparency');
+    return stored !== null ? parseInt(stored, 10) : 55;
+  });
+  const [radius, setRadius] = useState(() => {
+    const stored = localStorage.getItem('ycs-radius');
+    return stored !== null ? parseInt(stored, 10) : 4;
+  });
+  const [gap, setGap] = useState(() => {
+    const stored = localStorage.getItem('ycs-gap');
+    return stored !== null ? parseInt(stored, 10) : 6;
+  });
   const [motd, setMotd] = useState(localStorage.getItem('ycs-motd') || 'hello world');
 
   const [closeTabKey, setCloseTabKey] = useState(localStorage.getItem('ycs-keymap-closetab') || 'Ctrl+W');
@@ -145,9 +154,12 @@ export default function PreferencesPageNew({ isTile = false, onClose }) {
     const originalText = localStorage.getItem('ycs-text') || '#CCCCCC';
     const originalHighlight = localStorage.getItem('ycs-highlight') || '#007ACC';
     const originalFont = localStorage.getItem('ycs-font') || "'Inter', system-ui, sans-serif";
-    const originalTrans = parseInt(localStorage.getItem('ycs-transparency')) || 55;
-    const originalRadius = parseInt(localStorage.getItem('ycs-radius')) || 4;
-    const originalGap = parseInt(localStorage.getItem('ycs-gap')) || 6;
+    const storedTrans = localStorage.getItem('ycs-transparency');
+    const originalTrans = storedTrans !== null ? parseInt(storedTrans, 10) : 55;
+    const storedRadius = localStorage.getItem('ycs-radius');
+    const originalRadius = storedRadius !== null ? parseInt(storedRadius, 10) : 4;
+    const storedGap = localStorage.getItem('ycs-gap');
+    const originalGap = storedGap !== null ? parseInt(storedGap, 10) : 6;
     const originalMotd = localStorage.getItem('ycs-motd') || 'hello world';
     
     if (
@@ -202,9 +214,12 @@ export default function PreferencesPageNew({ isTile = false, onClose }) {
     const origText = localStorage.getItem('ycs-text') || '#CCCCCC';
     const origHighlight = localStorage.getItem('ycs-highlight') || '#007ACC';
     const origFont = localStorage.getItem('ycs-font') || "'Inter', system-ui, sans-serif";
-    const origTrans = parseInt(localStorage.getItem('ycs-transparency')) || 55;
-    const origRadius = parseInt(localStorage.getItem('ycs-radius')) || 4;
-    const origGap = parseInt(localStorage.getItem('ycs-gap')) || 6;
+    const storedOrigTrans = localStorage.getItem('ycs-transparency');
+    const origTrans = storedOrigTrans !== null ? parseInt(storedOrigTrans, 10) : 55;
+    const storedOrigRadius = localStorage.getItem('ycs-radius');
+    const origRadius = storedOrigRadius !== null ? parseInt(storedOrigRadius, 10) : 4;
+    const storedOrigGap = localStorage.getItem('ycs-gap');
+    const origGap = storedOrigGap !== null ? parseInt(storedOrigGap, 10) : 6;
     const origMotd = localStorage.getItem('ycs-motd') || 'hello world';
     const origCloseTab = localStorage.getItem('ycs-keymap-closetab') || 'Ctrl+W';
     const origReset = localStorage.getItem('ycs-keymap-reset') || 'Ctrl+Shift+R';

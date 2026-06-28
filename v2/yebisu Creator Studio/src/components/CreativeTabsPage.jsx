@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StringField, StandardDropdownField, NumberInput, findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
+import { StringField, StandardDropdownField, NumberInput, EditorFooter, findNodeByTabId as findNodeByTabIdUtil } from './Field/Field';
 import ItemSelector from './ItemSelector';
 
 const MODID = 'yebisurpg';
@@ -89,6 +89,13 @@ export default function CreativeTabsPage({ isTile = false, onClose, nodeId, tree
     if (!tab.key) return;
     const fe = window.electronAPI?.fileEngine;
     if (!fe) return;
+
+    // Close any open editor child tiles for this tab
+    const childTabId = `Tab Editor::${nodeId}::${tab.key}`;
+    const existing = findNodeByTabId(childTabId);
+    if (existing) {
+      window.dispatchEvent(new CustomEvent('ycs-close-tab-recursive', { detail: { targetId: existing.id } }));
+    }
 
     const next = tabs.filter((_, i) => i !== index);
     await fe.json.write(TABS_FILE, next);
@@ -296,8 +303,10 @@ export function TabEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) 
 
       setStatus({ ok: true, msg: 'Saved & injected' });
       window.dispatchEvent(new CustomEvent('ycs-tabs-changed'));
+      return true;
     } catch (err) {
       setStatus({ ok: false, msg: err.message });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -305,6 +314,37 @@ export function TabEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) 
 
   const itemListTabId = `Tab Items::${formKey}`;
   const isItemListOpen = !!findNodeByTabId(itemListTabId);
+
+  const handleSaveAndClose = useCallback(async () => {
+    const ok = await handleSave();
+    if (ok && onClose) onClose();
+  }, [handleSave, onClose]);
+
+  const handleRemove = useCallback(async () => {
+    if (!form.key) { if (onClose) onClose(); return; }
+    const fe = window.electronAPI?.fileEngine;
+    if (!fe) return;
+
+    const r = await fe.json.read(TABS_FILE);
+    const tabs = (r?.ok && Array.isArray(r.data)) ? r.data : [];
+    const next = tabs.filter(t => t.key !== form.key);
+    await fe.json.write(TABS_FILE, next);
+
+    const ar = await fe.json.read(TABS_ASSIGN_FILE);
+    const assignments = (ar?.ok && ar.data) ? { ...ar.data } : {};
+    Object.keys(assignments).forEach(k => { if (assignments[k] === form.key) delete assignments[k]; });
+    await fe.json.write(TABS_ASSIGN_FILE, assignments);
+
+    const langKey = `creativetab.${MODID}.${form.key}`;
+    try { await fe.json.deleteKey(LANG_FILE, langKey); } catch {}
+    try {
+      const regLine = buildTabRegistration(form);
+      await fe.markers.remove(`${JAVA_BASE}/item/ModCreativeModeTabs.java`, 'YCS_Mod_Creative_Tabs', regLine);
+    } catch {}
+
+    window.dispatchEvent(new CustomEvent('ycs-tabs-changed'));
+    if (onClose) onClose();
+  }, [form, onClose]);
 
   const toggleItemList = () => {
     const existing = findNodeByTabId(itemListTabId);
@@ -392,18 +432,18 @@ export function TabEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) 
         )}
       </div>
 
-      <div style={{
-        padding: '8px',
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px',
-        borderTop: '1px solid var(--ycs-foreground)', flexShrink: 0,
-      }}>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252', marginRight: 'auto' }}>{status.msg}</span>}
+      <EditorFooter
+        status={status}
+        onCancel={() => { if (onClose) onClose(); }}
+        onSave={handleSave}
+        onSaveAndClose={handleSaveAndClose}
+        onRemove={handleRemove}
+        saving={saving}
+      >
         <button className={`ycs-button inline${isItemListOpen ? ' active' : ''}`} onClick={toggleItemList}>
           Edit Item List
         </button>
-        <button className="ycs-button" onClick={() => { if (onClose) onClose(); }}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
+      </EditorFooter>
 
       {picker && (
         <ItemSelector
@@ -420,34 +460,98 @@ export function TabEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) 
 // Tab Item List (child tile) — registered as 'Tab Items'
 // ══════════════════════════════════════════════════════════════════════════════
 
-function DragItemRow({ itemId, index, onMove }) {
+function DragItemCard({ itemId, index, onMove, onDelete, containerRef }) {
   const label = itemId.replace(/^[#]?[^:]+:/, '').replace(/_/g, ' ');
+  const cardRef = useRef(null);
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0 || e.target.closest('.card-delete-item')) return;
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    let ghost = null;
+    let started = false;
+
+    const onMove_ = (me) => {
+      if (!started && Math.abs(me.clientX - startX) + Math.abs(me.clientY - startY) < 5) return;
+      if (!started) {
+        started = true;
+        ghost = document.createElement('div');
+        ghost.textContent = label;
+        ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:99999;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;color:var(--ycs-text);background:var(--ycs-accent-solid, #323233);border:1px solid var(--ycs-foreground);opacity:0.9;white-space:nowrap;';
+        document.body.appendChild(ghost);
+      }
+      ghost.style.left = me.clientX + 10 + 'px';
+      ghost.style.top = me.clientY + 10 + 'px';
+    };
+    const onUp = (ue) => {
+      window.removeEventListener('mousemove', onMove_);
+      window.removeEventListener('mouseup', onUp);
+      if (ghost) ghost.remove();
+      if (!started) return;
+      const container = containerRef?.current;
+      if (!container) return;
+      const cards = container.querySelectorAll('[data-card-index]');
+      let closest = -1, closestDist = Infinity;
+      cards.forEach(el => {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const d = Math.hypot(ue.clientX - cx, ue.clientY - cy);
+        if (d < closestDist) { closestDist = d; closest = parseInt(el.dataset.cardIndex, 10); }
+      });
+      if (closest >= 0 && closest !== index) onMove(index, closest);
+    };
+    window.addEventListener('mousemove', onMove_);
+    window.addEventListener('mouseup', onUp);
+  };
+
   return (
     <div
-      draggable
-      onDragStart={e => e.dataTransfer.setData('tab-item-index', String(index))}
-      onDragOver={e => e.preventDefault()}
-      onDrop={e => {
-        const from = parseInt(e.dataTransfer.getData('tab-item-index'), 10);
-        if (!isNaN(from) && from !== index) onMove(from, index);
-      }}
+      ref={cardRef}
+      data-card-index={index}
+      onMouseDown={handleMouseDown}
       style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
-        padding: '4px 8px',
+        width: '80px', cursor: 'grab',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: '8px 6px 6px',
         borderRadius: 'var(--ycs-radius, 4px)',
         border: '1px solid var(--ycs-foreground)',
-        fontSize: '12px', cursor: 'grab',
+        backgroundColor: 'transparent',
+        transition: 'border-color 0.1s, background-color 0.1s',
+        position: 'relative',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = 'var(--ycs-highlight)';
+        e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
+        const del = e.currentTarget.querySelector('.card-delete-item');
+        if (del) del.style.opacity = '1';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = 'var(--ycs-foreground)';
+        e.currentTarget.style.backgroundColor = 'transparent';
+        const del = e.currentTarget.querySelector('.card-delete-item');
+        if (del) del.style.opacity = '0';
       }}
     >
-      <div style={{ opacity: 0.3, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-          <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-          <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+      <div className="card-delete-item" onClick={e => { e.stopPropagation(); onDelete(index); }} title="Remove"
+        style={{ position: 'absolute', top: 3, right: 3, width: 16, height: 16, cursor: 'pointer', opacity: 0, transition: 'opacity 0.1s' }}>
+        <svg width="16" height="16" viewBox="0 0 18 18">
+          <defs><mask id={`del-item-${index}`}><circle cx="9" cy="9" r="9" fill="white"/><line x1="5" y1="9" x2="13" y2="9" stroke="black" strokeWidth="2" strokeLinecap="round"/></mask></defs>
+          <circle cx="9" cy="9" r="9" fill="white" mask={`url(#del-item-${index})`}/>
         </svg>
       </div>
-      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-      <span style={{ fontSize: '10px', opacity: 0.4, fontFamily: 'monospace', flexShrink: 0 }}>{itemId}</span>
+      <div style={{
+        width: '36px', height: '36px', backgroundColor: 'var(--ycs-foreground)',
+        borderRadius: 'var(--ycs-radius, 4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: '6px', flexShrink: 0,
+      }}>
+        <span style={{ fontSize: '8px', fontFamily: 'monospace', opacity: 0.5, textAlign: 'center', padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ fontSize: '10px', textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {label}
+      </div>
     </div>
   );
 }
@@ -456,7 +560,10 @@ export function TabItemListPage({ isTile = false, onClose, nodeId, tree, tabId }
   const parentFormKey = tabId?.replace(/^Tab Items::/, '') || '';
   const [tabKey, setTabKey] = useState('');
   const [items, setItems] = useState([]);
+  const [savedItems, setSavedItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(null);
+  const cardsRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -465,7 +572,7 @@ export function TabItemListPage({ isTile = false, onClose, nodeId, tree, tabId }
       const form = formRaw ? JSON.parse(formRaw) : null;
       const key = form?.key || '';
       setTabKey(key);
-      if (!key) { setItems([]); setLoading(false); return; }
+      if (!key) { setItems([]); setSavedItems([]); setLoading(false); return; }
 
       const fe = window.electronAPI?.fileEngine;
       if (!fe) { setLoading(false); return; }
@@ -473,6 +580,7 @@ export function TabItemListPage({ isTile = false, onClose, nodeId, tree, tabId }
       const assignments = (ar?.ok && ar.data) ? ar.data : {};
       const ordered = Object.entries(assignments).filter(([, v]) => v === key).map(([k]) => k);
       setItems(ordered);
+      setSavedItems(ordered);
     } catch {}
     setLoading(false);
   }, [parentFormKey]);
@@ -485,21 +593,56 @@ export function TabItemListPage({ isTile = false, onClose, nodeId, tree, tabId }
     return () => window.removeEventListener('ycs-tabs-changed', handler);
   }, [load]);
 
-  const moveItem = async (from, to) => {
+  const moveItem = (from, to) => {
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setItems(next);
+  };
 
+  const deleteItem = (index) => {
+    setItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = useCallback(async () => {
     const fe = window.electronAPI?.fileEngine;
     if (!fe || !tabKey) return;
+
     const ar = await fe.json.read(TABS_ASSIGN_FILE);
     const oldAssignments = (ar?.ok && ar.data) ? ar.data : {};
     const rebuilt = {};
     Object.entries(oldAssignments).forEach(([k, v]) => { if (v !== tabKey) rebuilt[k] = v; });
-    next.forEach(itemId => { rebuilt[itemId] = tabKey; });
+    items.forEach(itemId => { rebuilt[itemId] = tabKey; });
     await fe.json.write(TABS_ASSIGN_FILE, rebuilt);
-  };
+
+    const removed = savedItems.filter(id => !items.includes(id));
+    for (const itemId of removed) {
+      try {
+        const mr = await fe.json.read('ycs-manifest.json');
+        if (mr?.ok && mr.data) {
+          const manifest = mr.data;
+          const entries = manifest.entries || [];
+          for (const entry of entries) {
+            if (entry.id === itemId && entry.injections) {
+              entry.injections = entry.injections.filter(inj =>
+                !(inj.type === 'json-key' && inj.file === TABS_ASSIGN_FILE && inj.key === itemId)
+              );
+            }
+          }
+          await fe.json.write('ycs-manifest.json', manifest);
+        }
+      } catch {}
+    }
+
+    setSavedItems([...items]);
+    setStatus({ ok: true, msg: 'Saved' });
+    window.dispatchEvent(new CustomEvent('ycs-tabs-changed'));
+  }, [items, savedItems, tabKey]);
+
+  const handleCancel = useCallback(() => {
+    setItems([...savedItems]);
+    setStatus(null);
+  }, [savedItems]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -514,7 +657,7 @@ export function TabItemListPage({ isTile = false, onClose, nodeId, tree, tabId }
 
         <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
 
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '12px 16px' }}>
+        <div ref={cardsRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '12px 16px' }}>
           {loading ? (
             <div style={{ padding: '20px', textAlign: 'center', opacity: 0.4, fontSize: '12px' }}>Loading...</div>
           ) : items.length === 0 ? (
@@ -522,13 +665,15 @@ export function TabItemListPage({ isTile = false, onClose, nodeId, tree, tabId }
               No items assigned to this tab yet.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {items.map((itemId, i) => (
-                <DragItemRow key={`${itemId}-${i}`} itemId={itemId} index={i} onMove={moveItem} />
+                <DragItemCard key={`${itemId}-${i}`} itemId={itemId} index={i} onMove={moveItem} onDelete={deleteItem} containerRef={cardsRef} />
               ))}
             </div>
           )}
         </div>
+
+        <EditorFooter status={status} onCancel={handleCancel} onSave={handleSave} />
       </div>
     </div>
   );

@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { StandardDropdownField, NumberInput, Divider } from './Field/Field';
 import ItemSelector from './ItemSelector';
+import * as itemStore from '../store/itemStore';
 
 const SHAPE_OPTIONS = [
   { label: 'Shaped', value: 'shaped' },
   { label: 'Shapeless', value: 'shapeless' },
 ];
-
-const STORAGE_PREFIX = 'ycs-recipe::';
 
 function makeDefault() {
   return {
@@ -23,12 +22,19 @@ function makeDefault() {
   };
 }
 
-function readState(id) { try { const r = localStorage.getItem(STORAGE_PREFIX + id); return r ? JSON.parse(r) : null; } catch { return null; } }
-function writeState(id, d) { localStorage.setItem(STORAGE_PREFIX + id, JSON.stringify(d)); }
+function resolveItemId(tabId, nodeId) {
+  const stableId = tabId || nodeId;
+  const seeded = localStorage.getItem('ycs-child-item-id::' + stableId);
+  if (seeded) return seeded;
+  const parts = (stableId || '').split('::');
+  if (parts.length >= 3) {
+    return parts[parts.length - 2];
+  }
+  return '';
+}
 
-
-const SlotSquare = React.forwardRef(({ item, selected, onClick, onMouseEnter, onContextMenu, size = 48 }, ref) => (
-  <div ref={ref} onClick={onClick} onMouseEnter={onMouseEnter} onContextMenu={onContextMenu}
+const SlotSquare = React.forwardRef(({ item, selected, onClick, onMouseDown, onMouseEnter, onContextMenu, size = 48 }, ref) => (
+  <div ref={ref} onClick={onClick} onMouseDown={onMouseDown} onMouseEnter={onMouseEnter} onContextMenu={onContextMenu}
     style={{
       width: size, height: size,
       border: `2px solid ${selected ? 'var(--ycs-highlight)' : 'var(--ycs-foreground)'}`,
@@ -85,19 +91,35 @@ const InlineSlot = React.forwardRef(({ item, selected, onClick, onContextMenu },
 
 export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree, tabId }) {
   const stateKey = tabId || nodeId || 'recipe-default';
-  const [recipe, setRecipeRaw] = useState(() => readState(stateKey) || makeDefault());
+  const itemId = resolveItemId(tabId, nodeId);
+
+  const [recipe, setRecipeRaw] = useState(() => {
+    if (itemId) {
+      const stored = itemStore.getSection(itemId, 'recipe');
+      if (stored) return stored;
+    }
+    return makeDefault();
+  });
+
   const [picker, setPicker] = useState(null);
   const [brushItem, setBrushItem] = useState(null);
   const [brushActive, setBrushActive] = useState(false);
   const slotRefs = useRef({});
 
+  useEffect(() => {
+    if (!itemId) return;
+    return itemStore.subscribe(itemId, (data) => {
+      if (data?.recipe) setRecipeRaw(data.recipe);
+    });
+  }, [itemId]);
+
   const setRecipe = useCallback((updater) => {
     setRecipeRaw(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      writeState(stateKey, next);
+      if (itemId) itemStore.updateSection(itemId, 'recipe', next);
       return next;
     });
-  }, [stateKey]);
+  }, [itemId]);
 
   const R = useCallback((key, value) => {
     setRecipe(prev => ({ ...prev, [key]: value }));
@@ -108,21 +130,33 @@ export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree
     setPicker({ slot, rect: el.getBoundingClientRect() });
   };
 
-  const handlePickItem = (itemId) => {
+  const handlePickItem = (pickedItemId) => {
     const slot = picker?.slot;
     if (slot == null) return;
-    if (typeof slot === 'number') {
+    if (slot === 'brushPicker') {
+      setBrushItem(pickedItemId);
+    } else if (typeof slot === 'number') {
       setRecipe(prev => {
         const slots = [...prev.slots];
-        slots[slot] = itemId;
+        slots[slot] = pickedItemId;
         return { ...prev, slots };
       });
-      setBrushItem(itemId);
-      setBrushActive(true);
+      setBrushItem(pickedItemId);
     } else {
-      R(slot, itemId);
+      R(slot, pickedItemId);
     }
     setPicker(null);
+  };
+
+  const handleSlotMouseDown = (i) => {
+    if (brushItem == null) return;
+    setBrushActive(true);
+    setRecipe(prev => {
+      if (prev.slots[i] === brushItem) return prev;
+      const slots = [...prev.slots];
+      slots[i] = brushItem;
+      return { ...prev, slots };
+    });
   };
 
   const handleSlotHover = (i) => {
@@ -136,11 +170,10 @@ export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree
   };
 
   useEffect(() => {
-    if (!brushActive) return;
     const stop = () => setBrushActive(false);
     window.addEventListener('mouseup', stop);
     return () => window.removeEventListener('mouseup', stop);
-  }, [brushActive]);
+  }, []);
 
   const clearGridSlot = (e, i) => {
     e.preventDefault();
@@ -221,6 +254,7 @@ export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree
                           openPicker(i, slotRefs.current[i]);
                         }
                       }}
+                      onMouseDown={() => handleSlotMouseDown(i)}
                       onMouseEnter={() => handleSlotHover(i)}
                       onContextMenu={e => clearGridSlot(e, i)}
                     />
@@ -236,16 +270,27 @@ export default function RecipeEditorPage({ isTile = false, onClose, nodeId, tree
                   </div>
                 </div>
               </div>
-              {brushItem != null && (
-                <div style={{ marginTop: '6px', fontSize: '10px', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>Brush: <strong>{brushItem.replace(/^[#]?[^:]+:/, '')}</strong> — click slots to paint, right-click to clear</span>
-                  <button className="ycs-button icon" onClick={() => setBrushItem(null)} title="Clear brush" style={{ width: '22px', height: '22px', minWidth: '22px', padding: 0, flexShrink: 0 }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  ref={el => slotRefs.current['brushPicker'] = el}
+                  className="ycs-button inline"
+                  onClick={() => openPicker('brushPicker', slotRefs.current['brushPicker'])}
+                >
+                  Set Ingredient
+                </button>
+                {brushItem != null && (
+                  <>
+                    <span style={{ fontSize: '10px', opacity: 0.5 }}>
+                      Brush: <strong>{brushItem.replace(/^[#]?[^:]+:/, '')}</strong>
+                    </span>
+                    <button className="ycs-button icon" onClick={() => setBrushItem(null)} title="Clear brush" style={{ width: '22px', height: '22px', minWidth: '22px', padding: 0, flexShrink: 0 }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

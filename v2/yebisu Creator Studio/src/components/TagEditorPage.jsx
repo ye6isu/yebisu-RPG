@@ -30,6 +30,12 @@ const TAG_CATEGORIES = [
       'yebisurpg:cursed_item', 'yebisurpg:test_items',
     ],
   },
+  {
+    label: 'Special',
+    tags: [
+      'no_slowdown',
+    ],
+  },
 ];
 
 function readTags(nodeId) {

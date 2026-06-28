@@ -433,3 +433,64 @@ For fields that open a right-side panel (Texture, Methods, Tags, Tooltip, Recipe
 ### Keybind Mouse Buttons
 - Dropdown includes Mouse 1-5. Labels: "Mouse 1", "Mouse 2", "Mouse 3", "Mouse 4", "Mouse 5".
 - Browser button remapping: left=Mouse 1, right=Mouse 2, middle=Mouse 3 (browser gives 0=left, 1=middle, 2=right; we remap {0→0, 1→2, 2→1}).
+
+---
+
+## Entity File Persistence
+
+YCS uses per-entity JSON files as the single source of truth for all editor data. This replaces the previous localStorage-based persistence which broke across sessions due to workspace nodeId regeneration.
+
+### Architecture
+
+```
+resources/assets/yebisurpg/ycs/
+  items/<item_id>.json      — one file per item (form + recipe + DC + methods + blocky)
+  textures.json             — all texture definitions in one file
+  tabs/                     — reserved for future per-tab files
+  ycs_custom_tabs.json      — custom creative tab definitions (already file-based)
+  ycs_tabs.json             — item-to-tab assignments (already file-based)
+```
+
+### Layer Stack
+
+1. **`entityFiles.js`** — Low-level disk I/O via file engine IPC (`fe.json.read/write`). Paths resolve relative to `src/main/`.
+2. **`store/itemStore.js`**, **`store/textureStore.js`** — In-memory caches with pub/sub. Delegates to `entityFiles.js` for persistence. Components import from here.
+3. **Components** — Read/write through the store layer.
+
+### Item JSON Schema
+
+Flat structure — form fields sit alongside child editor sections at the top level:
+
+```json
+{
+  "displayName": "Ruby Sword",
+  "id": "ruby_sword",
+  "constName": "RUBY_SWORD",
+  "holdingMode": "handheld",
+  "stackSize": "64",
+  "isTool": true,
+  "...other form fields...": "...",
+  "recipe": { "craftingEnabled": true, "slots": [...], "..." : "..." },
+  "dataComponents": [{ "name": "CHARGE", "id": "charge", "type": "number", "defaultValue": "0" }],
+  "enabledMethods": ["useOn", "hurtEnemy"],
+  "blockGraphs": { "useOn": [...nodes...], "hurtEnemy": [...nodes...] },
+  "modelJsonData": { "model-json": { "geoModelJson": "...", "geoModelFileName": "..." } }
+}
+```
+
+### Data Flow
+
+1. **Load:** `ItemPageNew` calls `itemStore.loadItem(id)` on mount. The store loads from `ycs/items/<id>.json` via `entityFiles.loadEntityFile()`. The loaded data is cached in memory and seeded to localStorage for child editors.
+2. **Edit:** Form changes update React state and the in-memory cache. Child editors (Recipe, DC, Methods, etc.) use localStorage as ephemeral session buffers.
+3. **Save:** `handleSave` reads child data from the in-memory cache (falling back to localStorage), bundles it into the entity JSON schema, and calls `itemStore.saveItem(id, data)` which writes to disk.
+4. **Delete:** Removes from mod (via injector), deletes the entity JSON file, evicts from cache.
+
+### localStorage Role (Post-Migration)
+
+localStorage is now used only for:
+- **Session-level buffers:** Child tile editors (Recipe, DC, Methods, ModelJson, Tags, BlockEditor) read/write localStorage as an ephemeral editing buffer. The parent item seeds these on load and reads them back on save.
+- **Form bridge:** `ycs-form::<tileId>` is written so child editors can look up the parent item ID.
+- **Texture sync:** `ycs-textures-list` is kept in sync with `textures.json` for synchronous preview reads.
+- **UI state:** Workspace layout (`ycs-workspace`), preferences (`ycs-preferences`), tab editor seeds.
+
+localStorage is NOT the source of truth for any entity data. If localStorage is cleared, all data is recoverable from the JSON files on disk.

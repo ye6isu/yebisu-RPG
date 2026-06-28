@@ -30,8 +30,6 @@ const DROPDOWN_SOURCES = {
     { label: 'Invisibility', value: 'MobEffects.INVISIBILITY' },
     { label: 'Resistance', value: 'MobEffects.DAMAGE_RESISTANCE' },
     { label: 'Slow Falling', value: 'MobEffects.SLOW_FALLING' },
-    { label: '[Mod] Stun', value: 'ModEffects.STUN' },
-    { label: '[Mod] Root', value: 'ModEffects.ROOT' },
   ],
 };
 
@@ -142,14 +140,16 @@ function buildPaletteFromDefs() {
 }
 
 // ── Portal Dropdown (renders outside zoom transform) ───────────────────
-function PortalDropdown({ value, options, onChange, compact, transparent, minWidth: mw }) {
+function PortalDropdown({ value, options, onChange, compact, transparent, minWidth: mw, searchable }) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
+  const [search, setSearch] = useState('');
   const anchorRef = useRef(null);
+  const searchRef = useRef(null);
   const selected = options.find(o => o.value === value) || options[0];
   const openDrop = (e) => {
     e.stopPropagation();
-    if (!open) { const r = anchorRef.current?.getBoundingClientRect(); if (r) setRect(r); }
+    if (!open) { const r = anchorRef.current?.getBoundingClientRect(); if (r) setRect(r); setSearch(''); }
     setOpen(o => !o);
   };
   useEffect(() => {
@@ -158,21 +158,36 @@ function PortalDropdown({ value, options, onChange, compact, transparent, minWid
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+  useEffect(() => {
+    if (open && searchable) setTimeout(() => searchRef.current?.focus(), 0);
+  }, [open, searchable]);
+  const filtered = searchable && search ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase())) : options;
   const list = open && rect ? ReactDOM.createPortal(
     <div onWheel={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
       style={{ position: 'fixed', top: rect.bottom + 2, left: rect.left, zIndex: 99999,
         background: 'var(--ycs-accent-solid, #323233)', border: '1px solid var(--ycs-foreground)',
-        borderRadius: 5, minWidth: Math.max(mw || 80, rect.width), maxHeight: 220,
+        borderRadius: 5, minWidth: Math.max(mw || 80, rect.width), maxHeight: 250,
         display: 'flex', flexDirection: 'column', boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(10px)', overflow: 'hidden' }}>
+      {searchable && (
+        <div style={{ padding: '4px 6px', flexShrink: 0, borderBottom: '1px solid var(--ycs-foreground)' }}>
+          <input ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
+            onMouseDown={e => e.stopPropagation()} placeholder="Search..."
+            style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none',
+              color: '#fff', fontSize: 12, fontFamily: 'sans-serif', boxSizing: 'border-box' }} />
+        </div>
+      )}
       <div style={{ overflowY: 'auto', maxHeight: 200 }}>
-        {options.map(o => (
+        {filtered.map(o => (
           <div key={o.value} className="dropdown-item" onMouseDown={e => { e.stopPropagation(); onChange(o.value); setOpen(false); }}
             style={{ padding: '0 10px', fontSize: 12, color: o.value === value ? 'var(--ycs-highlight)' : 'var(--ycs-text)',
               cursor: 'pointer', whiteSpace: 'nowrap' }}>
             {o.label}
           </div>
         ))}
+        {filtered.length === 0 && (
+          <div style={{ padding: '4px 10px', fontSize: 11, opacity: 0.4 }}>No results</div>
+        )}
       </div>
     </div>, document.body) : null;
   return (
@@ -246,7 +261,8 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
     if (options.length > 0) {
       return <PortalDropdown key={i} value={node.fields?.[seg.key] ?? fieldDef?.default ?? ''}
         onChange={v => onFieldChange && onFieldChange(nodeId, seg.key, v)}
-        compact={fieldDef?.compact} transparent={transp} minWidth={fieldDef?.minWidth || 60} options={options} />;
+        compact={fieldDef?.compact} transparent={transp} minWidth={fieldDef?.minWidth || 60} options={options}
+        searchable={options.length > 8 || !!fieldDef?.searchable} />;
     }
     const val = node.fields?.[seg.key] ?? fieldDef?.default ?? '';
     return (
@@ -1199,7 +1215,7 @@ export default function BlockEditorPage({ isTile = false, onClose, nodeId, tree,
           visited.add(prev.nextId);
           const next = nodesRef.current.find(n => n.id === prev.nextId);
           if (!next) break;
-          const prevEl = document.querySelector(`[data-blockid="${prevId}"]`);
+          const prevEl = canvasAreaRef.current?.querySelector(`[data-blockid="${prevId}"]`);
           if (prevEl) {
             const prevRect = prevEl.getBoundingClientRect();
             const expectedY = (prevRect.bottom - canvasRect.top) / z - p.y + 4;
@@ -1312,10 +1328,11 @@ export default function BlockEditorPage({ isTile = false, onClose, nodeId, tree,
             let bestDist = SNAP_THRESHOLD;
             let snapAction = null;
 
-            // 1) Body-slot snapping: find body-slot regions via DOM
+            // 1) Body-slot snapping: find body-slot regions via DOM (scoped to this canvas)
             const smx = e.clientX, smy = e.clientY;
             let bestBodyDist = Infinity;
-            document.querySelectorAll('[data-bodyslotkey]').forEach(el => {
+            const canvasEl = canvasAreaRef.current;
+            (canvasEl ? canvasEl.querySelectorAll('[data-bodyslotkey]') : []).forEach(el => {
               const rect = el.getBoundingClientRect();
               // Distance from mouse to nearest edge of the body slot rect (0 if inside)
               const dx = Math.max(rect.left - smx, 0, smx - rect.right);
@@ -1354,8 +1371,7 @@ export default function BlockEditorPage({ isTile = false, onClose, nodeId, tree,
                 if (!n.isAction && n.id !== 'start') continue;
                 if (getDescendants(dragNode.id, updated).includes(n.id)) continue;
                 if (n.nextId) continue;
-                const nBdef = blockDefRegistry.get(n.opcode);
-                const nEl = document.querySelector(`[data-blockid="${n.id}"]`);
+                const nEl = canvasEl?.querySelector(`[data-blockid="${n.id}"]`);
                 if (!nEl) continue;
                 const nRect = nEl.getBoundingClientRect();
                 const bx = nRect.left + 20;
@@ -1373,7 +1389,7 @@ export default function BlockEditorPage({ isTile = false, onClose, nodeId, tree,
               updated = updated.map(n => n.id === snapAction.targetId ? { ...n, nextId: dragNode.id } : n);
               const target = updated.find(n => n.id === snapAction.targetId);
               if (target) {
-                const tEl = document.querySelector(`[data-blockid="${target.id}"]`);
+                const tEl = canvasEl?.querySelector(`[data-blockid="${target.id}"]`);
                 if (tEl) {
                   const canvasRect = canvasAreaRef.current?.getBoundingClientRect();
                   const z = zoomRef.current;
@@ -1396,7 +1412,7 @@ export default function BlockEditorPage({ isTile = false, onClose, nodeId, tree,
           let best = null;
           let bestDist = 50;
           const smx = e.clientX, smy = e.clientY;
-          document.querySelectorAll('.slot-conn').forEach(el => {
+          (canvasAreaRef.current?.querySelectorAll('.slot-conn') || []).forEach(el => {
             if (el.dataset.nodeid === dragNode.id) return;
             const rect = el.getBoundingClientRect();
             const sx = rect.left + rect.width / 2;
