@@ -1,8 +1,0 @@
-{
-  "parent": "minecraft:block/slab",
-  "textures": {
-    "bottom": "yebisurpg:block/crate_block",
-    "side": "yebisurpg:block/crate_block",
-    "top": "yebisurpg:block/crate_block"
-  }
-}

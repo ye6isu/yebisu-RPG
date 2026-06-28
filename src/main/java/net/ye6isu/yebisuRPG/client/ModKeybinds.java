@@ -49,24 +49,16 @@ public final class ModKeybinds {
 
     // ---------------------------------------------------------------------------------
     // Keybind declarations
+
     // ---------------------------------------------------------------------------------
     // Use bind(name, glfwKey) for standard in-game binds.
     // Use bindGui(name, glfwKey) for binds active only in GUIs.
     // Use new KeyMapping(...) directly for full control.
     // ---------------------------------------------------------------------------------
 
-    /** Opens the first-person hand debug screen. Default: H */
-    public static final KeyMapping OPEN_HAND_DEBUG = bind("open_hand_debug", GLFW.GLFW_KEY_H);
-
     // Add more binds here:
     // public static final KeyMapping OPEN_SKILL_TREE = bind("open_skill_tree", GLFW.GLFW_KEY_K);
     // public static final KeyMapping DODGE           = bind("dodge",           GLFW.GLFW_KEY_LEFT_ALT);
-
-    //YCS_Mod_Keybinds_START
-
-    public static final KeyMapping TESTER_DEBUG = bind("tester_debug", InputConstants.Type.MOUSE, GLFW.GLFW_MOUSE_BUTTON_4, KeyModifier.NONE, CATEGORY);
-
-    //YCS_Mod_Keybinds_END
 
     // ---------------------------------------------------------------------------------
 
@@ -81,13 +73,7 @@ public final class ModKeybinds {
      */
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
-        event.register(OPEN_HAND_DEBUG);
 
-        //YCS_Mod_Keybinds_Register_START
-
-        event.register(TESTER_DEBUG);
-
-        //YCS_Mod_Keybinds_Register_END
     }
 
     // ---------------------------------------------------------------------------------

@@ -1,12 +1,1 @@
-[
-  {
-    "name": "axe",
-    "type": "double",
-    "default": 0
-  },
-  {
-    "name": "sword",
-    "type": "double",
-    "default": 0
-  }
-]
+[]

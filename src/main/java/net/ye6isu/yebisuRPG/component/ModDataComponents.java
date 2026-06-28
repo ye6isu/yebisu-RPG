@@ -57,10 +57,6 @@ public final class ModDataComponents {
                 .networkSynchronized(ByteBufCodecs.VAR_INT)
                 .build());
 
-    //YCS_DataComponents_START
-
-    //YCS_DataComponents_END
-
     private ModDataComponents() {}
 
     public static void register(IEventBus eventBus) {

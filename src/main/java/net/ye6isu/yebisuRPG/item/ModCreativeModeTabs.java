@@ -14,20 +14,6 @@ import java.util.function.Supplier;
 public class ModCreativeModeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TAB_DEFERRED_REGISTER = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, yebisuRPG.MODID);
 
-    //YCS_Mod_Creative_Tabs_START
-
-    public static final Supplier<CreativeModeTab> YEBISURPG_TAB = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("yebisurpg_tab", () -> CreativeModeTab.builder()
-            .icon(() -> new ItemStack(ModItems.PLANK.get()))
-            .title(Component.translatable("creativetab.yebisurpg.yebisurpg_tab"))
-            .build());
-
-
-    public static final java.util.function.Supplier<CreativeModeTab> TESTTAB = CREATIVE_MODE_TAB_DEFERRED_REGISTER.register("testtab", () -> CreativeModeTab.builder()
-            .icon(() -> new ItemStack(ModItems.ITEMS.getEntries().iterator().next().get()))
-            .title(Component.translatable("creativetab.yebisurpg.testtab"))
-            .build());
-    //YCS_Mod_Creative_Tabs_END
-
     public static void register(IEventBus eventBus) {
         CREATIVE_MODE_TAB_DEFERRED_REGISTER.register(eventBus);
     }

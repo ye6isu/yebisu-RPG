@@ -1,8 +1,1 @@
-[
-  {
-    "name": "testbool",
-    "titleText": "Test Bool",
-    "type": "bool",
-    "default": false
-  }
-]
+[]
