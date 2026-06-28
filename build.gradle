@@ -196,5 +196,6 @@ idea {
     module {
         downloadSources = true
         downloadJavadoc = true
+        excludeDirs += file('old_mod')
     }
 }
