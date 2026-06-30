@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import ItemEditor from './ItemEditor';
+import BlockEditor from './BlockEditor';
 
 export default function ItemsLanding() {
   const [items, setItems] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
+  const [blockEditing, setBlockEditing] = useState(null); // { itemId, methodKey }
 
   const reload = useCallback(async () => {
     try {
@@ -56,12 +58,23 @@ export default function ItemsLanding() {
     }
   };
 
-  if (creating) {
-    return <ItemEditor onBack={() => { setCreating(false); reload(); }} />;
-  }
-
-  if (editing) {
-    return <ItemEditor itemId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating || editing) {
+    return (
+      <div style={{ position: 'relative', height: '100%' }}>
+        <div style={{ height: '100%', visibility: blockEditing ? 'hidden' : 'visible', pointerEvents: blockEditing ? 'none' : 'auto' }}>
+          <ItemEditor
+            itemId={editing || undefined}
+            onBack={() => { setCreating(false); setEditing(null); reload(); }}
+            onOpenBlockEditor={(itemId, methodKey) => setBlockEditing({ itemId, methodKey })}
+          />
+        </div>
+        {blockEditing && (
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <BlockEditor itemId={blockEditing.itemId} methodKey={blockEditing.methodKey} onBack={() => setBlockEditing(null)} />
+          </div>
+        )}
+      </div>
+    );
   }
 
   const filtered = items.filter(item =>

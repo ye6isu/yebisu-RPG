@@ -295,18 +295,30 @@ function TagPicker({ tags, onChange, onClose }) {
   );
 }
 
-function RecipeSubGroup({ label, enabled, onToggle, children }) {
+function FieldIconButton({ onClick, title, hasData }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <button className="ycs-button field" onClick={onClick} title={title}
+      style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: '0 6px', width: 'auto', height: '24px' }}>
+      {hasData ? 'edit' : 'set'}
+    </button>
+  );
+}
+
+function RecipeSubGroup({ label, enabled, onToggle, children, disabled, inline }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', opacity: disabled ? 0.35 : 1 }}>
       <div className="ycs-field-row">
         <div className="ycs-field-label" style={{ fontSize: '13px' }}>{label}</div>
         <div className="ycs-field-control">
-          <Checkbox checked={enabled} onChange={onToggle} />
+          <Checkbox checked={enabled} onChange={onToggle} disabled={disabled} />
         </div>
       </div>
-      {enabled && (
+      {enabled && !disabled && (
         <div style={{
-          display: 'flex', flexDirection: 'column',
+          display: 'flex',
+          flexDirection: inline ? 'row' : 'column',
+          alignItems: inline ? 'center' : undefined,
+          gap: inline ? '6px' : undefined,
           borderLeft: '1px solid var(--ycs-foreground)',
           paddingLeft: '12px', marginLeft: '4px',
         }}>
@@ -318,6 +330,16 @@ function RecipeSubGroup({ label, enabled, onToggle, children }) {
 }
 
 const MODID = 'yebisurpg';
+
+const ITEM_METHODS = [
+  { key: 'useOn',               label: 'Block Interaction',   sig: 'useOn(UseOnContext context)' },
+  { key: 'use',                 label: 'Interaction',          sig: 'use(Level, Player, InteractionHand)' },
+  { key: 'continuousUse',       label: 'Continuous Use',       sig: 'onUseTick(Level, LivingEntity, ItemStack, int)', requires: 'use' },
+  { key: 'finishUsingItem',     label: 'Finished Using',       sig: 'finishUsingItem(ItemStack, Level, LivingEntity)' },
+  { key: 'inventoryTick',       label: 'Inventory Tick',       sig: 'inventoryTick(ItemStack, Level, Entity, int, boolean)' },
+  { key: 'hurtEnemy',           label: 'Hurt Entity',          sig: 'hurtEnemy(ItemStack, LivingEntity, LivingEntity)' },
+  { key: 'interactLivingEntity',label: 'Entity Interaction',   sig: 'interactLivingEntity(ItemStack, Player, LivingEntity, InteractionHand)' },
+];
 const JAVA_BASE = 'java/net/ye6isu/yebisuRPG';
 const RES_BASE = 'resources/assets/yebisurpg';
 
@@ -403,13 +425,15 @@ function FileDropZone({ hasFile, fileName, onImport, onClear }) {
   );
 }
 
-export default function ItemEditor({ itemId: existingId, onBack }) {
+export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEditor }) {
   const [itemId, setItemId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [texture, setTexture] = useState('');
   const [holdingMode, setHoldingMode] = useState('generated');
   const [stackSize, setStackSize] = useState('64');
   const [useDuration, setUseDuration] = useState(false);
+  const [useDurationValue, setUseDurationValue] = useState('32');
+  const [useAnim, setUseAnim] = useState('NONE');
   const [tags, setTags] = useState([]);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [geoModel, setGeoModel] = useState('');
@@ -424,6 +448,7 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
   const [currentInjections, setCurrentInjections] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(existingId || null);
   const [customClass, setCustomClass] = useState(false);
+  const [enabledMethods, setEnabledMethods] = useState([]);
 
   // Combat
   const [attackDamage, setAttackDamage] = useState('');
@@ -496,7 +521,9 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
       for (const id of ids) {
         try {
           const raw = await invoke('load_texture', { id });
-          loaded.push(JSON.parse(raw));
+          const tex = JSON.parse(raw);
+          tex._url = await invoke('load_texture_image', { id }).catch(() => null);
+          loaded.push(tex);
         } catch {}
       }
       setTextures(loaded);
@@ -570,11 +597,14 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
           setHoldingMode(data.holdingMode || 'generated');
           setStackSize(String(data.stackSize ?? '64'));
           setUseDuration(data.useDuration || false);
+          setUseDurationValue(String(data.useDurationValue ?? '32'));
+          setUseAnim(data.useAnim || 'NONE');
           setTags(data.tags || []);
           setGeoModel(data.geoModel || '');
           setGeoTexture(data.geoTexture || '');
           setDisplayModel(data.displayModel || '');
           setCustomClass(data.customClass || false);
+          setEnabledMethods(data.enabledMethods || []);
           setAttackDamage(data.attackDamage != null ? String(data.attackDamage) : '');
           setAttackSpeed(data.attackSpeed != null ? String(data.attackSpeed) : '');
           setFoodEnabled(data.foodEnabled || false);
@@ -629,7 +659,7 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     }
   }, [existingId, loadTextures, loadTabs, loadRecipeItemOptions]);
 
-  const needsCustomClass = customClass;
+  const needsCustomClass = customClass || useDuration;
 
   const buildPayload = () => ({
     id: itemId,
@@ -638,11 +668,14 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     holdingMode,
     stackSize: parseInt(stackSize) || 64,
     useDuration,
+    useDurationValue: parseInt(useDurationValue) || 32,
+    useAnim,
     tags,
     geoModel: is3D && geoModel ? itemId : '',
     geoTexture: is3D ? geoTexture : '',
     displayModel: is3D && displayModel ? itemId : '',
     customClass,
+    enabledMethods,
     attackDamage: attackDamage !== '' ? parseFloat(attackDamage) : null,
     attackSpeed: attackSpeed !== '' ? parseFloat(attackSpeed) : null,
     foodEnabled,
@@ -760,7 +793,6 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
 
       const parsedStack = parseInt(stackSize) || 64;
       let propsChain = (!isTool && parsedStack !== 64) ? `.stacksTo(${parsedStack})` : '';
-      if (useDuration) propsChain += `.useDuration(32)`;
       if (foodEnabled) {
         let foodBuilder = `new FoodProperties.Builder().nutrition(${parseInt(nutrition) || 4}).saturationModifier(${parseFloat(saturation) || 0.3}f)`;
         if (canAlwaysEat) foodBuilder += '.alwaysEdible()';
@@ -849,18 +881,33 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
 ${buildTooltipLines('    ')}
     }` : '';
 
+          const useDurationMethod = useDuration ? `
+
+    @Override
+    public int getUseDuration(ItemStack stack, net.minecraft.world.level.Level level) {
+        return ${parseInt(useDurationValue) || 32};
+    }` : '';
+
+          const useAnimMethod = useAnim !== 'NONE' ? `
+
+    @Override
+    public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {
+        return net.minecraft.world.item.UseAnim.${useAnim};
+    }` : '';
+
           const tooltipImports = tooltipImportsNeeded.map(i => i + '\n').join('');
+          const stackImport = ((useDuration || useAnim !== 'NONE') && !tooltipEnabled) ? `import net.minecraft.world.item.ItemStack;\n` : '';
 
           const toolImport = isTool ? `import net.minecraft.world.item.${baseClass};\nimport net.minecraft.world.item.Tiers;\n` : '';
           const baseImport = `import net.minecraft.world.item.Item;\n`;
 
           const classContent = `package net.ye6isu.yebisuRPG.item.custom;
 
-${baseImport}${toolImport}${tooltipImports}
+${baseImport}${toolImport}${stackImport}${tooltipImports}
 public class ${className} extends ${baseClass} {
     public ${className}(${isTool ? `Tiers tier, Properties properties` : `Properties properties`}) {
         super(${isTool ? `tier, properties` : `properties`});
-    }${tooltipMethod}
+    }${useDurationMethod}${useAnimMethod}${tooltipMethod}
 }
 `;
           await invoke('write_mod_file', { file: classFile, content: classContent });
@@ -1091,7 +1138,7 @@ public class ${className} extends ${baseClass} {
     setSaving(false);
   };
 
-  const textureOptions = textures.map(t => ({ label: t.label, value: t.id }));
+  const textureOptions = textures.map(t => ({ label: t.label, value: t.id, img: t._url }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -1141,7 +1188,7 @@ public class ${className} extends ${baseClass} {
           {is3D ? (
             <>
               <FieldRow label="Texture">
-                <StandardDropdownField
+                <DropdownField
                   value={geoTexture}
                   onChange={setGeoTexture}
                   options={[{ label: '(None)', value: '' }, ...textureOptions]}
@@ -1166,7 +1213,7 @@ public class ${className} extends ${baseClass} {
             </>
           ) : (
             <FieldRow label="Texture">
-              <StandardDropdownField
+              <DropdownField
                 value={texture}
                 onChange={setTexture}
                 options={[{ label: '(None)', value: '' }, ...textureOptions]}
@@ -1181,9 +1228,6 @@ public class ${className} extends ${baseClass} {
               <NumberInput value={stackSize} onChange={setStackSize} style={{ width: '80px' }} />
             </FieldRow>
           )}
-          <FieldRow label="Use Duration">
-            <Checkbox checked={useDuration} onChange={setUseDuration} />
-          </FieldRow>
           <FieldRow label="Tool">
             <Checkbox checked={toolEnabled} onChange={setToolEnabled} />
           </FieldRow>
@@ -1220,19 +1264,31 @@ public class ${className} extends ${baseClass} {
 
         <FieldGroup label="Tags">
           <FieldRow label="Tags">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, flexWrap: 'wrap' }}>
-              {tags.map(t => (
-                <span key={t} style={{
-                  fontSize: '11px', padding: '2px 6px',
-                  border: '1px solid var(--ycs-foreground)',
-                  borderRadius: 'var(--ycs-radius, 4px)', whiteSpace: 'nowrap',
-                }}>{t}</span>
-              ))}
-              {tags.length === 0 && <span style={{ opacity: 0.3, fontSize: '12px' }}>None</span>}
+            <div
+              onClick={() => setShowTagPicker(true)}
+              className="ycs-string-input"
+              style={{
+                flex: 1, height: '24px', display: 'flex', alignItems: 'center',
+                gap: '6px', cursor: 'pointer', fontSize: '12px', padding: '0 8px',
+                boxSizing: 'border-box', overflow: 'hidden',
+                justifyContent: tags.length === 0 ? 'center' : 'flex-start',
+              }}
+            >
+              {tags.length === 0 ? (
+                <span style={{ opacity: 0.35, fontSize: '12px' }}>+</span>
+              ) : (
+                <>
+                  {tags.slice(0, 3).map(t => (
+                    <span key={t} style={{
+                      fontSize: '11px', padding: '1px 5px',
+                      border: '1px solid var(--ycs-foreground)',
+                      borderRadius: 'var(--ycs-radius, 4px)', whiteSpace: 'nowrap', flexShrink: 0,
+                    }}>{t}</span>
+                  ))}
+                  {tags.length > 3 && <span style={{ opacity: 0.4, fontSize: '11px', flexShrink: 0 }}>+{tags.length - 3}</span>}
+                </>
+              )}
             </div>
-            <button className="ycs-button" style={{ flexShrink: 0 }} onClick={() => setShowTagPicker(true)}>
-              Edit
-            </button>
           </FieldRow>
         </FieldGroup>
 
@@ -1396,6 +1452,59 @@ public class ${className} extends ${baseClass} {
               </span>
             )}
           </FieldRow>
+          {customClass && ITEM_METHODS.map(m => {
+            const gated = m.requires && !enabledMethods.includes(m.requires);
+            const on = enabledMethods.includes(m.key) && !gated;
+            const toggle = (checked) => {
+              if (checked) {
+                setEnabledMethods(prev => [...prev, m.key]);
+              } else {
+                const toRemove = m.key === 'use' ? [m.key, 'continuousUse'] : [m.key];
+                setEnabledMethods(prev => prev.filter(k => !toRemove.includes(k)));
+              }
+            };
+            return (
+              <FieldRow key={m.key} label={m.label}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: gated ? 0.35 : 1 }}>
+                  <Checkbox checked={on} onChange={toggle} disabled={gated} />
+                  {on && (m.key === 'continuousUse' ? (
+                    <>
+                      <NumberInput value={useDurationValue} onChange={setUseDurationValue} style={{ width: '48px' }} />
+                      <span style={{ fontSize: '11px', opacity: 0.4 }}>ticks</span>
+                      <StandardDropdownField
+                        value={useAnim}
+                        onChange={setUseAnim}
+                        options={[
+                          { label: 'None',      value: 'NONE' },
+                          { label: 'Eat',       value: 'EAT' },
+                          { label: 'Drink',     value: 'DRINK' },
+                          { label: 'Block',     value: 'BLOCK' },
+                          { label: 'Bow',       value: 'BOW' },
+                          { label: 'Spear',     value: 'SPEAR' },
+                          { label: 'Crossbow',  value: 'CROSSBOW' },
+                          { label: 'Spyglass',  value: 'SPYGLASS' },
+                          { label: 'Toot Horn', value: 'TOOT_HORN' },
+                          { label: 'Brush',     value: 'BRUSH' },
+                        ]}
+                      />
+                      <FieldIconButton title="onUseTick" onClick={() => onOpenBlockEditor && onOpenBlockEditor(itemId, 'continuousUse')} hasData={!!localStorage.getItem(`ycs-blocky::item::${itemId}::continuousUse`)} />
+                      <span style={{ fontSize: '11px', opacity: 0.4 }}>onUseTick</span>
+                      <FieldIconButton title="releaseUsing" onClick={() => onOpenBlockEditor && onOpenBlockEditor(itemId, 'releaseUsing')} hasData={!!localStorage.getItem(`ycs-blocky::item::${itemId}::releaseUsing`)} />
+                      <span style={{ fontSize: '11px', opacity: 0.4 }}>releaseUsing</span>
+                    </>
+
+                  ) : (
+                    <FieldIconButton title={m.label} onClick={() => onOpenBlockEditor && onOpenBlockEditor(itemId, m.key)} hasData={!!localStorage.getItem(`ycs-blocky::item::${itemId}::${m.key}`)} />
+                  ))}
+                  {gated && (
+                    <span style={{ fontSize: '10px', color: '#e8a868', background: '#3a2010', padding: '1px 5px', borderRadius: '3px' }}>
+                      requires Interaction
+                    </span>
+                  )}
+                </div>
+              </FieldRow>
+            );
+          })}
         </FieldGroup>
       </div>
 
