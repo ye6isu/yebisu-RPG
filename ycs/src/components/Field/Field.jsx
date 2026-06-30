@@ -154,9 +154,10 @@ export function DropdownField({ value, onChange, options }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef(null);
-  
+
   const selectedOption = options.find(o => o.value === value);
   const displayValue = isOpen ? searchTerm : (selectedOption ? selectedOption.label : value);
+  const selectedImg = selectedOption?.img;
 
   useEffect(() => {
     if (!isOpen) {
@@ -186,21 +187,25 @@ export function DropdownField({ value, onChange, options }) {
   
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      <div 
+      <div
         className="ycs-string-input"
         onClick={() => { if (!isOpen) setIsOpen(true); }}
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           width: '100%',
           padding: '0 8px',
           cursor: 'text',
           boxSizing: 'border-box',
-          height: '24px'
+          height: '24px',
+          gap: '4px',
         }}
       >
-        <input 
+        {selectedImg && !isOpen && (
+          <img src={selectedImg} alt="" style={{ width: '16px', height: '16px', imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} />
+        )}
+        <input
           type="text"
           value={displayValue}
           onChange={(e) => {
@@ -217,18 +222,15 @@ export function DropdownField({ value, onChange, options }) {
             height: '100%',
             fontFamily: 'inherit',
             fontSize: 'inherit',
-            cursor: 'text'
+            cursor: 'text',
           }}
         />
-        <span 
-          onClick={(e) => {
-             e.stopPropagation();
-             setIsOpen(!isOpen);
-          }}
-          style={{ fontSize: '8px', opacity: 0.7, cursor: 'pointer', padding: '4px' }}
+        <span
+          onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+          style={{ fontSize: '8px', opacity: 0.7, cursor: 'pointer', padding: '4px', flexShrink: 0 }}
         >▼</span>
       </div>
-      
+
       {isOpen && (
         <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100, maxHeight: '240px', overflowY: 'auto' }}>
           {filteredOptions.length > 0 ? filteredOptions.map((opt, i) =>
@@ -240,11 +242,13 @@ export function DropdownField({ value, onChange, options }) {
               <div
                 key={opt.value}
                 className="dropdown-item"
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
+                onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
+                {opt.img
+                  ? <img src={opt.img} alt="" style={{ width: '16px', height: '16px', imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} />
+                  : <div style={{ width: '16px', flexShrink: 0 }} />
+                }
                 {opt.label}
               </div>
             )

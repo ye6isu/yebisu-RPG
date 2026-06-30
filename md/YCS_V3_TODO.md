@@ -1,7 +1,10 @@
 # YCS V3 TODO
 
+## Items (Advanced)
+- [ ] Wire block-graph compiler to inject method bodies into custom item class on Save & Inject
+
 ## Blocks
-- [ ] Block editor (similar lifecycle to items)
+- [ ] Block registry (landing + editor, similar lifecycle to items)
 - [ ] Block properties (hardness, resistance, sound, material, etc.)
 - [ ] Block model/texture support
 - [ ] Block item generation
