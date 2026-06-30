@@ -17,6 +17,7 @@ public class ModItemModelProvider extends ItemModelProvider {
 
     @Override
     protected void registerModels() {
+        basicItem(ModItems.ANNYO.get());
         // YCS_Mod_Item_Model
     }
 

@@ -1,10 +1,13 @@
 # YCS V3 TODO
 
 ## Creative Tabs
-- [ ] Plan out creative tab system — decide on approach (custom tabs vs vanilla tab injection vs both)
-- [ ] Tab registration in mod (custom `CreativeModeTab` instances)
-- [ ] Tab assignment per item (dropdown in item editor)
-- [ ] Tab ordering / icon selection
+- [x] Plan out creative tab system — pure Java injection, no JSON in mod resources
+- [x] Tab registration in mod (`ModCreativeModeTabs.java` + `YCS_Mod_Creative_Tabs` marker)
+- [x] Tab assignment per item (dropdown in item editor, injects into `ModCreativeTabContents.java`)
+- [x] Vanilla tab support in item editor dropdown
+- [x] Icon selection (searchable item combobox — vanilla + mod items)
+- [x] Tab ordering / item arrangement (drag-and-drop in tab editor)
+- [x] Icon cycler (`TabIconCycler.java` + `AccessorCreativeModeTab` mixin, toggle + interval in tab editor)
 
 ## Blocks
 - [ ] Block editor (similar lifecycle to items)

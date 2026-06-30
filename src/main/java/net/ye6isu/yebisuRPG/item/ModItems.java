@@ -13,6 +13,8 @@ import net.minecraft.world.item.DiggerItem;
 public class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(yebisuRPG.MODID);
 
+    public static final DeferredItem<Item> ANNYO = ITEMS.register("annyo",
+            () -> new Item(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<AxeItem> TEST = ITEMS.register("test",
             () -> new TestItem(Tiers.NETHERITE, new Item.Properties().stacksTo(16).attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 180f, 10f))));
     // YCS_Mod_Items

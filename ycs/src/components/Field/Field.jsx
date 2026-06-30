@@ -174,9 +174,15 @@ export function DropdownField({ value, onChange, options }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter(opt => 
-    opt.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const searchLower = searchTerm.toLowerCase();
+  const filteredOptions = searchTerm
+    ? options.filter(opt =>
+        !opt.disabled && (
+          opt.label.toLowerCase().includes(searchLower) ||
+          opt.value.toLowerCase().includes(searchLower)
+        )
+      )
+    : options;
   
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
@@ -224,19 +230,25 @@ export function DropdownField({ value, onChange, options }) {
       </div>
       
       {isOpen && (
-        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100 }}>
-          {filteredOptions.length > 0 ? filteredOptions.map((opt) => (
-            <div 
-              key={opt.label}
-              className="dropdown-item"
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          )) : (
+        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100, maxHeight: '240px', overflowY: 'auto' }}>
+          {filteredOptions.length > 0 ? filteredOptions.map((opt, i) =>
+            opt.disabled ? (
+              <div key={opt.value + i} className="dropdown-item" style={{ opacity: 0.35, fontSize: '11px', cursor: 'default', pointerEvents: 'none' }}>
+                {opt.label}
+              </div>
+            ) : (
+              <div
+                key={opt.value}
+                className="dropdown-item"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+              >
+                {opt.label}
+              </div>
+            )
+          ) : (
             <div className="dropdown-item" style={{ opacity: 0.5 }}>No results found</div>
           )}
         </div>

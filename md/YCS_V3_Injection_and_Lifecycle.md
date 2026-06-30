@@ -131,6 +131,15 @@ When the item ID changes between saves:
 
 **3D items do NOT inject into `ModItemModelProvider`** — datagen doesn't handle geo models.
 
+### Creative Tabs
+
+| Target | Marker/Path | Content |
+|--------|-------------|---------|
+| Tab registration | `ModCreativeModeTabs.java` → `YCS_Mod_Creative_Tabs` | `DeferredHolder<CreativeModeTab>` field |
+| Lang key | `lang/en_us.json` → key | `itemGroup.yebisurpg.<id>` |
+
+Tab-to-item assignment is handled per-item: each item's `creativeTab` field injects one conditional line into `ModCreativeTabContents.java` → `YCS_Tab_Contents`. This means tab assignment is tracked in the **item's** `_injections` array, not the tab's.
+
 ---
 
 ## Marker Format
@@ -152,6 +161,10 @@ Content is inserted on the line **above** the marker. Removal searches for the e
 | `YCS_Mod_Item_Model` | `ModItemModelProvider.java` | Datagen model calls (flat/handheld only) |
 | `YCS_Geo_Collect` | `GeoItemRegistry.java` | 3D item registration in `collectGeoItems()` |
 | `YCS_Mod_Fuel` | `ModFuelEvents.java` | Fuel burn time entries via `FurnaceFuelBurnTimeEvent` |
+| `YCS_Mod_Creative_Tabs` | `ModCreativeModeTabs.java` | `DeferredHolder<CreativeModeTab>` declarations |
+| `YCS_Mod_Creative_Tab_Imports` | `ModCreativeModeTabs.java` | Import statements (reserved for future use) |
+| `YCS_Tab_Contents` | `ModCreativeTabContents.java` | Item-to-tab assignments via `BuildCreativeModeTabContentsEvent` |
+| `YCS_Cycler_Register` | `TabIconCycler.java` | `ENTRIES.add(...)` calls for tabs with icon cycling enabled |
 
 ---
 
