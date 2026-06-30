@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FieldRow, StringField, NumberInput, StandardDropdownField, DropdownField } from './Field/Field';
+import { VANILLA_ITEMS } from '../data/vanillaItems';
+import { EMPTY_GRID, buildCharMap, gridToPattern, ShapedGrid, ShapelessIngredients } from './RecipeEditor';
 
 function FieldGroup({ label, children }) {
   return (
@@ -41,6 +43,275 @@ function Checkbox({ checked, onChange, disabled = false }) {
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="20 6 9 17 4 12" />
         </svg>
+      )}
+    </div>
+  );
+}
+
+const TAG_CATEGORIES = [
+  {
+    label: 'Mod',
+    tags: [], // populated dynamically from ycs-data items
+  },
+  {
+    label: 'Vanilla',
+    tags: [
+      'minecraft:swords', 'minecraft:axes', 'minecraft:pickaxes', 'minecraft:shovels', 'minecraft:hoes',
+      'minecraft:acacia_logs', 'minecraft:anvil', 'minecraft:armadillo_food', 'minecraft:arrows',
+      'minecraft:axolotl_food', 'minecraft:bamboo_blocks', 'minecraft:banners',
+      'minecraft:beacon_payment_items', 'minecraft:beds', 'minecraft:bee_food', 'minecraft:birch_logs',
+      'minecraft:boats', 'minecraft:bookshelf_books', 'minecraft:breaks_decorated_pots',
+      'minecraft:brewing_fuel', 'minecraft:buttons', 'minecraft:camel_food', 'minecraft:candles',
+      'minecraft:cat_food', 'minecraft:chains', 'minecraft:cherry_logs', 'minecraft:chest_armor',
+      'minecraft:chest_boats', 'minecraft:chicken_food', 'minecraft:coals', 'minecraft:compasses',
+      'minecraft:copper_tool_materials', 'minecraft:cow_food', 'minecraft:creeper_drop_music_discs',
+      'minecraft:creeper_igniters', 'minecraft:crimson_stems', 'minecraft:dampens_vibrations',
+      'minecraft:dark_oak_logs', 'minecraft:decorated_pot_ingredients', 'minecraft:decorated_pot_sherds',
+      'minecraft:diamond_tool_materials', 'minecraft:dirt', 'minecraft:doors', 'minecraft:dowses_campfires',
+      'minecraft:drowned_preferred_weapons', 'minecraft:duplicates_allays', 'minecraft:dyes', 'minecraft:eggs',
+      'minecraft:enchantable/armor', 'minecraft:enchantable/bow', 'minecraft:enchantable/chest_armor',
+      'minecraft:enchantable/crossbow', 'minecraft:enchantable/durability', 'minecraft:enchantable/equippable',
+      'minecraft:enchantable/fire_aspect', 'minecraft:enchantable/fishing', 'minecraft:enchantable/foot_armor',
+      'minecraft:enchantable/head_armor', 'minecraft:enchantable/leg_armor', 'minecraft:enchantable/mace',
+      'minecraft:enchantable/melee_weapon', 'minecraft:enchantable/mining', 'minecraft:enchantable/mining_loot',
+      'minecraft:enchantable/sharp_weapon', 'minecraft:enchantable/sweeping', 'minecraft:enchantable/trident',
+      'minecraft:enchantable/vanishing', 'minecraft:enchantable/weapon',
+      'minecraft:fence_gates', 'minecraft:fences', 'minecraft:fishes', 'minecraft:flowers',
+      'minecraft:foot_armor', 'minecraft:fox_food', 'minecraft:freeze_immune_wearables', 'minecraft:frog_food',
+      'minecraft:furnace_minecart_fuel', 'minecraft:gaze_disguise_equipment', 'minecraft:goat_food',
+      'minecraft:gold_tool_materials', 'minecraft:hanging_signs', 'minecraft:head_armor',
+      'minecraft:hoglin_food', 'minecraft:horse_food', 'minecraft:horse_tempt_items',
+      'minecraft:ignored_by_piglin_babies', 'minecraft:iron_tool_materials', 'minecraft:jungle_logs',
+      'minecraft:lanterns', 'minecraft:leaves', 'minecraft:lectern_books', 'minecraft:leg_armor',
+      'minecraft:llama_food', 'minecraft:llama_tempt_items', 'minecraft:logs', 'minecraft:logs_that_burn',
+      'minecraft:loom_patterns', 'minecraft:mangrove_logs', 'minecraft:meat', 'minecraft:metal_nuggets',
+      'minecraft:mushrooms', 'minecraft:netherite_tool_materials', 'minecraft:non_flammable_wood',
+      'minecraft:noteblock_top_instruments', 'minecraft:oak_logs', 'minecraft:ocelot_food', 'minecraft:ores',
+      'minecraft:pale_oak_logs', 'minecraft:panda_food', 'minecraft:parrot_food',
+      'minecraft:parrot_poisonous_food', 'minecraft:piglin_food', 'minecraft:piglin_loved',
+      'minecraft:piglin_preferred_weapons', 'minecraft:piglin_repellents', 'minecraft:piglin_safe_armor',
+      'minecraft:pig_food', 'minecraft:pillager_preferred_weapons', 'minecraft:planks', 'minecraft:rabbit_food',
+      'minecraft:rails', 'minecraft:repairs_copper_armor', 'minecraft:repairs_chain_armor',
+      'minecraft:repairs_diamond_armor', 'minecraft:repairs_gold_armor', 'minecraft:repairs_iron_armor',
+      'minecraft:repairs_leather_armor', 'minecraft:repairs_netherite_armor', 'minecraft:repairs_turtle_helmet',
+      'minecraft:repairs_wolf_armor', 'minecraft:sand', 'minecraft:saplings', 'minecraft:sheep_food',
+      'minecraft:shulker_boxes', 'minecraft:signs', 'minecraft:skeleton_preferred_weapons', 'minecraft:skulls',
+      'minecraft:slabs', 'minecraft:small_flowers', 'minecraft:smelts_to_glass', 'minecraft:sniffer_food',
+      'minecraft:spruce_logs', 'minecraft:stairs', 'minecraft:stone_bricks', 'minecraft:stone_buttons',
+      'minecraft:stone_crafting_materials', 'minecraft:stone_tool_materials', 'minecraft:strider_food',
+      'minecraft:strider_tempt_items', 'minecraft:terracotta', 'minecraft:trapdoors',
+      'minecraft:trimmable_armor', 'minecraft:trim_materials', 'minecraft:turtle_food',
+      'minecraft:villager_plantable_seeds', 'minecraft:walls', 'minecraft:warped_stems',
+      'minecraft:wart_blocks', 'minecraft:wolf_food', 'minecraft:wooden_buttons', 'minecraft:wooden_doors',
+      'minecraft:wooden_fences', 'minecraft:wooden_pressure_plates', 'minecraft:wooden_slabs',
+      'minecraft:wooden_stairs', 'minecraft:wooden_tool_materials', 'minecraft:wooden_trapdoors',
+      'minecraft:wool', 'minecraft:wool_carpets',
+    ],
+  },
+  {
+    label: 'NeoForge',
+    tags: [
+      'neoforge:armors', 'neoforge:barrels', 'neoforge:barrels/wooden', 'neoforge:bones',
+      'neoforge:bookshelves', 'neoforge:bricks', 'neoforge:bricks/normal', 'neoforge:bricks/nether',
+      'neoforge:buckets', 'neoforge:buckets/empty', 'neoforge:buckets/water', 'neoforge:buckets/lava',
+      'neoforge:buckets/milk', 'neoforge:buckets/powder_snow', 'neoforge:buckets/entity_water',
+      'neoforge:chains', 'neoforge:chests', 'neoforge:chests/ender', 'neoforge:chests/trapped',
+      'neoforge:chests/wooden', 'neoforge:cobblestones', 'neoforge:cobblestones/normal',
+      'neoforge:cobblestones/infested', 'neoforge:cobblestones/mossy', 'neoforge:cobblestones/deepslate',
+      'neoforge:crops', 'neoforge:crops/beetroot', 'neoforge:crops/carrot', 'neoforge:crops/nether_wart',
+      'neoforge:crops/potato', 'neoforge:crops/wheat',
+      'neoforge:dusts', 'neoforge:dusts/redstone', 'neoforge:dusts/glowstone',
+      'neoforge:dyes', 'neoforge:dyes/black', 'neoforge:dyes/red', 'neoforge:dyes/green',
+      'neoforge:dyes/brown', 'neoforge:dyes/blue', 'neoforge:dyes/purple', 'neoforge:dyes/cyan',
+      'neoforge:dyes/light_gray', 'neoforge:dyes/gray', 'neoforge:dyes/pink', 'neoforge:dyes/lime',
+      'neoforge:dyes/yellow', 'neoforge:dyes/light_blue', 'neoforge:dyes/magenta',
+      'neoforge:dyes/orange', 'neoforge:dyes/white',
+      'neoforge:eggs', 'neoforge:enchantables', 'neoforge:enchanting_fuels', 'neoforge:end_stones',
+      'neoforge:ender_pearls', 'neoforge:feathers', 'neoforge:fence_gates', 'neoforge:fence_gates/wooden',
+      'neoforge:fences', 'neoforge:fences/nether_brick', 'neoforge:fences/wooden',
+      'neoforge:foods', 'neoforge:foods/fruits', 'neoforge:foods/vegetables', 'neoforge:foods/berries',
+      'neoforge:foods/breads', 'neoforge:foods/cookies', 'neoforge:foods/raw_meats',
+      'neoforge:foods/cooked_meats', 'neoforge:foods/raw_fishes', 'neoforge:foods/cooked_fishes',
+      'neoforge:foods/soups', 'neoforge:foods/food_poisoning',
+      'neoforge:gems', 'neoforge:gems/diamond', 'neoforge:gems/emerald', 'neoforge:gems/amethyst',
+      'neoforge:gems/lapis', 'neoforge:gems/prismarine', 'neoforge:gems/quartz',
+      'neoforge:glass_blocks', 'neoforge:glass_blocks/colorless', 'neoforge:glass_blocks/cheap',
+      'neoforge:glass_blocks/tinted', 'neoforge:glass_panes', 'neoforge:glass_panes/colorless',
+      'neoforge:glazed_terracottas', 'neoforge:gravels', 'neoforge:gunpowders',
+      'neoforge:ingots', 'neoforge:ingots/copper', 'neoforge:ingots/gold', 'neoforge:ingots/iron',
+      'neoforge:ingots/netherite', 'neoforge:leathers', 'neoforge:mushrooms', 'neoforge:music_discs',
+      'neoforge:nether_stars', 'neoforge:netherracks', 'neoforge:nuggets', 'neoforge:nuggets/gold',
+      'neoforge:nuggets/iron', 'neoforge:obsidians',
+      'neoforge:ore_bearing_ground/deepslate', 'neoforge:ore_bearing_ground/netherrack',
+      'neoforge:ore_bearing_ground/stone', 'neoforge:ore_rates/dense', 'neoforge:ore_rates/singular',
+      'neoforge:ore_rates/sparse',
+      'neoforge:ores', 'neoforge:ores/coal', 'neoforge:ores/copper', 'neoforge:ores/diamond',
+      'neoforge:ores/emerald', 'neoforge:ores/gold', 'neoforge:ores/iron', 'neoforge:ores/lapis',
+      'neoforge:ores/netherite_scrap', 'neoforge:ores/quartz', 'neoforge:ores/redstone',
+      'neoforge:ores_in_ground/deepslate', 'neoforge:ores_in_ground/netherrack', 'neoforge:ores_in_ground/stone',
+      'neoforge:player_workstations/crafting_tables', 'neoforge:player_workstations/furnaces',
+      'neoforge:raw_materials', 'neoforge:raw_materials/copper', 'neoforge:raw_materials/gold',
+      'neoforge:raw_materials/iron',
+      'neoforge:rods', 'neoforge:rods/blaze', 'neoforge:rods/breeze', 'neoforge:rods/wooden',
+      'neoforge:ropes', 'neoforge:sands', 'neoforge:sands/colorless', 'neoforge:sands/red',
+      'neoforge:seeds', 'neoforge:seeds/beetroot', 'neoforge:seeds/melon', 'neoforge:seeds/pumpkin',
+      'neoforge:seeds/wheat', 'neoforge:shulker_boxes', 'neoforge:slimeballs', 'neoforge:stones',
+      'neoforge:storage_blocks', 'neoforge:storage_blocks/bone_meal', 'neoforge:storage_blocks/coal',
+      'neoforge:storage_blocks/copper', 'neoforge:storage_blocks/diamond', 'neoforge:storage_blocks/dried_kelp',
+      'neoforge:storage_blocks/emerald', 'neoforge:storage_blocks/gold', 'neoforge:storage_blocks/iron',
+      'neoforge:storage_blocks/lapis', 'neoforge:storage_blocks/netherite', 'neoforge:storage_blocks/raw_copper',
+      'neoforge:storage_blocks/raw_gold', 'neoforge:storage_blocks/raw_iron', 'neoforge:storage_blocks/redstone',
+      'neoforge:storage_blocks/slime', 'neoforge:storage_blocks/wheat',
+      'neoforge:strings',
+      'neoforge:tools', 'neoforge:tools/bow', 'neoforge:tools/brush', 'neoforge:tools/crossbow',
+      'neoforge:tools/fishing_rod', 'neoforge:tools/shear', 'neoforge:tools/shield', 'neoforge:tools/spear',
+      'neoforge:villager_job_sites',
+    ],
+  },
+];
+
+function TagPicker({ tags, onChange, onClose }) {
+  const [filter, setFilter] = useState('');
+  const [modTags, setModTags] = useState([]);
+  const q = filter.toLowerCase();
+
+  const loadModTags = useCallback(async () => {
+    try {
+      const ids = await invoke('list_ycs_data', { category: 'tags' });
+      const loaded = [];
+      for (const id of ids) {
+        try {
+          const raw = await invoke('load_ycs_data', { category: 'tags', id });
+          const data = JSON.parse(raw);
+          if (data.tagName) loaded.push(data.tagName);
+        } catch {}
+      }
+      setModTags(loaded);
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadModTags(); }, [loadModTags]);
+
+  const toggle = (tag) => onChange(tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]);
+
+  const addCustom = () => {
+    const v = filter.trim();
+    if (!v) return;
+    const tag = v.includes(':') ? v : `yebisurpg:${v}`;
+    if (!tags.includes(tag)) onChange([...tags, tag]);
+    setFilter('');
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 200,
+      backgroundColor: 'var(--ycs-bg)',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button className="ycs-button icon" onClick={onClose} title="Back">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M10 12L6 8l4-4"/></svg>
+        </button>
+        <span style={{ fontSize: '15px', fontWeight: '500', flex: 1 }}>Tags</span>
+        <button className="ycs-button icon" onClick={loadModTags} title="Refresh">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/><polyline points="11 1 13.5 3.5 11 6"/></svg>
+        </button>
+        <input
+          className="ycs-string-input"
+          type="text"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addCustom()}
+          style={{ width: '160px' }}
+          autoFocus
+        />
+        <button className="ycs-button icon" onClick={addCustom} title="Add custom tag">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', flexShrink: 0 }} />
+
+      {/* Selected chips */}
+      <div style={{
+        padding: '10px 16px', flexShrink: 0, minHeight: '42px', maxHeight: '100px', overflowY: 'auto',
+        display: 'flex', flexWrap: 'wrap', gap: '4px', alignContent: 'flex-start',
+      }}>
+        {tags.length === 0
+          ? <span style={{ fontSize: '12px', opacity: 0.4 }}>No tags selected</span>
+          : tags.map(t => (
+            <div key={t} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '4px',
+              padding: '2px 8px', fontSize: '11px',
+              border: '1px solid var(--ycs-foreground)',
+              borderRadius: 'var(--ycs-radius, 4px)', whiteSpace: 'nowrap',
+            }}>
+              <span>{t}</span>
+              <span onClick={() => toggle(t)} style={{ cursor: 'pointer', opacity: 0.5, fontSize: '14px', lineHeight: 1 }}>×</span>
+            </div>
+          ))
+        }
+      </div>
+
+      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', flexShrink: 0 }} />
+
+      {/* Category list */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {TAG_CATEGORIES.map(cat => {
+          const catTags = cat.label === 'Mod' ? modTags : cat.tags;
+          const visible = catTags.filter(t => !q || t.includes(q));
+          if (cat.label === 'Mod' && visible.length === 0) return null;
+          if (visible.length === 0) return null;
+          return (
+            <div key={cat.label}>
+              <div style={{ fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.5, padding: '8px 16px 4px' }}>
+                {cat.label}
+              </div>
+              {visible.map(tag => {
+                const sel = tags.includes(tag);
+                return (
+                  <div key={tag} onClick={() => toggle(tag)} style={{
+                    padding: '6px 16px', fontSize: '13px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    backgroundColor: sel ? 'var(--ycs-highlight)' : 'transparent',
+                    transition: 'background-color 0.1s',
+                  }}
+                    onMouseEnter={e => { if (!sel) e.currentTarget.style.backgroundColor = 'var(--ycs-accent)'; }}
+                    onMouseLeave={e => { if (!sel) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <span>{tag}</span>
+                    {sel && <span style={{ fontSize: '13px', opacity: 0.8 }}>✓</span>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RecipeSubGroup({ label, enabled, onToggle, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="ycs-field-row">
+        <div className="ycs-field-label" style={{ fontSize: '13px' }}>{label}</div>
+        <div className="ycs-field-control">
+          <Checkbox checked={enabled} onChange={onToggle} />
+        </div>
+      </div>
+      {enabled && (
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          borderLeft: '1px solid var(--ycs-foreground)',
+          paddingLeft: '12px', marginLeft: '4px',
+        }}>
+          {children}
+        </div>
       )}
     </div>
   );
@@ -138,6 +409,9 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
   const [texture, setTexture] = useState('');
   const [holdingMode, setHoldingMode] = useState('generated');
   const [stackSize, setStackSize] = useState('64');
+  const [useDuration, setUseDuration] = useState(false);
+  const [tags, setTags] = useState([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [geoModel, setGeoModel] = useState('');
   const [geoTexture, setGeoTexture] = useState('');
   const [displayModel, setDisplayModel] = useState('');
@@ -178,6 +452,34 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
   const [tooltipUseDefaultHint, setTooltipUseDefaultHint] = useState(true);
   const [tooltipShiftHint, setTooltipShiftHint] = useState('');
   const [tooltipHidden, setTooltipHidden] = useState('');
+
+  // Recipes
+  const [recipeItemOptions, setRecipeItemOptions] = useState([]);
+  const [shapedEnabled, setShapedEnabled] = useState(false);
+  const [shapedGrid, setShapedGrid] = useState(EMPTY_GRID);
+  const [shapedCount, setShapedCount] = useState('1');
+  const [shapelessEnabled, setShapelessEnabled] = useState(false);
+  const [shapelessIngredients, setShapelessIngredients] = useState(['']);
+  const [shapelessCount, setShapelessCount] = useState('1');
+  const [smeltingEnabled, setSmeltingEnabled] = useState(false);
+  const [smeltingIngredient, setSmeltingIngredient] = useState('');
+  const [smeltingExp, setSmeltingExp] = useState('0.7');
+  const [smeltingTime, setSmeltingTime] = useState('200');
+  const [blastingEnabled, setBlastingEnabled] = useState(false);
+  const [blastingIngredient, setBlastingIngredient] = useState('');
+  const [blastingExp, setBlastingExp] = useState('0.7');
+  const [blastingTime, setBlastingTime] = useState('100');
+  const [smokingEnabled, setSmokingEnabled] = useState(false);
+  const [smokingIngredient, setSmokingIngredient] = useState('');
+  const [smokingExp, setSmokingExp] = useState('0.35');
+  const [smokingTime, setSmokingTime] = useState('100');
+  const [campfireEnabled, setCampfireEnabled] = useState(false);
+  const [campfireIngredient, setCampfireIngredient] = useState('');
+  const [campfireExp, setCampfireExp] = useState('0.35');
+  const [campfireTime, setCampfireTime] = useState('600');
+  const [stonecutEnabled, setStonecutEnabled] = useState(false);
+  const [stonecutIngredient, setStonecutIngredient] = useState('');
+  const [stonecutCount, setStonecutCount] = useState('1');
 
   const is3D = holdingMode === '3d';
 
@@ -231,15 +533,33 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
       setAllTabOptions([
         { label: '(None)', value: '' },
         ...loaded.map(t => ({ label: `${t.displayName || t.id} — ${MODID}:${t.id}`, value: t.id })),
-        { label: '─── Vanilla ───', value: '__sep__', disabled: true },
         ...VANILLA_TABS.map(t => ({ label: `${t.displayName} — ${t.id}`, value: t.id })),
       ]);
     } catch {}
   }, []);
 
+  const loadRecipeItemOptions = useCallback(async () => {
+    const modItems = [];
+    try {
+      const ids = await invoke('list_ycs_data', { category: 'items' });
+      for (const id of ids) {
+        try {
+          const raw = await invoke('load_ycs_data', { category: 'items', id });
+          const data = JSON.parse(raw);
+          modItems.push({ label: `${data.displayName || data.id} — ${MODID}:${data.id}`, value: `${MODID}:${data.id}` });
+        } catch {}
+      }
+    } catch {}
+    setRecipeItemOptions([
+      ...modItems,
+      ...VANILLA_ITEMS.map(i => ({ label: `${i.displayName} — ${i.id}`, value: i.id })),
+    ]);
+  }, []);
+
   useEffect(() => {
     loadTextures();
     loadTabs();
+    loadRecipeItemOptions();
     if (existingId) {
       invoke('load_ycs_data', { category: 'items', id: existingId })
         .then(raw => {
@@ -249,6 +569,8 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
           setTexture(data.texture || '');
           setHoldingMode(data.holdingMode || 'generated');
           setStackSize(String(data.stackSize ?? '64'));
+          setUseDuration(data.useDuration || false);
+          setTags(data.tags || []);
           setGeoModel(data.geoModel || '');
           setGeoTexture(data.geoTexture || '');
           setDisplayModel(data.displayModel || '');
@@ -272,13 +594,40 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
           setTooltipShiftHint(data.tooltipShiftHint || '');
           setTooltipHidden(data.tooltipHidden || '');
           setCreativeTab(data.creativeTab || '');
+          // Recipes
+          const r = data.recipes || {};
+          setShapedEnabled(!!r.shaped);
+          setShapedGrid(r.shaped?.grid || EMPTY_GRID);
+          setShapedCount(String(r.shaped?.count ?? 1));
+          setShapelessEnabled(!!r.shapeless);
+          setShapelessIngredients(r.shapeless?.ingredients || ['']);
+          setShapelessCount(String(r.shapeless?.count ?? 1));
+          setSmeltingEnabled(!!r.smelting);
+          setSmeltingIngredient(r.smelting?.ingredient || '');
+          setSmeltingExp(String(r.smelting?.experience ?? 0.7));
+          setSmeltingTime(String(r.smelting?.cookingTime ?? 200));
+          setBlastingEnabled(!!r.blasting);
+          setBlastingIngredient(r.blasting?.ingredient || '');
+          setBlastingExp(String(r.blasting?.experience ?? 0.7));
+          setBlastingTime(String(r.blasting?.cookingTime ?? 100));
+          setSmokingEnabled(!!r.smoking);
+          setSmokingIngredient(r.smoking?.ingredient || '');
+          setSmokingExp(String(r.smoking?.experience ?? 0.35));
+          setSmokingTime(String(r.smoking?.cookingTime ?? 100));
+          setCampfireEnabled(!!r.campfire);
+          setCampfireIngredient(r.campfire?.ingredient || '');
+          setCampfireExp(String(r.campfire?.experience ?? 0.35));
+          setCampfireTime(String(r.campfire?.cookingTime ?? 600));
+          setStonecutEnabled(!!r.stonecutting);
+          setStonecutIngredient(r.stonecutting?.ingredient || '');
+          setStonecutCount(String(r.stonecutting?.count ?? 1));
           const inj = Array.isArray(data._injections) ? data._injections : [];
           setCurrentInjections(inj);
           setInjected(inj.length > 0);
         })
         .catch(() => {});
     }
-  }, [existingId, loadTextures, loadTabs]);
+  }, [existingId, loadTextures, loadTabs, loadRecipeItemOptions]);
 
   const needsCustomClass = customClass;
 
@@ -288,6 +637,8 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     texture,
     holdingMode,
     stackSize: parseInt(stackSize) || 64,
+    useDuration,
+    tags,
     geoModel: is3D && geoModel ? itemId : '',
     geoTexture: is3D ? geoTexture : '',
     displayModel: is3D && displayModel ? itemId : '',
@@ -311,6 +662,15 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     tooltipShiftHint: tooltipEnabled && tooltipShift && !tooltipUseDefaultHint ? tooltipShiftHint : '',
     tooltipHidden: tooltipEnabled && tooltipShift ? tooltipHidden : '',
     creativeTab,
+    recipes: {
+      ...(shapedEnabled ? { shaped: { grid: shapedGrid, count: parseInt(shapedCount) || 1 } } : {}),
+      ...(shapelessEnabled ? { shapeless: { ingredients: shapelessIngredients.filter(Boolean), count: parseInt(shapelessCount) || 1 } } : {}),
+      ...(smeltingEnabled ? { smelting: { ingredient: smeltingIngredient, experience: parseFloat(smeltingExp) || 0.7, cookingTime: parseInt(smeltingTime) || 200 } } : {}),
+      ...(blastingEnabled ? { blasting: { ingredient: blastingIngredient, experience: parseFloat(blastingExp) || 0.7, cookingTime: parseInt(blastingTime) || 100 } } : {}),
+      ...(smokingEnabled ? { smoking: { ingredient: smokingIngredient, experience: parseFloat(smokingExp) || 0.35, cookingTime: parseInt(smokingTime) || 100 } } : {}),
+      ...(campfireEnabled ? { campfire: { ingredient: campfireIngredient, experience: parseFloat(campfireExp) || 0.35, cookingTime: parseInt(campfireTime) || 600 } } : {}),
+      ...(stonecutEnabled ? { stonecutting: { ingredient: stonecutIngredient, count: parseInt(stonecutCount) || 1 } } : {}),
+    },
     type: 'item',
   });
 
@@ -388,15 +748,6 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
       const className = toPascalCase(itemId) + 'Item';
 
       // Build Item.Properties() chain
-      const parsedStack = parseInt(stackSize) || 64;
-      let propsChain = parsedStack !== 64 ? `.stacksTo(${parsedStack})` : '';
-      if (foodEnabled) {
-        let foodBuilder = `new FoodProperties.Builder().nutrition(${parseInt(nutrition) || 4}).saturationModifier(${parseFloat(saturation) || 0.3}f)`;
-        if (canAlwaysEat) foodBuilder += '.alwaysEdible()';
-        if (fastFood) foodBuilder += '.fast()';
-        propsChain += `.food(${foodBuilder}.build())`;
-      }
-
       // Determine base class for registration and custom class extends
       const toolBaseClass = {
         sword: 'SwordItem',
@@ -406,6 +757,16 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
         hoe: 'HoeItem',
       }[toolType];
       const isTool = toolEnabled && !!toolBaseClass;
+
+      const parsedStack = parseInt(stackSize) || 64;
+      let propsChain = (!isTool && parsedStack !== 64) ? `.stacksTo(${parsedStack})` : '';
+      if (useDuration) propsChain += `.useDuration(32)`;
+      if (foodEnabled) {
+        let foodBuilder = `new FoodProperties.Builder().nutrition(${parseInt(nutrition) || 4}).saturationModifier(${parseFloat(saturation) || 0.3}f)`;
+        if (canAlwaysEat) foodBuilder += '.alwaysEdible()';
+        if (fastFood) foodBuilder += '.fast()';
+        propsChain += `.food(${foodBuilder}.build())`;
+      }
 
       const tierConst = {
         wood: 'Tiers.WOOD', stone: 'Tiers.STONE', iron: 'Tiers.IRON',
@@ -650,6 +1011,52 @@ public class ${className} extends ${baseClass} {
         }
       }
 
+      // Recipe file injection
+      const resultId = `${MODID}:${itemId}`;
+      const writeRecipe = async (recipeId, json) => {
+        const file = `resources/data/${MODID}/recipe/${recipeId}.json`;
+        await invoke('write_mod_file', { file, content: JSON.stringify(json, null, 2) });
+        injections.push({ type: 'created-file', file });
+      };
+
+      if (shapedEnabled) {
+        const charMap = buildCharMap(shapedGrid);
+        const pattern = gridToPattern(shapedGrid, charMap);
+        const key = {};
+        for (const [item, ch] of Object.entries(charMap)) if (item) key[ch] = { item };
+        await writeRecipe(`${itemId}_shaped`, { type: 'minecraft:crafting_shaped', pattern, key, result: { id: resultId, count: parseInt(shapedCount) || 1 } });
+      }
+      if (shapelessEnabled) {
+        await writeRecipe(`${itemId}_shapeless`, { type: 'minecraft:crafting_shapeless', ingredients: shapelessIngredients.filter(Boolean).map(i => ({ item: i })), result: { id: resultId, count: parseInt(shapelessCount) || 1 } });
+      }
+      if (smeltingEnabled && smeltingIngredient) {
+        await writeRecipe(`${itemId}_smelting`, { type: 'minecraft:smelting', ingredient: { item: smeltingIngredient }, result: { id: resultId }, experience: parseFloat(smeltingExp) || 0.7, cookingtime: parseInt(smeltingTime) || 200 });
+      }
+      if (blastingEnabled && blastingIngredient) {
+        await writeRecipe(`${itemId}_blasting`, { type: 'minecraft:blasting', ingredient: { item: blastingIngredient }, result: { id: resultId }, experience: parseFloat(blastingExp) || 0.7, cookingtime: parseInt(blastingTime) || 100 });
+      }
+      if (smokingEnabled && smokingIngredient) {
+        await writeRecipe(`${itemId}_smoking`, { type: 'minecraft:smoking', ingredient: { item: smokingIngredient }, result: { id: resultId }, experience: parseFloat(smokingExp) || 0.35, cookingtime: parseInt(smokingTime) || 100 });
+      }
+      if (campfireEnabled && campfireIngredient) {
+        await writeRecipe(`${itemId}_campfire_cooking`, { type: 'minecraft:campfire_cooking', ingredient: { item: campfireIngredient }, result: { id: resultId }, experience: parseFloat(campfireExp) || 0.35, cookingtime: parseInt(campfireTime) || 600 });
+      }
+      if (stonecutEnabled && stonecutIngredient) {
+        await writeRecipe(`${itemId}_stonecutting`, { type: 'minecraft:stonecutting', ingredient: { item: stonecutIngredient }, result: { id: resultId, count: parseInt(stonecutCount) || 1 } });
+      }
+
+      // Tag files — one JSON per tag, appending this item
+      for (const tag of tags) {
+        if (!tag) continue;
+        // tags look like "minecraft:swords" or "forge:tools/swords"
+        const [ns, ...rest] = tag.split(':');
+        const tagPath = rest.join(':').replace(/:/g, '/');
+        const file = `resources/data/${ns}/tags/item/${tagPath}.json`;
+        const tagJson = { replace: false, values: [`${MODID}:${itemId}`] };
+        await invoke('write_mod_file', { file, content: JSON.stringify(tagJson, null, 2) });
+        injections.push({ type: 'created-file', file });
+      }
+
       payload._injections = injections;
       await invoke('save_ycs_data', {
         category: 'items',
@@ -687,7 +1094,8 @@ public class ${className} extends ${baseClass} {
   const textureOptions = textures.map(t => ({ label: t.label, value: t.id }));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {showTagPicker && <TagPicker tags={tags} onChange={setTags} onClose={() => setShowTagPicker(false)} />}
       <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
           {existingId ? `Edit Item: ${existingId}` : 'New Item'}
@@ -768,8 +1176,13 @@ public class ${className} extends ${baseClass} {
         </FieldGroup>
 
         <FieldGroup label="Properties">
-          <FieldRow label="Stack Size">
-            <NumberInput value={stackSize} onChange={setStackSize} style={{ width: '80px' }} />
+          {!toolEnabled && (
+            <FieldRow label="Stack Size">
+              <NumberInput value={stackSize} onChange={setStackSize} style={{ width: '80px' }} />
+            </FieldRow>
+          )}
+          <FieldRow label="Use Duration">
+            <Checkbox checked={useDuration} onChange={setUseDuration} />
           </FieldRow>
           <FieldRow label="Tool">
             <Checkbox checked={toolEnabled} onChange={setToolEnabled} />
@@ -803,6 +1216,24 @@ public class ${className} extends ${baseClass} {
               />
             </FieldRow>
           </>}
+        </FieldGroup>
+
+        <FieldGroup label="Tags">
+          <FieldRow label="Tags">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, flexWrap: 'wrap' }}>
+              {tags.map(t => (
+                <span key={t} style={{
+                  fontSize: '11px', padding: '2px 6px',
+                  border: '1px solid var(--ycs-foreground)',
+                  borderRadius: 'var(--ycs-radius, 4px)', whiteSpace: 'nowrap',
+                }}>{t}</span>
+              ))}
+              {tags.length === 0 && <span style={{ opacity: 0.3, fontSize: '12px' }}>None</span>}
+            </div>
+            <button className="ycs-button" style={{ flexShrink: 0 }} onClick={() => setShowTagPicker(true)}>
+              Edit
+            </button>
+          </FieldRow>
         </FieldGroup>
 
         <FieldGroup label="Combat">
@@ -870,6 +1301,90 @@ public class ${className} extends ${baseClass} {
               </FieldRow>
             </>}
           </>}
+        </FieldGroup>
+
+        <FieldGroup label="Recipes">
+
+          {/* Crafting Table */}
+          <RecipeSubGroup label="Crafting" enabled={shapedEnabled || shapelessEnabled} onToggle={v => { if (!v) { setShapedEnabled(false); setShapelessEnabled(false); } else setShapedEnabled(true); }}>
+            {shapedEnabled && <>
+              <ShapedGrid grid={shapedGrid} onGridChange={setShapedGrid} itemOptions={recipeItemOptions} />
+            </>}
+            {shapelessEnabled && <>
+              <ShapelessIngredients ingredients={shapelessIngredients} onChange={setShapelessIngredients} itemOptions={recipeItemOptions} />
+            </>}
+            <FieldRow label="Type">
+              <StandardDropdownField
+                value={shapedEnabled ? 'shaped' : 'shapeless'}
+                onChange={v => { setShapedEnabled(v === 'shaped'); setShapelessEnabled(v === 'shapeless'); }}
+                options={[
+                  { label: 'Shaped', value: 'shaped' },
+                  { label: 'Shapeless', value: 'shapeless' },
+                ]}
+              />
+            </FieldRow>
+            <FieldRow label="Count">
+              <NumberInput value={shapedEnabled ? shapedCount : shapelessCount} onChange={shapedEnabled ? setShapedCount : setShapelessCount} style={{ width: '64px' }} />
+            </FieldRow>
+          </RecipeSubGroup>
+
+          <RecipeSubGroup label="Smelting" enabled={smeltingEnabled} onToggle={setSmeltingEnabled}>
+            <FieldRow label="Ingredient">
+              <DropdownField value={smeltingIngredient} onChange={setSmeltingIngredient} options={recipeItemOptions} />
+            </FieldRow>
+            <FieldRow label="Experience">
+              <NumberInput value={smeltingExp} onChange={setSmeltingExp} style={{ width: '80px' }} />
+            </FieldRow>
+            <FieldRow label="Cook Time">
+              <NumberInput value={smeltingTime} onChange={setSmeltingTime} style={{ width: '80px' }} />
+            </FieldRow>
+          </RecipeSubGroup>
+
+          <RecipeSubGroup label="Blasting" enabled={blastingEnabled} onToggle={setBlastingEnabled}>
+            <FieldRow label="Ingredient">
+              <DropdownField value={blastingIngredient} onChange={setBlastingIngredient} options={recipeItemOptions} />
+            </FieldRow>
+            <FieldRow label="Experience">
+              <NumberInput value={blastingExp} onChange={setBlastingExp} style={{ width: '80px' }} />
+            </FieldRow>
+            <FieldRow label="Cook Time">
+              <NumberInput value={blastingTime} onChange={setBlastingTime} style={{ width: '80px' }} />
+            </FieldRow>
+          </RecipeSubGroup>
+
+          <RecipeSubGroup label="Smoking" enabled={smokingEnabled} onToggle={setSmokingEnabled}>
+            <FieldRow label="Ingredient">
+              <DropdownField value={smokingIngredient} onChange={setSmokingIngredient} options={recipeItemOptions} />
+            </FieldRow>
+            <FieldRow label="Experience">
+              <NumberInput value={smokingExp} onChange={setSmokingExp} style={{ width: '80px' }} />
+            </FieldRow>
+            <FieldRow label="Cook Time">
+              <NumberInput value={smokingTime} onChange={setSmokingTime} style={{ width: '80px' }} />
+            </FieldRow>
+          </RecipeSubGroup>
+
+          <RecipeSubGroup label="Campfire" enabled={campfireEnabled} onToggle={setCampfireEnabled}>
+            <FieldRow label="Ingredient">
+              <DropdownField value={campfireIngredient} onChange={setCampfireIngredient} options={recipeItemOptions} />
+            </FieldRow>
+            <FieldRow label="Experience">
+              <NumberInput value={campfireExp} onChange={setCampfireExp} style={{ width: '80px' }} />
+            </FieldRow>
+            <FieldRow label="Cook Time">
+              <NumberInput value={campfireTime} onChange={setCampfireTime} style={{ width: '80px' }} />
+            </FieldRow>
+          </RecipeSubGroup>
+
+          <RecipeSubGroup label="Stonecutting" enabled={stonecutEnabled} onToggle={setStonecutEnabled}>
+            <FieldRow label="Ingredient">
+              <DropdownField value={stonecutIngredient} onChange={setStonecutIngredient} options={recipeItemOptions} />
+            </FieldRow>
+            <FieldRow label="Count">
+              <NumberInput value={stonecutCount} onChange={setStonecutCount} style={{ width: '64px' }} />
+            </FieldRow>
+          </RecipeSubGroup>
+
         </FieldGroup>
 
         <FieldGroup label="Advanced">

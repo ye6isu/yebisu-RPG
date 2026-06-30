@@ -4,6 +4,10 @@
   "texture": "yebisu",
   "holdingMode": "generated",
   "stackSize": 1,
+  "useDuration": false,
+  "tags": [
+    "yebisurpg:test"
+  ],
   "geoModel": "",
   "geoTexture": "",
   "displayModel": "",
@@ -27,6 +31,7 @@
   "tooltipShiftHint": "",
   "tooltipHidden": "",
   "creativeTab": "yebisurpg",
+  "recipes": {},
   "type": "item",
   "_injections": [
     {
@@ -55,7 +60,10 @@
     {
       "type": "created-file",
       "file": "resources/assets/yebisurpg/textures/item/annyo.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/data/yebisurpg/tags/item/test.json"
     }
-  ],
-  "tabOrder": 1
+  ]
 }

@@ -3,6 +3,7 @@ import Titlebar from "./components/Titlebar/Titlebar";
 import PreferencesPageNew from "./components/PreferencesPageNew";
 import ItemsLanding from "./components/ItemsLanding";
 import TabsLanding from "./components/TabsLanding";
+import TagsLanding from "./components/TagsLanding";
 import TextureManager from "./components/TextureManager";
 import "./App.css";
 
@@ -144,6 +145,7 @@ function App() {
   const tabs = [
     { key: 'items', component: <ItemsLanding /> },
     { key: 'tabs', component: <TabsLanding /> },
+    { key: 'tags', component: <TagsLanding /> },
     { key: 'textures', component: <TextureManager /> },
   ];
 
@@ -172,6 +174,7 @@ function App() {
             <SidebarGroup label="Registry" isOpen={isRegistryOpen} onToggle={() => setIsRegistryOpen(!isRegistryOpen)}>
               <SidebarTab label="Items" tabKey="items" />
               <SidebarTab label="Creative Tabs" tabKey="tabs" />
+              <SidebarTab label="Tags" tabKey="tags" />
             </SidebarGroup>
 
             <SidebarGroup label="Assets" isOpen={isAssetsOpen} onToggle={() => setIsAssetsOpen(!isAssetsOpen)}>
