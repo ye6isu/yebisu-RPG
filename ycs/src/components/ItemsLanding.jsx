@@ -81,20 +81,20 @@ export default function ItemsLanding() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
         {items.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {items.map(item => (
               <div
                 key={item.id}
                 onClick={() => setEditing(item.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
-                  width: '224px',
                   padding: '6px 8px',
                   borderRadius: 'var(--ycs-radius, 4px)',
                   border: '1px solid var(--ycs-foreground)',
                   cursor: 'pointer',
                   transition: 'background-color 0.1s, border-color 0.1s',
                   boxSizing: 'border-box',
+                  minWidth: '160px', flex: '1 1 160px', maxWidth: '280px',
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';

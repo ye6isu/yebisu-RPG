@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { FieldRow, StringField, NumberInput, StandardDropdownField } from './Field/Field';
+import { FieldRow, StringField, NumberInput, StandardDropdownField, DropdownField } from './Field/Field';
 
 function FieldGroup({ label, children }) {
   return (
@@ -142,6 +142,8 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
   const [geoTexture, setGeoTexture] = useState('');
   const [displayModel, setDisplayModel] = useState('');
   const [textures, setTextures] = useState([]);
+  const [availableTabs, setAvailableTabs] = useState([]);
+  const [creativeTab, setCreativeTab] = useState('');
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
   const [injected, setInjected] = useState(false);
@@ -199,8 +201,45 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     } catch {}
   }, []);
 
+  const VANILLA_TABS = [
+    { id: 'minecraft:building_blocks', displayName: 'Building Blocks' },
+    { id: 'minecraft:colored_blocks', displayName: 'Colored Blocks' },
+    { id: 'minecraft:natural_blocks', displayName: 'Natural Blocks' },
+    { id: 'minecraft:functional_blocks', displayName: 'Functional Blocks' },
+    { id: 'minecraft:redstone_blocks', displayName: 'Redstone Blocks' },
+    { id: 'minecraft:tools_and_utilities', displayName: 'Tools & Utilities' },
+    { id: 'minecraft:combat', displayName: 'Combat' },
+    { id: 'minecraft:food_and_drinks', displayName: 'Food & Drinks' },
+    { id: 'minecraft:ingredients', displayName: 'Ingredients' },
+    { id: 'minecraft:spawn_eggs', displayName: 'Spawn Eggs' },
+    { id: 'minecraft:op_blocks', displayName: 'Operator Utilities' },
+  ];
+
+  const [allTabOptions, setAllTabOptions] = useState([]);
+
+  const loadTabs = useCallback(async () => {
+    try {
+      const ids = await invoke('list_ycs_data', { category: 'tabs' });
+      const loaded = [];
+      for (const id of ids) {
+        try {
+          const raw = await invoke('load_ycs_data', { category: 'tabs', id });
+          loaded.push(JSON.parse(raw));
+        } catch {}
+      }
+      setAvailableTabs(loaded);
+      setAllTabOptions([
+        { label: '(None)', value: '' },
+        ...loaded.map(t => ({ label: `${t.displayName || t.id} — ${MODID}:${t.id}`, value: t.id })),
+        { label: '─── Vanilla ───', value: '__sep__', disabled: true },
+        ...VANILLA_TABS.map(t => ({ label: `${t.displayName} — ${t.id}`, value: t.id })),
+      ]);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     loadTextures();
+    loadTabs();
     if (existingId) {
       invoke('load_ycs_data', { category: 'items', id: existingId })
         .then(raw => {
@@ -232,13 +271,14 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
           setTooltipUseDefaultHint(data.tooltipUseDefaultHint ?? true);
           setTooltipShiftHint(data.tooltipShiftHint || '');
           setTooltipHidden(data.tooltipHidden || '');
+          setCreativeTab(data.creativeTab || '');
           const inj = Array.isArray(data._injections) ? data._injections : [];
           setCurrentInjections(inj);
           setInjected(inj.length > 0);
         })
         .catch(() => {});
     }
-  }, [existingId, loadTextures]);
+  }, [existingId, loadTextures, loadTabs]);
 
   const needsCustomClass = customClass;
 
@@ -270,6 +310,7 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     tooltipUseDefaultHint: tooltipEnabled && tooltipShift ? tooltipUseDefaultHint : true,
     tooltipShiftHint: tooltipEnabled && tooltipShift && !tooltipUseDefaultHint ? tooltipShiftHint : '',
     tooltipHidden: tooltipEnabled && tooltipShift ? tooltipHidden : '',
+    creativeTab,
     type: 'item',
   });
 
@@ -533,6 +574,23 @@ public class ${className} extends ${baseClass} {
       });
       injections.push({ type: 'json-key', file: `${RES_BASE}/lang/en_us.json`, key: langKey });
 
+      // Creative tab assignment
+      if (creativeTab) {
+        let tabContentLine;
+        if (creativeTab.startsWith('minecraft:')) {
+          const [ns, path] = creativeTab.split(':');
+          tabContentLine = `        if (event.getTabKey() == net.minecraft.world.item.CreativeModeTabs.${path.toUpperCase()}) event.accept(ModItems.${CN}.get());`;
+        } else {
+          tabContentLine = `        if (event.getTabKey() == ModCreativeModeTabs.${creativeTab.toUpperCase()}.getKey()) event.accept(ModItems.${CN}.get());`;
+        }
+        await invoke('inject_marker', {
+          file: `${JAVA_BASE}/item/ModCreativeTabContents.java`,
+          marker: 'YCS_Tab_Contents',
+          content: tabContentLine,
+        });
+        injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModCreativeTabContents.java`, marker: 'YCS_Tab_Contents', content: tabContentLine });
+      }
+
       if (is3D) {
         // If ID changed since last import, rename stored model files to match new ID
         const modelSourceId = geoModel || displayModel;
@@ -649,6 +707,13 @@ public class ${className} extends ${baseClass} {
           </FieldRow>
           <FieldRow label="Display Name">
             <StringField value={displayName} onChange={setDisplayName} style={{ width: '100%' }} />
+          </FieldRow>
+          <FieldRow label="Creative Tab">
+            <DropdownField
+              value={creativeTab}
+              onChange={(v) => v !== '__sep__' && setCreativeTab(v)}
+              options={allTabOptions}
+            />
           </FieldRow>
         </FieldGroup>
 

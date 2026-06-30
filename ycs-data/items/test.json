@@ -1,0 +1,85 @@
+{
+  "id": "test",
+  "displayName": "Tester",
+  "texture": "yebisu",
+  "holdingMode": "3d",
+  "stackSize": 16,
+  "geoModel": "test",
+  "geoTexture": "axe_texture",
+  "displayModel": "test",
+  "customClass": true,
+  "attackDamage": 180,
+  "attackSpeed": 10,
+  "foodEnabled": false,
+  "nutrition": null,
+  "saturation": null,
+  "canAlwaysEat": false,
+  "fastFood": false,
+  "fuelEnabled": false,
+  "fuel": null,
+  "toolEnabled": true,
+  "toolType": "axe",
+  "toolTier": "netherite",
+  "tooltipEnabled": false,
+  "tooltipNormal": "",
+  "tooltipShift": false,
+  "tooltipUseDefaultHint": true,
+  "tooltipShiftHint": "",
+  "tooltipHidden": "",
+  "creativeTab": "yebisurpg",
+  "type": "item",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Items",
+      "content": "    public static final DeferredItem<AxeItem> TEST = ITEMS.register(\"test\",\n            () -> new TestItem(Tiers.NETHERITE, new Item.Properties().stacksTo(16).attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 180f, 10f))));"
+    },
+    {
+      "type": "created-file",
+      "file": "java/net/ye6isu/yebisuRPG/item/custom/TestItem.java"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Item_Imports",
+      "content": "import net.ye6isu.yebisuRPG.item.custom.TestItem;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Item_Imports",
+      "content": "import net.minecraft.world.item.DiggerItem;"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "item.yebisurpg.test"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModCreativeTabContents.java",
+      "marker": "YCS_Tab_Contents",
+      "content": "        if (event.getTabKey() == ModCreativeModeTabs.YEBISURPG.getKey()) event.accept(ModItems.TEST.get());"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/geo/item/test.geo.json"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/geo/item/test.png"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/renderer/GeoItemRegistry.java",
+      "marker": "YCS_Geo_Collect",
+      "content": "        tryRegister(items, ModItems.TEST, \"test\");"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/models/item/test.json"
+    }
+  ],
+  "tabOrder": 0
+}

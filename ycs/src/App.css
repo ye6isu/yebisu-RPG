@@ -69,7 +69,9 @@ body {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
   min-width: 160px;
   z-index: 1000;
-  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .dropdown-item {
@@ -106,8 +108,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--ycs-foreground);
+  background: color-mix(in srgb, var(--ycs-text) 30%, transparent);
   border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ycs-text) 50%, transparent);
 }
 
 /* Range Slider (.ycs-slider) */
@@ -188,7 +194,7 @@ input[type="range"].ycs-slider::-webkit-slider-thumb:hover {
   flex: 1;
   display: flex;
   position: relative;
-  overflow: clip;
+  overflow: hidden;
   border: 1px solid transparent;
   border-radius: var(--ycs-radius, 4px);
   background-color: var(--ycs-bg);

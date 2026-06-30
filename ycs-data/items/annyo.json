@@ -1,0 +1,61 @@
+{
+  "id": "annyo",
+  "displayName": "Annyeong",
+  "texture": "yebisu",
+  "holdingMode": "generated",
+  "stackSize": 1,
+  "geoModel": "",
+  "geoTexture": "",
+  "displayModel": "",
+  "customClass": false,
+  "attackDamage": null,
+  "attackSpeed": null,
+  "foodEnabled": false,
+  "nutrition": null,
+  "saturation": null,
+  "canAlwaysEat": false,
+  "fastFood": false,
+  "fuelEnabled": false,
+  "fuel": null,
+  "toolEnabled": false,
+  "toolType": "",
+  "toolTier": "",
+  "tooltipEnabled": false,
+  "tooltipNormal": "",
+  "tooltipShift": false,
+  "tooltipUseDefaultHint": true,
+  "tooltipShiftHint": "",
+  "tooltipHidden": "",
+  "creativeTab": "yebisurpg",
+  "type": "item",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Items",
+      "content": "    public static final DeferredItem<Item> ANNYO = ITEMS.register(\"annyo\",\n            () -> new Item(new Item.Properties().stacksTo(1)));"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "item.yebisurpg.annyo"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModCreativeTabContents.java",
+      "marker": "YCS_Tab_Contents",
+      "content": "        if (event.getTabKey() == ModCreativeModeTabs.YEBISURPG.getKey()) event.accept(ModItems.ANNYO.get());"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/datagen/ModItemModelProvider.java",
+      "marker": "YCS_Mod_Item_Model",
+      "content": "        basicItem(ModItems.ANNYO.get());"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/item/annyo.png"
+    }
+  ],
+  "tabOrder": 1
+}

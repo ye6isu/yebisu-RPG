@@ -1,4 +1,6 @@
 {
+  "item.yebisurpg.annyo": "Annyeong",
   "item.yebisurpg.test": "Tester",
+  "itemGroup.yebisurpg.yebisurpg": "yebisu RPG",
   "tooltip.yebisurpg.shift_hint": "Hold SHIFT for more information"
 }
