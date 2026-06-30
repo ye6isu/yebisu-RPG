@@ -148,8 +148,10 @@ Content is inserted on the line **above** the marker. Removal searches for the e
 | Marker | File | Purpose |
 |--------|------|---------|
 | `YCS_Mod_Items` | `ModItems.java` | Item DeferredItem declarations |
+| `YCS_Mod_Item_Imports` | `ModItems.java` | Import statements for custom item classes |
 | `YCS_Mod_Item_Model` | `ModItemModelProvider.java` | Datagen model calls (flat/handheld only) |
 | `YCS_Geo_Collect` | `GeoItemRegistry.java` | 3D item registration in `collectGeoItems()` |
+| `YCS_Mod_Fuel` | `ModFuelEvents.java` | Fuel burn time entries via `FurnaceFuelBurnTimeEvent` |
 
 ---
 

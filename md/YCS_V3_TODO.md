@@ -1,13 +1,5 @@
 # YCS V3 TODO
 
-## Item Properties (Next Up)
-- [ ] Attack Damage — float field, adds `ATTACK_DAMAGE` attribute modifier to `Item.Properties`
-- [ ] Attack Speed — float field, adds `ATTACK_SPEED` attribute modifier to `Item.Properties`
-- [ ] Food — toggle + fields (nutrition, saturation, canAlwaysEat, fastFood), uses `Item.Properties.food()`
-- [ ] Fuel — int field (burn time in ticks), registers via `FurnaceFuelBurnTimeEvent`
-- [ ] Tool Type — dropdown (sword, pickaxe, axe, shovel, hoe, none), sets tool tier and mining behavior
-- [ ] Tooltip — text field(s), adds custom tooltip lines via `appendHoverText` override (requires custom class)
-
 ## Creative Tabs
 - [ ] Plan out creative tab system — decide on approach (custom tabs vs vanilla tab injection vs both)
 - [ ] Tab registration in mod (custom `CreativeModeTab` instances)

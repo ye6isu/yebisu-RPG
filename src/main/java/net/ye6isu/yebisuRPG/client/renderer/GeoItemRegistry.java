@@ -47,7 +47,7 @@ public class GeoItemRegistry {
 
     private static List<Item> collectGeoItems() {
         List<Item> items = new ArrayList<>();
-        tryRegister(items, ModItems.CUTIT, "cutit");
+        tryRegister(items, ModItems.TEST, "test");
         // YCS_Geo_Collect
         return items;
     }
