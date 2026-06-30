@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { FieldRow, StringField, StandardDropdownField } from './Field/Field';
+import { FieldRow, StringField, NumberInput, StandardDropdownField } from './Field/Field';
 
 function FieldGroup({ label, children }) {
   return (
@@ -19,6 +19,29 @@ function FieldGroup({ label, children }) {
       }}>
         {children}
       </div>
+    </div>
+  );
+}
+
+function Checkbox({ checked, onChange, disabled = false }) {
+  return (
+    <div
+      onClick={() => !disabled && onChange(!checked)}
+      style={{
+        width: '16px', height: '16px', cursor: disabled ? 'default' : 'pointer', flexShrink: 0,
+        border: `1px solid ${checked ? 'var(--ycs-highlight)' : 'var(--ycs-foreground)'}`,
+        borderRadius: '3px',
+        backgroundColor: checked ? 'var(--ycs-highlight)' : 'transparent',
+        opacity: disabled ? 0.5 : 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background-color 0.1s, border-color 0.1s',
+      }}
+    >
+      {checked && (
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      )}
     </div>
   );
 }
@@ -126,6 +149,34 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
   const [lastSavedId, setLastSavedId] = useState(existingId || null);
   const [customClass, setCustomClass] = useState(false);
 
+  // Combat
+  const [attackDamage, setAttackDamage] = useState('');
+  const [attackSpeed, setAttackSpeed] = useState('');
+
+  // Food
+  const [foodEnabled, setFoodEnabled] = useState(false);
+  const [nutrition, setNutrition] = useState('4');
+  const [saturation, setSaturation] = useState('0.3');
+  const [canAlwaysEat, setCanAlwaysEat] = useState(false);
+  const [fastFood, setFastFood] = useState(false);
+
+  // Fuel
+  const [fuelEnabled, setFuelEnabled] = useState(false);
+  const [fuel, setFuel] = useState('');
+
+  // Tool
+  const [toolEnabled, setToolEnabled] = useState(false);
+  const [toolType, setToolType] = useState('sword');
+  const [toolTier, setToolTier] = useState('iron');
+
+  // Tooltip
+  const [tooltipEnabled, setTooltipEnabled] = useState(false);
+  const [tooltipNormal, setTooltipNormal] = useState('');
+  const [tooltipShift, setTooltipShift] = useState(false);
+  const [tooltipUseDefaultHint, setTooltipUseDefaultHint] = useState(true);
+  const [tooltipShiftHint, setTooltipShiftHint] = useState('');
+  const [tooltipHidden, setTooltipHidden] = useState('');
+
   const is3D = holdingMode === '3d';
 
   const toPascalCase = (s) => s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
@@ -163,6 +214,24 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
           setGeoTexture(data.geoTexture || '');
           setDisplayModel(data.displayModel || '');
           setCustomClass(data.customClass || false);
+          setAttackDamage(data.attackDamage != null ? String(data.attackDamage) : '');
+          setAttackSpeed(data.attackSpeed != null ? String(data.attackSpeed) : '');
+          setFoodEnabled(data.foodEnabled || false);
+          setNutrition(data.nutrition != null ? String(data.nutrition) : '4');
+          setSaturation(data.saturation != null ? String(data.saturation) : '0.3');
+          setCanAlwaysEat(data.canAlwaysEat || false);
+          setFastFood(data.fastFood || false);
+          setFuelEnabled(data.fuelEnabled || false);
+          setFuel(data.fuel != null ? String(data.fuel) : '');
+          setToolEnabled(data.toolEnabled || false);
+          setToolType(data.toolType || 'sword');
+          setToolTier(data.toolTier || 'iron');
+          setTooltipEnabled(data.tooltipEnabled || false);
+          setTooltipNormal(data.tooltipNormal || '');
+          setTooltipShift(data.tooltipShift || false);
+          setTooltipUseDefaultHint(data.tooltipUseDefaultHint ?? true);
+          setTooltipShiftHint(data.tooltipShiftHint || '');
+          setTooltipHidden(data.tooltipHidden || '');
           const inj = Array.isArray(data._injections) ? data._injections : [];
           setCurrentInjections(inj);
           setInjected(inj.length > 0);
@@ -170,6 +239,8 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
         .catch(() => {});
     }
   }, [existingId, loadTextures]);
+
+  const needsCustomClass = customClass;
 
   const buildPayload = () => ({
     id: itemId,
@@ -181,6 +252,24 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
     geoTexture: is3D ? geoTexture : '',
     displayModel: is3D && displayModel ? itemId : '',
     customClass,
+    attackDamage: attackDamage !== '' ? parseFloat(attackDamage) : null,
+    attackSpeed: attackSpeed !== '' ? parseFloat(attackSpeed) : null,
+    foodEnabled,
+    nutrition: foodEnabled ? (parseInt(nutrition) || 4) : null,
+    saturation: foodEnabled ? (parseFloat(saturation) || 0.3) : null,
+    canAlwaysEat: foodEnabled ? canAlwaysEat : false,
+    fastFood: foodEnabled ? fastFood : false,
+    fuelEnabled,
+    fuel: fuelEnabled && fuel !== '' ? (parseInt(fuel) || null) : null,
+    toolEnabled,
+    toolType: toolEnabled ? toolType : '',
+    toolTier: toolEnabled ? toolTier : '',
+    tooltipEnabled,
+    tooltipNormal: tooltipEnabled ? tooltipNormal : '',
+    tooltipShift: tooltipEnabled ? tooltipShift : false,
+    tooltipUseDefaultHint: tooltipEnabled && tooltipShift ? tooltipUseDefaultHint : true,
+    tooltipShiftHint: tooltipEnabled && tooltipShift && !tooltipUseDefaultHint ? tooltipShiftHint : '',
+    tooltipHidden: tooltipEnabled && tooltipShift ? tooltipHidden : '',
     type: 'item',
   });
 
@@ -256,12 +345,90 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
       const injections = [];
       const CN = itemId.toUpperCase();
       const className = toPascalCase(itemId) + 'Item';
-      const propsChain = parseInt(stackSize) !== 64 ? `.stacksTo(${parseInt(stackSize)})` : '';
-      const constructor = customClass
-        ? `new ${className}(new Item.Properties()${propsChain})`
-        : `new Item(new Item.Properties()${propsChain})`;
 
-      const regLine = `    public static final DeferredItem<Item> ${CN} = ITEMS.register("${itemId}",\n            () -> ${constructor});`;
+      // Build Item.Properties() chain
+      const parsedStack = parseInt(stackSize) || 64;
+      let propsChain = parsedStack !== 64 ? `.stacksTo(${parsedStack})` : '';
+      if (foodEnabled) {
+        let foodBuilder = `new FoodProperties.Builder().nutrition(${parseInt(nutrition) || 4}).saturationModifier(${parseFloat(saturation) || 0.3}f)`;
+        if (canAlwaysEat) foodBuilder += '.alwaysEdible()';
+        if (fastFood) foodBuilder += '.fast()';
+        propsChain += `.food(${foodBuilder}.build())`;
+      }
+
+      // Determine base class for registration and custom class extends
+      const toolBaseClass = {
+        sword: 'SwordItem',
+        pickaxe: 'PickaxeItem',
+        axe: 'AxeItem',
+        shovel: 'ShovelItem',
+        hoe: 'HoeItem',
+      }[toolType];
+      const isTool = toolEnabled && !!toolBaseClass;
+
+      const tierConst = {
+        wood: 'Tiers.WOOD', stone: 'Tiers.STONE', iron: 'Tiers.IRON',
+        gold: 'Tiers.GOLD', diamond: 'Tiers.DIAMOND', netherite: 'Tiers.NETHERITE',
+      }[toolTier] || 'Tiers.IRON';
+
+      const defaultDamage = { sword: 3, axe: 5, pickaxe: 1, shovel: 1.5, hoe: 0 };
+      const defaultSpeed  = { sword: -2.4, axe: -3.1, pickaxe: -2.8, shovel: -3.0, hoe: -3.0 };
+      const toolDamageBonus = attackDamage !== '' ? parseFloat(attackDamage) : (defaultDamage[toolType] ?? 0);
+      const toolSpeedBonus  = attackSpeed  !== '' ? parseFloat(attackSpeed)  : (defaultSpeed[toolType]  ?? 0);
+
+      // Attach attack/speed via .attributes() — all tool constructors in 1.21.1 are (Tier, Properties) only
+      const hasCustomAttrs = attackDamage !== '' || attackSpeed !== '';
+      if (isTool && hasCustomAttrs) {
+        const helper = toolType === 'sword'
+          ? `SwordItem.createAttributes(${tierConst}, ${toolDamageBonus}f, ${toolSpeedBonus}f)`
+          : `DiggerItem.createAttributes(${tierConst}, ${toolDamageBonus}f, ${toolSpeedBonus}f)`;
+        propsChain += `.attributes(${helper})`;
+      } else if (!isTool && hasCustomAttrs) {
+        const parts = [];
+        if (attackDamage !== '') parts.push(`                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(Item.BASE_ATTACK_DAMAGE_ID, ${parseFloat(attackDamage)}, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)`);
+        if (attackSpeed !== '')  parts.push(`                .add(Attributes.ATTACK_SPEED, new AttributeModifier(Item.BASE_ATTACK_SPEED_ID, ${parseFloat(attackSpeed)}, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)`);
+        propsChain += `.attributes(ItemAttributeModifiers.builder()\n${parts.join('\n')}\n                .build())`;
+      }
+
+      // Build tooltip body (used both for inline anon class and custom class method)
+      const buildTooltipLines = (indent) => {
+        const i = `${indent}    `;
+        const lines = [];
+        if (tooltipNormal) lines.push(`${i}tooltipData.add(Component.translatable("tooltip.${MODID}.${itemId}.normal"));`);
+        if (tooltipShift) {
+          const hintKey = tooltipUseDefaultHint
+            ? `"tooltip.${MODID}.shift_hint"`
+            : tooltipShiftHint ? `"tooltip.${MODID}.${itemId}.shift_hint"` : null;
+          if (hintKey) lines.push(`${i}if (!flag.hasShiftDown()) tooltipData.add(Component.translatable(${hintKey}).withStyle(net.minecraft.ChatFormatting.GRAY));`);
+          if (tooltipHidden) lines.push(`${i}if (flag.hasShiftDown()) tooltipData.add(Component.translatable("tooltip.${MODID}.${itemId}.hidden"));`);
+        }
+        lines.push(`${i}super.appendHoverText(stack, context, tooltipData, flag);`);
+        return lines.join('\n');
+      };
+
+      const tooltipImportsNeeded = tooltipEnabled
+        ? ['import java.util.List;', 'import net.minecraft.network.chat.Component;', 'import net.minecraft.world.item.TooltipFlag;', 'import net.minecraft.world.item.Item.TooltipContext;', 'import net.minecraft.world.item.ItemStack;']
+        : [];
+
+      let baseClass, constructorArgs;
+      if (isTool) {
+        baseClass = toolBaseClass;
+        constructorArgs = needsCustomClass
+          ? `${tierConst}, new Item.Properties()${propsChain}`
+          : `${tierConst}, new Item.Properties()${propsChain}`;
+      } else {
+        baseClass = 'Item';
+        constructorArgs = `new Item.Properties()${propsChain}`;
+      }
+
+      const instanceClass = needsCustomClass ? className : baseClass;
+      const baseConstructor = `new ${instanceClass}(${constructorArgs})`;
+      const constructor = (tooltipEnabled && !needsCustomClass)
+        ? `new ${baseClass}(${constructorArgs}) {\n            @Override\n            public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipData, TooltipFlag flag) {\n${buildTooltipLines('            ')}\n            }\n        }`
+        : baseConstructor;
+      const registeredType = isTool ? baseClass : 'Item';
+
+      const regLine = `    public static final DeferredItem<${registeredType}> ${CN} = ITEMS.register("${itemId}",\n            () -> ${constructor});`;
       await invoke('inject_marker', {
         file: `${JAVA_BASE}/item/ModItems.java`,
         marker: 'YCS_Mod_Items',
@@ -269,18 +436,29 @@ export default function ItemEditor({ itemId: existingId, onBack }) {
       });
       injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Items', content: regLine });
 
-      if (customClass) {
+      if (needsCustomClass) {
         const classFile = `${JAVA_BASE}/item/custom/${className}.java`;
         const exists = await invoke('mod_file_exists', { file: classFile });
         if (!exists) {
+          const tooltipMethod = tooltipEnabled ? `
+
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipData, TooltipFlag flag) {
+${buildTooltipLines('    ')}
+    }` : '';
+
+          const tooltipImports = tooltipImportsNeeded.map(i => i + '\n').join('');
+
+          const toolImport = isTool ? `import net.minecraft.world.item.${baseClass};\nimport net.minecraft.world.item.Tiers;\n` : '';
+          const baseImport = `import net.minecraft.world.item.Item;\n`;
+
           const classContent = `package net.ye6isu.yebisuRPG.item.custom;
 
-import net.minecraft.world.item.Item;
-
-public class ${className} extends Item {
-    public ${className}(Properties properties) {
-        super(properties);
-    }
+${baseImport}${toolImport}${tooltipImports}
+public class ${className} extends ${baseClass} {
+    public ${className}(${isTool ? `Tiers tier, Properties properties` : `Properties properties`}) {
+        super(${isTool ? `tier, properties` : `properties`});
+    }${tooltipMethod}
 }
 `;
           await invoke('write_mod_file', { file: classFile, content: classContent });
@@ -294,6 +472,57 @@ public class ${className} extends Item {
           content: importLine,
         });
         injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
+      }
+
+      // Tooltip imports for inline anonymous class (when no custom class)
+      if (tooltipEnabled && !needsCustomClass) {
+        for (const importLine of tooltipImportsNeeded) {
+          await invoke('inject_marker', { file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
+          injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
+        }
+      }
+
+      // Attribute modifier imports (both tool and non-tool paths use .attributes())
+      if (hasCustomAttrs) {
+        const attrImports = isTool
+          ? [
+              toolType === 'sword'
+                ? 'import net.minecraft.world.item.SwordItem;'
+                : 'import net.minecraft.world.item.DiggerItem;',
+            ]
+          : [
+              'import net.minecraft.world.item.component.ItemAttributeModifiers;',
+              'import net.minecraft.world.entity.ai.attributes.AttributeModifier;',
+              'import net.minecraft.world.entity.ai.attributes.Attributes;',
+              'import net.minecraft.world.entity.EquipmentSlotGroup;',
+            ];
+        for (const importLine of attrImports) {
+          await invoke('inject_marker', { file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
+          injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
+        }
+      }
+
+      // Tooltip lang keys
+      if (tooltipEnabled) {
+        const ttLangEntries = [];
+        if (tooltipNormal) ttLangEntries.push([`tooltip.${MODID}.${itemId}.normal`, tooltipNormal]);
+        if (tooltipShift && !tooltipUseDefaultHint && tooltipShiftHint) ttLangEntries.push([`tooltip.${MODID}.${itemId}.shift_hint`, tooltipShiftHint]);
+        if (tooltipShift && tooltipHidden) ttLangEntries.push([`tooltip.${MODID}.${itemId}.hidden`, tooltipHidden]);
+        for (const [key, value] of ttLangEntries) {
+          await invoke('set_json_key', { file: `${RES_BASE}/lang/en_us.json`, key, value });
+          injections.push({ type: 'json-key', file: `${RES_BASE}/lang/en_us.json`, key });
+        }
+      }
+
+      // Fuel registration
+      if (fuelEnabled && fuel !== '' && parseInt(fuel)) {
+        const fuelLine = `        if (event.getItemStack().is(ModItems.${CN}.get())) { event.setBurnTime(${parseInt(fuel)}); }`;
+        await invoke('inject_marker', {
+          file: `${JAVA_BASE}/item/ModFuelEvents.java`,
+          marker: 'YCS_Mod_Fuel',
+          content: fuelLine,
+        });
+        injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModFuelEvents.java`, marker: 'YCS_Mod_Fuel', content: fuelLine });
       }
 
       const langKey = `item.${MODID}.${itemId}`;
@@ -413,7 +642,7 @@ public class ${className} extends Item {
 
       <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldGroup label="Identity">
           <FieldRow label="Item ID">
             <StringField value={itemId} onChange={handleIdChange} style={{ width: '100%' }} />
@@ -475,29 +704,112 @@ public class ${className} extends Item {
 
         <FieldGroup label="Properties">
           <FieldRow label="Stack Size">
-            <StringField value={stackSize} onChange={setStackSize} style={{ width: '80px' }} />
+            <NumberInput value={stackSize} onChange={setStackSize} style={{ width: '80px' }} />
           </FieldRow>
+          <FieldRow label="Tool">
+            <Checkbox checked={toolEnabled} onChange={setToolEnabled} />
+          </FieldRow>
+          {toolEnabled && <>
+            <FieldRow label="Tool Type">
+              <StandardDropdownField
+                value={toolType}
+                onChange={setToolType}
+                options={[
+                  { label: 'Sword', value: 'sword' },
+                  { label: 'Pickaxe', value: 'pickaxe' },
+                  { label: 'Axe', value: 'axe' },
+                  { label: 'Shovel', value: 'shovel' },
+                  { label: 'Hoe', value: 'hoe' },
+                ]}
+              />
+            </FieldRow>
+            <FieldRow label="Tier">
+              <StandardDropdownField
+                value={toolTier}
+                onChange={setToolTier}
+                options={[
+                  { label: 'Wood', value: 'wood' },
+                  { label: 'Stone', value: 'stone' },
+                  { label: 'Iron', value: 'iron' },
+                  { label: 'Gold', value: 'gold' },
+                  { label: 'Diamond', value: 'diamond' },
+                  { label: 'Netherite', value: 'netherite' },
+                ]}
+              />
+            </FieldRow>
+          </>}
+        </FieldGroup>
+
+        <FieldGroup label="Combat">
+          <FieldRow label="Attack Damage">
+            <NumberInput value={attackDamage} onChange={setAttackDamage} style={{ width: '80px' }} />
+          </FieldRow>
+          <FieldRow label="Attack Speed">
+            <NumberInput value={attackSpeed} onChange={setAttackSpeed} style={{ width: '80px' }} />
+          </FieldRow>
+        </FieldGroup>
+
+        <FieldGroup label="Food">
+          <FieldRow label="Food">
+            <Checkbox checked={foodEnabled} onChange={setFoodEnabled} />
+          </FieldRow>
+          {foodEnabled && <>
+            <FieldRow label="Nutrition">
+              <NumberInput value={nutrition} onChange={setNutrition} style={{ width: '80px' }} />
+            </FieldRow>
+            <FieldRow label="Saturation">
+              <NumberInput value={saturation} onChange={setSaturation} style={{ width: '80px' }} />
+            </FieldRow>
+            <FieldRow label="Can Always Eat">
+              <Checkbox checked={canAlwaysEat} onChange={setCanAlwaysEat} />
+            </FieldRow>
+            <FieldRow label="Fast Food">
+              <Checkbox checked={fastFood} onChange={setFastFood} />
+            </FieldRow>
+          </>}
+        </FieldGroup>
+
+        <FieldGroup label="Fuel">
+          <FieldRow label="Fuel">
+            <Checkbox checked={fuelEnabled} onChange={setFuelEnabled} />
+          </FieldRow>
+          {fuelEnabled && (
+            <FieldRow label="Burn Time (ticks)">
+              <NumberInput value={fuel} onChange={setFuel} style={{ width: '80px' }} />
+            </FieldRow>
+          )}
+        </FieldGroup>
+
+        <FieldGroup label="Tooltip">
+          <FieldRow label="Tooltip">
+            <Checkbox checked={tooltipEnabled} onChange={setTooltipEnabled} />
+          </FieldRow>
+          {tooltipEnabled && <>
+            <FieldRow label="Normal Text">
+              <StringField value={tooltipNormal} onChange={setTooltipNormal} style={{ width: '100%' }} />
+            </FieldRow>
+            <FieldRow label="Shift to Reveal">
+              <Checkbox checked={tooltipShift} onChange={setTooltipShift} />
+            </FieldRow>
+            {tooltipShift && <>
+              <FieldRow label="Default Hint">
+                <Checkbox checked={tooltipUseDefaultHint} onChange={setTooltipUseDefaultHint} />
+              </FieldRow>
+              {!tooltipUseDefaultHint && (
+                <FieldRow label="Custom Hint">
+                  <StringField value={tooltipShiftHint} onChange={setTooltipShiftHint} style={{ width: '100%' }} />
+                </FieldRow>
+              )}
+              <FieldRow label="Hidden Text">
+                <StringField value={tooltipHidden} onChange={setTooltipHidden} style={{ width: '100%' }} />
+              </FieldRow>
+            </>}
+          </>}
         </FieldGroup>
 
         <FieldGroup label="Advanced">
           <FieldRow label="Custom Class">
-            <div
-              onClick={() => setCustomClass(!customClass)}
-              style={{
-                width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0,
-                border: `1px solid ${customClass ? 'var(--ycs-highlight)' : 'var(--ycs-foreground)'}`,
-                borderRadius: '3px',
-                backgroundColor: customClass ? 'var(--ycs-highlight)' : 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'background-color 0.1s, border-color 0.1s',
-              }}
-            >
-              {customClass && (
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </div>
+            <Checkbox checked={customClass} onChange={setCustomClass} />
             {customClass && itemId && (
               <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>
                 {toPascalCase(itemId)}Item.java
