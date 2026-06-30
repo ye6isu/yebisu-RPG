@@ -18,6 +18,7 @@ public final class TabIconCycler {
     private TabIconCycler() {}
 
     static {
+        ENTRIES.add(new CycleEntry(ModCreativeModeTabs.YEBISURPG, 1000L, new java.util.ArrayList<>()));
         // YCS_Cycler_Register
     }
 

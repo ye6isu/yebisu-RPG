@@ -4,6 +4,11 @@
   "texture": "yebisu",
   "holdingMode": "3d",
   "stackSize": 16,
+  "useDuration": false,
+  "tags": [
+    "minecraft:axes",
+    "yebisurpg:test"
+  ],
   "geoModel": "test",
   "geoTexture": "axe_texture",
   "displayModel": "test",
@@ -27,13 +32,14 @@
   "tooltipShiftHint": "",
   "tooltipHidden": "",
   "creativeTab": "yebisurpg",
+  "recipes": {},
   "type": "item",
   "_injections": [
     {
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
       "marker": "YCS_Mod_Items",
-      "content": "    public static final DeferredItem<AxeItem> TEST = ITEMS.register(\"test\",\n            () -> new TestItem(Tiers.NETHERITE, new Item.Properties().stacksTo(16).attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 180f, 10f))));"
+      "content": "    public static final DeferredItem<AxeItem> TEST = ITEMS.register(\"test\",\n            () -> new TestItem(Tiers.NETHERITE, new Item.Properties().attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 180f, 10f))));"
     },
     {
       "type": "created-file",
@@ -79,7 +85,14 @@
     {
       "type": "created-file",
       "file": "resources/assets/yebisurpg/models/item/test.json"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/data/minecraft/tags/item/axes.json"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/data/yebisurpg/tags/item/test.json"
     }
-  ],
-  "tabOrder": 0
+  ]
 }
