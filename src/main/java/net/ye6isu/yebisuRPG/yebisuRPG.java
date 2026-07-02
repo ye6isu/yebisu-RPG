@@ -1,5 +1,6 @@
 package net.ye6isu.yebisuRPG;
 
+import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.item.ModCreativeModeTabs;
 import net.ye6isu.yebisuRPG.item.ModCreativeTabContents;
 import net.ye6isu.yebisuRPG.item.ModItems;
@@ -21,6 +22,7 @@ public class yebisuRPG
 
     public yebisuRPG(IEventBus modEventBus, ModContainer modContainer) {
         ModItems.register(modEventBus);
+        ModDataComponents.register(modEventBus);
         ModCreativeModeTabs.register(modEventBus);
         modEventBus.addListener(ModCreativeTabContents::buildTabContents);
 

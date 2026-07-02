@@ -4,6 +4,8 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { FieldRow, StringField, NumberInput, StandardDropdownField, DropdownField } from './Field/Field';
 import { VANILLA_ITEMS } from '../data/vanillaItems';
 import { EMPTY_GRID, buildCharMap, gridToPattern, ShapedGrid, ShapelessIngredients } from './RecipeEditor';
+import { compileChain, collectBlockImports } from '../codegen/visual/compiler.js';
+import { DATA_COMPONENT_TYPES, componentConstName } from './ComponentsLanding';
 
 function FieldGroup({ label, children }) {
   return (
@@ -329,6 +331,74 @@ function RecipeSubGroup({ label, enabled, onToggle, children, disabled, inline }
   );
 }
 
+function DataComponentsGroup({ components, onChange, globalComponents }) {
+  const update = (i, patch) => onChange(components.map((c, idx) => idx === i ? { ...c, ...patch } : c));
+  const remove = (i) => onChange(components.filter((_, idx) => idx !== i));
+  const addInline = () => onChange([...components, { kind: 'inline', name: '', type: 'double', defaultValue: '', slotCount: '1' }]);
+  const addRef = () => onChange([...components, { kind: 'ref', ref: globalComponents[0]?.name || '', overrideDefault: '' }]);
+
+  const globalOptions = globalComponents.map(c => ({ label: `${c.name} (${DATA_COMPONENT_TYPES.find(t => t.value === c.type)?.label || c.type})`, value: c.name }));
+
+  return (
+    <FieldGroup label="Data Components">
+      {components.map((dc, i) => {
+        const isRef = dc.kind === 'ref';
+        const refComp = isRef ? globalComponents.find(c => c.name === dc.ref) : null;
+        return (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '6px', borderBottom: i < components.length - 1 ? '1px solid var(--ycs-foreground)' : 'none' }}>
+            <FieldRow label={isRef ? 'Global Component' : 'Name'}>
+              {isRef ? (
+                <StandardDropdownField value={dc.ref} onChange={v => update(i, { ref: v })} options={globalOptions.length ? globalOptions : [{ label: '(none defined)', value: '' }]} />
+              ) : (
+                <StringField value={dc.name} onChange={v => update(i, { name: v.toLowerCase().replace(/\s/g, '_') })} style={{ width: '100%' }} />
+              )}
+              <button className="ycs-button icon" onClick={() => remove(i)} title="Remove">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </FieldRow>
+            {isRef ? (
+              refComp?.type === 'itemstack' ? null : refComp?.type === 'boolean' ? (
+                <FieldRow label="Override Default">
+                  <Checkbox checked={!!dc.overrideDefault} onChange={v => update(i, { overrideDefault: v })} />
+                </FieldRow>
+              ) : (
+                <FieldRow label="Override Default">
+                  <StringField value={dc.overrideDefault ?? ''} onChange={v => update(i, { overrideDefault: v })} placeholder={String(refComp?.defaultValue ?? '')} style={{ width: '100%' }} />
+                </FieldRow>
+              )
+            ) : (
+              <>
+                <FieldRow label="Type">
+                  <StandardDropdownField value={dc.type} onChange={v => update(i, { type: v })} options={DATA_COMPONENT_TYPES} />
+                </FieldRow>
+                {dc.type === 'itemstack' ? (
+                  <FieldRow label="Slot Count">
+                    <NumberInput value={dc.slotCount ?? '1'} onChange={v => update(i, { slotCount: v })} style={{ width: '64px' }} />
+                  </FieldRow>
+                ) : dc.type === 'boolean' ? (
+                  <FieldRow label="Default">
+                    <Checkbox checked={!!dc.defaultValue} onChange={v => update(i, { defaultValue: v })} />
+                  </FieldRow>
+                ) : (
+                  <FieldRow label="Default">
+                    <StringField value={dc.defaultValue ?? ''} onChange={v => update(i, { defaultValue: v })} style={{ width: '100%' }} />
+                  </FieldRow>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button className="ycs-button" onClick={addRef} style={{ alignSelf: 'flex-start' }}>+ Attach Global</button>
+        <button className="ycs-button" onClick={addInline} style={{ alignSelf: 'flex-start' }}>+ New Item-Specific</button>
+      </div>
+    </FieldGroup>
+  );
+}
+
 const MODID = 'yebisurpg';
 
 const ITEM_METHODS = [
@@ -450,6 +520,10 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
   const [customClass, setCustomClass] = useState(false);
   const [enabledMethods, setEnabledMethods] = useState([]);
 
+  // Data Components
+  const [dataComponents, setDataComponents] = useState([]);
+  const [globalComponents, setGlobalComponents] = useState([]);
+
   // Combat
   const [attackDamage, setAttackDamage] = useState('');
   const [attackSpeed, setAttackSpeed] = useState('');
@@ -513,6 +587,20 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
   const handleIdChange = (val) => {
     setItemId(val.toLowerCase().replace(/\s/g, '_'));
   };
+
+  const loadGlobalComponents = useCallback(async () => {
+    try {
+      const ids = await invoke('list_ycs_data', { category: 'components' });
+      const loaded = [];
+      for (const id of ids) {
+        try {
+          const raw = await invoke('load_ycs_data', { category: 'components', id });
+          loaded.push(JSON.parse(raw));
+        } catch {}
+      }
+      setGlobalComponents(loaded);
+    } catch {}
+  }, []);
 
   const loadTextures = useCallback(async () => {
     try {
@@ -587,6 +675,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     loadTextures();
     loadTabs();
     loadRecipeItemOptions();
+    loadGlobalComponents();
     if (existingId) {
       invoke('load_ycs_data', { category: 'items', id: existingId })
         .then(raw => {
@@ -605,6 +694,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           setDisplayModel(data.displayModel || '');
           setCustomClass(data.customClass || false);
           setEnabledMethods(data.enabledMethods || []);
+          setDataComponents(data.dataComponents || []);
           setAttackDamage(data.attackDamage != null ? String(data.attackDamage) : '');
           setAttackSpeed(data.attackSpeed != null ? String(data.attackSpeed) : '');
           setFoodEnabled(data.foodEnabled || false);
@@ -657,7 +747,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
         })
         .catch(() => {});
     }
-  }, [existingId, loadTextures, loadTabs, loadRecipeItemOptions]);
+  }, [existingId, loadTextures, loadTabs, loadRecipeItemOptions, loadGlobalComponents]);
 
   const needsCustomClass = customClass || useDuration;
 
@@ -676,6 +766,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     displayModel: is3D && displayModel ? itemId : '',
     customClass,
     enabledMethods,
+    dataComponents,
     attackDamage: attackDamage !== '' ? parseFloat(attackDamage) : null,
     attackSpeed: attackSpeed !== '' ? parseFloat(attackSpeed) : null,
     foodEnabled,
@@ -872,46 +963,69 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
 
       if (needsCustomClass) {
         const classFile = `${JAVA_BASE}/item/custom/${className}.java`;
-        const exists = await invoke('mod_file_exists', { file: classFile });
-        if (!exists) {
-          const tooltipMethod = tooltipEnabled ? `
 
-    @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipData, TooltipFlag flag) {
-${buildTooltipLines('    ')}
-    }` : '';
+        // Compile block editor bodies for all enabled methods
+        const METHOD_DEFS = [
+          { key: 'useOn',                returnType: 'InteractionResult',            sig: 'useOn(UseOnContext context)',                                                             superCall: 'return super.useOn(context);',                                        imports: ['net.minecraft.world.item.context.UseOnContext', 'net.minecraft.world.InteractionResult'] },
+          { key: 'use',                  returnType: 'InteractionResultHolder<ItemStack>', sig: 'use(Level level, Player player, InteractionHand usedHand)',                    preBody: 'player.startUsingItem(usedHand);', superCall: 'return InteractionResultHolder.consume(player.getItemInHand(usedHand));', imports: ['net.minecraft.world.InteractionResultHolder', 'net.minecraft.world.InteractionHand', 'net.minecraft.world.entity.player.Player'] },
+          { key: 'continuousUse',        returnType: 'void',                          sig: 'onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration)', imports: ['net.minecraft.world.entity.LivingEntity'] },
+          { key: 'releaseUsing',         returnType: 'void',                          sig: 'releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged)',       imports: ['net.minecraft.world.entity.LivingEntity'] },
+          { key: 'finishUsingItem',      returnType: 'ItemStack',                     sig: 'finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity)',           superCall: 'return super.finishUsingItem(stack, level, livingEntity);',           imports: ['net.minecraft.world.entity.LivingEntity'] },
+          { key: 'inventoryTick',        returnType: 'void',                          sig: 'inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected)', imports: ['net.minecraft.world.entity.Entity'] },
+          { key: 'hurtEnemy',            returnType: 'boolean',                       sig: 'hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker)',             superCall: 'return super.hurtEnemy(stack, target, attacker);',                    imports: ['net.minecraft.world.entity.LivingEntity'] },
+          { key: 'interactLivingEntity', returnType: 'InteractionResult',             sig: 'interactLivingEntity(ItemStack stack, Player player, LivingEntity interactionTarget, InteractionHand usedHand)', superCall: 'return super.interactLivingEntity(stack, player, interactionTarget, usedHand);', imports: ['net.minecraft.world.InteractionResult', 'net.minecraft.world.InteractionHand', 'net.minecraft.world.entity.player.Player', 'net.minecraft.world.entity.LivingEntity'] },
+        ];
 
-          const useDurationMethod = useDuration ? `
-
-    @Override
-    public int getUseDuration(ItemStack stack, net.minecraft.world.level.Level level) {
-        return ${parseInt(useDurationValue) || 32};
-    }` : '';
-
-          const useAnimMethod = useAnim !== 'NONE' ? `
-
-    @Override
-    public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {
-        return net.minecraft.world.item.UseAnim.${useAnim};
-    }` : '';
-
-          const tooltipImports = tooltipImportsNeeded.map(i => i + '\n').join('');
-          const stackImport = ((useDuration || useAnim !== 'NONE') && !tooltipEnabled) ? `import net.minecraft.world.item.ItemStack;\n` : '';
-
-          const toolImport = isTool ? `import net.minecraft.world.item.${baseClass};\nimport net.minecraft.world.item.Tiers;\n` : '';
-          const baseImport = `import net.minecraft.world.item.Item;\n`;
-
-          const classContent = `package net.ye6isu.yebisuRPG.item.custom;
-
-${baseImport}${toolImport}${stackImport}${tooltipImports}
-public class ${className} extends ${baseClass} {
-    public ${className}(${isTool ? `Tiers tier, Properties properties` : `Properties properties`}) {
-        super(${isTool ? `tier, properties` : `properties`});
-    }${useDurationMethod}${useAnimMethod}${tooltipMethod}
-}
-`;
-          await invoke('write_mod_file', { file: classFile, content: classContent });
+        const blockImports = new Set();
+        const compiledMethods = {};
+        for (const mdef of METHOD_DEFS) {
+          if (!enabledMethods.includes(mdef.key)) continue;
+          const raw = localStorage.getItem(`ycs-blocky::item::${itemId}::${mdef.key}`);
+          if (!raw) continue;
+          try {
+            const nodes = JSON.parse(raw);
+            const startNode = nodes.find(n => n.id === 'start');
+            if (startNode?.nextId) {
+              compiledMethods[mdef.key] = compileChain(startNode.nextId, nodes, mdef.key);
+              const nodeImports = collectBlockImports(nodes);
+              for (const imp of nodeImports) blockImports.add(imp);
+            }
+          } catch (e) {
+            console.error('Block compile error for', mdef.key, e);
+          }
         }
+
+        // Build method stubs
+        const buildMethodStub = (mdef) => {
+          const lines = compiledMethods[mdef.key] || [];
+          const bodyLines = [
+            ...(mdef.preBody ? [`        ${mdef.preBody}`] : []),
+            ...lines.map(l => `        ${l}`),
+            ...(mdef.superCall ? [`        ${mdef.superCall}`] : []),
+          ];
+          return `\n    @Override\n    public ${mdef.returnType} ${mdef.sig} {\n${bodyLines.join('\n')}\n    }`;
+        };
+
+        const tooltipMethod = tooltipEnabled ? `\n    @Override\n    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipData, TooltipFlag flag) {\n${buildTooltipLines('    ')}\n    }` : '';
+        const useDurationMethod = useDuration ? `\n    @Override\n    public int getUseDuration(ItemStack stack, net.minecraft.world.level.Level level) {\n        return ${parseInt(useDurationValue) || 32};\n    }` : '';
+        const useAnimMethod = useAnim !== 'NONE' ? `\n    @Override\n    public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {\n        return net.minecraft.world.item.UseAnim.${useAnim};\n    }` : '';
+        const enabledMethodStubs = METHOD_DEFS.filter(m => enabledMethods.includes(m.key)).map(buildMethodStub).join('');
+
+        // Collect all imports
+        const allImports = new Set([
+          'net.minecraft.world.item.Item',
+          ...(isTool ? [`net.minecraft.world.item.${baseClass}`, 'net.minecraft.world.item.Tiers'] : []),
+          ...((useDuration || useAnim !== 'NONE' || enabledMethods.length > 0) ? ['net.minecraft.world.item.ItemStack'] : []),
+          ...(tooltipEnabled ? ['java.util.List', 'net.minecraft.network.chat.Component', 'net.minecraft.world.item.TooltipFlag', 'net.minecraft.world.item.Item.TooltipContext', 'net.minecraft.world.item.ItemStack'] : []),
+          ...(enabledMethods.length > 0 ? ['net.minecraft.world.level.Level'] : []),
+          ...METHOD_DEFS.filter(m => enabledMethods.includes(m.key)).flatMap(m => m.imports || []),
+          ...blockImports,
+        ]);
+        const importBlock = [...allImports].sort().map(i => `import ${i};`).join('\n');
+
+        const classContent = `package net.ye6isu.yebisuRPG.item.custom;\n\n${importBlock}\n\npublic class ${className} extends ${baseClass} {\n    public ${className}(${isTool ? `Tiers tier, Properties properties` : `Properties properties`}) {\n        super(${isTool ? `tier, properties` : `properties`});\n    }${useDurationMethod}${useAnimMethod}${tooltipMethod}${enabledMethodStubs}\n}\n`;
+
+        await invoke('write_mod_file', { file: classFile, content: classContent });
         injections.push({ type: 'created-file', file: classFile });
 
         const importLine = `import net.ye6isu.yebisuRPG.item.custom.${className};`;
@@ -1090,6 +1204,26 @@ public class ${className} extends ${baseClass} {
       }
       if (stonecutEnabled && stonecutIngredient) {
         await writeRecipe(`${itemId}_stonecutting`, { type: 'minecraft:stonecutting', ingredient: { item: stonecutIngredient }, result: { id: resultId, count: parseInt(stonecutCount) || 1 } });
+      }
+
+      // Data component registrations — only item-specific ("inline") components need a fresh
+      // Java registration here. "ref" components point at an existing global component
+      // (registered via the Data Components page) and are just stored by reference below.
+      const DC_REGISTER_METHOD = { double: 'registerDouble', boolean: 'registerBoolean', string: 'registerString', itemstack: 'registerItemStackList' };
+      const DC_JAVA_TYPE = { double: 'Double', boolean: 'Boolean', string: 'String', itemstack: 'List<ItemStack>' };
+      for (const dc of dataComponents) {
+        if (dc.kind === 'ref' || !dc.name) continue;
+        const compId = `${itemId}_${dc.name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        const constName = componentConstName(compId);
+        const method = DC_REGISTER_METHOD[dc.type] || 'registerDouble';
+        const javaType = DC_JAVA_TYPE[dc.type] || 'Double';
+        const line = `    public static final DeferredHolder<DataComponentType<?>, DataComponentType<${javaType}>> ${constName} = ${method}("${compId}");`;
+        await invoke('inject_marker', {
+          file: `${JAVA_BASE}/component/ModDataComponents.java`,
+          marker: 'YCS_Data_Components',
+          content: line,
+        });
+        injections.push({ type: 'java-marker', file: `${JAVA_BASE}/component/ModDataComponents.java`, marker: 'YCS_Data_Components', content: line });
       }
 
       // Tag files — one JSON per tag, appending this item
@@ -1291,6 +1425,8 @@ public class ${className} extends ${baseClass} {
             </div>
           </FieldRow>
         </FieldGroup>
+
+        <DataComponentsGroup components={dataComponents} onChange={setDataComponents} globalComponents={globalComponents} />
 
         <FieldGroup label="Combat">
           <FieldRow label="Attack Damage">

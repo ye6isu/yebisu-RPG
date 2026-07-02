@@ -5,6 +5,7 @@ import ItemsLanding from "./components/ItemsLanding";
 import TabsLanding from "./components/TabsLanding";
 import TagsLanding from "./components/TagsLanding";
 import TextureManager from "./components/TextureManager";
+import ComponentsLanding from "./components/ComponentsLanding";
 import "./App.css";
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
   });
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ycs-active-tab') || 'items');
   const [isRegistryOpen, setIsRegistryOpen] = useState(true);
+  const [isDataOpen, setIsDataOpen] = useState(true);
   const [isAssetsOpen, setIsAssetsOpen] = useState(true);
   const resizingRef = useRef(false);
 
@@ -146,6 +148,7 @@ function App() {
     { key: 'items', component: <ItemsLanding /> },
     { key: 'tabs', component: <TabsLanding /> },
     { key: 'tags', component: <TagsLanding /> },
+    { key: 'components', component: <ComponentsLanding /> },
     { key: 'textures', component: <TextureManager /> },
   ];
 
@@ -175,6 +178,10 @@ function App() {
               <SidebarTab label="Items" tabKey="items" />
               <SidebarTab label="Creative Tabs" tabKey="tabs" />
               <SidebarTab label="Tags" tabKey="tags" />
+            </SidebarGroup>
+
+            <SidebarGroup label="Data" isOpen={isDataOpen} onToggle={() => setIsDataOpen(!isDataOpen)}>
+              <SidebarTab label="Data Components" tabKey="components" />
             </SidebarGroup>
 
             <SidebarGroup label="Assets" isOpen={isAssetsOpen} onToggle={() => setIsAssetsOpen(!isAssetsOpen)}>

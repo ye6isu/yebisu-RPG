@@ -107,6 +107,8 @@ When the item ID changes between saves:
 
 ## Injection Targets by Holding Mode
 
+All items (regardless of holding mode) also inject their declared **Data Components** — see `Data Components` below.
+
 ### Flat (Generated) / Handheld Items
 
 | Target | Marker/Path | Content |
@@ -165,6 +167,39 @@ Content is inserted on the line **above** the marker. Removal searches for the e
 | `YCS_Mod_Creative_Tab_Imports` | `ModCreativeModeTabs.java` | Import statements (reserved for future use) |
 | `YCS_Tab_Contents` | `ModCreativeTabContents.java` | Item-to-tab assignments via `BuildCreativeModeTabContentsEvent` |
 | `YCS_Cycler_Register` | `TabIconCycler.java` | `ENTRIES.add(...)` calls for tabs with icon cycling enabled |
+| `YCS_Data_Components` | `ModDataComponents.java` | `DataComponentType` field declarations — global (`<name>`, owned by `ycs-data/components/`) and item-specific (`<itemId>_<name>`, owned by the item) |
+
+---
+
+## Data Components
+
+Data components (`DataComponentType`s stored on an `ItemStack`) come in two flavors, both editable via YCS. Supported `type` values for either flavor:
+
+| Type | Java Type | Codec |
+|------|-----------|-------|
+| `double` | `Double` | `Codec.DOUBLE` |
+| `boolean` | `Boolean` | `Codec.BOOL` |
+| `string` | `String` | `Codec.STRING` |
+| `itemstack` | `List<ItemStack>` | `ItemStack.CODEC.listOf()` — for socketed/held items (power slots, backpacks); `slotCount` is a UI-only hint, not enforced by the codec |
+
+### Global Components (`ycs-data/components/`)
+
+Defined once on the **Data Components** page, independent of any item — the right choice when many items should share the exact same `DataComponentType` (e.g. `max_ammo` used identically by every gun item, so shared code can do `stack.get(ModDataComponents.MAX_AMMO.get())` regardless of which gun it is).
+
+- Stored as `ycs-data/components/<name>.json`: `{ name, type, defaultValue, slotCount }`.
+- Registered as `ModDataComponents.<NAME>` via `ModDataComponents.register*(name)`, injected above `YCS_Data_Components` — owned by the component's own `_injections`, not by any item.
+- Deleting a global component checks `find_component_usage` for items that reference it (via `dataComponents[].ref`) and warns before deleting; referencing items are **not** auto-updated and will keep a dangling `ref` until re-saved.
+
+### Item-Specific Components
+
+Declared inline in an item's own editor — the right choice for one-off mechanics that don't generalize to other items (e.g. a legendary weapon's unique cooldown).
+
+- Stored in the item's own JSON as `dataComponents: [{ kind: 'inline', name, type, defaultValue, slotCount }]`.
+- Registered as `<itemId>_<name>` (uppercased for the constant name), injected above `YCS_Data_Components`, and tracked in **that item's** `_injections` — cleaned up automatically like any other item injection.
+
+### Attaching a Global Component to an Item
+
+An item can also reference an existing global component without creating a new registration: `dataComponents: [{ kind: 'ref', ref: '<globalName>', overrideDefault }]`. No Java injection happens for `ref` entries — only the reference (and optional per-item default override) is stored in the item's JSON. An item's `dataComponents` array may freely mix `inline` and `ref` entries.
 
 ---
 
