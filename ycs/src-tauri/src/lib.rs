@@ -153,7 +153,39 @@ fn find_texture_usage(texture_id: &str) -> Result<Vec<String>, String> {
         if !name.ends_with(".json") { continue; }
         let content = fs::read_to_string(entry.path()).unwrap_or_default();
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-            if val.get("texture").and_then(|v| v.as_str()) == Some(texture_id) {
+            let matches = val.get("texture").and_then(|v| v.as_str()) == Some(texture_id)
+                || val.get("geoTexture").and_then(|v| v.as_str()) == Some(texture_id);
+            if matches {
+                let item_id = name.trim_end_matches(".json").to_string();
+                let display = val.get("displayName")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&item_id)
+                    .to_string();
+                usages.push(display);
+            }
+        }
+    }
+    Ok(usages)
+}
+
+#[tauri::command]
+fn find_component_usage(component_id: &str) -> Result<Vec<String>, String> {
+    let items_dir = ycs_data_dir().join("items");
+    if !items_dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut usages = Vec::new();
+    for entry in fs::read_dir(&items_dir).map_err(|e| format!("{}", e))? {
+        let entry = entry.map_err(|e| format!("{}", e))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.ends_with(".json") { continue; }
+        let content = fs::read_to_string(entry.path()).unwrap_or_default();
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+            let uses_component = val.get("dataComponents")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().any(|dc| dc.get("ref").and_then(|r| r.as_str()) == Some(component_id)))
+                .unwrap_or(false);
+            if uses_component {
                 let item_id = name.trim_end_matches(".json").to_string();
                 let display = val.get("displayName")
                     .and_then(|v| v.as_str())
@@ -488,6 +520,7 @@ pub fn run() {
             delete_texture,
             list_textures,
             find_texture_usage,
+            find_component_usage,
             rename_texture_image,
             copy_texture_to_mod,
             read_image_base64,
