@@ -296,7 +296,7 @@ export default function TagsLanding() {
                   cursor: 'pointer',
                   transition: 'background-color 0.1s, border-color 0.1s',
                   boxSizing: 'border-box',
-                  minWidth: '160px', flex: '1 1 160px', maxWidth: '320px',
+                  minWidth: '160px', flex: '1 1 160px', maxWidth: '280px',
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
@@ -311,14 +311,21 @@ export default function TagsLanding() {
                   if (del) del.style.opacity = '0';
                 }}
               >
-                <div style={{ width: '6px', height: '24px', flexShrink: 0, borderRadius: '3px', backgroundColor: 'var(--ycs-highlight)', opacity: 0.6 }} />
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {tag.tagName || tag.id}
-                  </div>
-                  <div style={{ fontSize: '11px', opacity: 0.4 }}>
-                    {tag._itemCount || 0} item{(tag._itemCount || 0) !== 1 ? 's' : ''}
-                  </div>
+                <div style={{
+                  width: '24px', height: '24px', flexShrink: 0,
+                  borderRadius: 'var(--ycs-radius, 4px)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
+                    <path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.17L4 3a1 1 0 0 0-1 1l.17 5.59a2 2 0 0 0 .66 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z" />
+                    <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '500', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '24px' }}>
+                  {tag.tagName || tag.id}
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.4, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {tag._itemCount || 0} item{(tag._itemCount || 0) !== 1 ? 's' : ''}
                 </div>
                 <div
                   className="row-delete"

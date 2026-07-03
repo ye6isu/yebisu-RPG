@@ -10,6 +10,11 @@ export const LINK_TEXT = "text";
 export const LINK_ITERATOR = "iterator";
 export const LINK_ITEMSTACK = "itemstack";
 
+function dataComponentConstName(node) {
+  const raw = node.fields?.compConstName || node.fields?.compName || "my_value";
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+}
+
 export function resolveStackExpr(methodKey) {
   if (methodKey === "useOn") return "context.getItemInHand()";
   if (methodKey === "use") return "player.getItemInHand(usedHand)";
@@ -440,13 +445,29 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode === "datacomp.set") {
     const stackExpr = resolveStackExpr(methodKey);
     if (!stackExpr) return ["// datacomp.set not available in this method"];
-    const compName = node.fields?.compName || "my_value";
     const compType = node.fields?.compType || "double";
     const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? "0";
-    const constName = "YCS_" + compName.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    const ref = `ModDataComponents.${constName}.get()`;
-    if (compType === "bool" || compType === "string") return [`${stackExpr}.set(${ref}, ${valueExpr});`];
+    const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
+    if (compType === "boolean" || compType === "string") return [`${stackExpr}.set(${ref}, ${valueExpr});`];
     return [`${stackExpr}.set(${ref}, (double)(${valueExpr}));`];
+  }
+
+  if (node.opcode === "datacomp.set_slot") {
+    const stackExpr = resolveStackExpr(methodKey);
+    if (!stackExpr) return ["// datacomp.set_slot not available in this method"];
+    const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
+    const index = resolveSlotValue(node.slots?.index, nodes, methodKey) ?? "0";
+    const itemExpr = resolveSlotValue(node.slots?.item, nodes, methodKey) ?? "ItemStack.EMPTY";
+    const listVar = `ycsSlotList${node.id}`;
+    return [
+      `{`,
+      `    ArrayList<ItemStack> ${listVar} = new ArrayList<>(${stackExpr}.getOrDefault(${ref}, java.util.List.<ItemStack>of()));`,
+      `    int ycsSlotIdx${node.id} = (int)(${index});`,
+      `    while (${listVar}.size() <= ycsSlotIdx${node.id}) ${listVar}.add(ItemStack.EMPTY);`,
+      `    if (ycsSlotIdx${node.id} >= 0) ${listVar}.set(ycsSlotIdx${node.id}, ${itemExpr});`,
+      `    ${stackExpr}.set(${ref}, ${listVar});`,
+      `}`,
+    ];
   }
 
   if (node.opcode === "variable.set") {
@@ -655,13 +676,32 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
   if (node.opcode === "datacomp.get") {
     const stackExpr = resolveStackExpr(methodKey);
     if (!stackExpr) return "0";
-    const compName = node.fields?.compName || "my_value";
     const compType = node.fields?.compType || "double";
-    const constName = "YCS_" + compName.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    const ref = `ModDataComponents.${constName}.get()`;
-    if (compType === "bool") return `(${stackExpr}.getOrDefault(${ref}, false))`;
+    const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
+    if (compType === "boolean") return `(${stackExpr}.getOrDefault(${ref}, false))`;
     if (compType === "string") return `(${stackExpr}.getOrDefault(${ref}, ""))`;
     return `(${stackExpr}.getOrDefault(${ref}, 0.0))`;
+  }
+  if (node.opcode === "datacomp.get_slot") {
+    const stackExpr = resolveStackExpr(methodKey);
+    if (!stackExpr) return "ItemStack.EMPTY";
+    const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
+    const index = resolveSlotValue(node.slots?.index, nodes, methodKey) ?? "0";
+    const listVar = `${stackExpr}.getOrDefault(${ref}, java.util.List.<ItemStack>of())`;
+    return `(((int)(${index}) >= 0 && (int)(${index}) < ${listVar}.size()) ? ${listVar}.get((int)(${index})) : ItemStack.EMPTY)`;
+  }
+  if (node.opcode === "datacomp.slot_count") {
+    const stackExpr = resolveStackExpr(methodKey);
+    if (!stackExpr) return "0";
+    const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
+    return `(${stackExpr}.getOrDefault(${ref}, java.util.List.<ItemStack>of()).size())`;
+  }
+  if (node.opcode === "datacomp.find_empty_slot") {
+    const stackExpr = resolveStackExpr(methodKey);
+    if (!stackExpr) return "-1";
+    const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
+    const listVar = `${stackExpr}.getOrDefault(${ref}, java.util.List.<ItemStack>of())`;
+    return `(java.util.stream.IntStream.range(0, ${listVar}.size()).filter(ycsIdx -> ${listVar}.get(ycsIdx).isEmpty()).findFirst().orElse(-1))`;
   }
   if (node.opcode === "itemstack.is_on_cooldown") {
     const ent = resolveEntityVar("entity.event", methodKey);
