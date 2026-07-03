@@ -18,6 +18,83 @@ export function componentConstName(name) {
   return name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 }
 
+function TypeGroup({ label, children }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px',
+        opacity: 0.4, padding: '4px 0', userSelect: 'none',
+      }}>
+        {label}
+      </div>
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '4px',
+        borderLeft: '1px solid var(--ycs-foreground)',
+        paddingLeft: '12px', marginLeft: '4px', marginBottom: '12px',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ComponentRow({ comp, onClick, onDelete }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '6px 8px',
+        borderRadius: 'var(--ycs-radius, 4px)',
+        border: '1px solid var(--ycs-foreground)',
+        cursor: 'pointer',
+        transition: 'background-color 0.1s, border-color 0.1s',
+        boxSizing: 'border-box',
+        minWidth: '160px', flex: '1 1 160px', maxWidth: '280px',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
+        e.currentTarget.style.borderColor = 'var(--ycs-highlight)';
+        const del = e.currentTarget.querySelector('.row-delete');
+        if (del) del.style.opacity = '1';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = 'transparent';
+        e.currentTarget.style.borderColor = 'var(--ycs-foreground)';
+        const del = e.currentTarget.querySelector('.row-delete');
+        if (del) del.style.opacity = '0';
+      }}
+    >
+      <div style={{
+        width: '24px', height: '24px', flexShrink: 0,
+        borderRadius: 'var(--ycs-radius, 4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      </div>
+      <div style={{ fontSize: '13px', fontWeight: '500', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '24px' }}>
+        {comp.name || comp.id}
+      </div>
+      <div
+        className="row-delete"
+        onClick={onDelete}
+        title="Delete"
+        style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0, transition: 'opacity 0.1s', flexShrink: 0 }}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <circle cx="9" cy="9" r="9" fill="white"/>
+          <line x1="5" y1="9" x2="13" y2="9" stroke="black" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 function Checkbox({ checked, onChange, disabled = false }) {
   return (
     <div
@@ -217,56 +294,22 @@ export default function ComponentsLanding() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
         {filtered.length > 0 ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {filtered.map(comp => (
-              <div
-                key={comp.id}
-                onClick={() => setEditing(comp.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '6px 8px',
-                  borderRadius: 'var(--ycs-radius, 4px)',
-                  border: '1px solid var(--ycs-foreground)',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  minWidth: '160px', flex: '1 1 160px', maxWidth: '320px',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
-                  e.currentTarget.style.borderColor = 'var(--ycs-highlight)';
-                  const del = e.currentTarget.querySelector('.row-delete');
-                  if (del) del.style.opacity = '1';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.borderColor = 'var(--ycs-foreground)';
-                  const del = e.currentTarget.querySelector('.row-delete');
-                  if (del) del.style.opacity = '0';
-                }}
-              >
-                <div style={{ width: '6px', height: '24px', flexShrink: 0, borderRadius: '3px', backgroundColor: 'var(--ycs-highlight)', opacity: 0.6 }} />
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {comp.name || comp.id}
-                  </div>
-                  <div style={{ fontSize: '11px', opacity: 0.4 }}>
-                    {DATA_COMPONENT_TYPES.find(t => t.value === comp.type)?.label || comp.type}
-                  </div>
-                </div>
-                <div
-                  className="row-delete"
-                  onClick={e => deleteComponent(comp, e)}
-                  title="Delete"
-                  style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0, transition: 'opacity 0.1s', flexShrink: 0 }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 18 18">
-                    <circle cx="9" cy="9" r="9" fill="white"/>
-                    <line x1="5" y1="9" x2="13" y2="9" stroke="black" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </div>
-              </div>
-            ))}
-          </div>
+          DATA_COMPONENT_TYPES.map(({ value, label }) => {
+            const group = filtered.filter(c => c.type === value);
+            if (group.length === 0) return null;
+            return (
+              <TypeGroup key={value} label={label}>
+                {group.map(comp => (
+                  <ComponentRow
+                    key={comp.id}
+                    comp={comp}
+                    onClick={() => setEditing(comp.id)}
+                    onDelete={e => deleteComponent(comp, e)}
+                  />
+                ))}
+              </TypeGroup>
+            );
+          })
         ) : (
           <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No data components yet. Click + to add one.</div>
         )}

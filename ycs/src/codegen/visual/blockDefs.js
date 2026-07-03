@@ -934,9 +934,10 @@ export const BLOCK_DEFS = [
     label: "Get Data Component [compName:dropdown.dataComponents]",
     hint: "Get a data component value from the item stack",
     color: "#4d65b4",
+    dropdownExcludesCompType: "itemstack",
     dynamicLinkType: {
       field: "compType",
-      map: { bool: "logic", string: "text", "*": "number" },
+      map: { boolean: "logic", string: "text", "*": "number" },
     },
     codegen: {
       type: "value",
@@ -952,8 +953,9 @@ export const BLOCK_DEFS = [
     label: "Set Data Component [compName:dropdown.dataComponents] to [value:number]",
     hint: "Set a data component value on the item stack",
     color: "#4d65b4",
+    dropdownExcludesCompType: "itemstack",
     dynamicAccepts: {
-      value: { field: "compType", map: { bool: "logic", string: "text", "*": "number" } },
+      value: { field: "compType", map: { boolean: "logic", string: "text", "*": "number" } },
     },
     codegen: {
       type: "action",
@@ -962,6 +964,73 @@ export const BLOCK_DEFS = [
       slotDefaults: {
         value: { opcode: "number.literal", fields: { value: "0" } },
       },
+    },
+  },
+  {
+    opcode: "datacomp.get_slot",
+    category: "Data", sub: "data",
+    linkType: "itemstack",
+    paletteLabel: "Get Data Component Slot",
+    label: "Get Data Component [compName:dropdown.dataComponents] Slot [index:number]",
+    hint: "Get the item stack at a slot index within an Item Slots data component",
+    color: "#945d66",
+    dropdownRequiresCompType: "itemstack",
+    codegen: {
+      type: "value",
+      handler: "datacomp.get_slot",
+      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents", "net.minecraft.world.item.ItemStack"],
+      slotDefaults: {
+        index: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "datacomp.set_slot",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Data Component Slot",
+    label: "Set Data Component [compName:dropdown.dataComponents] Slot [index:number] to [item:itemstack]",
+    hint: "Set the item stack at a slot index within an Item Slots data component",
+    color: "#945d66",
+    dropdownRequiresCompType: "itemstack",
+    codegen: {
+      type: "action",
+      handler: "datacomp.set_slot",
+      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents", "net.minecraft.world.item.ItemStack", "java.util.ArrayList"],
+      slotDefaults: {
+        index: { opcode: "number.literal", fields: { value: "0" } },
+        item: { opcode: "itemstack.literal" },
+      },
+    },
+  },
+  {
+    opcode: "datacomp.slot_count",
+    category: "Data", sub: "data",
+    linkType: "number",
+    paletteLabel: "Data Component Slot Count",
+    label: "Slot Count of [compName:dropdown.dataComponents]",
+    hint: "Number of slots currently stored in an Item Slots data component's list",
+    color: "#4d65b4",
+    dropdownRequiresCompType: "itemstack",
+    codegen: {
+      type: "value",
+      handler: "datacomp.slot_count",
+      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents"],
+    },
+  },
+  {
+    opcode: "datacomp.find_empty_slot",
+    category: "Data", sub: "data",
+    linkType: "number",
+    paletteLabel: "Find Empty Data Component Slot",
+    label: "First Empty Slot of [compName:dropdown.dataComponents]",
+    hint: "Index of the first empty (or missing) slot in an Item Slots data component; -1 if none found",
+    color: "#4d65b4",
+    dropdownRequiresCompType: "itemstack",
+    codegen: {
+      type: "value",
+      handler: "datacomp.find_empty_slot",
+      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents", "net.minecraft.world.item.ItemStack"],
     },
   },
 

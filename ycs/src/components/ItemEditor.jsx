@@ -331,7 +331,54 @@ function RecipeSubGroup({ label, enabled, onToggle, children, disabled, inline }
   );
 }
 
-function DataComponentsGroup({ components, onChange, globalComponents }) {
+function DataComponentRow({ dc, onChange, onRemove, globalOptions, globalComponents }) {
+  const isRef = dc.kind === 'ref';
+  const refComp = isRef ? globalComponents.find(c => c.name === dc.ref) : null;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      {isRef ? (
+        <div style={{ flex: 1 }}>
+          <DropdownField value={dc.ref} onChange={v => onChange({ ref: v })} options={globalOptions.length ? globalOptions : [{ label: '(none defined)', value: '', disabled: true }]} />
+        </div>
+      ) : (
+        <StringField value={dc.name} onChange={v => onChange({ name: v.toLowerCase().replace(/\s/g, '_') })} placeholder="name" style={{ flex: 1 }} />
+      )}
+
+      {!isRef && (
+        <div style={{ flex: 1 }}>
+          <StandardDropdownField value={dc.type} onChange={v => onChange({ type: v })} options={DATA_COMPONENT_TYPES} />
+        </div>
+      )}
+
+      {isRef ? (
+        refComp?.type === 'itemstack' ? (
+          <span style={{ fontSize: '11px', opacity: 0.3, width: '120px', flexShrink: 0 }}>(no override)</span>
+        ) : refComp?.type === 'boolean' ? (
+          <Checkbox checked={!!dc.overrideDefault} onChange={v => onChange({ overrideDefault: v })} />
+        ) : (
+          <StringField value={dc.overrideDefault ?? ''} onChange={v => onChange({ overrideDefault: v })} placeholder={String(refComp?.defaultValue ?? 'default')} style={{ width: '120px', flexShrink: 0 }} />
+        )
+      ) : (
+        dc.type === 'itemstack' ? (
+          <NumberInput value={dc.slotCount ?? '1'} onChange={v => onChange({ slotCount: v })} style={{ width: '120px', flexShrink: 0 }} />
+        ) : dc.type === 'boolean' ? (
+          <Checkbox checked={!!dc.defaultValue} onChange={v => onChange({ defaultValue: v })} />
+        ) : (
+          <StringField value={dc.defaultValue ?? ''} onChange={v => onChange({ defaultValue: v })} placeholder="default" style={{ width: '120px', flexShrink: 0 }} />
+        )
+      )}
+
+      <button className="ycs-tiny-button" onClick={onRemove} title="Remove" style={{ marginLeft: 'auto', flexShrink: 0, border: '1px solid var(--ycs-foreground)' }}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function DataComponentsPage({ components, onChange, globalComponents, onBack }) {
   const update = (i, patch) => onChange(components.map((c, idx) => idx === i ? { ...c, ...patch } : c));
   const remove = (i) => onChange(components.filter((_, idx) => idx !== i));
   const addInline = () => onChange([...components, { kind: 'inline', name: '', type: 'double', defaultValue: '', slotCount: '1' }]);
@@ -339,63 +386,50 @@ function DataComponentsGroup({ components, onChange, globalComponents }) {
 
   const globalOptions = globalComponents.map(c => ({ label: `${c.name} (${DATA_COMPONENT_TYPES.find(t => t.value === c.type)?.label || c.type})`, value: c.name }));
 
+  const refRows = components.map((dc, i) => ({ dc, i })).filter(({ dc }) => dc.kind === 'ref');
+  const inlineRows = components.map((dc, i) => ({ dc, i })).filter(({ dc }) => dc.kind !== 'ref');
+
   return (
-    <FieldGroup label="Data Components">
-      {components.map((dc, i) => {
-        const isRef = dc.kind === 'ref';
-        const refComp = isRef ? globalComponents.find(c => c.name === dc.ref) : null;
-        return (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '6px', borderBottom: i < components.length - 1 ? '1px solid var(--ycs-foreground)' : 'none' }}>
-            <FieldRow label={isRef ? 'Global Component' : 'Name'}>
-              {isRef ? (
-                <StandardDropdownField value={dc.ref} onChange={v => update(i, { ref: v })} options={globalOptions.length ? globalOptions : [{ label: '(none defined)', value: '' }]} />
-              ) : (
-                <StringField value={dc.name} onChange={v => update(i, { name: v.toLowerCase().replace(/\s/g, '_') })} style={{ width: '100%' }} />
-              )}
-              <button className="ycs-button icon" onClick={() => remove(i)} title="Remove">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </FieldRow>
-            {isRef ? (
-              refComp?.type === 'itemstack' ? null : refComp?.type === 'boolean' ? (
-                <FieldRow label="Override Default">
-                  <Checkbox checked={!!dc.overrideDefault} onChange={v => update(i, { overrideDefault: v })} />
-                </FieldRow>
-              ) : (
-                <FieldRow label="Override Default">
-                  <StringField value={dc.overrideDefault ?? ''} onChange={v => update(i, { overrideDefault: v })} placeholder={String(refComp?.defaultValue ?? '')} style={{ width: '100%' }} />
-                </FieldRow>
-              )
-            ) : (
-              <>
-                <FieldRow label="Type">
-                  <StandardDropdownField value={dc.type} onChange={v => update(i, { type: v })} options={DATA_COMPONENT_TYPES} />
-                </FieldRow>
-                {dc.type === 'itemstack' ? (
-                  <FieldRow label="Slot Count">
-                    <NumberInput value={dc.slotCount ?? '1'} onChange={v => update(i, { slotCount: v })} style={{ width: '64px' }} />
-                  </FieldRow>
-                ) : dc.type === 'boolean' ? (
-                  <FieldRow label="Default">
-                    <Checkbox checked={!!dc.defaultValue} onChange={v => update(i, { defaultValue: v })} />
-                  </FieldRow>
-                ) : (
-                  <FieldRow label="Default">
-                    <StringField value={dc.defaultValue ?? ''} onChange={v => update(i, { defaultValue: v })} style={{ width: '100%' }} />
-                  </FieldRow>
-                )}
-              </>
-            )}
-          </div>
-        );
-      })}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button className="ycs-button" onClick={addRef} style={{ alignSelf: 'flex-start' }}>+ Attach Global</button>
-        <button className="ycs-button" onClick={addInline} style={{ alignSelf: 'flex-start' }}>+ New Item-Specific</button>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>Data Components</h2>
+        <button className="ycs-button" onClick={addRef}>+ Attach Global</button>
+        <button className="ycs-button" onClick={addInline}>+ New Item-Specific</button>
+        <button className="ycs-button" onClick={onBack}>Back</button>
       </div>
-    </FieldGroup>
+
+      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <FieldGroup label="Global">
+          {refRows.length === 0 && <span style={{ fontSize: '12px', opacity: 0.3 }}>None attached</span>}
+          {refRows.map(({ dc, i }) => (
+            <DataComponentRow
+              key={i}
+              dc={dc}
+              onChange={patch => update(i, patch)}
+              onRemove={() => remove(i)}
+              globalOptions={globalOptions}
+              globalComponents={globalComponents}
+            />
+          ))}
+        </FieldGroup>
+
+        <FieldGroup label="Item-Specific">
+          {inlineRows.length === 0 && <span style={{ fontSize: '12px', opacity: 0.3 }}>None defined</span>}
+          {inlineRows.map(({ dc, i }) => (
+            <DataComponentRow
+              key={i}
+              dc={dc}
+              onChange={patch => update(i, patch)}
+              onRemove={() => remove(i)}
+              globalOptions={globalOptions}
+              globalComponents={globalComponents}
+            />
+          ))}
+        </FieldGroup>
+      </div>
+    </div>
   );
 }
 
@@ -519,6 +553,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
   const [lastSavedId, setLastSavedId] = useState(existingId || null);
   const [customClass, setCustomClass] = useState(false);
   const [enabledMethods, setEnabledMethods] = useState([]);
+  const [editingDataComponents, setEditingDataComponents] = useState(false);
 
   // Data Components
   const [dataComponents, setDataComponents] = useState([]);
@@ -1274,6 +1309,17 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
 
   const textureOptions = textures.map(t => ({ label: t.label, value: t.id, img: t._url }));
 
+  if (editingDataComponents) {
+    return (
+      <DataComponentsPage
+        components={dataComponents}
+        onChange={setDataComponents}
+        globalComponents={globalComponents}
+        onBack={() => setEditingDataComponents(false)}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {showTagPicker && <TagPicker tags={tags} onChange={setTags} onClose={() => setShowTagPicker(false)} />}
@@ -1426,7 +1472,11 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           </FieldRow>
         </FieldGroup>
 
-        <DataComponentsGroup components={dataComponents} onChange={setDataComponents} globalComponents={globalComponents} />
+        <FieldGroup label="Data Components">
+          <FieldRow label="Data Components">
+            <FieldIconButton title="Data Components" onClick={() => setEditingDataComponents(true)} hasData={dataComponents.length > 0} />
+          </FieldRow>
+        </FieldGroup>
 
         <FieldGroup label="Combat">
           <FieldRow label="Attack Damage">

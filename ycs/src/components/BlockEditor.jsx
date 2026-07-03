@@ -1,9 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
+import { invoke } from '@tauri-apps/api/core';
 import { BLOCK_DEFS, blockDefRegistry } from '../codegen/visual/blockDefs.js';
 import { parseLabel, extractSlotDefs } from '../codegen/visual/labelParser.js';
 
 const STORAGE_PREFIX = 'ycs-blocky::';
+
+// Populated by BlockEditor's data-component-loading effect; read by SegmentItem's
+// "dataComponents" dropdown. Kept outside React state (like window.__hoveredSlot)
+// since it's a cross-cutting lookup, not something SegmentItem's own render depends on
+// via props drilling through CanvasBlock/BlockContent.
+let dynamicDataComponentOptions = [];
 
 const DROPDOWN_SOURCES = {
   effects: [
@@ -255,12 +262,35 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
   if (seg.type === 'dropdown') {
     const fieldDef = bdef?.fields?.[seg.key];
     if (fieldDef?.showIf && !evalCondition(fieldDef.showIf, node.fields)) return null;
-    const options = fieldDef?.options || (fieldDef?.source && DROPDOWN_SOURCES[fieldDef.source]) || [];
+    const isDataComponents = fieldDef?.source === 'dataComponents';
+    let options = fieldDef?.options
+      || (isDataComponents ? dynamicDataComponentOptions : null)
+      || (fieldDef?.source && DROPDOWN_SOURCES[fieldDef.source])
+      || [];
+    if (isDataComponents && bdef?.dropdownExcludesCompType) {
+      options = options.filter(o => o.compType !== bdef.dropdownExcludesCompType);
+    }
+    if (isDataComponents && bdef?.dropdownRequiresCompType) {
+      options = options.filter(o => o.compType === bdef.dropdownRequiresCompType);
+    }
     if (options.length > 0) {
       return <PortalDropdown key={i} value={node.fields?.[seg.key] ?? fieldDef?.default ?? ''}
-        onChange={v => onFieldChange && onFieldChange(nodeId, seg.key, v)}
+        onChange={v => {
+          if (onFieldChange) {
+            onFieldChange(nodeId, seg.key, v);
+            if (isDataComponents) {
+              const opt = options.find(o => o.value === v);
+              onFieldChange(nodeId, 'compType', opt?.compType || 'double');
+              onFieldChange(nodeId, 'compConstName', opt?.constName || v);
+            }
+          }
+        }}
         compact={fieldDef?.compact} transparent={transp} minWidth={fieldDef?.minWidth || 60} options={options}
         searchable={options.length > 8 || !!fieldDef?.searchable} />;
+    }
+    if (isDataComponents) {
+      const msg = bdef?.dropdownRequiresCompType ? '(no Item Slots components)' : '(no components)';
+      return <span key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: 'sans-serif', padding: '0 6px' }}>{msg}</span>;
     }
     const val = node.fields?.[seg.key] ?? fieldDef?.default ?? '';
     return (
@@ -791,6 +821,52 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
   nodesRef.current = nodes;
   panRef.current = pan;
   zoomRef.current = zoom;
+
+  const [dataComponentOptions, setDataComponentOptions] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const options = [];
+      try {
+        const globalIds = await invoke('list_ycs_data', { category: 'components' });
+        for (const id of globalIds) {
+          try {
+            const raw = await invoke('load_ycs_data', { category: 'components', id });
+            const c = JSON.parse(raw);
+            options.push({
+              value: c.name || id,
+              label: `${c.name || id} (Global)`,
+              compType: c.type,
+              constName: c.name || id,
+            });
+          } catch {}
+        }
+      } catch {}
+      if (itemId) {
+        try {
+          const raw = await invoke('load_ycs_data', { category: 'items', id: itemId });
+          const item = JSON.parse(raw);
+          for (const dc of (item.dataComponents || [])) {
+            if (dc.kind !== 'inline' || !dc.name) continue;
+            const compId = `${itemId}_${dc.name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            options.push({
+              value: dc.name,
+              label: dc.name,
+              compType: dc.type,
+              constName: compId,
+            });
+          }
+        } catch {}
+      }
+      if (!cancelled) {
+        dynamicDataComponentOptions = options;
+        setDataComponentOptions(options);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [itemId]);
 
   const addBlock = useCallback((block, wx, wy) => {
     const bdef = blockDefRegistry.get(block.opcode);
