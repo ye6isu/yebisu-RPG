@@ -44,27 +44,69 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
     // ─── Registration ────────────────────────────────────────────────────────────
 
     public static void register(Item item, ResourceLocation geoLoc, ResourceLocation texLoc) {
-        REGISTRY.put(item, new GeoItemEntry(List.of(geoLoc), List.of(texLoc), List.of(StateAnim.NONE)));
+        REGISTRY.put(item, new GeoItemEntry(List.of(
+                new ItemStateEntry(StateKind.GEO, geoLoc, texLoc, StateAnim.NONE, null, null))));
     }
 
     public static void register(Item item, ResourceLocation geoLoc, ResourceLocation texLoc,
                                 int frames, boolean animated, int ticksPerFrame) {
-        REGISTRY.put(item, new GeoItemEntry(List.of(geoLoc), List.of(texLoc),
-                List.of(new StateAnim(frames, animated, ticksPerFrame))));
+        register(item, geoLoc, texLoc, frames, animated, ticksPerFrame, 0);
+    }
+
+    public static void register(Item item, ResourceLocation geoLoc, ResourceLocation texLoc,
+                                int frames, boolean animated, int ticksPerFrame, int defaultFrame) {
+        REGISTRY.put(item, new GeoItemEntry(List.of(new ItemStateEntry(StateKind.GEO, geoLoc, texLoc,
+                new StateAnim(frames, animated, ticksPerFrame, defaultFrame), null, null))));
     }
 
     public static void register(Item item, List<ResourceLocation> geoLocs, List<ResourceLocation> textures) {
-        List<StateAnim> anims = new ArrayList<>(Collections.nCopies(textures.size(), StateAnim.NONE));
-        REGISTRY.put(item, new GeoItemEntry(geoLocs, textures, anims));
+        List<ItemStateEntry> states = new ArrayList<>();
+        for (int i = 0; i < geoLocs.size(); i++) {
+            states.add(new ItemStateEntry(StateKind.GEO, geoLocs.get(i), textures.get(i), StateAnim.NONE, null, null));
+        }
+        REGISTRY.put(item, new GeoItemEntry(states));
     }
 
     public static void register(Item item, List<ResourceLocation> geoLocs, List<ResourceLocation> textures,
                                 List<StateAnim> stateAnims) {
-        REGISTRY.put(item, new GeoItemEntry(geoLocs, textures, stateAnims));
+        List<ItemStateEntry> states = new ArrayList<>();
+        for (int i = 0; i < geoLocs.size(); i++) {
+            StateAnim anim = i < stateAnims.size() ? stateAnims.get(i) : StateAnim.NONE;
+            states.add(new ItemStateEntry(StateKind.GEO, geoLocs.get(i), textures.get(i), anim, null, null));
+        }
+        REGISTRY.put(item, new GeoItemEntry(states));
+    }
+
+    /** Full mixed-state registration — each state independently GEO (3D bone-rendered) or FLAT (baked-quad rendered). */
+    public static void registerMixed(Item item, List<ItemStateEntry> states) {
+        REGISTRY.put(item, new GeoItemEntry(states));
     }
 
     public static boolean hasEntry(Item item) {
         return REGISTRY.containsKey(item);
+    }
+
+    /**
+     * All {@code flatModelLoc}s across every registered FLAT state, across every item — these are
+     * loose model files not tied to any real Item registration, so they must be explicitly baked via
+     * {@code ModelEvent.RegisterAdditional} (see {@code GeoItemRegistry.onRegisterAdditionalModels})
+     * or {@code ModelManager.getModel} silently falls back to the missing/checkerboard model.
+     */
+    public static List<ResourceLocation> getAllFlatModelLocations() {
+        List<ResourceLocation> locs = new ArrayList<>();
+        for (GeoItemEntry entry : REGISTRY.values()) {
+            for (ItemStateEntry state : entry.states()) {
+                if (state.kind() != StateKind.FLAT) continue;
+                if (state.flatModelLoc() != null) locs.add(state.flatModelLoc());
+                StateAnim anim = state.stateAnim() != null ? state.stateAnim() : StateAnim.NONE;
+                if (anim.frames() > 1 && !anim.animated() && state.flatFrameModelBase() != null) {
+                    for (int f = 0; f < anim.frames(); f++) {
+                        locs.add(state.flatFrameModelBase().withSuffix("_frame" + f));
+                    }
+                }
+            }
+        }
+        return locs;
     }
 
     // ─── Resource reload ─────────────────────────────────────────────────────────
@@ -74,21 +116,27 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         models.clear();
         spritesheetFrameCounts.clear();
         for (var entry : REGISTRY.entrySet()) {
+            List<ItemStateEntry> states = entry.getValue().states();
             List<BakedGeoModel> bakedModels = new ArrayList<>();
-            for (ResourceLocation geoLoc : entry.getValue().geoLocations()) {
-                BakedGeoModel model = loadModel(resourceManager, geoLoc);
-                if (model != null) bakedModels.add(model);
-            }
-            if (bakedModels.isEmpty()) continue;
-
-            models.put(entry.getKey(), bakedModels);
-            List<ResourceLocation> textures = entry.getValue().textures();
             Map<Integer, Integer> frameCounts = new HashMap<>();
-            for (int i = 0; i < textures.size(); i++) {
-                BakedGeoModel m = bakedModels.get(Math.min(i, bakedModels.size() - 1));
-                int frames = detectFrameCount(resourceManager, textures.get(i), m.texWidth(), m.texHeight());
-                if (frames > 1) frameCounts.put(i, frames);
+
+            for (int i = 0; i < states.size(); i++) {
+                ItemStateEntry state = states.get(i);
+                if (state.kind() == StateKind.GEO) {
+                    BakedGeoModel model = loadModel(resourceManager, state.geoLoc());
+                    if (model != null) {
+                        bakedModels.add(model);
+                        int frames = detectFrameCount(resourceManager, state.texture(), model.texWidth(), model.texHeight());
+                        if (frames > 1) frameCounts.put(i, frames);
+                        continue;
+                    }
+                }
+                // FLAT states (or a GEO state whose model failed to load) have no bone data —
+                // keep index alignment with `states` by inserting a placeholder.
+                bakedModels.add(null);
             }
+
+            if (!bakedModels.isEmpty()) models.put(entry.getKey(), bakedModels);
             if (!frameCounts.isEmpty()) spritesheetFrameCounts.put(entry.getKey(), frameCounts);
         }
     }
@@ -120,22 +168,34 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         GeoItemEntry entry = REGISTRY.get(item);
         if (entry == null) return;
 
-        List<BakedGeoModel> modelList = models.get(item);
-        if (modelList == null || modelList.isEmpty()) return;
+        List<ItemStateEntry> states = entry.states();
+        if (states.isEmpty()) return;
 
         int customModelData = stack.getOrDefault(
                 net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
                 new net.minecraft.world.item.component.CustomModelData(0)).value();
-        int itemState = Math.max(0, customModelData);
+        int itemState = Math.min(Math.max(0, customModelData), states.size() - 1);
 
-        BakedGeoModel model = modelList.get(Math.min(itemState, modelList.size() - 1));
+        ItemStateEntry state = states.get(itemState);
+        if (state.kind() == StateKind.FLAT) {
+            renderFlatState(stack, item, itemState, state, displayContext, poseStack, buffer, packedLight, packedOverlay);
+        } else {
+            renderGeoState(stack, item, itemState, state, displayContext, poseStack, buffer, packedLight, packedOverlay);
+        }
+    }
 
-        int texIdx = Math.min(itemState, entry.textures().size() - 1);
-        ResourceLocation textureLoc = entry.textures().get(texIdx);
-        StateAnim stateAnim = texIdx < entry.stateAnims().size() ? entry.stateAnims().get(texIdx) : StateAnim.NONE;
+    private void renderGeoState(ItemStack stack, Item item, int itemState, ItemStateEntry state,
+                                ItemDisplayContext displayContext, PoseStack poseStack, MultiBufferSource buffer,
+                                int packedLight, int packedOverlay) {
+        List<BakedGeoModel> modelList = models.get(item);
+        if (modelList == null || itemState >= modelList.size()) return;
+        BakedGeoModel model = modelList.get(itemState);
+        if (model == null) return;
+
+        StateAnim stateAnim = state.stateAnim() != null ? state.stateAnim() : StateAnim.NONE;
 
         Map<Integer, Integer> frameCounts = spritesheetFrameCounts.get(item);
-        int detectedFrames = frameCounts != null && frameCounts.containsKey(texIdx) ? frameCounts.get(texIdx) : 0;
+        int detectedFrames = frameCounts != null && frameCounts.containsKey(itemState) ? frameCounts.get(itemState) : 0;
         int resolvedFrameCount = stateAnim.frames() > 1 ? stateAnim.frames() : detectedFrames;
 
         int frame = 0;
@@ -143,9 +203,13 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
             if (stateAnim.animated()) {
                 int tpf = Math.max(1, stateAnim.ticksPerFrame() > 0 ? stateAnim.ticksPerFrame() : 4);
                 long tick = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
-                frame = (int) ((tick / tpf) % resolvedFrameCount);
+                frame = net.ye6isu.yebisuRPG.texture.TextureFrameClock.frameAt(
+                        tick, tpf, resolvedFrameCount, net.ye6isu.yebisuRPG.texture.FrameLoopMode.LOOP);
             } else {
-                frame = Math.max(0, customModelData - 1);
+                // ITEM_FRAME is independent of CustomModelData (which only picks the active state) —
+                // each state's spritesheet has its own frame dial via this separate component.
+                Integer itemFrame = stack.get(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_FRAME.get());
+                frame = itemFrame != null ? itemFrame : stateAnim.defaultFrame();
             }
         }
 
@@ -158,7 +222,7 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
             effectiveTexH = model.texHeight();
         }
 
-        RenderType renderType = RenderType.entityCutoutNoCull(textureLoc);
+        RenderType renderType = RenderType.entityCutoutNoCull(state.texture());
         VertexConsumer vc = ItemRenderer.getFoilBufferDirect(buffer, renderType, false, stack.hasFoil());
 
         poseStack.pushPose();
@@ -170,6 +234,41 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         }
 
         poseStack.popPose();
+    }
+
+    /**
+     * Renders a FLAT-kind state — a plain vanilla item model (e.g. {@code minecraft:item/generated})
+     * resolved and baked directly, bypassing model-resolution/custom-renderer dispatch (which would
+     * otherwise loop back to this same renderer, since the Item's base model is {@code builtin/entity}).
+     * This lets one Item mix 3D geo states and flat icon states, since vanilla itself only decides
+     * "custom renderer vs. not" once per Item, not per CustomModelData value. Vanilla never applies an
+     * ItemTransform for custom-rendered items (that branch is skipped entirely in ItemRenderer), so this
+     * renders the flat model's raw baked quads directly with no additional pose applied.
+     */
+    private void renderFlatState(ItemStack stack, Item item, int itemState, ItemStateEntry state,
+                                 ItemDisplayContext displayContext, PoseStack poseStack, MultiBufferSource buffer,
+                                 int packedLight, int packedOverlay) {
+        StateAnim stateAnim = state.stateAnim() != null ? state.stateAnim() : StateAnim.NONE;
+
+        ResourceLocation resolvedLoc = state.flatModelLoc();
+        // Non-animated multi-frame flat state: pick a per-frame model via ITEM_FRAME, independent of
+        // CustomModelData (which only ever picks the active state). Animated flat states need no code
+        // here at all — their vanilla .mcmeta handles playback with no custom logic.
+        if (stateAnim.frames() > 1 && !stateAnim.animated() && state.flatFrameModelBase() != null) {
+            Integer itemFrame = stack.get(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_FRAME.get());
+            int frame = itemFrame != null ? Math.min(Math.max(itemFrame, 0), stateAnim.frames() - 1) : stateAnim.defaultFrame();
+            resolvedLoc = state.flatFrameModelBase().withSuffix("_frame" + frame);
+        }
+        if (resolvedLoc == null) return;
+
+        var modelManager = Minecraft.getInstance().getModelManager();
+        var modelLoc = new net.minecraft.client.resources.model.ModelResourceLocation(
+                resolvedLoc, net.minecraft.client.resources.model.ModelResourceLocation.STANDALONE_VARIANT);
+        var bakedModel = modelManager.getModel(modelLoc);
+        if (bakedModel == null) return;
+
+        Minecraft.getInstance().getItemRenderer().render(
+                stack, displayContext, false, poseStack, buffer, packedLight, packedOverlay, bakedModel);
     }
 
     private void renderBone(BakedBone bone, PoseStack poseStack, VertexConsumer vc,
@@ -398,12 +497,37 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     // ─── Data records ────────────────────────────────────────────────────────────
 
-    public record StateAnim(int frames, boolean animated, int ticksPerFrame) {
-        public static final StateAnim NONE = new StateAnim(0, false, 0);
+    public record StateAnim(int frames, boolean animated, int ticksPerFrame, int defaultFrame) {
+        public static final StateAnim NONE = new StateAnim(0, false, 0, 0);
+
+        public StateAnim(int frames, boolean animated, int ticksPerFrame) {
+            this(frames, animated, ticksPerFrame, 0);
+        }
     }
 
-    private record GeoItemEntry(List<ResourceLocation> geoLocations, List<ResourceLocation> textures,
-                                List<StateAnim> stateAnims) {}
+    /** Whether a state is a 3D bone-rendered geo model, or a flat vanilla-style baked item model. */
+    public enum StateKind { GEO, FLAT }
+
+    /**
+     * One entry in an item's state list, selected at render time by {@code CustomModelData}.
+     * {@code geoLoc} is only used for {@code GEO} states; {@code flatModelLoc} only for {@code FLAT} states.
+     * {@code texture} is the geo texture for {@code GEO} states (spritesheet-capable via {@code stateAnim}).
+     * {@code stateAnim} also carries a FLAT state's own spritesheet info (frames/animated/ticksPerFrame/
+     * defaultFrame) — animated flat states rely entirely on the vanilla {@code .mcmeta} file (no code
+     * needed here); non-animated multi-frame flat states resolve a per-frame model via
+     * {@code flatFrameModelBase} + {@link net.ye6isu.yebisuRPG.component.ModDataComponents#ITEM_FRAME}
+     * (independent of {@code CustomModelData}, which only ever picks the active state).
+     */
+    public record ItemStateEntry(StateKind kind, ResourceLocation geoLoc, ResourceLocation texture,
+                                 StateAnim stateAnim, ResourceLocation flatModelLoc, ResourceLocation displayModelLoc,
+                                 ResourceLocation flatFrameModelBase) {
+        public ItemStateEntry(StateKind kind, ResourceLocation geoLoc, ResourceLocation texture,
+                              StateAnim stateAnim, ResourceLocation flatModelLoc, ResourceLocation displayModelLoc) {
+            this(kind, geoLoc, texture, stateAnim, flatModelLoc, displayModelLoc, null);
+        }
+    }
+
+    private record GeoItemEntry(List<ItemStateEntry> states) {}
     private record BakedGeoModel(int texWidth, int texHeight, List<BakedBone> bones) {}
     private record BakedBone(String name, float pivotX, float pivotY, float pivotZ,
                              float rotX, float rotY, float rotZ,

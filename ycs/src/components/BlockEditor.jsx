@@ -153,7 +153,7 @@ function PortalDropdown({ value, options, onChange, compact, transparent, minWid
   const [search, setSearch] = useState('');
   const anchorRef = useRef(null);
   const searchRef = useRef(null);
-  const selected = options.find(o => o.value === value) || options[0];
+  const selected = options.find(o => o.value === value);
   const openDrop = (e) => {
     e.stopPropagation();
     if (!open) { const r = anchorRef.current?.getBoundingClientRect(); if (r) setRect(r); setSearch(''); }
@@ -262,10 +262,11 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
   if (seg.type === 'dropdown') {
     const fieldDef = bdef?.fields?.[seg.key];
     if (fieldDef?.showIf && !evalCondition(fieldDef.showIf, node.fields)) return null;
-    const isDataComponents = fieldDef?.source === 'dataComponents';
+    const source = fieldDef?.source || seg.source;
+    const isDataComponents = source === 'dataComponents';
     let options = fieldDef?.options
       || (isDataComponents ? dynamicDataComponentOptions : null)
-      || (fieldDef?.source && DROPDOWN_SOURCES[fieldDef.source])
+      || (source && DROPDOWN_SOURCES[source])
       || [];
     if (isDataComponents && bdef?.dropdownExcludesCompType) {
       options = options.filter(o => o.compType !== bdef.dropdownExcludesCompType);
@@ -828,36 +829,42 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
     let cancelled = false;
     const load = async () => {
       const options = [];
-      try {
-        const globalIds = await invoke('list_ycs_data', { category: 'components' });
-        for (const id of globalIds) {
-          try {
-            const raw = await invoke('load_ycs_data', { category: 'components', id });
-            const c = JSON.parse(raw);
-            options.push({
-              value: c.name || id,
-              label: `${c.name || id} (Global)`,
-              compType: c.type,
-              constName: c.name || id,
-            });
-          } catch {}
-        }
-      } catch {}
+      let itemDataComponents = [];
       if (itemId) {
         try {
           const raw = await invoke('load_ycs_data', { category: 'items', id: itemId });
           const item = JSON.parse(raw);
-          for (const dc of (item.dataComponents || [])) {
-            if (dc.kind !== 'inline' || !dc.name) continue;
-            const compId = `${itemId}_${dc.name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-            options.push({
-              value: dc.name,
-              label: dc.name,
-              compType: dc.type,
-              constName: compId,
-            });
+          itemDataComponents = item.dataComponents || [];
+        } catch {}
+      }
+      const attachedRefs = new Set(itemDataComponents.filter(dc => dc.kind === 'ref' && dc.ref).map(dc => dc.ref));
+      if (attachedRefs.size > 0) {
+        try {
+          const globalIds = await invoke('list_ycs_data', { category: 'components' });
+          for (const id of globalIds) {
+            try {
+              const raw = await invoke('load_ycs_data', { category: 'components', id });
+              const c = JSON.parse(raw);
+              if (!attachedRefs.has(c.name || id)) continue;
+              options.push({
+                value: c.name || id,
+                label: `${c.name || id} (Global)`,
+                compType: c.type,
+                constName: c.name || id,
+              });
+            } catch {}
           }
         } catch {}
+      }
+      for (const dc of itemDataComponents) {
+        if (dc.kind !== 'inline' || !dc.name) continue;
+        const compId = `${itemId}_${dc.name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        options.push({
+          value: dc.name,
+          label: dc.name,
+          compType: dc.type,
+          constName: compId,
+        });
       }
       if (!cancelled) {
         dynamicDataComponentOptions = options;
@@ -922,10 +929,6 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
     if (!startNode) return;
     setPan({ x: el.clientWidth / 2 - startNode.x - 60, y: el.clientHeight / 2 - startNode.y - BLOCK_H / 2 });
   }, [pan]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + stableId, JSON.stringify(nodes));
-  }, [nodes, stableId]);
 
   const relayoutChains = useCallback(() => {
     requestAnimationFrame(() => {
@@ -1134,6 +1137,15 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
     setDragging(null);
   }, [dragging, relayoutChains]);
 
+  useEffect(() => {
+    window.addEventListener('mousemove', handleCanvasMouseMove);
+    window.addEventListener('mouseup', handleCanvasMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleCanvasMouseMove);
+      window.removeEventListener('mouseup', handleCanvasMouseUp);
+    };
+  }, [handleCanvasMouseMove, handleCanvasMouseUp]);
+
   const handleBlockMouseDown = useCallback((e, nid) => {
     e.stopPropagation();
     if (e.button !== 0) return;
@@ -1326,9 +1338,6 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
         <div ref={canvasAreaRef}
           style={{ position: 'relative', flex: 1, overflow: 'hidden', backgroundColor: 'transparent', minHeight: 0 }}
           onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
-          onMouseLeave={handleCanvasMouseUp}
           onWheel={handleWheel}
           onDragOver={e => e.preventDefault()}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
@@ -1346,13 +1355,6 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
               })}
             </div>
           </div>
-          {nodes.length <= 1 && (
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-              color: 'var(--ycs-text)', opacity: 0.15, fontSize: 16, fontWeight: 500,
-              pointerEvents: 'none', zIndex: 1, textAlign: 'center', userSelect: 'none' }}>
-              Drag blocks from the palette to get started
-            </div>
-          )}
           <div style={{ position: 'absolute', bottom: 8, right: 8, fontSize: '10px',
             color: 'var(--ycs-text)', opacity: 0.3, pointerEvents: 'none', zIndex: 4 }}>
             {Math.round(zoom * 100)}%

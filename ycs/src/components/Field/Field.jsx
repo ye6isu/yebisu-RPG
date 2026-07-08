@@ -202,9 +202,9 @@ export function DropdownField({ value, onChange, options }) {
           gap: '4px',
         }}
       >
-        {selectedImg && !isOpen && (
+        {!isOpen && (selectedOption?.thumb || (selectedImg && (
           <img src={selectedImg} alt="" style={{ width: '16px', height: '16px', imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} />
-        )}
+        )))}
         <input
           type="text"
           value={displayValue}
@@ -245,10 +245,10 @@ export function DropdownField({ value, onChange, options }) {
                 onClick={() => { onChange(opt.value); setIsOpen(false); }}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {opt.img
+                {opt.thumb || (opt.img
                   ? <img src={opt.img} alt="" style={{ width: '16px', height: '16px', imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} />
                   : <div style={{ width: '16px', flexShrink: 0 }} />
-                }
+                )}
                 {opt.label}
               </div>
             )
