@@ -5,6 +5,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.ye6isu.yebisuRPG.network.animation.*;
+import net.ye6isu.yebisuRPG.texture.network.TextureSyncClientHandler;
+import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
 @EventBusSubscriber(modid = yebisuRPG.MODID)
@@ -47,5 +49,10 @@ public final class NetworkRegistry {
                 ItemAnimPosePayload.TYPE,
                 ItemAnimPosePayload.STREAM_CODEC,
                 ClientHandlerProxy::onItemAnimPose);
+
+        registrar.playToClient(
+                TextureSyncPayload.TYPE,
+                TextureSyncPayload.STREAM_CODEC,
+                TextureSyncClientHandler::handle);
     }
 }

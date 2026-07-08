@@ -496,6 +496,40 @@ fn copy_texture_to_mod(texture_id: &str, dest_file: &str) -> Result<String, Stri
     Err(format!("No image file found for texture {}", texture_id))
 }
 
+/// Slices a spritesheet texture (single column, N rows, one frame per row) into
+/// individual per-frame PNGs and writes them into the mod at `<dest_dir>/<dest_stem>_frame<N>.png`.
+/// Returns the list of relative dest_file paths written (frame 0 first), for `_injections` tracking.
+#[tauri::command]
+fn write_item_frame_textures(texture_id: &str, rows: u32, dest_dir: &str, dest_stem: &str) -> Result<Vec<String>, String> {
+    let tex_dir = ycs_data_dir().join("textures");
+    let extensions = ["png", "jpg", "jpeg", "gif", "webp"];
+    let src = extensions
+        .iter()
+        .map(|ext| tex_dir.join(format!("{}.{}", texture_id, ext)))
+        .find(|p| p.exists())
+        .ok_or_else(|| format!("No image file found for texture {}", texture_id))?;
+
+    let img = image::open(&src).map_err(|e| format!("Failed to decode image: {}", e))?;
+    let (width, height) = (img.width(), img.height());
+    if rows == 0 || height % rows != 0 {
+        return Err(format!("Image height {} is not evenly divisible by {} rows", height, rows));
+    }
+    let frame_height = height / rows;
+
+    let dest_dir_path = src_root().join(dest_dir);
+    fs::create_dir_all(&dest_dir_path).map_err(|e| format!("Failed to create dir: {}", e))?;
+
+    let mut written = Vec::new();
+    for row in 0..rows {
+        let frame = img.crop_imm(0, row * frame_height, width, frame_height);
+        let dest_rel = format!("{}/{}_frame{}.png", dest_dir, dest_stem, row);
+        let dest_path = src_root().join(&dest_rel);
+        frame.save(&dest_path).map_err(|e| format!("Failed to write frame {}: {}", row, e))?;
+        written.push(dest_rel);
+    }
+    Ok(written)
+}
+
 #[tauri::command]
 fn get_mod_root() -> String {
     mod_root().to_string_lossy().to_string()
@@ -523,6 +557,7 @@ pub fn run() {
             find_component_usage,
             rename_texture_image,
             copy_texture_to_mod,
+            write_item_frame_textures,
             read_image_base64,
             inject_marker,
             remove_marker_content,

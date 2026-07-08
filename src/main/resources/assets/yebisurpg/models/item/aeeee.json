@@ -1,0 +1,29 @@
+{
+  "parent": "minecraft:item/generated",
+  "overrides": [
+    {
+      "predicate": {
+        "custom_model_data": 0
+      },
+      "model": "yebisurpg:item/aeeee_state0"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 1
+      },
+      "model": "yebisurpg:item/aeeee_state1"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 2
+      },
+      "model": "yebisurpg:item/aeeee_state2"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 3
+      },
+      "model": "yebisurpg:item/aeeee_state3"
+    }
+  ]
+}

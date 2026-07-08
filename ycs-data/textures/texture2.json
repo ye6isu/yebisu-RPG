@@ -1,0 +1,9 @@
+{
+  "id": "texture2",
+  "label": "texture2",
+  "fileName": "texture2.png",
+  "rows": 2,
+  "defaultFrame": 0,
+  "animatedOnUse": true,
+  "ticksPerFrame": 4
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { FieldRow, StringField, NumberInput, StandardDropdownField } from './Field/Field';
+import { FieldRow, StringField, StandardDropdownField } from './Field/Field';
 
 const JAVA_BASE = 'java/net/ye6isu/yebisuRPG';
 
@@ -8,11 +8,10 @@ export const DATA_COMPONENT_TYPES = [
   { label: 'Number', value: 'double' },
   { label: 'Boolean', value: 'boolean' },
   { label: 'Text', value: 'string' },
-  { label: 'Item Slots', value: 'itemstack' },
 ];
 
-const DC_REGISTER_METHOD = { double: 'registerDouble', boolean: 'registerBoolean', string: 'registerString', itemstack: 'registerItemStackList' };
-const DC_JAVA_TYPE = { double: 'Double', boolean: 'Boolean', string: 'String', itemstack: 'List<ItemStack>' };
+const DC_REGISTER_METHOD = { double: 'registerDouble', boolean: 'registerBoolean', string: 'registerString' };
+const DC_JAVA_TYPE = { double: 'Double', boolean: 'Boolean', string: 'String' };
 
 export function componentConstName(name) {
   return name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
@@ -121,7 +120,6 @@ function ComponentEditor({ componentId, onBack, onSaved }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('double');
   const [defaultValue, setDefaultValue] = useState('');
-  const [slotCount, setSlotCount] = useState('1');
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -133,7 +131,6 @@ function ComponentEditor({ componentId, onBack, onSaved }) {
         setName(data.name || componentId);
         setType(data.type || 'double');
         setDefaultValue(data.defaultValue ?? '');
-        setSlotCount(String(data.slotCount ?? '1'));
       })
       .catch(() => {});
   }, [componentId]);
@@ -168,7 +165,6 @@ function ComponentEditor({ componentId, onBack, onSaved }) {
 
       const payload = {
         name: trimmed, type, defaultValue,
-        slotCount: type === 'itemstack' ? (parseInt(slotCount) || 1) : undefined,
         _injections: [{ type: 'java-marker', file: `${JAVA_BASE}/component/ModDataComponents.java`, marker: 'YCS_Data_Components', content: line }],
       };
       await invoke('save_ycs_data', { category: 'components', id, content: JSON.stringify(payload, null, 2) });
@@ -205,11 +201,7 @@ function ComponentEditor({ componentId, onBack, onSaved }) {
         <FieldRow label="Type">
           <StandardDropdownField value={type} onChange={setType} options={DATA_COMPONENT_TYPES} />
         </FieldRow>
-        {type === 'itemstack' ? (
-          <FieldRow label="Slot Count">
-            <NumberInput value={slotCount} onChange={setSlotCount} style={{ width: '64px' }} />
-          </FieldRow>
-        ) : type === 'boolean' ? (
+        {type === 'boolean' ? (
           <FieldRow label="Default">
             <Checkbox checked={!!defaultValue} onChange={setDefaultValue} />
           </FieldRow>

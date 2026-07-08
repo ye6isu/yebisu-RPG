@@ -1,5 +1,5 @@
 {
-  "name": "max_ammo",
+  "name": "globalnum",
   "type": "double",
   "defaultValue": "0",
   "_injections": [
@@ -7,7 +7,7 @@
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/component/ModDataComponents.java",
       "marker": "YCS_Data_Components",
-      "content": "    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> MAX_AMMO = registerDouble(\"max_ammo\");"
+      "content": "    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> GLOBALNUM = registerDouble(\"globalnum\");"
     }
   ]
 }

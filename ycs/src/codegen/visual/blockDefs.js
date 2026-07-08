@@ -934,7 +934,9 @@ export const BLOCK_DEFS = [
     label: "Get Data Component [compName:dropdown.dataComponents]",
     hint: "Get a data component value from the item stack",
     color: "#4d65b4",
-    dropdownExcludesCompType: "itemstack",
+    fields: {
+      compName: { source: "dataComponents", searchable: true },
+    },
     dynamicLinkType: {
       field: "compType",
       map: { boolean: "logic", string: "text", "*": "number" },
@@ -953,7 +955,9 @@ export const BLOCK_DEFS = [
     label: "Set Data Component [compName:dropdown.dataComponents] to [value:number]",
     hint: "Set a data component value on the item stack",
     color: "#4d65b4",
-    dropdownExcludesCompType: "itemstack",
+    fields: {
+      compName: { source: "dataComponents", searchable: true },
+    },
     dynamicAccepts: {
       value: { field: "compType", map: { boolean: "logic", string: "text", "*": "number" } },
     },
@@ -967,70 +971,51 @@ export const BLOCK_DEFS = [
     },
   },
   {
-    opcode: "datacomp.get_slot",
-    category: "Data", sub: "data",
-    linkType: "itemstack",
-    paletteLabel: "Get Data Component Slot",
-    label: "Get Data Component [compName:dropdown.dataComponents] Slot [index:number]",
-    hint: "Get the item stack at a slot index within an Item Slots data component",
-    color: "#945d66",
-    dropdownRequiresCompType: "itemstack",
-    codegen: {
-      type: "value",
-      handler: "datacomp.get_slot",
-      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents", "net.minecraft.world.item.ItemStack"],
-      slotDefaults: {
-        index: { opcode: "number.literal", fields: { value: "0" } },
-      },
-    },
-  },
-  {
-    opcode: "datacomp.set_slot",
+    opcode: "overlay.play",
     category: "Data", sub: "actions",
     isAction: true,
-    paletteLabel: "Set Data Component Slot",
-    label: "Set Data Component [compName:dropdown.dataComponents] Slot [index:number] to [item:itemstack]",
-    hint: "Set the item stack at a slot index within an Item Slots data component",
-    color: "#945d66",
-    dropdownRequiresCompType: "itemstack",
+    paletteLabel: "Play Overlay Animation",
+    label: "Play Texture Overlay [loopMode:dropdown] Speed [speed:number] Ticks/Frame [ticksPerFrame:number] for [entity:entity]",
+    hint: "Start playing entity's active spritesheet overlay layers — synced to every client (including late joiners) from one shared start point, like bone/pose animation triggers",
+    color: "#c46c94",
+    fields: {
+      loopMode: {
+        type: "dropdown",
+        options: [
+          { value: "loop", label: "Loop" },
+          { value: "play_once", label: "Play Once" },
+          { value: "hold", label: "Hold Last Frame" },
+        ],
+        default: "loop",
+      },
+    },
     codegen: {
       type: "action",
-      handler: "datacomp.set_slot",
-      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents", "net.minecraft.world.item.ItemStack", "java.util.ArrayList"],
+      handler: "overlay.play",
+      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents", "net.ye6isu.yebisuRPG.texture.FrameLoopMode"],
       slotDefaults: {
-        index: { opcode: "number.literal", fields: { value: "0" } },
-        item: { opcode: "itemstack.literal" },
+        entity: { opcode: "entity.event" },
+        speed: { opcode: "number.literal", fields: { value: "1" } },
+        ticksPerFrame: { opcode: "number.literal", fields: { value: "4" } },
       },
     },
   },
   {
-    opcode: "datacomp.slot_count",
-    category: "Data", sub: "data",
-    linkType: "number",
-    paletteLabel: "Data Component Slot Count",
-    label: "Slot Count of [compName:dropdown.dataComponents]",
-    hint: "Number of slots currently stored in an Item Slots data component's list",
-    color: "#4d65b4",
-    dropdownRequiresCompType: "itemstack",
+    opcode: "overlay.stop",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Stop Overlay Animation",
+    label: "Stop Texture Overlay at Frame [frame:number] for [entity:entity]",
+    hint: "Stop entity's active spritesheet overlay layers, holding on the given frame — synced to every client",
+    color: "#c46c94",
     codegen: {
-      type: "value",
-      handler: "datacomp.slot_count",
-      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents"],
-    },
-  },
-  {
-    opcode: "datacomp.find_empty_slot",
-    category: "Data", sub: "data",
-    linkType: "number",
-    paletteLabel: "Find Empty Data Component Slot",
-    label: "First Empty Slot of [compName:dropdown.dataComponents]",
-    hint: "Index of the first empty (or missing) slot in an Item Slots data component; -1 if none found",
-    color: "#4d65b4",
-    dropdownRequiresCompType: "itemstack",
-    codegen: {
-      type: "value",
-      handler: "datacomp.find_empty_slot",
-      imports: ["net.ye6isu.yebisuRPG.component.ModDataComponents", "net.minecraft.world.item.ItemStack"],
+      type: "action",
+      handler: "overlay.stop",
+      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        frame: { opcode: "number.literal", fields: { value: "0" } },
+      },
     },
   },
 
@@ -1131,7 +1116,7 @@ export const BLOCK_DEFS = [
     color: "#c46c94",
     codegen: {
       type: "action",
-      template: "{{stack}}.set(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get(), (int)((double)({{state}})));",
+      template: "{{stack}}.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)({{state}}))));",
       imports: [],
       slotDefaults: {
         stack: { opcode: "itemstack.literal" },
@@ -1148,7 +1133,7 @@ export const BLOCK_DEFS = [
     color: "#c46c94",
     codegen: {
       type: "action",
-      template: "{{stack}}.remove(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get());",
+      template: "{{stack}}.remove(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA);",
       imports: [],
       slotDefaults: { stack: { opcode: "itemstack.literal" } },
     },
@@ -1162,7 +1147,7 @@ export const BLOCK_DEFS = [
     color: "#4d65b4",
     codegen: {
       type: "value",
-      expr: "({{stack}}.getOrDefault(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_STATE.get(), 0))",
+      expr: "({{stack}}.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData(0)).value())",
       imports: [],
       slotDefaults: { stack: { opcode: "itemstack.literal" } },
     },
@@ -1172,11 +1157,11 @@ export const BLOCK_DEFS = [
     category: "Item", sub: "actions",
     isAction: true,
     label: "Set Item Texture Frame to [frame:number] for [stack:itemstack]",
-    hint: "Set the visual frame of a spritesheet item via CustomModelData",
+    hint: "Set the visual frame of a spritesheet item — independent from Item State, so this works the same whether or not the item also uses multiple states",
     color: "#c46c94",
     codegen: {
       type: "action",
-      template: "{{stack}}.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)({{frame}})) + 1));",
+      template: "{{stack}}.set(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_FRAME.get(), (int)((double)({{frame}})));",
       imports: [],
       slotDefaults: {
         stack: { opcode: "itemstack.literal" },
@@ -1193,7 +1178,7 @@ export const BLOCK_DEFS = [
     color: "#c46c94",
     codegen: {
       type: "action",
-      template: "{{stack}}.remove(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA);",
+      template: "{{stack}}.remove(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_FRAME.get());",
       imports: [],
       slotDefaults: {
         stack: { opcode: "itemstack.literal" },
@@ -1209,7 +1194,7 @@ export const BLOCK_DEFS = [
     color: "#4d65b4",
     codegen: {
       type: "value",
-      expr: "(Math.max(0, {{stack}}.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData(0)).value() - 1))",
+      expr: "({{stack}}.getOrDefault(net.ye6isu.yebisuRPG.component.ModDataComponents.ITEM_FRAME.get(), 0))",
       imports: [],
       slotDefaults: { stack: { opcode: "itemstack.literal" } },
     },

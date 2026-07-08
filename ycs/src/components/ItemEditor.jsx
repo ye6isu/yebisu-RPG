@@ -6,15 +6,18 @@ import { VANILLA_ITEMS } from '../data/vanillaItems';
 import { EMPTY_GRID, buildCharMap, gridToPattern, ShapedGrid, ShapelessIngredients } from './RecipeEditor';
 import { compileChain, collectBlockImports } from '../codegen/visual/compiler.js';
 import { DATA_COMPONENT_TYPES, componentConstName } from './ComponentsLanding';
+import { SpritesheetPreview } from './TextureManager';
 
-function FieldGroup({ label, children }) {
+function FieldGroup({ label, headerExtra, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
         fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px',
         opacity: 0.4, padding: '4px 0', userSelect: 'none',
       }}>
-        {label}
+        <span>{label}</span>
+        {headerExtra}
       </div>
       <div style={{
         display: 'flex', flexDirection: 'column', gap: '4px',
@@ -352,17 +355,13 @@ function DataComponentRow({ dc, onChange, onRemove, globalOptions, globalCompone
       )}
 
       {isRef ? (
-        refComp?.type === 'itemstack' ? (
-          <span style={{ fontSize: '11px', opacity: 0.3, width: '120px', flexShrink: 0 }}>(no override)</span>
-        ) : refComp?.type === 'boolean' ? (
+        refComp?.type === 'boolean' ? (
           <Checkbox checked={!!dc.overrideDefault} onChange={v => onChange({ overrideDefault: v })} />
         ) : (
           <StringField value={dc.overrideDefault ?? ''} onChange={v => onChange({ overrideDefault: v })} placeholder={String(refComp?.defaultValue ?? 'default')} style={{ width: '120px', flexShrink: 0 }} />
         )
       ) : (
-        dc.type === 'itemstack' ? (
-          <NumberInput value={dc.slotCount ?? '1'} onChange={v => onChange({ slotCount: v })} style={{ width: '120px', flexShrink: 0 }} />
-        ) : dc.type === 'boolean' ? (
+        dc.type === 'boolean' ? (
           <Checkbox checked={!!dc.defaultValue} onChange={v => onChange({ defaultValue: v })} />
         ) : (
           <StringField value={dc.defaultValue ?? ''} onChange={v => onChange({ defaultValue: v })} placeholder="default" style={{ width: '120px', flexShrink: 0 }} />
@@ -381,7 +380,7 @@ function DataComponentRow({ dc, onChange, onRemove, globalOptions, globalCompone
 function DataComponentsPage({ components, onChange, globalComponents, onBack }) {
   const update = (i, patch) => onChange(components.map((c, idx) => idx === i ? { ...c, ...patch } : c));
   const remove = (i) => onChange(components.filter((_, idx) => idx !== i));
-  const addInline = () => onChange([...components, { kind: 'inline', name: '', type: 'double', defaultValue: '', slotCount: '1' }]);
+  const addInline = () => onChange([...components, { kind: 'inline', name: '', type: 'double', defaultValue: '' }]);
   const addRef = () => onChange([...components, { kind: 'ref', ref: globalComponents[0]?.name || '', overrideDefault: '' }]);
 
   const globalOptions = globalComponents.map(c => ({ label: `${c.name} (${DATA_COMPONENT_TYPES.find(t => t.value === c.type)?.label || c.type})`, value: c.name }));
@@ -392,10 +391,12 @@ function DataComponentsPage({ components, onChange, globalComponents, onBack }) 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button className="ycs-tiny-button" onClick={onBack} title="Back" style={{ border: '1px solid var(--ycs-foreground)' }}>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 12L6 8l4-4"/></svg>
+        </button>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>Data Components</h2>
         <button className="ycs-button" onClick={addRef}>+ Attach Global</button>
         <button className="ycs-button" onClick={addInline}>+ New Item-Specific</button>
-        <button className="ycs-button" onClick={onBack}>Back</button>
       </div>
 
       <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
@@ -529,6 +530,129 @@ function FileDropZone({ hasFile, fileName, onImport, onClear }) {
   );
 }
 
+/**
+ * Repeatable list of item states, switchable in-game via CustomModelData (see Set/Get/Reset Item
+ * State Blocky blocks). Each state independently picks kind = 3D geo model or flat icon, modeled
+ * on RecipeEditor.jsx's ShapelessIngredients pattern (controlled array, add/set/remove by index).
+ */
+function ItemStates({ itemId, states, onChange, textureOptions, max = 16 }) {
+  const add = () => {
+    if (states.length < max) {
+      onChange([...states, { holdingMode: 'generated', texture: '', geoModel: '', geoTexture: '', displayModel: '' }]);
+    }
+  };
+  const set = (i, patch) => {
+    const next = [...states];
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  };
+  const remove = (i) => onChange(states.filter((_, idx) => idx !== i));
+
+  const importStateGeoModel = async (i, droppedPath) => {
+    if (!itemId) return;
+    let filePath = droppedPath;
+    if (!filePath) {
+      const file = await open({ multiple: false, filters: [{ name: 'Bedrock Geo', extensions: ['json'] }] });
+      if (!file) return;
+      filePath = typeof file === 'string' ? file : file.path;
+    }
+    const stateModelId = `${itemId}_state${i}`;
+    try {
+      await invoke('import_geo_model', { id: stateModelId, sourcePath: filePath });
+      set(i, { geoModel: stateModelId });
+    } catch {}
+  };
+
+  const importStateDisplayModel = async (i, droppedPath) => {
+    if (!itemId) return;
+    let filePath = droppedPath;
+    if (!filePath) {
+      const file = await open({ multiple: false, filters: [{ name: 'Display Model JSON', extensions: ['json'] }] });
+      if (!file) return;
+      filePath = typeof file === 'string' ? file : file.path;
+    }
+    const stateModelId = `${itemId}_state${i}`;
+    try {
+      await invoke('import_display_model', { id: stateModelId, sourcePath: filePath });
+      set(i, { displayModel: stateModelId });
+    } catch {}
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {states.map((state, i) => {
+        const is3DState = state.holdingMode === '3d';
+        return (
+          <FieldGroup
+            key={i}
+            label={`State ${i}`}
+            headerExtra={
+              <button className="ycs-button icon" onClick={() => remove(i)} title="Remove State" style={{ flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            }
+          >
+            <FieldRow label="Holding Mode">
+              <StandardDropdownField
+                value={state.holdingMode}
+                onChange={(v) => set(i, { holdingMode: v })}
+                options={[
+                  { label: 'Generated', value: 'generated' },
+                  { label: 'Handheld', value: 'handheld' },
+                  { label: '3D Model', value: '3d' },
+                ]}
+              />
+            </FieldRow>
+
+            {is3DState ? (
+              <>
+                <FieldRow label="Texture">
+                  <DropdownField
+                    value={state.geoTexture}
+                    onChange={(v) => set(i, { geoTexture: v })}
+                    options={[{ label: '(None)', value: '' }, ...textureOptions]}
+                  />
+                </FieldRow>
+                <FieldRow label="Model">
+                  <FileDropZone
+                    hasFile={!!state.geoModel}
+                    fileName={`${state.geoModel}.geo.json`}
+                    onImport={(path) => importStateGeoModel(i, path)}
+                    onClear={() => set(i, { geoModel: '' })}
+                  />
+                </FieldRow>
+                <FieldRow label="Display Model">
+                  <FileDropZone
+                    hasFile={!!state.displayModel}
+                    fileName={`${state.displayModel}.display.json`}
+                    onImport={(path) => importStateDisplayModel(i, path)}
+                    onClear={() => set(i, { displayModel: '' })}
+                  />
+                </FieldRow>
+              </>
+            ) : (
+              <FieldRow label="Texture">
+                <DropdownField
+                  value={state.texture}
+                  onChange={(v) => set(i, { texture: v })}
+                  options={[{ label: '(None)', value: '' }, ...textureOptions]}
+                />
+              </FieldRow>
+            )}
+          </FieldGroup>
+        );
+      })}
+      {states.length < max && (
+        <button className="ycs-button" style={{ alignSelf: 'flex-start', minWidth: 0, padding: '4px 10px', fontSize: '12px' }} onClick={add}>
+          + Add State
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEditor }) {
   const [itemId, setItemId] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -543,6 +667,8 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
   const [geoModel, setGeoModel] = useState('');
   const [geoTexture, setGeoTexture] = useState('');
   const [displayModel, setDisplayModel] = useState('');
+  const [multiState, setMultiState] = useState(false);
+  const [states, setStates] = useState([]);
   const [textures, setTextures] = useState([]);
   const [availableTabs, setAvailableTabs] = useState([]);
   const [creativeTab, setCreativeTab] = useState('');
@@ -727,6 +853,8 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           setGeoModel(data.geoModel || '');
           setGeoTexture(data.geoTexture || '');
           setDisplayModel(data.displayModel || '');
+          setMultiState(!!data.states?.length);
+          setStates(data.states || []);
           setCustomClass(data.customClass || false);
           setEnabledMethods(data.enabledMethods || []);
           setDataComponents(data.dataComponents || []);
@@ -799,6 +927,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     geoModel: is3D && geoModel ? itemId : '',
     geoTexture: is3D ? geoTexture : '',
     displayModel: is3D && displayModel ? itemId : '',
+    states: multiState ? states : [],
     customClass,
     enabledMethods,
     dataComponents,
@@ -1148,7 +1277,134 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
         injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModCreativeTabContents.java`, marker: 'YCS_Tab_Contents', content: tabContentLine });
       }
 
-      if (is3D) {
+      if (multiState) {
+        // Each state gets its own namespaced files (`${itemId}_state${i}`). Every multi-state item —
+        // whether it mixes 3D/flat or is flat-only — registers through tryRegisterMixedStates; Java
+        // decides internally whether the custom renderer is actually needed (only for geo states, or
+        // flat states that are themselves non-animated frame-sheets needing ITEM_FRAME-driven swapping).
+        const specs = [];
+        for (let i = 0; i < states.length; i++) {
+          const state = states[i];
+          const stateId = `${itemId}_state${i}`;
+
+          if (state.holdingMode === '3d') {
+            const modelSourceId = state.geoModel || state.displayModel;
+            if (modelSourceId && modelSourceId !== stateId) {
+              await invoke('rename_geo_model', { oldId: modelSourceId, newId: stateId }).catch(() => {});
+            }
+
+            const hasGeo = await invoke('load_geo_model_path', { id: stateId }).then(() => true).catch(() => false);
+            if (hasGeo) {
+              const geoDestPath = `${RES_BASE}/geo/item/${stateId}.geo.json`;
+              await invoke('copy_geo_model_to_mod', { modelId: stateId, destFile: geoDestPath });
+              injections.push({ type: 'created-file', file: geoDestPath });
+            }
+
+            if (state.geoTexture) {
+              const geoTexPath = `${RES_BASE}/textures/geo/item/${stateId}.png`;
+              await invoke('copy_texture_to_mod', { textureId: state.geoTexture, destFile: geoTexPath });
+              injections.push({ type: 'created-file', file: geoTexPath });
+            }
+
+            const stateTexMeta = state.geoTexture ? textures.find(t => t.id === state.geoTexture) : null;
+            const stateIsFrameSheet = stateTexMeta?.rows > 1;
+            const stateDefaultFrame = stateIsFrameSheet
+              ? Math.min(Math.max(parseInt(stateTexMeta.defaultFrame) || 0, 0), stateTexMeta.rows - 1)
+              : 0;
+            specs.push(`new GeoItemRegistry.StateSpec("geo", "${stateId}", ${stateIsFrameSheet ? stateTexMeta.rows : 0}, ${stateIsFrameSheet ? !!stateTexMeta.animatedOnUse : false}, ${stateIsFrameSheet ? (parseInt(stateTexMeta.ticksPerFrame) || 4) : 0}, ${stateDefaultFrame})`);
+
+            const displayModelPath = `${RES_BASE}/models/item/${stateId}.json`;
+            const hasDisplay = await invoke('load_display_model', { id: stateId }).then(() => true).catch(() => false);
+            if (hasDisplay) {
+              await invoke('copy_display_model_to_mod', { modelId: stateId, destFile: displayModelPath });
+            } else {
+              const fallbackModel = JSON.stringify({ parent: "minecraft:builtin/entity" }, null, 2);
+              await invoke('write_mod_file', { file: displayModelPath, content: fallbackModel });
+            }
+            injections.push({ type: 'created-file', file: displayModelPath });
+          } else {
+            const isHandheld = state.holdingMode === 'handheld';
+            const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated';
+            const stateTexMeta = state.texture ? textures.find(t => t.id === state.texture) : null;
+            const stateIsFrameSheet = stateTexMeta?.rows > 1 && !stateTexMeta.animatedOnUse;
+            const stateDefaultFrame = stateTexMeta?.rows > 1
+              ? Math.min(Math.max(parseInt(stateTexMeta.defaultFrame) || 0, 0), stateTexMeta.rows - 1)
+              : 0;
+
+            if (stateIsFrameSheet) {
+              // Static (non-animated) spritesheet on a flat state: slice into per-row textures and
+              // per-frame models, selected via ITEM_FRAME (not CustomModelData, which this state
+              // machinery already uses to pick the active STATE).
+              const rows = stateTexMeta.rows;
+              const framePaths = await invoke('write_item_frame_textures', {
+                textureId: state.texture, rows, destDir: `${RES_BASE}/textures/item`, destStem: stateId,
+              });
+              framePaths.forEach(p => injections.push({ type: 'created-file', file: p }));
+
+              for (let row = 0; row < rows; row++) {
+                const frameModelPath = `${RES_BASE}/models/item/${stateId}_frame${row}.json`;
+                const frameModel = { parent, textures: { layer0: `${MODID}:item/${stateId}_frame${row}` } };
+                await invoke('write_mod_file', { file: frameModelPath, content: JSON.stringify(frameModel, null, 2) });
+                injections.push({ type: 'created-file', file: frameModelPath });
+              }
+
+              const flatModelPath = `${RES_BASE}/models/item/${stateId}.json`;
+              const flatModel = { parent, textures: { layer0: `${MODID}:item/${stateId}_frame${stateDefaultFrame}` } };
+              await invoke('write_mod_file', { file: flatModelPath, content: JSON.stringify(flatModel, null, 2) });
+              injections.push({ type: 'created-file', file: flatModelPath });
+
+              specs.push(`new GeoItemRegistry.StateSpec("flat", "${stateId}", ${rows}, false, 0, ${stateDefaultFrame})`);
+            } else {
+              const flatModelPath = `${RES_BASE}/models/item/${stateId}.json`;
+              const flatModel = { parent, textures: { layer0: state.texture ? `${MODID}:item/${stateId}` : `${MODID}:item/missing` } };
+              await invoke('write_mod_file', { file: flatModelPath, content: JSON.stringify(flatModel, null, 2) });
+              injections.push({ type: 'created-file', file: flatModelPath });
+
+              if (state.texture) {
+                const texPath = `${RES_BASE}/textures/item/${stateId}.png`;
+                await invoke('copy_texture_to_mod', { textureId: state.texture, destFile: texPath });
+                injections.push({ type: 'created-file', file: texPath });
+
+                if (stateTexMeta?.rows > 1 && stateTexMeta.animatedOnUse) {
+                  const mcmetaPath = `${texPath}.mcmeta`;
+                  const mcmeta = { animation: { frametime: parseInt(stateTexMeta.ticksPerFrame) || 4 } };
+                  await invoke('write_mod_file', { file: mcmetaPath, content: JSON.stringify(mcmeta, null, 2) });
+                  injections.push({ type: 'created-file', file: mcmetaPath });
+                }
+              }
+
+              specs.push(`new GeoItemRegistry.StateSpec("flat", "${stateId}", 0, false, 0, 0)`);
+            }
+          }
+        }
+
+        const collectLine = `        tryRegisterMixedStates(items, ModItems.${CN}, java.util.List.of(${specs.join(', ')}));`;
+        await invoke('inject_marker', {
+          file: `${JAVA_BASE}/client/renderer/GeoItemRegistry.java`,
+          marker: 'YCS_Geo_Collect',
+          content: collectLine,
+        });
+        injections.push({ type: 'java-marker', file: `${JAVA_BASE}/client/renderer/GeoItemRegistry.java`, marker: 'YCS_Geo_Collect', content: collectLine });
+
+        // The Item's own base model routes to each state's OWN model via real custom_model_data
+        // overrides — vanilla resolves the override BEFORE applying any display transform or
+        // deciding custom-render-or-not (ItemRenderer.getModel -> BakedModel.getOverrides().resolve),
+        // so each state's resolved model independently supplies its own display block (or none) and
+        // its own isCustomRenderer() — exactly like a normal single-state item, no special-casing
+        // needed in GeoItemRenderer. State 0's own model is also the base model's own fallback look.
+        const baseParent = states[0]?.holdingMode === 'handheld' ? 'minecraft:item/handheld'
+          : states[0]?.holdingMode === '3d' ? 'minecraft:builtin/entity' : 'minecraft:item/generated';
+        const baseModelPath = `${RES_BASE}/models/item/${itemId}.json`;
+        const baseModel = {
+          parent: baseParent,
+          overrides: states.map((_, i) => ({
+            predicate: { custom_model_data: i },
+            model: `${MODID}:item/${itemId}_state${i}`,
+          })),
+        };
+        await invoke('write_mod_file', { file: baseModelPath, content: JSON.stringify(baseModel, null, 2) });
+        injections.push({ type: 'created-file', file: baseModelPath });
+      } else if (is3D) {
         // If ID changed since last import, rename stored model files to match new ID
         const modelSourceId = geoModel || displayModel;
         if (modelSourceId && modelSourceId !== itemId) {
@@ -1169,7 +1425,14 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           injections.push({ type: 'created-file', file: geoTexPath });
         }
 
-        const collectLine = `        tryRegister(items, ModItems.${CN}, "${itemId}");`;
+        const geoTexMeta = geoTexture ? textures.find(t => t.id === geoTexture) : null;
+        const geoIsFrameSheet = geoTexMeta?.rows > 1;
+        const geoDefaultFrame = geoIsFrameSheet
+          ? Math.min(Math.max(parseInt(geoTexMeta.defaultFrame) || 0, 0), geoTexMeta.rows - 1)
+          : 0;
+        const collectLine = geoIsFrameSheet
+          ? `        tryRegister(items, ModItems.${CN}, "${itemId}", ${geoTexMeta.rows}, ${!!geoTexMeta.animatedOnUse}, ${parseInt(geoTexMeta.ticksPerFrame) || 4}, ${geoDefaultFrame});`
+          : `        tryRegister(items, ModItems.${CN}, "${itemId}");`;
         await invoke('inject_marker', {
           file: `${JAVA_BASE}/client/renderer/GeoItemRegistry.java`,
           marker: 'YCS_Geo_Collect',
@@ -1190,20 +1453,65 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
 
       } else {
         const isHandheld = holdingMode === 'handheld';
-        const modelLine = isHandheld
-          ? `        handheldItem(ModItems.${CN});`
-          : `        basicItem(ModItems.${CN}.get());`;
-        await invoke('inject_marker', {
-          file: `${JAVA_BASE}/datagen/ModItemModelProvider.java`,
-          marker: 'YCS_Mod_Item_Model',
-          content: modelLine,
-        });
-        injections.push({ type: 'java-marker', file: `${JAVA_BASE}/datagen/ModItemModelProvider.java`, marker: 'YCS_Mod_Item_Model', content: modelLine });
+        const texMeta = texture ? textures.find(t => t.id === texture) : null;
+        const isFrameSheet = texMeta?.rows > 1 && !texMeta.animatedOnUse;
+
+        if (isFrameSheet) {
+          // Static (non-animated) spritesheet: slice into per-row textures and register as a single
+          // flat "state" through GeoItemRegistry, so Set/Get/Reset Item Texture Frame (which reads/
+          // writes the dedicated ITEM_FRAME component, independent of CustomModelData/Item State)
+          // works identically here as it does on multi-state items — one consistent mechanism.
+          const rows = texMeta.rows;
+          const defaultFrame = Math.min(Math.max(parseInt(texMeta.defaultFrame) || 0, 0), rows - 1);
+          const frameDestDir = `${RES_BASE}/textures/item`;
+          const framePaths = await invoke('write_item_frame_textures', {
+            textureId: texture, rows, destDir: frameDestDir, destStem: itemId,
+          });
+          framePaths.forEach(p => injections.push({ type: 'created-file', file: p }));
+
+          const parent = isHandheld ? 'minecraft:item/handheld' : 'minecraft:item/generated';
+          for (let row = 0; row < rows; row++) {
+            const frameModelPath = `${RES_BASE}/models/item/${itemId}_frame${row}.json`;
+            const frameModel = { parent, textures: { layer0: `${MODID}:item/${itemId}_frame${row}` } };
+            await invoke('write_mod_file', { file: frameModelPath, content: JSON.stringify(frameModel, null, 2) });
+            injections.push({ type: 'created-file', file: frameModelPath });
+          }
+
+          const baseModelPath = `${RES_BASE}/models/item/${itemId}.json`;
+          const baseModel = { parent, textures: { layer0: `${MODID}:item/${itemId}_frame${defaultFrame}` } };
+          await invoke('write_mod_file', { file: baseModelPath, content: JSON.stringify(baseModel, null, 2) });
+          injections.push({ type: 'created-file', file: baseModelPath });
+
+          const collectLine = `        tryRegisterMixedStates(items, ModItems.${CN}, java.util.List.of(new GeoItemRegistry.StateSpec("flat", "${itemId}", ${rows}, false, 0, ${defaultFrame})));`;
+          await invoke('inject_marker', {
+            file: `${JAVA_BASE}/client/renderer/GeoItemRegistry.java`,
+            marker: 'YCS_Geo_Collect',
+            content: collectLine,
+          });
+          injections.push({ type: 'java-marker', file: `${JAVA_BASE}/client/renderer/GeoItemRegistry.java`, marker: 'YCS_Geo_Collect', content: collectLine });
+        } else {
+          const modelLine = isHandheld
+            ? `        handheldItem(ModItems.${CN});`
+            : `        basicItem(ModItems.${CN}.get());`;
+          await invoke('inject_marker', {
+            file: `${JAVA_BASE}/datagen/ModItemModelProvider.java`,
+            marker: 'YCS_Mod_Item_Model',
+            content: modelLine,
+          });
+          injections.push({ type: 'java-marker', file: `${JAVA_BASE}/datagen/ModItemModelProvider.java`, marker: 'YCS_Mod_Item_Model', content: modelLine });
+        }
 
         if (texture) {
           const texPath = `${RES_BASE}/textures/item/${itemId}.png`;
           await invoke('copy_texture_to_mod', { textureId: texture, destFile: texPath });
           injections.push({ type: 'created-file', file: texPath });
+
+          if (texMeta?.rows > 1 && texMeta.animatedOnUse) {
+            const mcmetaPath = `${texPath}.mcmeta`;
+            const mcmeta = { animation: { frametime: parseInt(texMeta.ticksPerFrame) || 4 } };
+            await invoke('write_mod_file', { file: mcmetaPath, content: JSON.stringify(mcmeta, null, 2) });
+            injections.push({ type: 'created-file', file: mcmetaPath });
+          }
         }
       }
 
@@ -1244,8 +1552,8 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
       // Data component registrations — only item-specific ("inline") components need a fresh
       // Java registration here. "ref" components point at an existing global component
       // (registered via the Data Components page) and are just stored by reference below.
-      const DC_REGISTER_METHOD = { double: 'registerDouble', boolean: 'registerBoolean', string: 'registerString', itemstack: 'registerItemStackList' };
-      const DC_JAVA_TYPE = { double: 'Double', boolean: 'Boolean', string: 'String', itemstack: 'List<ItemStack>' };
+      const DC_REGISTER_METHOD = { double: 'registerDouble', boolean: 'registerBoolean', string: 'registerString' };
+      const DC_JAVA_TYPE = { double: 'Double', boolean: 'Boolean', string: 'String' };
       for (const dc of dataComponents) {
         if (dc.kind === 'ref' || !dc.name) continue;
         const compId = `${itemId}_${dc.name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
@@ -1307,7 +1615,22 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     setSaving(false);
   };
 
-  const textureOptions = textures.map(t => ({ label: t.label, value: t.id, img: t._url }));
+  const textureOptions = textures.map(t => ({
+    label: t.label,
+    value: t.id,
+    img: t._url,
+    thumb: t._url && t.rows > 1 ? (
+      <SpritesheetPreview
+        dataUrl={t._url}
+        rows={t.rows}
+        defaultFrame={t.defaultFrame || 0}
+        ticksPerFrame={t.ticksPerFrame || 4}
+        autoPlay={!!t.animatedOnUse}
+        size={16}
+        bare
+      />
+    ) : undefined,
+  }));
 
   if (editingDataComponents) {
     return (
@@ -1353,52 +1676,62 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
         </FieldGroup>
 
         <FieldGroup label="Appearance">
-          <FieldRow label="Holding Mode">
-            <StandardDropdownField
-              value={holdingMode}
-              onChange={setHoldingMode}
-              options={[
-                { label: 'Generated', value: 'generated' },
-                { label: 'Handheld', value: 'handheld' },
-                { label: '3D Model', value: '3d' },
-              ]}
-            />
+          <FieldRow label="Multiple States">
+            <Checkbox checked={multiState} onChange={setMultiState} />
           </FieldRow>
 
-          {is3D ? (
-            <>
-              <FieldRow label="Texture">
-                <DropdownField
-                  value={geoTexture}
-                  onChange={setGeoTexture}
-                  options={[{ label: '(None)', value: '' }, ...textureOptions]}
-                />
-              </FieldRow>
-              <FieldRow label="Model">
-                <FileDropZone
-                  hasFile={!!geoModel}
-                  fileName={`${geoModel}.geo.json`}
-                  onImport={(path) => importGeoModel(path)}
-                  onClear={() => setGeoModel('')}
-                />
-              </FieldRow>
-              <FieldRow label="Display Model">
-                <FileDropZone
-                  hasFile={!!displayModel}
-                  fileName={`${displayModel}.display.json`}
-                  onImport={(path) => importDisplayModel(path)}
-                  onClear={() => setDisplayModel('')}
-                />
-              </FieldRow>
-            </>
+          {multiState ? (
+            <ItemStates itemId={itemId} states={states} onChange={setStates} textureOptions={textureOptions} />
           ) : (
-            <FieldRow label="Texture">
-              <DropdownField
-                value={texture}
-                onChange={setTexture}
-                options={[{ label: '(None)', value: '' }, ...textureOptions]}
-              />
-            </FieldRow>
+            <>
+              <FieldRow label="Holding Mode">
+                <StandardDropdownField
+                  value={holdingMode}
+                  onChange={setHoldingMode}
+                  options={[
+                    { label: 'Generated', value: 'generated' },
+                    { label: 'Handheld', value: 'handheld' },
+                    { label: '3D Model', value: '3d' },
+                  ]}
+                />
+              </FieldRow>
+
+              {is3D ? (
+                <>
+                  <FieldRow label="Texture">
+                    <DropdownField
+                      value={geoTexture}
+                      onChange={setGeoTexture}
+                      options={[{ label: '(None)', value: '' }, ...textureOptions]}
+                    />
+                  </FieldRow>
+                  <FieldRow label="Model">
+                    <FileDropZone
+                      hasFile={!!geoModel}
+                      fileName={`${geoModel}.geo.json`}
+                      onImport={(path) => importGeoModel(path)}
+                      onClear={() => setGeoModel('')}
+                    />
+                  </FieldRow>
+                  <FieldRow label="Display Model">
+                    <FileDropZone
+                      hasFile={!!displayModel}
+                      fileName={`${displayModel}.display.json`}
+                      onImport={(path) => importDisplayModel(path)}
+                      onClear={() => setDisplayModel('')}
+                    />
+                  </FieldRow>
+                </>
+              ) : (
+                <FieldRow label="Texture">
+                  <DropdownField
+                    value={texture}
+                    onChange={setTexture}
+                    options={[{ label: '(None)', value: '' }, ...textureOptions]}
+                  />
+                </FieldRow>
+              )}
+            </>
           )}
         </FieldGroup>
 
