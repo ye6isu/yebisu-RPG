@@ -8,6 +8,22 @@
     "defaultRequire": 1
   },
   "mixins": [],
-  "client": ["AccessorCreativeModeTab"],
+  "client": [
+    "AccessorCreativeModeTab",
+    "MixinPlayerRenderer",
+    "MixinLivingEntityRenderer",
+    "MixinEnderDragonRenderer",
+    "MixinEmissiveLayers",
+    "MixinWardenEmissiveLayer",
+    "MixinBreezeEyesLayer",
+    "MixinBreezeWindLayer",
+    "MixinMushroomCowMushroomLayer",
+    "MixinHorseMarkingLayer",
+    "MixinTropicalFishPatternLayer",
+    "MixinRenderLayer",
+    "MixinSlimeOuterLayer",
+    "MixinShulkerHeadLayer",
+    "MixinLlamaDecorLayer"
+  ],
   "server": []
 }

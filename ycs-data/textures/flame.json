@@ -1,0 +1,11 @@
+{
+  "id": "flame",
+  "label": "flame",
+  "fileName": "flame.png",
+  "rows": 4,
+  "defaultFrame": 0,
+  "animatedOnUse": true,
+  "ticksPerFrame": 2,
+  "hasMask": true,
+  "hasEmissive": true
+}

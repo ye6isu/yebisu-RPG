@@ -12,6 +12,10 @@ const STORAGE_PREFIX = 'ycs-blocky::';
 // via props drilling through CanvasBlock/BlockContent.
 let dynamicDataComponentOptions = [];
 
+// Same pattern as dynamicDataComponentOptions above, but for the global texture pool — read by the
+// "textures" dropdown source (used by e.g. "Set Entity Texture Overlay").
+let dynamicTextureOptions = [];
+
 const DROPDOWN_SOURCES = {
   effects: [
     { label: 'Regeneration', value: 'MobEffects.REGENERATION' },
@@ -264,8 +268,10 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
     if (fieldDef?.showIf && !evalCondition(fieldDef.showIf, node.fields)) return null;
     const source = fieldDef?.source || seg.source;
     const isDataComponents = source === 'dataComponents';
+    const isTextures = source === 'textures';
     let options = fieldDef?.options
       || (isDataComponents ? dynamicDataComponentOptions : null)
+      || (isTextures ? dynamicTextureOptions : null)
       || (source && DROPDOWN_SOURCES[source])
       || [];
     if (isDataComponents && bdef?.dropdownExcludesCompType) {
@@ -283,6 +289,14 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
               const opt = options.find(o => o.value === v);
               onFieldChange(nodeId, 'compType', opt?.compType || 'double');
               onFieldChange(nodeId, 'compConstName', opt?.constName || v);
+            }
+            if (isTextures) {
+              const opt = options.find(o => o.value === v);
+              onFieldChange(nodeId, 'textureRows', String(opt?.rows || 1));
+              onFieldChange(nodeId, 'textureHasMask', opt?.hasMask ? '1' : '0');
+              onFieldChange(nodeId, 'textureHasEmissive', opt?.hasEmissive ? '1' : '0');
+              onFieldChange(nodeId, 'textureAnimatedOnUse', opt?.animatedOnUse ? '1' : '0');
+              onFieldChange(nodeId, 'textureTicksPerFrame', String(opt?.ticksPerFrame || 4));
             }
           }
         }}
@@ -874,6 +888,34 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
     load();
     return () => { cancelled = true; };
   }, [itemId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const options = [];
+      try {
+        const ids = await invoke('list_textures');
+        for (const id of ids) {
+          try {
+            const raw = await invoke('load_texture', { id });
+            const tex = JSON.parse(raw);
+            options.push({
+              value: tex.id || id,
+              label: tex.label || id,
+              rows: tex.rows || 1,
+              hasMask: !!tex.hasMask,
+              hasEmissive: !!tex.hasEmissive,
+              animatedOnUse: !!tex.animatedOnUse,
+              ticksPerFrame: tex.ticksPerFrame || 4,
+            });
+          } catch {}
+        }
+      } catch {}
+      if (!cancelled) dynamicTextureOptions = options;
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const addBlock = useCallback((block, wx, wy) => {
     const bdef = blockDefRegistry.get(block.opcode);

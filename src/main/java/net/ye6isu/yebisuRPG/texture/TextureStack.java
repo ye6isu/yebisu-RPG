@@ -29,4 +29,17 @@ public final class TextureStack {
     public List<TextureComponent> getLayers() { return Collections.unmodifiableList(components); }
     public int size()      { return components.size(); }
     public boolean isEmpty() { return components.isEmpty(); }
+
+    /**
+     * True if any active layer uses {@link MaskMode#ALPHA_FROM_BASE} ("Mask Over Base" in
+     * Blocky) — this mode means the overlay is meant to fully take over the entity's visible
+     * shape, so vanilla's own extra special-part passes (glowing eyes, sheep wool, mooshroom
+     * mushrooms) should be suppressed rather than drawn on top of/underneath it.
+     */
+    public boolean hasMaskOverBase() {
+        for (TextureComponent c : components) {
+            if (c.getMaskMode() == MaskMode.ALPHA_FROM_BASE) return true;
+        }
+        return false;
+    }
 }

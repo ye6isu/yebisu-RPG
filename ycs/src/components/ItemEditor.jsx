@@ -1142,12 +1142,27 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
 
         const blockImports = new Set();
         const compiledMethods = {};
+        const overlayTextureIds = new Set();
         for (const mdef of METHOD_DEFS) {
           if (!enabledMethods.includes(mdef.key)) continue;
           const raw = localStorage.getItem(`ycs-blocky::item::${itemId}::${mdef.key}`);
           if (!raw) continue;
           try {
             const nodes = JSON.parse(raw);
+            // Re-derive mask/emissive/rows/animation from the live texture pool at Save time rather
+            // than trusting whatever was cached on the node when the dropdown was last touched in
+            // the Blocky editor — avoids silently falling back to stale behavior if the texture's
+            // mask/emissive/Animated setting was changed after this block's texture was first picked.
+            for (const n of nodes) {
+              if (n.opcode !== 'overlay.set' || !n.fields?.texture) continue;
+              const texMeta = textures.find(t => t.id === n.fields.texture);
+              n.fields.textureRows = String(texMeta?.rows || 1);
+              n.fields.textureHasMask = texMeta?.hasMask ? '1' : '0';
+              n.fields.textureHasEmissive = texMeta?.hasEmissive ? '1' : '0';
+              n.fields.textureAnimatedOnUse = texMeta?.animatedOnUse ? '1' : '0';
+              n.fields.textureTicksPerFrame = String(texMeta?.ticksPerFrame || 4);
+              overlayTextureIds.add(n.fields.texture);
+            }
             const startNode = nodes.find(n => n.id === 'start');
             if (startNode?.nextId) {
               compiledMethods[mdef.key] = compileChain(startNode.nextId, nodes, mdef.key);
@@ -1156,6 +1171,27 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
             }
           } catch (e) {
             console.error('Block compile error for', mdef.key, e);
+          }
+        }
+
+        // Any texture picked via a "Set Texture Overlay" Blocky block must physically exist in the
+        // mod at a fixed, well-known path (compiler.js hardcodes "textures/overlay/<id>.png" since it
+        // can't do async file I/O during codegen) — copy it (+ mask/emissive if attached) here.
+        for (const texId of overlayTextureIds) {
+          const texMeta = textures.find(t => t.id === texId);
+          if (!texMeta) continue;
+          const overlayTexPath = `${RES_BASE}/textures/overlay/${texId}.png`;
+          await invoke('copy_texture_to_mod', { textureId: texId, destFile: overlayTexPath }).catch(() => {});
+          injections.push({ type: 'created-file', file: overlayTexPath });
+          if (texMeta.hasMask) {
+            const maskPath = `${RES_BASE}/textures/overlay/${texId}_mask.png`;
+            await invoke('copy_texture_to_mod', { textureId: `${texId}_mask`, destFile: maskPath }).catch(() => {});
+            injections.push({ type: 'created-file', file: maskPath });
+          }
+          if (texMeta.hasEmissive) {
+            const emissivePath = `${RES_BASE}/textures/overlay/${texId}_emissive.png`;
+            await invoke('copy_texture_to_mod', { textureId: `${texId}_emissive`, destFile: emissivePath }).catch(() => {});
+            injections.push({ type: 'created-file', file: emissivePath });
           }
         }
 

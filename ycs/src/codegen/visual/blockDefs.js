@@ -1018,6 +1018,56 @@ export const BLOCK_DEFS = [
       },
     },
   },
+  {
+    opcode: "overlay.set",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Texture Overlay",
+    label: "Set Texture Overlay [texture:dropdown.textures] Mask [maskMode:dropdown] at Layer [layer:number] for [entity:entity]",
+    hint: "Attach a texture from the pool as an overlay layer on this entity, at the given layer number (z-index) — layer controls draw order and lets multiple independent overlays (e.g. a hat and a cape) coexist without overwriting each other. Mask decides how it blends: None just draws on top, Cutout Below erases everything beneath it (this layer and every layer below, including any prior Cutout Below shape) wherever the texture's attached mask image is opaque, Mask Over Base conforms to whatever's already opaque in the composited result so far (this layer + everything below it). If the picked texture is set to Animated in the Texture tab, this immediately starts the same server-synced looping playback overlay.play uses (correct for late joiners automatically) — no separate Play block needed. Setting the same layer number again replaces that layer only.",
+    color: "#c46c94",
+    fields: {
+      texture: { source: "textures", searchable: true },
+      maskMode: {
+        type: "dropdown",
+        options: [
+          { value: "none", label: "None" },
+          { value: "cutout", label: "Cutout Below" },
+          { value: "alpha", label: "Mask Over Base" },
+        ],
+        default: "none",
+      },
+    },
+    codegen: {
+      type: "action",
+      handler: "overlay.set",
+      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        layer: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "overlay.remove",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Remove Texture Overlay",
+    label: "Remove Texture Overlay [texture:dropdown.textures] for [entity:entity]",
+    hint: "Remove whichever overlay layer is currently showing this texture, regardless of which layer number it was set at — leaves all other layers untouched",
+    color: "#c46c94",
+    fields: {
+      texture: { source: "textures", searchable: true },
+    },
+    codegen: {
+      type: "action",
+      handler: "overlay.remove",
+      imports: ["net.ye6isu.yebisuRPG.texture.TextureServerEvents"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ITEM — Data & Actions
