@@ -466,6 +466,43 @@ export function compileActionNode(node, nodes, methodKey) {
     return [`TextureServerEvents.stop(${ent}, (int)(${frameExpr}));`];
   }
 
+  if (node.opcode === "overlay.set") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const layerExpr = resolveSlotValue(node.slots?.layer, nodes, methodKey) ?? "0";
+    const textureId = node.fields?.texture || "";
+    const rows = parseInt(node.fields?.textureRows) || 1;
+    const hasMask = node.fields?.textureHasMask === '1';
+    const hasEmissive = node.fields?.textureHasEmissive === '1';
+    // Animation comes entirely from the texture's own "Animated" setting in the Texture tab —
+    // no separate checkbox here, so this stays in sync automatically if that setting changes later.
+    const animated = node.fields?.textureAnimatedOnUse === '1';
+    const ticksPerFrame = parseInt(node.fields?.textureTicksPerFrame) || 4;
+    // maskMode: "none" -> NORMAL(0), "cutout" -> CUTOUT_BELOW(1), "alpha" -> ALPHA_FROM_BASE(2).
+    // Cutout only actually applies if a mask image is attached to the texture; otherwise falls back
+    // to none, since CUTOUT_BELOW with no distinct mask would just erase using the overlay's own
+    // shape at every non-transparent pixel, which is a different (unrequested) behavior.
+    const maskModeField = node.fields?.maskMode || "none";
+    const maskModeByte = maskModeField === "cutout" && hasMask ? 1 : maskModeField === "alpha" ? 2 : 0;
+    // Overlay textures live at a fixed mod path — YCS copies the picked pool texture here at Save time.
+    const texPath = `"yebisurpg:textures/overlay/${textureId}.png"`;
+    const maskPath = maskModeByte === 1 ? `"yebisurpg:textures/overlay/${textureId}_mask.png"` : `""`;
+    const emissivePath = hasEmissive ? `"yebisurpg:textures/overlay/${textureId}_emissive.png"` : `""`;
+    // Build the LayerData record directly rather than picking a narrow factory — mask/emissive/
+    // spritesheet are independent attributes and every combination is valid (e.g. a masked,
+    // emissive, animated spritesheet), which no single named factory method covers.
+    const layerExprJava = `new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData(`
+      + `${texPath}, (int)(${layerExpr}), (byte)${maskModeByte}, ${maskPath}, ${emissivePath}, `
+      + `1, ${rows}, false, (byte)0, ${ticksPerFrame}, 0L, 1f, 0)`;
+    return [`TextureServerEvents.setLayer(${ent}, ${layerExprJava}, ${animated});`];
+  }
+
+  if (node.opcode === "overlay.remove") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const textureId = node.fields?.texture || "";
+    const texPath = `"yebisurpg:textures/overlay/${textureId}.png"`;
+    return [`TextureServerEvents.removeByTexture(${ent}, ${texPath});`];
+  }
+
   if (node.opcode === "variable.set") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const type = node.fields?.varType || "int";

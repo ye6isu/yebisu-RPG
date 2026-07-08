@@ -1,12 +1,15 @@
 package net.ye6isu.yebisuRPG.item.custom;
 
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
+import net.ye6isu.yebisuRPG.texture.TextureServerEvents;
 
 public class AeeeeItem extends Item {
     public AeeeeItem(Properties properties) {
@@ -15,12 +18,21 @@ public class AeeeeItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-        if (((double)((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AEEEE_TAAAAA.get(), 0.0)))<(double)(3))) {
-              player.getItemInHand(usedHand).set(ModDataComponents.AEEEE_TAAAAA.get(), (double)((((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AEEEE_TAAAAA.get(), 0.0)))+(1))));
+        if ((player.isCrouching())) {
+              TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/petrified.png", (int)(1), (byte)2, "", "", 1, 1, false, (byte)0, 4, 0L, 1f, 0), false);
             } else {
-              player.getItemInHand(usedHand).set(ModDataComponents.AEEEE_TAAAAA.get(), (double)(0));
+              TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/bandana.png", (int)(0), (byte)1, "yebisurpg:textures/overlay/bandana_mask.png", "", 1, 1, false, (byte)0, 4, 0L, 1f, 0), false);
         }
-        player.getItemInHand(usedHand).set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData((int)((double)((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AEEEE_TAAAAA.get(), 0.0))))));
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
+    }
+    @Override
+    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        TextureServerEvents.setLayer(target, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/petrified.png", (int)(0), (byte)2, "", "", 1, 1, false, (byte)0, 4, 0L, 1f, 0), false);
+        return super.hurtEnemy(stack, target, attacker);
+    }
+    @Override
+    public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity interactionTarget, InteractionHand usedHand) {
+        TextureServerEvents.removeByTexture(interactionTarget, "yebisurpg:textures/overlay/flame.png");
+        return super.interactLivingEntity(stack, player, interactionTarget, usedHand);
     }
 }

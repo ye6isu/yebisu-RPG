@@ -28,4 +28,10 @@ public final class TextureOverlayManager {
     public TextureStack getStack(int entityId) { return stacks.get(entityId); }
     public boolean hasStack(int entityId) { return stacks.containsKey(entityId); }
     public Map<Integer, TextureStack> getAllStacks() { return Collections.unmodifiableMap(stacks); }
+
+    /** See {@link TextureStack#hasMaskOverBase()} — false if the entity has no active overlay stack. */
+    public boolean hasMaskOverBase(int entityId) {
+        TextureStack stack = stacks.get(entityId);
+        return stack != null && stack.hasMaskOverBase();
+    }
 }

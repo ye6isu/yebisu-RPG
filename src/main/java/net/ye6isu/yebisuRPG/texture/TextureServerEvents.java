@@ -39,6 +39,69 @@ public final class TextureServerEvents {
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, new TextureSyncPayload(entity.getId(), layers));
     }
 
+    /**
+     * Adds or replaces a single overlay layer on this entity, keyed by {@code zIndex} — any existing
+     * layer at that same z-index is replaced, all other layers are left untouched. This is the entry
+     * point for Blocky's "Set Entity Texture Overlay" block: each call only ever touches its own layer
+     * slot, so multiple independent overlays (e.g. a hat layer and a cape layer) can be toggled without
+     * stepping on each other.
+     */
+    public static void setLayer(Entity entity, TextureSyncPayload.LayerData layer) {
+        if (!(entity.level() instanceof ServerLevel sl)) return;
+        List<TextureSyncPayload.LayerData> existing = TextureAuthority.get(sl).getAll().get(entity.getUUID());
+        List<TextureSyncPayload.LayerData> updated = new java.util.ArrayList<>();
+        if (existing != null) {
+            for (TextureSyncPayload.LayerData l : existing) {
+                if (l.zIndex() != layer.zIndex()) updated.add(l);
+            }
+        }
+        updated.add(layer);
+        apply(entity, updated);
+    }
+
+    /**
+     * Same as {@link #setLayer(Entity, TextureSyncPayload.LayerData)}, but if {@code animated} is true
+     * and this is a spritesheet layer ({@code columns * rows > 1}), immediately starts the same
+     * server-synced looping playhead {@link #play} uses — correct for late joiners for free via
+     * {@link #onPlayerLogin}/{@link #onStartTracking}, no separate {@code play(...)} call needed.
+     */
+    public static void setLayer(Entity entity, TextureSyncPayload.LayerData layer, boolean animated) {
+        if (!(entity.level() instanceof ServerLevel sl)) return;
+        if (animated && layer.columns() * layer.rows() > 1) {
+            layer = layer.playingFrom(sl.getGameTime(), FrameLoopMode.LOOP, layer.ticksPerFrame(), 1f);
+        }
+        setLayer(entity, layer);
+    }
+
+    /** Removes whichever overlay layer is currently at this z-index, leaving all other layers untouched. */
+    public static void removeLayer(Entity entity, int zIndex) {
+        if (!(entity.level() instanceof ServerLevel sl)) return;
+        List<TextureSyncPayload.LayerData> existing = TextureAuthority.get(sl).getAll().get(entity.getUUID());
+        if (existing == null || existing.isEmpty()) return;
+        List<TextureSyncPayload.LayerData> updated = new java.util.ArrayList<>();
+        for (TextureSyncPayload.LayerData l : existing) {
+            if (l.zIndex() != zIndex) updated.add(l);
+        }
+        apply(entity, updated);
+    }
+
+    /**
+     * Removes whichever overlay layer is currently showing this exact texture path, regardless of
+     * which layer/z-index it's on — no need to track/remember layer numbers separately from the
+     * texture itself. If more than one layer somehow shares the same texture, all matching layers
+     * are removed.
+     */
+    public static void removeByTexture(Entity entity, String texturePath) {
+        if (!(entity.level() instanceof ServerLevel sl)) return;
+        List<TextureSyncPayload.LayerData> existing = TextureAuthority.get(sl).getAll().get(entity.getUUID());
+        if (existing == null || existing.isEmpty()) return;
+        List<TextureSyncPayload.LayerData> updated = new java.util.ArrayList<>();
+        for (TextureSyncPayload.LayerData l : existing) {
+            if (!l.texturePath().equals(texturePath)) updated.add(l);
+        }
+        apply(entity, updated);
+    }
+
     /** Starts (or restarts) playback of every spritesheet layer currently on this entity. */
     public static void play(Entity entity, FrameLoopMode mode, int ticksPerFrame, float speed) {
         if (!(entity.level() instanceof ServerLevel sl)) return;

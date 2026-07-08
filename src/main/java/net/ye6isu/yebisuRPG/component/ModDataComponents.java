@@ -71,6 +71,13 @@ public final class ModDataComponents {
      * textures (they always tick via {@code TextureFrameClock}, never read this component).
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> ITEM_FRAME = registerInt("item_frame");
+
+    /**
+     * Generic per-stack bitflag storage for items that toggle entity texture overlay layers on/off
+     * (e.g. a wearable-cosmetic item where each bit is a separate layer). Not tied to any one item —
+     * any item wanting simple on/off overlay layers can reuse this the same way {@code WalkmanItem} does.
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OVERLAY_FLAGS = registerInt("overlay_flags");
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AEEEE_TAAAAA = registerDouble("aeeee_taaaaa");
     // YCS_Data_Components
 

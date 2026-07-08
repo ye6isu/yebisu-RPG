@@ -85,6 +85,11 @@ public record TextureSyncPayload(int entityId, List<LayerData> layers) implement
             return new LayerData(texturePath, zIndex, (byte) 0, "", "", 1, 1, false, (byte) 0, 4, 0L, 1f, 0);
         }
 
+        /** A plain overlay layer (no mask) with an emissive glow layer attached. */
+        public static LayerData simpleWithEmissive(String texturePath, int zIndex, String emissivePath) {
+            return new LayerData(texturePath, zIndex, (byte) 0, "", emissivePath, 1, 1, false, (byte) 0, 4, 0L, 1f, 0);
+        }
+
         public static LayerData alphaFromBase(String texturePath, int zIndex) {
             return new LayerData(texturePath, zIndex, (byte) 2, "", "", 1, 1, false, (byte) 0, 4, 0L, 1f, 0);
         }
