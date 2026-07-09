@@ -33,6 +33,7 @@ public class yebisuRPG
             modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.EntityTextureRenderHooks::onRegisterShaders);
             modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.EntityTextureRenderHooks::onAddLayers);
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> TabIconCycler.onClientTick());
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE.tick());
         }
     }
 }

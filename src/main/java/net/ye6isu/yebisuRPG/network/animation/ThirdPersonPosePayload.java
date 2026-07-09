@@ -52,6 +52,19 @@ public record ThirdPersonPosePayload(
 
     public boolean isClear() { return animName == null || animName.isEmpty(); }
 
+    /** True if at least one body part is flagged to allow vanilla actions (eating, swinging, etc.) through. */
+    public boolean hasAnyAllowActions() { return allowActionsMask != 0; }
+
+    /** True if the camera-anchored first-person mannequin overlay is enabled (any limb) for this pose. */
+    public boolean showInFirstPerson() {
+        return (vanillaMoveMask & net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_ANY_LIMB) != 0;
+    }
+
+    /** Bitmask of which limbs (FP_RIGHT_ARM/FP_LEFT_ARM/FP_RIGHT_LEG/FP_LEFT_LEG) the first-person mannequin should render. */
+    public int firstPersonLimbMask() {
+        return vanillaMoveMask & net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_ANY_LIMB;
+    }
+
     public static ThirdPersonPosePayload set(int entityId, String animName, String filePath,
                                               int lookAtMask, int vanillaMask, int vanillaMoveMask,
                                               int allowActionsMask, int keepPosScaleMask) {

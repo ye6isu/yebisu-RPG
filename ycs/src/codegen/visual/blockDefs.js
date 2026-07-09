@@ -403,7 +403,15 @@ export const BLOCK_DEFS = [
     hint: "Play first person animation for entity with playback speed from file",
     color: "#3a5c3a",
     settings: {
-      handMask: { type: "hidden", default: 0 },
+      handMask: {
+        type: "maskCheckboxGroup", default: 0,
+        groups: [
+          { bits: [
+            { label: "Hand Skip Right", bit: 512 },
+            { label: "Hand Skip Left", bit: 1024 },
+          ] },
+        ],
+      },
     },
     codegen: {
       type: "action",
@@ -483,10 +491,11 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     settings: {
       allowVanillaActions: { type: "checkbox", label: "Allow Vanilla Actions", default: false },
+      keepPosScale: { type: "checkbox", label: "Keep Position/Scale", default: false },
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, false);\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, {{keepPosScale}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
@@ -528,15 +537,54 @@ export const BLOCK_DEFS = [
     hint: "Play third person animation for entity with playback speed from file",
     color: "#3a5c3a",
     settings: {
-      handMask: { type: "hidden", default: 0 },
-      lookAtMask: { type: "hidden", default: 0 },
-      vanillaMask: { type: "hidden", default: 0 },
-      vanillaMoveMask: { type: "hidden", default: 0 },
-      fpViewMask: { type: "hidden", default: 0 },
+      lookAtMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Look At (Camera)",
+        groups: [
+          { label: "Head", bits: [{ label: "Yaw", bit: 1 }, { label: "Pitch", bit: 2 }] },
+          { label: "Torso", bits: [{ label: "Yaw", bit: 4 }, { label: "Pitch", bit: 8 }] },
+          { label: "Right Arm", bits: [{ label: "Yaw", bit: 16 }, { label: "Pitch", bit: 32 }] },
+          { label: "Left Arm", bits: [{ label: "Yaw", bit: 64 }, { label: "Pitch", bit: 128 }] },
+          { label: "Right Leg", bits: [{ label: "Yaw", bit: 256 }, { label: "Pitch", bit: 512 }] },
+          { label: "Left Leg", bits: [{ label: "Yaw", bit: 1024 }, { label: "Pitch", bit: 2048 }] },
+        ],
+      },
+      vanillaMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Let Vanilla Control",
+        groups: [
+          { label: "Body Parts", bits: [
+            { label: "Head", bit: 1 }, { label: "Torso", bit: 2 },
+            { label: "Right Arm", bit: 4 }, { label: "Left Arm", bit: 8 },
+            { label: "Right Leg", bit: 16 }, { label: "Left Leg", bit: 32 },
+          ] },
+          { label: "Poses", bits: [
+            { label: "Disable Custom Crouch", bit: 64 },
+            { label: "Disable Prone", bit: 128 },
+            { label: "Disable Custom Sitting", bit: 256 },
+          ] },
+        ],
+      },
+      handMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Hand Skip (Fall Back to TP Pose)",
+        groups: [
+          { bits: [
+            { label: "Right Arm", bit: 512 },
+            { label: "Left Arm", bit: 1024 },
+          ] },
+        ],
+      },
+      firstPersonLimbMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Show in First Person (camera-anchored mannequin, eye-pivoted)",
+        groups: [
+          { bits: [
+            { label: "Right Arm", bit: 1 }, { label: "Left Arm", bit: 2 },
+            { label: "Right Leg", bit: 4 }, { label: "Left Leg", bit: 8 },
+          ] },
+        ],
+      },
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}} | {{handMask}}, {{vanillaMoveMask}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.triggerAnimation(animEntity,\n        AnimationCategory.ENTITY_THIRD_PERSON,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{float:playbackSpeed}}, {{lookAtMask}}, {{vanillaMask}} | {{handMask}}, {{firstPersonLimbMask}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
 
@@ -612,16 +660,68 @@ export const BLOCK_DEFS = [
     hint: "Set third person pose",
     color: "#3a5c3a",
     settings: {
-      lookAtMask: { type: "hidden", default: 0 },
-      vanillaMask: { type: "hidden", default: 0 },
-      vanillaMoveMask: { type: "hidden", default: 0 },
-      allowActionsMask: { type: "hidden", default: 0 },
-      keepPosScaleMask: { type: "hidden", default: 0 },
-      fpViewMask: { type: "hidden", default: 0 },
+      lookAtMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Look At (Camera)",
+        groups: [
+          { label: "Head", bits: [{ label: "Yaw", bit: 1 }, { label: "Pitch", bit: 2 }] },
+          { label: "Torso", bits: [{ label: "Yaw", bit: 4 }, { label: "Pitch", bit: 8 }] },
+          { label: "Right Arm", bits: [{ label: "Yaw", bit: 16 }, { label: "Pitch", bit: 32 }] },
+          { label: "Left Arm", bits: [{ label: "Yaw", bit: 64 }, { label: "Pitch", bit: 128 }] },
+          { label: "Right Leg", bits: [{ label: "Yaw", bit: 256 }, { label: "Pitch", bit: 512 }] },
+          { label: "Left Leg", bits: [{ label: "Yaw", bit: 1024 }, { label: "Pitch", bit: 2048 }] },
+        ],
+      },
+      vanillaMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Let Vanilla Control",
+        groups: [
+          { label: "Body Parts", bits: [
+            { label: "Head", bit: 1 }, { label: "Torso", bit: 2 },
+            { label: "Right Arm", bit: 4 }, { label: "Left Arm", bit: 8 },
+            { label: "Right Leg", bit: 16 }, { label: "Left Leg", bit: 32 },
+          ] },
+          { label: "Poses", bits: [
+            { label: "Disable Custom Crouch", bit: 64 },
+            { label: "Disable Prone", bit: 128 },
+            { label: "Disable Custom Sitting", bit: 256 },
+          ] },
+          { label: "Hand Skip (Fall Back to This Pose)", bits: [
+            { label: "Right Arm", bit: 512 }, { label: "Left Arm", bit: 1024 },
+          ] },
+        ],
+      },
+      firstPersonLimbMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Show in First Person (camera-anchored mannequin, eye-pivoted)",
+        groups: [
+          { bits: [
+            { label: "Right Arm", bit: 1 }, { label: "Left Arm", bit: 2 },
+            { label: "Right Leg", bit: 4 }, { label: "Left Leg", bit: 8 },
+          ] },
+        ],
+      },
+      allowActionsMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Allow Vanilla Actions (e.g. eating, swinging)",
+        groups: [
+          { bits: [
+            { label: "Head", bit: 1 }, { label: "Torso", bit: 2 },
+            { label: "Right Arm", bit: 4 }, { label: "Left Arm", bit: 8 },
+            { label: "Right Leg", bit: 16 }, { label: "Left Leg", bit: 32 },
+          ] },
+        ],
+      },
+      keepPosScaleMask: {
+        type: "maskCheckboxGroup", default: 0, label: "Keep Pose+Scale During Vanilla Action",
+        groups: [
+          { bits: [
+            { label: "Head", bit: 1 }, { label: "Torso", bit: 2 },
+            { label: "Right Arm", bit: 4 }, { label: "Left Arm", bit: 8 },
+            { label: "Right Leg", bit: 16 }, { label: "Left Leg", bit: 32 },
+          ] },
+        ],
+      },
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setThirdPersonPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{lookAtMask}}, {{vanillaMask}}, {{vanillaMoveMask}}, {{allowActionsMask}}, {{keepPosScaleMask}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setThirdPersonPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}},\n        {{lookAtMask}}, {{vanillaMask}}, {{firstPersonLimbMask}}, {{allowActionsMask}}, {{keepPosScaleMask}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
 
