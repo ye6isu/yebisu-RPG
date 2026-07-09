@@ -2,6 +2,7 @@ package net.ye6isu.yebisuRPG.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -16,6 +17,7 @@ import net.ye6isu.yebisuRPG.client.renderer.FullbrightRenderType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
@@ -33,6 +35,20 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
 
     protected MixinPlayerRenderer(EntityRendererProvider.Context context, PlayerModel<AbstractClientPlayer> model, float shadowRadius) {
         super(context, model, shadowRadius);
+    }
+
+    @ModifyVariable(method = "renderHand", at = @At("STORE"), ordinal = 0)
+    private ResourceLocation yebisurpg$useCompositeFirstPersonHandTexture(
+            ResourceLocation original,
+            PoseStack poseStack,
+            MultiBufferSource buffer,
+            int combinedLight,
+            AbstractClientPlayer player,
+            ModelPart rendererArm,
+            ModelPart rendererArmwear) {
+        EntityTextureCompositor.INSTANCE.update(player);
+        ResourceLocation composite = EntityTextureCompositor.INSTANCE.getCompositeLocation(player.getId());
+        return composite != null ? composite : original;
     }
 
     @Inject(method = "renderRightHand", at = @At("TAIL"))

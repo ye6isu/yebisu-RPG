@@ -329,44 +329,49 @@ public final class EntityTextureCompositor {
      */
     private static void applyStack(Minecraft mc, NativeImage result, @Nullable NativeImage emissiveResult,
                                     TextureStack stack, long tick) {
-        for (TextureComponent component : stack.getLayers()) {
-            NativeImage overlay = null;
-            try { overlay = loadModAsset(mc, component.getTexture()); }
-            catch (IOException e) {
-                LOGGER.warn("Cannot load overlay {}: {}", component.getTexture(), e.getMessage());
-            }
-            if (overlay == null) continue;
+        NativeImage coverageMask = alphaMaskFrom(result);
+        try {
+            for (TextureComponent component : stack.getLayers()) {
+                NativeImage overlay = null;
+                try { overlay = loadModAsset(mc, component.getTexture()); }
+                catch (IOException e) {
+                    LOGGER.warn("Cannot load overlay {}: {}", component.getTexture(), e.getMessage());
+                }
+                if (overlay == null) continue;
 
-            NativeImage mask = null;
-            if (component.getMaskMode() == MaskMode.CUTOUT_BELOW) {
-                ResourceLocation maskLoc = component.getEffectiveMaskTexture();
-                if (!maskLoc.equals(component.getTexture())) {
-                    try { mask = loadModAsset(mc, maskLoc); }
-                    catch (IOException e) {
-                        LOGGER.warn("Cannot load mask {}: {}", maskLoc, e.getMessage());
+                NativeImage mask = null;
+                if (component.getMaskMode() == MaskMode.CUTOUT_BELOW) {
+                    ResourceLocation maskLoc = component.getEffectiveMaskTexture();
+                    if (!maskLoc.equals(component.getTexture())) {
+                        try { mask = loadModAsset(mc, maskLoc); }
+                        catch (IOException e) {
+                            LOGGER.warn("Cannot load mask {}: {}", maskLoc, e.getMessage());
+                        }
                     }
                 }
+
+                applyLayer(result, emissiveResult, coverageMask, overlay, mask != null ? mask : overlay, component, tick);
+
+                // Emissive: bake into the main composite at full bright (so anything sampling the
+                // entity's normal texture directly still shows a glow), AND into the dedicated
+                // emissive-only texture at normal brightness (for the full-bright shader pass).
+                final NativeImage emissiveDst = emissiveResult;
+                component.getEmissiveTexture().ifPresent(emissiveLocRes -> {
+                    try {
+                        NativeImage emissive = loadModAsset(mc, emissiveLocRes);
+                        applyLayerNormalBright(result, emissive, component, tick);
+                        if (emissiveDst != null) applyLayerNormal(emissiveDst, emissive, component, tick);
+                        emissive.close();
+                    } catch (IOException e) {
+                        LOGGER.warn("Cannot load emissive {}: {}", emissiveLocRes, e.getMessage());
+                    }
+                });
+
+                if (mask != null) mask.close();
+                overlay.close();
             }
-
-            applyLayer(result, overlay, mask != null ? mask : overlay, component, tick);
-
-            // Emissive: bake into the main composite at full bright (so anything sampling the
-            // entity's normal texture directly still shows a glow), AND into the dedicated
-            // emissive-only texture at normal brightness (for the full-bright shader pass).
-            final NativeImage emissiveDst = emissiveResult;
-            component.getEmissiveTexture().ifPresent(emissiveLocRes -> {
-                try {
-                    NativeImage emissive = loadModAsset(mc, emissiveLocRes);
-                    applyLayerNormalBright(result, emissive, component, tick);
-                    if (emissiveDst != null) applyLayerNormal(emissiveDst, emissive, component, tick);
-                    emissive.close();
-                } catch (IOException e) {
-                    LOGGER.warn("Cannot load emissive {}: {}", emissiveLocRes, e.getMessage());
-                }
-            });
-
-            if (mask != null) mask.close();
-            overlay.close();
+        } finally {
+            coverageMask.close();
         }
     }
 
@@ -427,7 +432,8 @@ public final class EntityTextureCompositor {
 
     // ---- Compositing ----
 
-    private static void applyLayer(NativeImage base, NativeImage overlay, NativeImage mask,
+    private static void applyLayer(NativeImage base, @Nullable NativeImage emissiveResult,
+                                   NativeImage coverageMask, NativeImage overlay, NativeImage mask,
                                    TextureComponent component, long tick) {
         int bw = base.getWidth(), bh = base.getHeight();
         int ow = overlay.getWidth(), oh = overlay.getHeight();
@@ -460,7 +466,9 @@ public final class EntityTextureCompositor {
                         int ox = frameX + x * frameW / bw;
                         int oy = frameY + y * frameH / bh;
                         int ov = overlay.getPixelRGBA(ox, oy);
+                        boolean covered = separateMask || alpha(ov) > 0;
                         base.setPixelRGBA(x, y, alpha(ov) > 0 ? ov : 0x00000000);
+                        coverageMask.setPixelRGBA(x, y, covered ? 0xFFFFFFFF : 0x00000000);
                     }
                 }
             }
@@ -472,6 +480,7 @@ public final class EntityTextureCompositor {
                     int oa = alpha(ov);
                     if (oa == 0) continue;
                     base.setPixelRGBA(x, y, oa == 255 ? ov : over(base.getPixelRGBA(x, y), ov, oa));
+                    coverageMask.setPixelRGBA(x, y, alpha(base.getPixelRGBA(x, y)) > 0 ? 0xFFFFFFFF : 0x00000000);
                 }
             }
             case ALPHA_FROM_BASE -> {
@@ -480,9 +489,17 @@ public final class EntityTextureCompositor {
                     int oy = frameY + y * frameH / bh;
                     int ov = overlay.getPixelRGBA(ox, oy);
                     int bs = base.getPixelRGBA(x, y);
-                    int ea = alpha(ov) * alpha(bs) / 255;
-                    if (ea == 0) continue;
-                    base.setPixelRGBA(x, y, over(bs, (ov & 0x00FFFFFF) | (ea << 24), ea));
+                    int oa = alpha(ov) * alpha(coverageMask.getPixelRGBA(x, y)) / 255;
+                    if (oa == 0) continue;
+                    base.setPixelRGBA(x, y, over(bs, (ov & 0x00FFFFFF) | (oa << 24), oa));
+                    if (emissiveResult != null) {
+                        int ev = emissiveResult.getPixelRGBA(x, y);
+                        int ea = alpha(ev);
+                        if (ea > 0) {
+                            int keptAlpha = ea * (255 - oa) / 255;
+                            emissiveResult.setPixelRGBA(x, y, (ev & 0x00FFFFFF) | (keptAlpha << 24));
+                        }
+                    }
                 }
             }
         }
@@ -555,5 +572,15 @@ public final class EntityTextureCompositor {
             for (int x = 0; x < src.getWidth(); x++)
                 dst.setPixelRGBA(x, y, src.getPixelRGBA(x, y));
         return dst;
+    }
+
+    private static NativeImage alphaMaskFrom(NativeImage src) {
+        NativeImage mask = new NativeImage(src.getWidth(), src.getHeight(), false);
+        for (int y = 0; y < src.getHeight(); y++) {
+            for (int x = 0; x < src.getWidth(); x++) {
+                mask.setPixelRGBA(x, y, alpha(src.getPixelRGBA(x, y)) > 0 ? 0xFFFFFFFF : 0x00000000);
+            }
+        }
+        return mask;
     }
 }
