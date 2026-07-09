@@ -4,6 +4,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.ye6isu.yebisuRPG.network.animation.*;
+import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
 
 public final class ClientHandlerProxy {
 
@@ -42,6 +43,16 @@ public final class ClientHandlerProxy {
     public static void onItemAnimPose(ItemAnimPosePayload payload, IPayloadContext ctx) {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             // TODO: wire to ClientAnimationEngine.INSTANCE.setItemAnimPose(payload)
+        }
+    }
+
+    public static void onTextureSync(TextureSyncPayload payload, IPayloadContext ctx) {
+        if (FMLEnvironment.dist != Dist.CLIENT) return;
+        try {
+            Class<?> handler = Class.forName("net.ye6isu.yebisuRPG.texture.network.TextureSyncClientHandler");
+            handler.getMethod("handle", TextureSyncPayload.class, IPayloadContext.class).invoke(null, payload, ctx);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to dispatch texture sync payload on client", e);
         }
     }
 }
