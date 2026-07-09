@@ -229,12 +229,81 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.translate(0.5f, 0.5f, 0.5f);
         poseStack.scale(1.0f / 16.0f, 1.0f / 16.0f, 1.0f / 16.0f);
 
+        ItemAnimContext animCtx = resolveItemAnimContext();
+
         for (BakedBone bone : model.bones()) {
-            renderBone(bone, poseStack, vc, packedLight, packedOverlay, model.texWidth(), effectiveTexH, vFrameOffset);
+            renderBone(bone, poseStack, vc, packedLight, packedOverlay, model.texWidth(), effectiveTexH, vFrameOffset, animCtx);
         }
 
         poseStack.popPose();
     }
+
+    /**
+     * Resolves the item-animation pose (if any) for whichever entity/hand is currently being
+     * rendered, per {@link net.ye6isu.yebisuRPG.animation.client.ItemRenderContextHolder} —
+     * only populated for third-person held items (see {@code MixinItemInHandLayer}); first-person
+     * items bypass this renderer entirely, so {@code animCtx} is {@code null} there.
+     */
+    private ItemAnimContext resolveItemAnimContext() {
+        if (!net.ye6isu.yebisuRPG.animation.client.ItemRenderContextHolder.ACTIVE.get()) return null;
+        int entityId = net.ye6isu.yebisuRPG.animation.client.ItemRenderContextHolder.ENTITY_ID.get();
+        boolean mainHand = net.ye6isu.yebisuRPG.animation.client.ItemRenderContextHolder.MAIN_HAND.get();
+        if (entityId < 0) return null;
+
+        var engine = net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE;
+        var category = mainHand
+                ? net.ye6isu.yebisuRPG.animation.AnimationCategory.ITEM_MAIN_HAND
+                : net.ye6isu.yebisuRPG.animation.AnimationCategory.ITEM_OFF_HAND;
+        var playhead = engine.getPlayhead(entityId, category);
+        var blender = engine.getBlender(entityId, category);
+
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData poseAnim =
+                playhead == null ? engine.getItemAnimPose(entityId, mainHand) : null;
+        if (playhead == null && blender == null && poseAnim == null) return null;
+
+        net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim;
+        if (playhead != null) {
+            anim = playhead.filePath() != null
+                    ? net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId(), playhead.filePath())
+                    : net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.INSTANCE.get(playhead.animId());
+        } else {
+            anim = poseAnim;
+        }
+        if (anim == null && blender == null) return null;
+
+        float timeSecs = 0f;
+        if (playhead == null) {
+            if (anim != null && anim.loopMode() == net.ye6isu.yebisuRPG.animation.AnimationLoopMode.LOOP && anim.length() > 0f) {
+                float elapsed = engine.getItemPoseElapsedSecs(entityId, mainHand);
+                timeSecs = elapsed % anim.length();
+            } else if (anim != null) {
+                timeSecs = anim.length();
+            }
+        } else {
+            float raw = playhead.getCurrentTimeSecs();
+            timeSecs = (anim != null && playhead.effectiveLoopMode(anim) == net.ye6isu.yebisuRPG.animation.AnimationLoopMode.HOLD_LAST)
+                    ? Math.min(raw, anim.length())
+                    : raw;
+        }
+
+        float weight = 1.0f;
+        if (playhead != null) {
+            float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
+            weight *= playhead.getBlendInWeight(partialTick);
+        }
+        if (blender != null && blender.isActive()) {
+            float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
+            weight *= 1.0f - blender.getBlendAlpha(partialTick);
+        }
+        if (weight <= 0f) weight = 0.001f;
+
+        return new ItemAnimContext(anim, timeSecs, weight);
+    }
+
+    /** Resolved item-animation pose for the current render call — null when nothing is playing/posed. */
+    private record ItemAnimContext(
+            net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader.AnimData anim,
+            float timeSecs, float weight) {}
 
     /**
      * Renders a FLAT-kind state — a plain vanilla item model (e.g. {@code minecraft:item/generated})
@@ -272,26 +341,50 @@ public class GeoItemRenderer extends BlockEntityWithoutLevelRenderer {
     }
 
     private void renderBone(BakedBone bone, PoseStack poseStack, VertexConsumer vc,
-                            int light, int overlay, int texW, int texH, float vFrameOffset) {
+                            int light, int overlay, int texW, int texH, float vFrameOffset,
+                            ItemAnimContext animCtx) {
         poseStack.pushPose();
 
         float px = bone.pivotX(), py = bone.pivotY(), pz = bone.pivotZ();
 
+        float animRX = 0f, animRY = 0f, animRZ = 0f;
+        float animPX = 0f, animPY = 0f, animPZ = 0f;
+        float animSX = 1f, animSY = 1f, animSZ = 1f;
+        if (animCtx != null && animCtx.anim() != null) {
+            var bonePose = animCtx.anim().bone(bone.name());
+            float t = animCtx.timeSecs(), w = animCtx.weight();
+            animRX = bonePose.rotation().evalX(t) * w;
+            animRY = bonePose.rotation().evalY(t) * w;
+            animRZ = bonePose.rotation().evalZ(t) * w;
+            animPX = bonePose.position().evalX(t) * w;
+            animPY = bonePose.position().evalY(t) * w;
+            animPZ = bonePose.position().evalZ(t) * w;
+            animSX = 1f + (bonePose.scale().evalX(t) - 1f) * w;
+            animSY = 1f + (bonePose.scale().evalY(t) - 1f) * w;
+            animSZ = 1f + (bonePose.scale().evalZ(t) - 1f) * w;
+        }
+
         Quaternionf q = eulerToQuat(
-                (float) Math.toRadians(-bone.rotX()),
-                (float) Math.toRadians(-bone.rotY()),
-                (float) Math.toRadians(bone.rotZ()));
+                (float) Math.toRadians(-(bone.rotX() + animRX)),
+                (float) Math.toRadians(-(bone.rotY() + animRY)),
+                (float) Math.toRadians(bone.rotZ() + animRZ));
 
         poseStack.translate(px, py, pz);
         poseStack.mulPose(q);
         poseStack.translate(-px, -py, -pz);
+        if (animPX != 0f || animPY != 0f || animPZ != 0f) {
+            poseStack.translate(animPX, -animPY, animPZ);
+        }
+        if (animSX != 1f || animSY != 1f || animSZ != 1f) {
+            poseStack.scale(animSX, animSY, animSZ);
+        }
 
         for (BakedCube cube : bone.cubes()) {
             renderCube(cube, poseStack, vc, light, overlay, texW, texH, vFrameOffset);
         }
 
         for (BakedBone child : bone.children()) {
-            renderBone(child, poseStack, vc, light, overlay, texW, texH, vFrameOffset);
+            renderBone(child, poseStack, vc, light, overlay, texW, texH, vFrameOffset, animCtx);
         }
 
         poseStack.popPose();

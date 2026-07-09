@@ -11,38 +11,36 @@ public final class ClientHandlerProxy {
     private ClientHandlerProxy() {}
 
     public static void onAnimTrigger(AnimTriggerPayload payload, IPayloadContext ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            // TODO: wire to ClientAnimationEngine.INSTANCE.trigger(payload)
-        }
+        dispatchAnim("onTrigger", AnimTriggerPayload.class, payload, ctx);
     }
 
     public static void onAnimStop(AnimStopPayload payload, IPayloadContext ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            // TODO: wire to ClientAnimationEngine.INSTANCE.stop(payload)
-        }
+        dispatchAnim("onStop", AnimStopPayload.class, payload, ctx);
     }
 
     public static void onAnimPause(AnimPausePayload payload, IPayloadContext ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            // TODO: wire to ClientAnimationEngine.INSTANCE.pause(payload)
-        }
+        dispatchAnim("onAnimPause", AnimPausePayload.class, payload, ctx);
     }
 
     public static void onHandPose(HandPosePayload payload, IPayloadContext ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            // TODO: wire to ClientAnimationEngine.INSTANCE.setHandPose(payload)
-        }
+        dispatchAnim("onHandPose", HandPosePayload.class, payload, ctx);
     }
 
     public static void onThirdPersonPose(ThirdPersonPosePayload payload, IPayloadContext ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            // TODO: wire to ClientAnimationEngine.INSTANCE.setThirdPersonPose(payload)
-        }
+        dispatchAnim("onThirdPersonPose", ThirdPersonPosePayload.class, payload, ctx);
     }
 
     public static void onItemAnimPose(ItemAnimPosePayload payload, IPayloadContext ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            // TODO: wire to ClientAnimationEngine.INSTANCE.setItemAnimPose(payload)
+        dispatchAnim("onItemAnimPose", ItemAnimPosePayload.class, payload, ctx);
+    }
+
+    private static <T> void dispatchAnim(String method, Class<T> payloadType, T payload, IPayloadContext ctx) {
+        if (FMLEnvironment.dist != Dist.CLIENT) return;
+        try {
+            Class<?> handler = Class.forName("net.ye6isu.yebisuRPG.animation.client.AnimClientHandler");
+            handler.getMethod(method, payloadType, IPayloadContext.class).invoke(null, payload, ctx);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to dispatch " + method + " payload on client", e);
         }
     }
 

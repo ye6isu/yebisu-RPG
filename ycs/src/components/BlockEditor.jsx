@@ -398,6 +398,20 @@ function BlockContent({ bdef, node, nodes, onFieldChange, nodeId, onSelect, sele
   );
 }
 
+// Shortens common mask-checkbox labels ("Right Arm" -> "RA", "While Moving" -> "Mov") so a
+// group's checkboxes fit on one compact row; full label is still shown via the checkbox's title.
+const MASK_LABEL_ABBREVIATIONS = {
+  'Head': 'H', 'Torso': 'T',
+  'Right Arm': 'RA', 'Left Arm': 'LA',
+  'Right Leg': 'RL', 'Left Leg': 'LL',
+  'Yaw': 'Yaw', 'Pitch': 'Pitch',
+  'While Moving': 'Mov', 'While Still': 'Still',
+  'Disable Custom Crouch': 'Crouch', 'Disable Prone': 'Prone', 'Disable Custom Sitting': 'Sitting',
+};
+function abbreviateMaskLabel(label) {
+  return MASK_LABEL_ABBREVIATIONS[label] ?? label;
+}
+
 // ── SettingsPortal ───────────────────────────────────────────────────────
 function SettingsPortal({ open, onClose, anchorRef, children }) {
   useEffect(() => {
@@ -463,6 +477,46 @@ function BlockSettingsPopup({ bdef, node, onFieldChange, showSettings, setShowSe
                   onChange={e => { e.stopPropagation(); onFieldChange?.(node.id, key, parseInt(e.target.value) || 0); }}
                   onMouseDown={e => e.stopPropagation()}
                   style={{ width: 60 }} />
+              </div>
+            );
+          }
+          if (s.type === 'maskCheckboxGroup') {
+            // Renders a set of checkboxes, each toggling one bit of a single packed integer
+            // field (node.fields[key]). s.groups is an array of { label, bits: [{ label, bit }] } —
+            // each group renders as ONE compact row (group label + abbreviated bit checkboxes
+            // packed inline) rather than a sub-heading with wrapped rows, so a block with many
+            // groups/bits stays short instead of tall.
+            const packed = node.fields?.[key] ?? s.default ?? 0;
+            const toggleBit = (bit) => {
+              const next = (packed & bit) !== 0 ? (packed & ~bit) : (packed | bit);
+              onFieldChange?.(node.id, key, next);
+            };
+            return (
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {s.label && <span style={{ color: 'var(--ycs-text)', opacity: 0.7, fontSize: 11, fontWeight: 600 }}>{s.label}</span>}
+                {(s.groups || []).map((group, gi) => (
+                  <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {group.label && (
+                      <span style={{ color: 'var(--ycs-text)', opacity: 0.55, fontSize: 10, fontWeight: 600, minWidth: 60, flexShrink: 0 }}>
+                        {group.label}
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {group.bits.map(({ label, bit }) => {
+                        const checked = (packed & bit) !== 0;
+                        return (
+                          <label key={bit} title={label}
+                            style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--ycs-text)', fontSize: 10, cursor: 'pointer' }}
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={e => { e.stopPropagation(); toggleBit(bit); }}>
+                            <input type="checkbox" className="ycs-checkbox" checked={checked} onChange={() => {}} />
+                            {abbreviateMaskLabel(label)}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           }

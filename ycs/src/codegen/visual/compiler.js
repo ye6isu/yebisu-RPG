@@ -380,17 +380,9 @@ export function compileActionNode(node, nodes, methodKey) {
     return lines;
   }
 
-  const animGuardOpcodes = [
-    "anim.firstperson.play", "anim.firstperson.stop", "anim.firstperson.pause", "anim.firstperson.resume",
-    "anim.thirdperson.play", "anim.thirdperson.stop", "anim.thirdperson.pause", "anim.thirdperson.resume",
-    "anim.handpose.set", "anim.handpose.reset", "anim.tppose.set", "anim.tppose.reset",
-  ];
-  if (animGuardOpcodes.includes(node.opcode)) {
-    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || "player";
-    const guard = `if (${ent} instanceof Entity animEntity && !level.isClientSide()) {`;
-    const body = compileAnimBody(node, nodes, methodKey);
-    return [guard, ...body.map(l => "    " + l), "}"];
-  }
+  // Note: anim.firstperson.*/anim.thirdperson.*/anim.handpose.*/anim.tppose.* opcodes are
+  // compiled entirely via their blockDefs.js `codegen.template` (handled by compileFromDef
+  // above) — no manual dispatch needed here.
 
   if (node.opcode?.startsWith("anim.item.")) {
     const stackNodeId = node.slots?.stack;
@@ -547,48 +539,8 @@ export function compileActionNode(node, nodes, methodKey) {
 }
 
 // ── Animation body helpers ───────────────────────────────────────────────
-
-function compileAnimBody(node, nodes, methodKey) {
-  if (node.opcode === "anim.firstperson.play") {
-    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
-    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
-    const speed = floatSuffix(resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f");
-    return [`AnimationAPI.triggerAnimation(animEntity,`, `    AnimationCategory.ENTITY,`, `    ${quoteIfNeeded(animName)},`, `    ${quoteIfNeeded(filePath)},`, `    ${speed});`];
-  }
-  if (node.opcode === "anim.firstperson.stop") return ["AnimationAPI.stopFirstPersonAnimation(animEntity);"];
-  if (node.opcode === "anim.firstperson.pause") return ["AnimationAPI.pauseAnimation(animEntity,", "    AnimationCategory.ENTITY);"];
-  if (node.opcode === "anim.firstperson.resume") return ["AnimationAPI.resumeAnimation(animEntity,", "    AnimationCategory.ENTITY);"];
-  if (node.opcode === "anim.thirdperson.play") {
-    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
-    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
-    const speed = floatSuffix(resolveSlotValue(node.slots?.playbackSpeed, nodes, methodKey) ?? "1.0f");
-    const lm = node.fields?.lookAtMask || 0;
-    const vm = node.fields?.vanillaMask || 0;
-    const vmm = node.fields?.vanillaMoveMask || 0;
-    const fpm = node.fields?.fpViewMask || 0;
-    return [`AnimationAPI.triggerAnimation(animEntity,`, `    AnimationCategory.ENTITY_THIRD_PERSON,`, `    ${quoteIfNeeded(animName)},`, `    ${quoteIfNeeded(filePath)},`, `    ${speed}, ${lm}, ${vm}, ${vmm}, ${fpm});`];
-  }
-  if (node.opcode === "anim.thirdperson.stop") return ["AnimationAPI.stopThirdPersonAnimation(animEntity);"];
-  if (node.opcode === "anim.thirdperson.pause") return ["AnimationAPI.pauseThirdPersonAnimation(animEntity);"];
-  if (node.opcode === "anim.thirdperson.resume") return ["AnimationAPI.resumeThirdPersonAnimation(animEntity);"];
-  if (node.opcode === "anim.handpose.set") {
-    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
-    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
-    const aa = !!node.fields?.allowVanillaActions;
-    const kps = !!node.fields?.keepPosScale;
-    return [`AnimationAPI.setFirstPersonHandPose(animEntity,`, `    ${quoteIfNeeded(animName)},`, `    ${quoteIfNeeded(filePath)}, ${aa}, ${kps});`];
-  }
-  if (node.opcode === "anim.handpose.reset") return ["AnimationAPI.resetFirstPersonHandPose(animEntity);"];
-  if (node.opcode === "anim.tppose.set") {
-    const animName = resolveSlotValue(node.slots?.animName, nodes, methodKey) ?? (node.fields?.animName ?? "");
-    const filePath = resolveSlotValue(node.slots?.filePath, nodes, methodKey) ?? (node.fields?.filePath ?? "");
-    const lm = node.fields?.lookAtMask || 0; const vm = node.fields?.vanillaMask || 0; const vmm = node.fields?.vanillaMoveMask || 0;
-    const aam = node.fields?.allowActionsMask || 0; const kpsm = node.fields?.keepPosScaleMask || 0; const fpm = node.fields?.fpViewMask || 0;
-    return [`AnimationAPI.setThirdPersonPose(animEntity,`, `    ${quoteIfNeeded(animName)},`, `    ${quoteIfNeeded(filePath)},`, `    ${lm}, ${vm}, ${vmm}, ${aam}, ${kpsm}, ${fpm});`];
-  }
-  if (node.opcode === "anim.tppose.reset") return ["AnimationAPI.resetThirdPersonPose(animEntity);"];
-  return ["// unknown anim: " + node.opcode];
-}
+// (anim.firstperson.*/anim.thirdperson.*/anim.handpose.*/anim.tppose.* are compiled via their
+// blockDefs.js inline `codegen.template` — see compileFromDef — not via a handler function here.)
 
 function compileItemAnimBody(node, nodes, methodKey, isMainHand) {
   if (node.opcode === "anim.item.play") {

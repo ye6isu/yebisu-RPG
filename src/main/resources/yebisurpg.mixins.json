@@ -11,6 +11,9 @@
   "client": [
     "AccessorCreativeModeTab",
     "MixinPlayerRenderer",
+    "MixinPlayerModel",
+    "MixinItemInHandRenderer",
+    "MixinItemInHandLayer",
     "MixinLivingEntityRenderer",
     "MixinEnderDragonRenderer",
     "MixinEmissiveLayers",
