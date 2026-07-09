@@ -19,6 +19,8 @@
     "MixinBreezeWindLayer",
     "MixinMushroomCowMushroomLayer",
     "MixinHorseMarkingLayer",
+    "MixinSelfLitEntityRenderers",
+    "MixinTropicalFishRenderer",
     "MixinTropicalFishPatternLayer",
     "MixinRenderLayer",
     "MixinSlimeOuterLayer",

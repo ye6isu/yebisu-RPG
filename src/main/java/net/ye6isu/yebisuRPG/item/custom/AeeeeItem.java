@@ -19,9 +19,10 @@ public class AeeeeItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
         if ((player.isCrouching())) {
-              TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/petrified.png", (int)(1), (byte)2, "", "", 1, 1, false, (byte)0, 4, 0L, 1f, 0), false);
+              TextureServerEvents.removeByTexture(player, "yebisurpg:textures/overlay/petrified.png");
             } else {
-              TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/bandana.png", (int)(0), (byte)1, "yebisurpg:textures/overlay/bandana_mask.png", "", 1, 1, false, (byte)0, 4, 0L, 1f, 0), false);
+              TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/flame.png", (int)(0), (byte)1, "yebisurpg:textures/overlay/flame_mask.png", "yebisurpg:textures/overlay/flame_emissive.png", 1, 4, false, (byte)0, 2, 0L, 1f, 0), true);
+              TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/petrified.png", (int)(1), (byte)2, "", "", 1, 1, false, (byte)0, 4, 0L, 1f, 0), false);
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }
