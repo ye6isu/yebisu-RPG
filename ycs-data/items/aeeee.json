@@ -85,11 +85,15 @@
     },
     {
       "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/overlay/bandana.png"
+      "file": "resources/assets/yebisurpg/textures/overlay/flame.png"
     },
     {
       "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/overlay/bandana_mask.png"
+      "file": "resources/assets/yebisurpg/textures/overlay/flame_mask.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/overlay/flame_emissive.png"
     },
     {
       "type": "created-file",
