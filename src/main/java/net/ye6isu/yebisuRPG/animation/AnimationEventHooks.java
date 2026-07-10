@@ -26,9 +26,8 @@ import java.util.Map;
  *
  * <p>This class intentionally covers ONLY animation/pose catch-up. The old_mod reference
  * implementation bundled this together with server-authoritative hurtbox/damage-window
- * sweeping and a {@code DashUtil.tick()} call in the same {@code onServerTick} hook — those
- * are unrelated systems (melee hit-detection, dash movement) and are out of scope for the
- * animation port; they are not included here.</p>
+ * sweeping in the same {@code onServerTick} hook — that is an unrelated system (melee
+ * hit-detection) and is out of scope for the animation port; it is not included here.</p>
  */
 @EventBusSubscriber(modid = yebisuRPG.MODID)
 public final class AnimationEventHooks {
@@ -125,7 +124,6 @@ public final class AnimationEventHooks {
                 AnimationRegistry.get().removeAll(eid);
             }
             PoseRegistry.get().removeAll(eid);
-            LOGGER.debug("[AnimHooks] Cleared registry for removed entity={}", eid);
         }
     }
 }

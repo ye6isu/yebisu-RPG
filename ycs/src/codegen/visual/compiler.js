@@ -328,10 +328,11 @@ export function compileActionNode(node, nodes, methodKey) {
     const hasOff = ox !== "0" || oy !== "0" || oz !== "0";
     const los = node.fields?.los !== false;
     const showP = !!node.fields?.showParticles;
+    const copyPitch = !!node.fields?.copyPitch;
     const shape = node.opcode === "aoe.each" ? (node.fields?.shape || "sphere") : node.opcode.replace("aoe.each.", "");
     let lines = [
       `if (${ent}.level() instanceof net.minecraft.server.level.ServerLevel _sl) {`,
-      `    net.minecraft.world.phys.Vec3[] _f = AoeShapes.frameFromEntity(${ent});`,
+      `    net.minecraft.world.phys.Vec3[] _f = AoeShapes.frameFromEntity(${ent}, ${copyPitch});`,
       `    net.minecraft.world.phys.Vec3 _c = ${ent}.getEyePosition();`,
     ];
     if (hasOff) lines.push(`    _c = _c.add(_f[0].scale((double)(${ox}))).add(_f[1].scale((double)(${oy}))).add(_f[2].scale((double)(${oz})));`);
@@ -353,27 +354,28 @@ export function compileActionNode(node, nodes, methodKey) {
       const dist = resolveSlotValue(node.slots?.distance, nodes, methodKey) ?? "8";
       const angle = resolveSlotValue(node.slots?.angle, nodes, methodKey) ?? "60";
       if (!hasOff) {
-        queryExpr = `AoeShapes.queryCone(_sl, ${ent}, (double)(${dist}), (double)(${angle}), true, ${los})`;
-        visExpr = showP ? `    AoeShapes.visualizeCone(_sl, ${ent}, (double)(${dist}), (double)(${angle}));` : null;
+        queryExpr = `AoeShapes.queryCone(_sl, ${ent}, (double)(${dist}), (double)(${angle}), true, ${los}, ${copyPitch})`;
+        visExpr = showP ? `    AoeShapes.visualizeCone(_sl, ${ent}, (double)(${dist}), (double)(${angle}), ${copyPitch});` : null;
       } else {
-        queryExpr = `AoeShapes.queryConeOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${angle}), true, ${los})`;
-        visExpr = showP ? `    AoeShapes.visualizeConeOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${angle}));` : null;
+        queryExpr = `AoeShapes.queryConeOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${angle}), true, ${los}, ${copyPitch})`;
+        visExpr = showP ? `    AoeShapes.visualizeConeOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${angle}), ${copyPitch});` : null;
       }
     } else if (shape === "line") {
       const dist = resolveSlotValue(node.slots?.distance, nodes, methodKey) ?? "10";
       const w = resolveSlotValue(node.slots?.width, nodes, methodKey) ?? "1";
       if (!hasOff) {
-        queryExpr = `AoeShapes.queryLine(_sl, ${ent}, (double)(${dist}), (double)(${w}), true, ${los})`;
-        visExpr = showP ? `    AoeShapes.visualizeLine(_sl, ${ent}, (double)(${dist}), (double)(${w}));` : null;
+        queryExpr = `AoeShapes.queryLine(_sl, ${ent}, (double)(${dist}), (double)(${w}), true, ${los}, ${copyPitch})`;
+        visExpr = showP ? `    AoeShapes.visualizeLine(_sl, ${ent}, (double)(${dist}), (double)(${w}), ${copyPitch});` : null;
       } else {
-        queryExpr = `AoeShapes.queryLineOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${w}), true, ${los})`;
-        visExpr = showP ? `    AoeShapes.visualizeLineOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${w}));` : null;
+        queryExpr = `AoeShapes.queryLineOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${w}), true, ${los}, ${copyPitch})`;
+        visExpr = showP ? `    AoeShapes.visualizeLineOffset(_sl, ${ent}, _c.subtract(${ent}.getEyePosition()), (double)(${dist}), (double)(${w}), ${copyPitch});` : null;
       }
     }
     if (visExpr) lines.push(visExpr);
     lines.push(`    for (net.minecraft.world.entity.LivingEntity hitEntity : ${queryExpr}) {`);
     lines.push(`      hitEntity.setYRot(${ent}.getYRot());`);
     if (node.fields?.copyPitch) lines.push(`      hitEntity.setXRot(${ent}.getXRot());`);
+    if (showP) lines.push(`      AoeShapes.applyGlowing(java.util.List.of(hitEntity), 20);`);
     if (node.slots?.do0) lines.push(...compileChain(node.slots.do0, nodes, methodKey).map(l => "      " + l));
     lines.push("    }");
     lines.push("}");
@@ -387,7 +389,7 @@ export function compileActionNode(node, nodes, methodKey) {
   if (node.opcode?.startsWith("anim.item.")) {
     const stackNodeId = node.slots?.stack;
     const stackNode = stackNodeId ? nodes.find(n => n.id === stackNodeId) : null;
-    const isMainHand = !stackNode || stackNode.opcode !== "itemstack.offhand";
+    const isMainHand = !stackNode || !(stackNode.opcode === "itemstack.hand_item" && stackNode.fields?.hand === "off");
     const entitySlotId = stackNode?.slots?.entity;
     const entityExpr = entitySlotId ? resolveSlotValue(entitySlotId, nodes, methodKey) : resolveEntityVar("entity.event", methodKey);
     const guard = `if (${entityExpr} instanceof Entity animEntity && !level.isClientSide()) {`;

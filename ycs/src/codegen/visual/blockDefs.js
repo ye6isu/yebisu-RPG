@@ -307,6 +307,45 @@ export const BLOCK_DEFS = [
     },
   },
   {
+    opcode: "entity.is_dashing",
+    category: "Entity", sub: "data",
+    linkType: "logic",
+    paletteLabel: "Is Dashing?",
+    label: "Is [entity:entity] Dashing?",
+    hint: "True if the entity is currently mid-dash",
+    color: "#6494a4",
+    codegen: {
+      type: "value",
+      expr: "(net.ye6isu.yebisuRPG.util.DashUtil.isDashing({{entity}}))",
+      imports: ["net.ye6isu.yebisuRPG.util.DashUtil"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "entity.cancel_dash",
+    category: "Entity", sub: "actions",
+    isAction: true,
+    label: "Cancel Dash [entity:entity] [stopVelocity:dropdown]",
+    hint: "Stop the entity's current dash immediately. Stop Velocity = instant hard stop (Poppy W style). Keep Velocity = momentum carries through into normal falling/sliding.",
+    color: "#c46c94",
+    fields: {
+      stopVelocity: {
+        type: "dropdown",
+        options: [
+          { value: "true", label: "Stop Velocity" },
+          { value: "false", label: "Keep Velocity" },
+        ],
+        default: "true",
+      },
+    },
+    codegen: {
+      type: "action",
+      template: "net.ye6isu.yebisuRPG.util.DashUtil.cancel({{entity}}, {{stopVelocity}});",
+      imports: ["net.ye6isu.yebisuRPG.util.DashUtil"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
     opcode: "entity.deal_damage",
     category: "Entity", sub: "actions",
     isAction: true,
@@ -361,36 +400,6 @@ export const BLOCK_DEFS = [
       },
     },
   },
-  {
-    opcode: "entity.is_dashing",
-    category: "Entity", sub: "data",
-    linkType: "logic",
-    paletteLabel: "Is Dashing?",
-    label: "Is [entity:entity] Dashing?",
-    hint: "True if the entity is currently mid-dash",
-    color: "#6494a4",
-    codegen: {
-      type: "value",
-      expr: "(net.ye6isu.yebisuRPG.util.DashUtil.isDashing({{entity}}))",
-      imports: ["net.ye6isu.yebisuRPG.util.DashUtil"],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "entity.cancel_dash",
-    category: "Entity", sub: "actions",
-    isAction: true,
-    label: "Cancel Dash [entity:entity]",
-    hint: "Stop the entity's current dash immediately",
-    color: "#c46c94",
-    codegen: {
-      type: "action",
-      template: "net.ye6isu.yebisuRPG.util.DashUtil.cancel({{entity}});",
-      imports: ["net.ye6isu.yebisuRPG.util.DashUtil"],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-
   // ═══════════════════════════════════════════════════════════════════════════
   // PLAYER — First Person Animations (Actions)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -778,7 +787,7 @@ export const BLOCK_DEFS = [
         animName: { opcode: "text.literal", fields: { value: "" } },
         playbackSpeed: { opcode: "number.literal", fields: { value: "1" } },
         filePath: { opcode: "text.literal", fields: { value: "" } },
-        stack: { opcode: "itemstack.mainhand" },
+        stack: { opcode: "itemstack.hand_item", fields: { hand: "main" } },
       },
     },
   },
@@ -796,7 +805,7 @@ export const BLOCK_DEFS = [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
       ],
-      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+      slotDefaults: { stack: { opcode: "itemstack.hand_item", fields: { hand: "main" } } },
     },
   },
   {
@@ -813,7 +822,7 @@ export const BLOCK_DEFS = [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
       ],
-      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+      slotDefaults: { stack: { opcode: "itemstack.hand_item", fields: { hand: "main" } } },
     },
   },
   {
@@ -830,7 +839,7 @@ export const BLOCK_DEFS = [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
       ],
-      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+      slotDefaults: { stack: { opcode: "itemstack.hand_item", fields: { hand: "main" } } },
     },
   },
   {
@@ -851,7 +860,7 @@ export const BLOCK_DEFS = [
         animName: { opcode: "text.literal", fields: { value: "" } },
         playbackSpeed: { opcode: "number.literal", fields: { value: "1" } },
         filePath: { opcode: "text.literal", fields: { value: "" } },
-        stack: { opcode: "itemstack.mainhand" },
+        stack: { opcode: "itemstack.hand_item", fields: { hand: "main" } },
       },
     },
   },
@@ -869,7 +878,7 @@ export const BLOCK_DEFS = [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
       ],
-      slotDefaults: { stack: { opcode: "itemstack.mainhand" } },
+      slotDefaults: { stack: { opcode: "itemstack.hand_item", fields: { hand: "main" } } },
     },
   },
 
@@ -1201,29 +1210,29 @@ export const BLOCK_DEFS = [
     },
   },
   {
-    opcode: "itemstack.mainhand",
+    opcode: "itemstack.hand_item",
     category: "Item", sub: "data",
     linkType: "itemstack",
-    label: "Get Main Hand Item of [entity:entity]",
-    hint: "Get the item stack in the entity's main hand",
+    label: "Get [hand:dropdown] Item of [entity:entity]",
+    hint: "Get the item stack in the entity's main or off hand",
     color: "#945d66",
-    codegen: {
-      type: "value",
-      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getMainHandItem())",
-      imports: ["net.minecraft.world.entity.LivingEntity"],
-      slotDefaults: { entity: { opcode: "entity.event" } },
+    fields: {
+      hand: {
+        type: "dropdown",
+        options: [
+          { value: "main", label: "Main Hand" },
+          { value: "off", label: "Off Hand" },
+        ],
+        default: "main",
+      },
     },
-  },
-  {
-    opcode: "itemstack.offhand",
-    category: "Item", sub: "data",
-    linkType: "itemstack",
-    label: "Get Off Hand Item of [entity:entity]",
-    hint: "Get the item stack in the entity's off hand",
-    color: "#945d66",
     codegen: {
       type: "value",
-      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getOffhandItem())",
+      variants: {
+        "hand == 'off'": { expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getOffhandItem())" },
+        "hand == 'main'": { expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getMainHandItem())" },
+      },
+      expr: "(((net.minecraft.world.entity.LivingEntity){{entity}}).getMainHandItem())",
       imports: ["net.minecraft.world.entity.LivingEntity"],
       slotDefaults: { entity: { opcode: "entity.event" } },
     },
@@ -1714,7 +1723,6 @@ export const BLOCK_DEFS = [
       losOrigin: { type: "hidden", default: "caller" },
       showParticles: { type: "hidden", default: false },
       copyPitch: { type: "hidden", default: true },
-      multiline: { type: "hidden", default: false },
     },
     shapeSlots: {
       sphere: "radius [radius:number]",
@@ -1724,7 +1732,6 @@ export const BLOCK_DEFS = [
     },
     suffixLabel: "offset x [offX:number] y [offY:number] z [offZ:number]",
     settings: {
-      multiline: { type: "checkbox", label: "New Line per Link", default: false },
       los: { type: "checkbox", label: "Line of Sight", default: false },
       losOrigin: { type: "dropdown", label: "LOS Origin", options: [{ value: "caller", label: "Caller" }, { value: "center", label: "Shape Center" }], default: "caller", showIf: "los" },
       showParticles: { type: "checkbox", label: "Visual", default: false },

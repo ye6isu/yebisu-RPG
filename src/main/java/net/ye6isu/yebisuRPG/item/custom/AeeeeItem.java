@@ -1,5 +1,6 @@
 package net.ye6isu.yebisuRPG.item.custom;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -9,10 +10,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.ye6isu.yebisuRPG.animation.AnimationAPI;
-import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.texture.TextureServerEvents;
+import net.ye6isu.yebisuRPG.util.AoeShapes;
+import net.ye6isu.yebisuRPG.util.DashUtil;
 
 public class AeeeeItem extends Item {
     public AeeeeItem(Properties properties) {
@@ -21,14 +22,22 @@ public class AeeeeItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-        TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/flame.png", (int)(0), (byte)1, "yebisurpg:textures/overlay/flame_mask.png", "yebisurpg:textures/overlay/flame_emissive.png", 1, 4, false, (byte)0, 2, 0L, 1f, 0), true);
-        if (player instanceof Entity animEntity && !level.isClientSide()) {
-            AnimationAPI.setThirdPersonPose(animEntity,
-                "test",
-                "yebisurpg:animations/player.animation.json",
-                48, 507, 49, 6, 4);
-        }
+        DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(10), (int)((double)(5)), DashUtil.Easing.EASE_OUT, (_dashSrc, hitEntity) -> {
+    hitEntity.setDeltaMovement((double)(0), (double)(1), (double)(0));
+}, null, "box", (double)(3), (double)(3), (double)(3), false);
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
+    }
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
+        if ((net.minecraft.world.item.ItemStack.isSameItem((((net.minecraft.world.entity.LivingEntity)entity).getMainHandItem()), stack))) {
+              if (entity instanceof Player chatPlayer) {
+              chatPlayer.sendSystemMessage(Component.literal("handhand"));
+              }
+            } else if ((net.minecraft.world.item.ItemStack.isSameItem((((net.minecraft.world.entity.LivingEntity)entity).getOffhandItem()), stack))) {
+              if (entity instanceof Player chatPlayer) {
+              chatPlayer.sendSystemMessage(Component.literal("offhand"));
+              }
+        }
     }
     @Override
     public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {

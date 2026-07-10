@@ -64,6 +64,15 @@ public final class ForceRenderCameraEntity {
 
     private ForceRenderCameraEntity() {}
 
+    /** Distance in blocks the mannequin's eye point is pushed forward (along this render space's
+     *  fixed -Z axis) from the camera. Needed because placing the model exactly AT the camera
+     *  (0 offset) puts its head/torso volume centered on the eye, clipping the near plane —
+     *  unlike the old world-space implementation, where 0 was a perfectly fine anchor distance
+     *  since the model was a full distinct entity out in the world, not drawn in a space whose
+     *  origin the camera itself sits inside of. Tune this if the arm still looks clipped/too
+     *  close or too far away. */
+    private static final double ANCHOR_DISTANCE = 0.35;
+
     private static RemotePlayer mannequin;
     private static ClientLevel mannequinLevel;
 
@@ -182,11 +191,13 @@ public final class ForceRenderCameraEntity {
 
         // Fixed rigidly to the camera view — no yaw or pitch rotation applied at all, so the
         // mannequin never tilts as you look around, matching vanilla's own first-person arms.
+        // Pushed ANCHOR_DISTANCE forward along -Z (this space's fixed forward axis) so the
+        // model's head/torso volume isn't centered directly on the eye/near plane.
         poseStack.pushPose();
         TorsoRotationHolder.RENDERING_MANNEQUIN.set(true);
         TorsoRotationHolder.MANNEQUIN_LIMB_MASK.set(limbMask);
         try {
-            dispatcher.render(mannequin, 0, -eyeHeight, 0, 0f, 1f, poseStack, bufferSource, packedLight);
+            dispatcher.render(mannequin, 0, -eyeHeight, -ANCHOR_DISTANCE, 0f, 1f, poseStack, bufferSource, packedLight);
         } finally {
             TorsoRotationHolder.RENDERING_MANNEQUIN.set(false);
             TorsoRotationHolder.MANNEQUIN_LIMB_MASK.set(0);
