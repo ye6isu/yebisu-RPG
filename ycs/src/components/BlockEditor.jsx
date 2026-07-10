@@ -681,12 +681,23 @@ function CanvasBlock({ node, nodes, inChain, selected, onSelect, onBlockMouseDow
           return <>
             <div style={{ minHeight: BLOCK_H, background: bg, display: 'flex', alignItems: 'center',
               padding: '0 10px', gap: 10, borderLeft: sel2, borderRight: sel2, boxSizing: 'border-box' }}>
-              <span style={{ fontSize: 14, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700 }}>On Collision</span>
+              <span style={{ fontSize: 14, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700, whiteSpace: 'nowrap' }}>On Collision</span>
               <PortalDropdown value={colShape} onChange={v => onFieldChange?.(node.id, 'collisionShape', v)} minWidth={80}
                 options={[{ value: 'sphere', label: 'Sphere' }, { value: 'box', label: 'Box' }]} />
               {colShape === 'sphere' && <>
                 <span style={{ fontSize: 13, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700 }}>radius</span>
                 <SlotConn sk="colRadius" connId={node.slots?.colRadius} nodes={nodes}
+                  onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selected={selected} onBlockMouseDown={onBlockMouseDown} />
+              </>}
+              {colShape === 'box' && <>
+                <span style={{ fontSize: 13, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700 }}>w</span>
+                <SlotConn sk="colWidth" connId={node.slots?.colWidth} nodes={nodes}
+                  onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selected={selected} onBlockMouseDown={onBlockMouseDown} />
+                <span style={{ fontSize: 13, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700 }}>h</span>
+                <SlotConn sk="colHeight" connId={node.slots?.colHeight} nodes={nodes}
+                  onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selected={selected} onBlockMouseDown={onBlockMouseDown} />
+                <span style={{ fontSize: 13, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700 }}>d</span>
+                <SlotConn sk="colDepth" connId={node.slots?.colDepth} nodes={nodes}
                   onFieldChange={onFieldChange} nodeId={node.id} onSelect={onSelect} selected={selected} onBlockMouseDown={onBlockMouseDown} />
               </>}
             </div>
@@ -700,7 +711,7 @@ function CanvasBlock({ node, nodes, inChain, selected, onSelect, onBlockMouseDow
           <>
             <div style={{ minHeight: BLOCK_H, background: bg, display: 'flex', alignItems: 'center',
               padding: '0 10px', borderLeft: sel2, borderRight: sel2, boxSizing: 'border-box' }}>
-              <span style={{ fontSize: 14, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700 }}>Then</span>
+              <span style={{ fontSize: 14, fontFamily: 'sans-serif', color: '#fff', fontWeight: 700, whiteSpace: 'nowrap' }}>Then</span>
             </div>
             <div style={bodyWrap}>
               <BodySlot slotKey={dashThenSlot} parentId={node.id} slotId={node.slots?.[dashThenSlot]} nodes={nodes} inChain={inChain} selected={selected}

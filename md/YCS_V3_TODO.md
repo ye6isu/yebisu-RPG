@@ -22,16 +22,19 @@
 - [ ] No validation that a referenced component still exists at compile time — a stale/deleted component compiles to a reference to a nonexistent Java constant with no error.
 
 ## Blocky Wiring
-- [ ] 14 block opcodes defined in the palette have no compiler handler in `compiler.js` — compiles to a silently broken/placeholder result (empty expression, `"0"`, or a dropped action line), not a build error: `entity.deal_damage`, `entity.is_dashing`, `entity.cancel_dash`, `itemstack.literal`, `itemstack.mainhand`, `itemstack.offhand`, `itemstack.use_duration`, `logic.not`, `itemstack.compare`, `logic.compare_string`, `logic.compare_bool`. (Note: `itemstack.set_texture_frame`/`get_texture_frame`/`reset_texture_frame` and `itemstack.set_state`/`get_state`/`reset_state` were previously listed here too — all six are confirmed working via `compiler.js`'s generic `def.codegen`-driven dispatcher; the state blocks additionally had broken codegen (referenced a nonexistent `ModDataComponents.ITEM_STATE` field) which has since been fixed to use `CustomModelData` directly.)
+- [ ] 12 block opcodes defined in the palette have no compiler handler in `compiler.js` — compiles to a silently broken/placeholder result (empty expression, `"0"`, or a dropped action line), not a build error: `entity.deal_damage`, `entity.is_dashing`, `entity.cancel_dash`, `itemstack.literal`, `itemstack.use_duration`, `logic.not`, `itemstack.compare`, `logic.compare_string`, `logic.compare_bool`. (Note: `itemstack.set_texture_frame`/`get_texture_frame`/`reset_texture_frame`, `itemstack.set_state`/`get_state`/`reset_state`, and `itemstack.hand_item` — the merged Main/Off Hand dropdown block, formerly two separate opcodes `itemstack.mainhand`/`itemstack.offhand` — were previously listed here too; all are confirmed working via `compiler.js`'s generic `def.codegen`-driven dispatcher. The state blocks additionally had broken codegen (referenced a nonexistent `ModDataComponents.ITEM_STATE` field) which has since been fixed to use `CustomModelData` directly.)
 - [ ] The same `dropdown.attributes`/`dropdown.effects` blocks (`attribute.get`, `attribute.modifier.add`, etc.) likely have the same missing-`fields.attrId`/`fields.effect` dropdown-source bug that was fixed for `dropdown.dataComponents` — not yet audited/fixed.
 
 ## Networking (Brought Over, Not Connected)
 - [ ] Wire up animation payloads to client animation engine when animation system is added
 - [ ] `ClientHandlerProxy` stub methods need real implementations
 
+## Dash System
+- [ ] `DashUtil`/`entity.dash` (+`entity.is_dashing`/`entity.cancel_dash`) is ported from `old_mod` verbatim — velocity-based (`setDeltaMovement` per tick), no gravity, no position teleport, no wall-clamping, no client-side sync payload. Not yet tested in-game on a real dedicated server/multi-client session.
+- [ ] `Cancel Dash` now supports a Stop Velocity / Keep Velocity option (`DashUtil.cancel(entity, stopVelocity)`) — only exercised in singleplayer testing so far.
+
 ## Future / Deferred
 - [ ] Variables and Attributes tabs (planned to join the Data sidebar group alongside Data Components)
-- [ ] Porting `DashUtil` and the animation system from `old_mod` into `src/main` — planned after Blocky editor blocks are refined
 
 ## Documentation
 - [ ] Keep `YCS_V3_Injection_and_Lifecycle.md` updated as new object types/injection targets are added
