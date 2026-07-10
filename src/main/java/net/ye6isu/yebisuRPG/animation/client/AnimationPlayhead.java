@@ -73,6 +73,14 @@ public final class AnimationPlayhead {
     public static final int FP_LEFT_LEG  = 1 << 3;
     public static final int FP_ANY_LIMB  = FP_RIGHT_ARM | FP_LEFT_ARM | FP_RIGHT_LEG | FP_LEFT_LEG;
 
+    // Gate bits (same vanillaMoveMask int): when set alongside the matching FP_* arm bit above,
+    // the REAL third-person body's vanilla arm rendering is hidden too — otherwise the mannequin's
+    // first-person arm and the real body's third-person arm would both be visible at once. Only
+    // meaningful in combination with the corresponding FP_RIGHT_ARM/FP_LEFT_ARM bit; arms only
+    // (legs stay visible in third person regardless, since first-person legs aren't normally seen).
+    public static final int FP_HIDE_VANILLA_RIGHT_ARM = 1 << 4;
+    public static final int FP_HIDE_VANILLA_LEFT_ARM  = 1 << 5;
+
     private final int entityId;
     private final AnimationCategory category;
     private final String animId;
@@ -212,6 +220,18 @@ public final class AnimationPlayhead {
 
     /** Bitmask of which limbs (FP_RIGHT_ARM/FP_LEFT_ARM/FP_RIGHT_LEG/FP_LEFT_LEG) the first-person mannequin should render. */
     public int firstPersonLimbMask() { return vanillaMoveMask & FP_ANY_LIMB; }
+
+    /** True if vanilla's first-person right arm/hand render should be hidden — independent of
+     *  whether the mannequin is also showing that limb (see {@link #FP_HIDE_VANILLA_RIGHT_ARM}). */
+    public boolean hideVanillaRightArm() {
+        return (vanillaMoveMask & FP_HIDE_VANILLA_RIGHT_ARM) != 0;
+    }
+
+    /** True if vanilla's first-person left arm/hand render should be hidden — independent of
+     *  whether the mannequin is also showing that limb (see {@link #FP_HIDE_VANILLA_LEFT_ARM}). */
+    public boolean hideVanillaLeftArm() {
+        return (vanillaMoveMask & FP_HIDE_VANILLA_LEFT_ARM) != 0;
+    }
 
     public float getBlendInWeight(float partialTick) {
         long elapsedMs = System.currentTimeMillis() - createdMs;

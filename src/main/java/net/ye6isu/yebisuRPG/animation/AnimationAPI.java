@@ -235,16 +235,12 @@ public final class AnimationAPI {
     }
 
     public static void setFirstPersonHandPose(Entity entity, String animName, String filePath, boolean allowVanillaActions) {
-        setFirstPersonHandPose(entity, animName, filePath, allowVanillaActions, false);
-    }
-
-    public static void setFirstPersonHandPose(Entity entity, String animName, String filePath, boolean allowVanillaActions, boolean keepPosScale) {
         if (!(entity.level() instanceof ServerLevel)) {
             LOGGER.warn("[AnimationAPI] setFirstPersonHandPose called client-side for entity={}; ignoring.", entity.getId());
             return;
         }
         var payload = net.ye6isu.yebisuRPG.network.animation.HandPosePayload.set(
-                entity.getId(), animName, filePath, allowVanillaActions, keepPosScale);
+                entity.getId(), animName, filePath, allowVanillaActions);
         PoseRegistry.get().setHandPose(payload);
         NetworkUtils.sendToPlayersTrackingAndSelf(entity, payload);
     }

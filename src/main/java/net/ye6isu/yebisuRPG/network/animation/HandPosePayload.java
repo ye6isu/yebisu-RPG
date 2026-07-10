@@ -11,24 +11,17 @@ public record HandPosePayload(
         int entityId,
         String animName,
         String filePath,
-        boolean allowVanillaActions,
-        boolean keepPosScale
+        boolean allowVanillaActions
 ) implements BasePayload {
 
     private static final int FLAG_ALLOW_ACTIONS = 1;
-    private static final int FLAG_KEEP_POS_SCALE = 2;
 
     private int flags() {
-        int f = 0;
-        if (allowVanillaActions) f |= FLAG_ALLOW_ACTIONS;
-        if (keepPosScale) f |= FLAG_KEEP_POS_SCALE;
-        return f;
+        return allowVanillaActions ? FLAG_ALLOW_ACTIONS : 0;
     }
 
     private static HandPosePayload fromFields(int entityId, String animName, String filePath, int flags) {
-        return new HandPosePayload(entityId, animName, filePath,
-                (flags & FLAG_ALLOW_ACTIONS) != 0,
-                (flags & FLAG_KEEP_POS_SCALE) != 0);
+        return new HandPosePayload(entityId, animName, filePath, (flags & FLAG_ALLOW_ACTIONS) != 0);
     }
 
     public static final CustomPacketPayload.Type<HandPosePayload> TYPE =
@@ -49,14 +42,14 @@ public record HandPosePayload(
     public boolean isClear() { return animName == null || animName.isEmpty(); }
 
     public static HandPosePayload set(int entityId, String animName, String filePath,
-                                      boolean allowVanillaActions, boolean keepPosScale) {
+                                      boolean allowVanillaActions) {
         return new HandPosePayload(entityId,
                 animName != null ? animName : "",
                 filePath != null ? filePath : "",
-                allowVanillaActions, keepPosScale);
+                allowVanillaActions);
     }
 
     public static HandPosePayload clear(int entityId) {
-        return new HandPosePayload(entityId, "", "", false, false);
+        return new HandPosePayload(entityId, "", "", false);
     }
 }

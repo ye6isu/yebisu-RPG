@@ -21,12 +21,12 @@ public class AeeeeItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
+        TextureServerEvents.setLayer(player, new net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload.LayerData("yebisurpg:textures/overlay/flame.png", (int)(0), (byte)1, "yebisurpg:textures/overlay/flame_mask.png", "yebisurpg:textures/overlay/flame_emissive.png", 1, 4, false, (byte)0, 2, 0L, 1f, 0), true);
         if (player instanceof Entity animEntity && !level.isClientSide()) {
-            AnimationAPI.triggerAnimation(animEntity,
-                AnimationCategory.ENTITY_THIRD_PERSON,
+            AnimationAPI.setThirdPersonPose(animEntity,
                 "test",
                 "yebisurpg:animations/player.animation.json",
-                1f, 48, 59 | 0, 1);
+                48, 507, 49, 6, 4);
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

@@ -8,16 +8,11 @@ import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.ye6isu.yebisuRPG.animation.AnimationCategory;
 import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
 import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.ye6isu.yebisuRPG.animation.client.TorsoRotationHolder;
 import net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload;
-import net.ye6isu.yebisuRPG.yebisuRPG;
 
 /**
  * Renders a partial extra player body ("mannequin") fixed in front of the camera when the local
@@ -37,24 +32,62 @@ import net.ye6isu.yebisuRPG.yebisuRPG;
  * means vanilla's shadow pass (which iterates only tracked entities) never draws one for it. The
  * mannequin reuses the real local player's {@code GameProfile} so it resolves the same skin.</p>
  *
- * <p>Position/yaw/pitch are recomputed every frame from the camera's CURRENT position and look
- * direction (a fixed offset directly in front, via camera yaw/pitch) rather than any entity's real
- * world position, so the mannequin stays pinned in the same spot in your view no matter which way
- * you look. The pivot for pitch is the mannequin's EYES (the anchor point), not its feet, so
- * looking up/down rotates the whole rendered body around eye level.</p>
+ * <p>Fixed rigidly to the camera's view — no yaw or pitch rotation is applied to the mannequin
+ * at all, matching how vanilla's own first-person hand/held item never tilts as you look
+ * around. This is drawn directly in the render space {@code renderHandsWithItems} already
+ * operates in (see below), whose forward axis is permanently the camera's current look
+ * direction by construction — there is no world rotation baked into that space at all, so no
+ * yaw/pitch math is needed (or even meaningful) here.</p>
+ *
+ * <p><b>Render timing/occlusion:</b> the actual draw is invoked from
+ * {@code MixinItemInHandRenderer.yebisurpg$renderMannequin}, injected into
+ * {@code ItemInHandRenderer.renderHandsWithItems} — the same method vanilla's own
+ * first-person hand/held-item render runs through, called from
+ * {@code GameRenderer.renderItemInHand} AFTER {@code GameRenderer.render} clears the depth
+ * buffer (see {@code RenderSystem.clear(GL_DEPTH_BUFFER_BIT, ...)} right before
+ * {@code renderItemInHand} is called). Drawing here — rather than at any
+ * {@code RenderLevelStageEvent.Stage} inside {@code renderLevel} — is what makes the
+ * mannequin immune to world-geometry occlusion, matching vanilla's own hand: two earlier
+ * attempts at a {@code RenderLevelStageEvent} stage failed because every stage inside
+ * {@code renderLevel} runs before that depth clear, no matter how late (a plain
+ * {@code disableDepthTest()} wrap doesn't help either, since {@code PlayerModel}'s own
+ * {@code RenderType}s force depth-testing back on via their {@code DepthTestStateShard} at
+ * flush time). Unlike {@code RenderLevelStageEvent}'s PoseStack (true world axes, only
+ * camera-relative in position), the {@code poseStack} passed into {@code renderHandsWithItems}
+ * is built from the inverse projection matrix only ({@code GameRenderer.renderItemInHand}) and
+ * has no world rotation baked in — an earlier version of this class ported the original
+ * yaw/pitch-following math over unchanged and only worked correctly while facing world north
+ * (where the two conventions happened to coincide); it's since been replaced with the
+ * fixed-to-camera behavior described above.</p>
  */
-@EventBusSubscriber(modid = yebisuRPG.MODID, value = Dist.CLIENT)
 public final class ForceRenderCameraEntity {
 
     private ForceRenderCameraEntity() {}
 
-    /** Distance in front of the camera, in blocks, that the mannequin is anchored at.
-     *  Kept near zero so the mannequin's eyes sit at (not in front of) the camera, aligning
-     *  its limbs with where the real first-person body would be. */
-    private static final double ANCHOR_DISTANCE = 0.0;
-
     private static RemotePlayer mannequin;
     private static ClientLevel mannequinLevel;
+
+    // Reflective access to Player.DATA_PLAYER_MODE_CUSTOMISATION — protected, no public
+    // getter/setter for the raw synced byte exists (only the per-part isModelPartShown query).
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Byte> MODE_CUSTOMISATION_ACCESSOR;
+    static {
+        net.minecraft.network.syncher.EntityDataAccessor<Byte> accessor = null;
+        try {
+            var field = net.minecraft.world.entity.player.Player.class.getDeclaredField("DATA_PLAYER_MODE_CUSTOMISATION");
+            field.setAccessible(true);
+            //noinspection unchecked
+            accessor = (net.minecraft.network.syncher.EntityDataAccessor<Byte>) field.get(null);
+        } catch (ReflectiveOperationException e) {
+            org.slf4j.LoggerFactory.getLogger(ForceRenderCameraEntity.class)
+                    .error("Failed to reflect DATA_PLAYER_MODE_CUSTOMISATION", e);
+        }
+        MODE_CUSTOMISATION_ACCESSOR = accessor;
+    }
+
+    private static void copyModelPartCustomisation(LivingEntity from, LivingEntity to) {
+        if (MODE_CUSTOMISATION_ACCESSOR == null) return;
+        to.getEntityData().set(MODE_CUSTOMISATION_ACCESSOR, from.getEntityData().get(MODE_CUSTOMISATION_ACCESSOR));
+    }
 
     private static RemotePlayer getOrCreateMannequin(Minecraft mc, ClientLevel level) {
         if (mannequin == null || mannequinLevel != level) {
@@ -68,10 +101,20 @@ public final class ForceRenderCameraEntity {
         return mannequin;
     }
 
-    @SubscribeEvent
-    public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) return;
-
+    /**
+     * Draws the mannequin, if applicable. Called from
+     * {@code MixinItemInHandRenderer.yebisurpg$renderMannequin} — see the class javadoc for why
+     * this specific call site (inside {@code renderHandsWithItems}, post depth-clear) was chosen.
+     *
+     * @param poseStack   the render-space PoseStack {@code renderHandsWithItems} itself received
+     *                    (see class javadoc — camera yaw/pitch are NOT read here, since the space
+     *                    this PoseStack is in already has no world rotation baked into it)
+     * @param bufferSource buffer source to draw into; flushed (via {@code endBatch()}) by this
+     *                    method before returning
+     * @param packedLight packed light coords for the draw (caller already has these computed for
+     *                    its own hand render, so no need to recompute)
+     */
+    public static void render(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, int packedLight) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.getCameraType() != CameraType.FIRST_PERSON) return;
         if (mc.player == null || mc.level == null) return;
@@ -85,7 +128,10 @@ public final class ForceRenderCameraEntity {
             limbMask = playhead.firstPersonLimbMask();
         } else {
             ThirdPersonPosePayload pose = engine.getThirdPersonPosePayload(entityId);
-            limbMask = pose != null ? pose.firstPersonLimbMask() : 0;
+            // An arm currently yielding to a vanilla action (Allow Vanilla Actions checked +
+            // eating/swinging/using item) is masked out here so the mannequin doesn't keep
+            // showing a frozen limb while vanilla's own first-person hand plays for real.
+            limbMask = pose != null ? pose.effectiveFirstPersonLimbMask(mc.player) : 0;
         }
         if (limbMask == 0) return;
 
@@ -96,74 +142,51 @@ public final class ForceRenderCameraEntity {
         mannequin.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, mc.player.getMainHandItem());
         mannequin.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND, mc.player.getOffhandItem());
 
-        var camera = event.getCamera();
-        var camPos = camera.getPosition();
-        float camYaw = camera.getYRot();
-        float camPitch = camera.getXRot();
+        // Mirror the real player's skin-layer visibility (jacket/sleeves/pants/hat/cape toggles
+        // from the skin customization screen). A freshly constructed RemotePlayer's synced
+        // DATA_PLAYER_MODE_CUSTOMISATION byte defaults to 0 (all layers hidden per
+        // Player.isModelPartShown), so without this every second-skin-layer part on the
+        // mannequin is invisible regardless of ModelPart scale.
+        copyModelPartCustomisation(mc.player, mannequin);
 
-        // Fixed offset directly in front of the camera's CURRENT look direction — recomputed
-        // every frame from the camera's live yaw/pitch, not from any entity's real position.
-        double yawRad = Math.toRadians(camYaw);
-        double pitchRad = Math.toRadians(camPitch);
-        double dirX = -Math.sin(yawRad) * Math.cos(pitchRad);
-        double dirY = -Math.sin(pitchRad);
-        double dirZ =  Math.cos(yawRad) * Math.cos(pitchRad);
-
-        // Anchor point is where the mannequin's HEAD should sit, ANCHOR_DISTANCE in front of the
-        // camera. render()/setPos() place the entity at its FEET, so shift down by eye height to
-        // land the head (not the feet) at the anchor point.
-        double headWorldX = camPos.x + dirX * ANCHOR_DISTANCE;
-        double headWorldY = camPos.y + dirY * ANCHOR_DISTANCE;
-        double headWorldZ = camPos.z + dirZ * ANCHOR_DISTANCE;
-
+        // NOTE on coordinate space: unlike RenderLevelStageEvent's PoseStack (true world axes,
+        // just camera-relative in position), the poseStack passed into renderHandsWithItems is
+        // built from the INVERSE PROJECTION matrix only (GameRenderer.renderItemInHand) — it has
+        // no world rotation baked in at all. "Forward" in this space is always -Z, permanently
+        // aligned with wherever the camera is currently looking, regardless of camera yaw OR
+        // pitch. So the mannequin needs no rotation handling at all here — it's fixed rigidly to
+        // the camera's view (no yaw or pitch tilt applied), the same way vanilla's own
+        // first-person hand/held item never tilts as you look around.
         double eyeHeight = mannequin.getEyeHeight();
-        double worldX = headWorldX;
-        double worldY = headWorldY - eyeHeight;
-        double worldZ = headWorldZ;
 
-        // Keep the mannequin's own position/rotation fields in sync (some render paths read
-        // these directly rather than only the args passed to render()). Facing the SAME direction
-        // as the camera (not back toward it) is what makes this read as "fixed in your view."
-        mannequin.setPos(worldX, worldY, worldZ);
-        float yaw = camYaw;
-        mannequin.setYRot(yaw);
-        mannequin.yRotO = yaw;
-        mannequin.yBodyRot = yaw;
-        mannequin.yBodyRotO = yaw;
-        mannequin.yHeadRot = yaw;
-        mannequin.yHeadRotO = yaw;
+        // Keep the mannequin's own position/rotation fields at sane neutral values (some render
+        // paths read these directly rather than only the args passed to render()); world
+        // position doesn't matter here since the draw itself is done entirely in camera-relative
+        // hand-space, not from the entity's real world transform.
+        //
+        // LivingEntityRenderer.setupRotations applies mulPose(YP.rotationDegrees(180 - yBodyRot))
+        // — at yBodyRot=0 the model is rotated 180° and faces the opposite of this space's -Z
+        // "into the screen" forward axis. Using 180° here cancels that flip so the mannequin
+        // faces the same way the camera is looking, matching vanilla's own first-person arms.
+        mannequin.setPos(0, 0, 0);
+        mannequin.setYRot(180f);
+        mannequin.yRotO = 180f;
+        mannequin.yBodyRot = 180f;
+        mannequin.yBodyRotO = 180f;
+        mannequin.yHeadRot = 180f;
+        mannequin.yHeadRotO = 180f;
         mannequin.setXRot(0f);
         mannequin.xRotO = 0f;
 
-        // Render position is camera-relative (world anchor point minus camera position).
-        double x = worldX - camPos.x;
-        double y = worldY - camPos.y;
-        double z = worldZ - camPos.z;
-
         EntityRenderDispatcher dispatcher = mc.getEntityRenderDispatcher();
-        int packedLight = dispatcher.getPackedLightCoords(mannequin, 1f);
 
-        PoseStack poseStack = event.getPoseStack();
-        MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
-
-        // Pitch the WHOLE model (not just the head) to follow the camera's up/down look,
-        // pivoting around the head/eye point rather than the feet — done here at the
-        // PoseStack level (not via entity.setXRot, which only drives vanilla's per-bone head
-        // tilt) so the entire body rotates as one rigid unit around the anchor.
+        // Fixed rigidly to the camera view — no yaw or pitch rotation applied at all, so the
+        // mannequin never tilts as you look around, matching vanilla's own first-person arms.
         poseStack.pushPose();
-        poseStack.translate(x, y + eyeHeight, z);
-        // Rotate into the mannequin's own facing direction first so the pitch axis is
-        // relative to ITS yaw (not world space) — otherwise pitch only reads correctly
-        // when facing south, since Axis.XP is a fixed world axis. Entity render applies
-        // -yaw internally, so undo our yaw rotation afterward to avoid double-rotating.
-        poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-yaw));
-        poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(camPitch));
-        poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(yaw));
-        poseStack.translate(-x, -y - eyeHeight, -z);
         TorsoRotationHolder.RENDERING_MANNEQUIN.set(true);
         TorsoRotationHolder.MANNEQUIN_LIMB_MASK.set(limbMask);
         try {
-            dispatcher.render(mannequin, x, y, z, yaw, 1f, poseStack, bufferSource, packedLight);
+            dispatcher.render(mannequin, 0, -eyeHeight, 0, 0f, 1f, poseStack, bufferSource, packedLight);
         } finally {
             TorsoRotationHolder.RENDERING_MANNEQUIN.set(false);
             TorsoRotationHolder.MANNEQUIN_LIMB_MASK.set(0);

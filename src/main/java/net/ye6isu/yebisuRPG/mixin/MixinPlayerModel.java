@@ -16,6 +16,7 @@ import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
 import net.ye6isu.yebisuRPG.animation.client.TorsoRotationHolder;
 import net.ye6isu.yebisuRPG.network.animation.ThirdPersonPosePayload;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -46,6 +47,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidModel<T> {
 
     protected MixinPlayerModel(ModelPart root) { super(root); }
+
+    @Shadow public ModelPart jacket;
+    @Shadow public ModelPart leftSleeve;
+    @Shadow public ModelPart rightSleeve;
+    @Shadow public ModelPart leftPants;
+    @Shadow public ModelPart rightPants;
 
     /**
      * false = full vanilla prone rendering (tilt + limb animation) when no custom animation/pose
@@ -313,7 +320,7 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         // Parts with keepPS: apply pose then add vanilla delta.
         // Parts with allowAct but no keepPS: skip pose, let vanilla through.
         // Parts without allowAct: apply pose normally (handled in main path below).
-        if (performingAction && (keepPSMask & 0x3F) != 0 && anim != null) {
+        if (performingAction && anim != null) {
             ThirdPersonPosePayload tpPoseAdditive = engine.getThirdPersonPosePayload(entityId);
             int addLookMask = tpPoseAdditive != null ? tpPoseAdditive.lookAtMask() : 0;
             float yawRad2   = (float) Math.toRadians(netHeadYaw);
@@ -376,9 +383,12 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
             for (int i = 0; i < 6; i++) {
                 boolean partKeep = (keepPSMask & PART_BITS[i]) != 0;
                 boolean partAct  = (allowActMask & PART_BITS[i]) != 0;
+                boolean partVan  = (vanMask & PART_BITS[i]) != 0;
                 if (partKeep) continue; // already done
-                if (partAct) continue;  // vanilla handles it
-                // No allowAct, no keepPS — apply pose normally for this part.
+                if (partAct) continue;  // vanilla handles it (allowed action override)
+                if (partVan) continue;  // "Let Vanilla Control" — leave vanilla's own value alone,
+                                         // same as the main (non-action) path does for this part
+                // No allowAct, no keepPS, no vanMask — apply pose normally for this part.
                 bones[i].resetPose();
                 float lYaw   = (addLookMask & YAW_BITS[i])   != 0 ? yawRad2 : 0f;
                 float lPitch = (addLookMask & PITCH_BITS[i]) != 0 ? pitchRad2 : 0f;
@@ -554,10 +564,11 @@ public abstract class MixinPlayerModel<T extends LivingEntity> extends HumanoidM
         hideBone(this.head);
         hideBone(this.hat);
         hideBone(this.body);
-        if ((limbMask & AnimationPlayhead.FP_RIGHT_ARM) == 0) hideBone(this.rightArm);
-        if ((limbMask & AnimationPlayhead.FP_LEFT_ARM)  == 0) hideBone(this.leftArm);
-        if ((limbMask & AnimationPlayhead.FP_RIGHT_LEG) == 0) hideBone(this.rightLeg);
-        if ((limbMask & AnimationPlayhead.FP_LEFT_LEG)  == 0) hideBone(this.leftLeg);
+        hideBone(this.jacket);
+        if ((limbMask & AnimationPlayhead.FP_RIGHT_ARM) == 0) { hideBone(this.rightArm); hideBone(this.rightSleeve); }
+        if ((limbMask & AnimationPlayhead.FP_LEFT_ARM)  == 0) { hideBone(this.leftArm);  hideBone(this.leftSleeve); }
+        if ((limbMask & AnimationPlayhead.FP_RIGHT_LEG) == 0) { hideBone(this.rightLeg); hideBone(this.rightPants); }
+        if ((limbMask & AnimationPlayhead.FP_LEFT_LEG)  == 0) { hideBone(this.leftLeg);  hideBone(this.leftPants); }
     }
 
     private static void hideBone(ModelPart bone) {
