@@ -25,6 +25,7 @@ import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
 import net.ye6isu.yebisuRPG.client.debug.HandArmCalibration;
 import net.ye6isu.yebisuRPG.client.renderer.EntityTextureCompositor;
+import net.ye6isu.yebisuRPG.client.renderer.ForceRenderCameraEntity;
 import net.ye6isu.yebisuRPG.client.renderer.FullbrightRenderType;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
@@ -54,6 +55,36 @@ public abstract class MixinItemInHandRenderer {
     private static float yebisu$lagPitch = 0f;
     private static float yebisu$prevYaw   = Float.NaN;
     private static float yebisu$prevPitch = Float.NaN;
+
+    /**
+     * Draws the camera-anchored first-person mannequin (see {@link ForceRenderCameraEntity})
+     * right here — inside {@code renderHandsWithItems}, called from
+     * {@code GameRenderer.renderItemInHand} AFTER the depth buffer has already been cleared for
+     * the frame's hand-render pass. This is the one call site that's actually immune to world
+     * geometry occlusion, matching vanilla's own first-person hand/held item; every
+     * {@code RenderLevelStageEvent.Stage} (including {@code AFTER_WEATHER}, the very last one)
+     * runs BEFORE that depth clear, so nothing inside {@code renderLevel} can achieve this.
+     *
+     * <p>Declared BEFORE {@link #yebisurpg$renderFirstPersonHands} below in this file — Mixin
+     * applies same-target/same-{@code @At} injectors in declaration order by default, and this
+     * one must run first so it's never skipped. {@code yebisurpg$renderFirstPersonHands} is
+     * {@code cancellable} and may {@code ci.cancel()} the whole method (when a custom FP hand
+     * animation takes over from vanilla) — if it ran first and cancelled, any injector ordered
+     * after it in the same method (including a {@code TAIL}/{@code RETURN} one) would be
+     * skipped entirely, which would make the mannequin vanish whenever a custom FP hand
+     * animation was also active.</p>
+     */
+    @Inject(
+        method = "renderHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/player/LocalPlayer;I)V",
+        at = @At("HEAD")
+    )
+    private void yebisurpg$renderMannequin(
+            float partialTick, PoseStack poseStack,
+            MultiBufferSource.BufferSource bufferSource,
+            LocalPlayer player, int packedLight,
+            CallbackInfo ci) {
+        ForceRenderCameraEntity.render(poseStack, bufferSource, packedLight);
+    }
 
     @Inject(
         method = "renderHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/player/LocalPlayer;I)V",
@@ -270,12 +301,16 @@ public abstract class MixinItemInHandRenderer {
         float lTY = HandArmCalibration.BASE_LEFT_TY;
         float lTZ = HandArmCalibration.BASE_LEFT_TZ;
 
-        // Render arm skin + sleeve + emissive (skip vanilla-owned hands).
-        if (!rightVanilla) renderArmSkin(playerModel.rightArm, playerModel.rightSleeve,
+        // Render arm skin + sleeve + emissive (skip vanilla-owned hands, and any hand whose
+        // "Hide Vanilla Arm" gate is active — that arm is being shown by the first-person
+        // mannequin instead, see ForceRenderCameraEntity / AnimationPlayhead.hideVanillaRightArm()).
+        boolean hideRightArm = yebisurpg$hideVanillaArm(player, true);
+        boolean hideLeftArm  = yebisurpg$hideVanillaArm(player, false);
+        if (!rightVanilla && !hideRightArm) renderArmSkin(playerModel.rightArm, playerModel.rightSleeve,
                 rRX, rightRY, rightRZ, rTX, rTY, rTZ, rightPX, rightPY, rightPZ,
                 rightSX, rightSY, rightSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
-        if (!leftVanilla) renderArmSkin(playerModel.leftArm, playerModel.leftSleeve,
+        if (!leftVanilla && !hideLeftArm) renderArmSkin(playerModel.leftArm, playerModel.leftSleeve,
                 lRX, leftRY, leftRZ, lTX, lTY, lTZ, leftPX, leftPY, leftPZ,
                 leftSX, leftSY, leftSZ,
                 skinTex, emissiveTex, bufferSource, packedLight);
@@ -349,6 +384,25 @@ public abstract class MixinItemInHandRenderer {
     private static boolean yebisu$skipVanillaRight = false;
     private static boolean yebisu$skipVanillaLeft  = false;
 
+    /**
+     * True if the given hand's "Hide Vanilla Arm" gate is active on the entity's
+     * {@code ENTITY_THIRD_PERSON} animation/pose (the mannequin's own animation slot — distinct
+     * from the {@code ENTITY} first-person hand animation this class otherwise reads from).
+     * For the pose case, an arm currently yielding to a vanilla action (Allow Vanilla Actions +
+     * eating/swinging/using item) always answers false here, so vanilla plays its own normal
+     * first-person hand for that arm instead of staying hidden.
+     */
+    private static boolean yebisurpg$hideVanillaArm(net.minecraft.world.entity.LivingEntity entity, boolean right) {
+        int entityId = entity.getId();
+        AnimationPlayhead tpPlayhead = ClientAnimationEngine.INSTANCE.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+        if (tpPlayhead != null) {
+            return right ? tpPlayhead.hideVanillaRightArm() : tpPlayhead.hideVanillaLeftArm();
+        }
+        var tpPose = ClientAnimationEngine.INSTANCE.getThirdPersonPosePayload(entityId);
+        if (tpPose == null) return false;
+        return right ? tpPose.effectiveHideVanillaRightArm(entity) : tpPose.effectiveHideVanillaLeftArm(entity);
+    }
+
     @Inject(
         method = "renderArmWithItem",
         at = @At("HEAD"),
@@ -364,8 +418,21 @@ public abstract class MixinItemInHandRenderer {
         if (isMain && yebisu$skipVanillaRight) {
             yebisu$skipVanillaRight = false;
             ci.cancel();
+            return;
         } else if (!isMain && yebisu$skipVanillaLeft) {
             yebisu$skipVanillaLeft = false;
+            ci.cancel();
+            return;
+        }
+
+        // "Hide Vanilla Arm" gate: cancels the WHOLE per-hand render (bare arm AND held item —
+        // both live inside this one method), not just the empty-hand arm mesh, since a floating
+        // item with no arm holding it looks just as broken as a duplicate arm. The mannequin
+        // already shows this hand's mirrored item (see ForceRenderCameraEntity), so vanilla's
+        // own render for this hand must be fully suppressed, empty or not.
+        boolean armIsRight = (hand == net.minecraft.world.InteractionHand.MAIN_HAND)
+                == (player.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT);
+        if (yebisurpg$hideVanillaArm(player, armIsRight)) {
             ci.cancel();
         }
     }

@@ -491,11 +491,10 @@ export const BLOCK_DEFS = [
     color: "#3a5c3a",
     settings: {
       allowVanillaActions: { type: "checkbox", label: "Allow Vanilla Actions", default: false },
-      keepPosScale: { type: "checkbox", label: "Keep Position/Scale", default: false },
     },
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}}, {{keepPosScale}});\n}",
+      template: "if ({{entity}} instanceof Entity animEntity && !level.isClientSide()) {\n    AnimationAPI.setFirstPersonHandPose(animEntity,\n        {{quote:animName}},\n        {{quote:filePath}}, {{allowVanillaActions}});\n}",
       imports: [
         "net.ye6isu.yebisuRPG.animation.AnimationAPI",
         "net.minecraft.world.entity.Entity",
@@ -546,6 +545,7 @@ export const BLOCK_DEFS = [
           { label: "Left Arm", bits: [{ label: "Yaw", bit: 64 }, { label: "Pitch", bit: 128 }] },
           { label: "Right Leg", bits: [{ label: "Yaw", bit: 256 }, { label: "Pitch", bit: 512 }] },
           { label: "Left Leg", bits: [{ label: "Yaw", bit: 1024 }, { label: "Pitch", bit: 2048 }] },
+          { label: "Root", bits: [{ label: "Yaw", bit: 4096 }, { label: "Pitch", bit: 8192 }] },
         ],
       },
       vanillaMask: {
@@ -578,6 +578,9 @@ export const BLOCK_DEFS = [
           { bits: [
             { label: "Right Arm", bit: 1 }, { label: "Left Arm", bit: 2 },
             { label: "Right Leg", bit: 4 }, { label: "Left Leg", bit: 8 },
+          ] },
+          { label: "Hide Vanilla Arm (First-Person Empty Hand)", bits: [
+            { label: "Right Arm", bit: 16 }, { label: "Left Arm", bit: 32 },
           ] },
         ],
       },
@@ -669,6 +672,7 @@ export const BLOCK_DEFS = [
           { label: "Left Arm", bits: [{ label: "Yaw", bit: 64 }, { label: "Pitch", bit: 128 }] },
           { label: "Right Leg", bits: [{ label: "Yaw", bit: 256 }, { label: "Pitch", bit: 512 }] },
           { label: "Left Leg", bits: [{ label: "Yaw", bit: 1024 }, { label: "Pitch", bit: 2048 }] },
+          { label: "Root", bits: [{ label: "Yaw", bit: 4096 }, { label: "Pitch", bit: 8192 }] },
         ],
       },
       vanillaMask: {
@@ -684,9 +688,6 @@ export const BLOCK_DEFS = [
             { label: "Disable Prone", bit: 128 },
             { label: "Disable Custom Sitting", bit: 256 },
           ] },
-          { label: "Hand Skip (Fall Back to This Pose)", bits: [
-            { label: "Right Arm", bit: 512 }, { label: "Left Arm", bit: 1024 },
-          ] },
         ],
       },
       firstPersonLimbMask: {
@@ -695,6 +696,9 @@ export const BLOCK_DEFS = [
           { bits: [
             { label: "Right Arm", bit: 1 }, { label: "Left Arm", bit: 2 },
             { label: "Right Leg", bit: 4 }, { label: "Left Leg", bit: 8 },
+          ] },
+          { label: "Hide Vanilla Arm (First-Person Empty Hand)", bits: [
+            { label: "Right Arm", bit: 16 }, { label: "Left Arm", bit: 32 },
           ] },
         ],
       },

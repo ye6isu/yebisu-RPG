@@ -65,6 +65,54 @@ public record ThirdPersonPosePayload(
         return vanillaMoveMask & net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_ANY_LIMB;
     }
 
+    /** True if vanilla's first-person right arm/hand render should be hidden — independent of
+     *  whether the mannequin is also showing that limb. */
+    public boolean hideVanillaRightArm() {
+        return (vanillaMoveMask & net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_HIDE_VANILLA_RIGHT_ARM) != 0;
+    }
+
+    /** True if vanilla's first-person left arm/hand render should be hidden — independent of
+     *  whether the mannequin is also showing that limb. */
+    public boolean hideVanillaLeftArm() {
+        return (vanillaMoveMask & net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_HIDE_VANILLA_LEFT_ARM) != 0;
+    }
+
+    /**
+     * True if this arm's "Allow Vanilla Actions" checkbox is set on the pose AND the entity is
+     * actually eating/swinging/using an item right now. While this is true, first-person's
+     * Show-in-Mannequin and Hide-Vanilla-Arm settings for this arm are meant to stand down —
+     * vanilla should play its own normal first-person hand animation for that arm instead,
+     * matching what already happens to the real third-person arm during the same vanilla action
+     * (see {@code MixinPlayerModel}'s {@code allowActMask} handling).
+     */
+    public boolean isArmYieldingToVanillaAction(net.minecraft.world.entity.LivingEntity entity, boolean right) {
+        int bit = right ? net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.VAN_RIGHT_ARM
+                        : net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.VAN_LEFT_ARM;
+        if ((allowActionsMask & bit) == 0) return false;
+        return entity.isUsingItem() || entity.swinging;
+    }
+
+    /** Bitmask of which limbs the mannequin should render right now, with any arm currently
+     *  yielding to a vanilla action (see {@link #isArmYieldingToVanillaAction}) masked out. */
+    public int effectiveFirstPersonLimbMask(net.minecraft.world.entity.LivingEntity entity) {
+        int mask = firstPersonLimbMask();
+        if (isArmYieldingToVanillaAction(entity, true))  mask &= ~net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_RIGHT_ARM;
+        if (isArmYieldingToVanillaAction(entity, false)) mask &= ~net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead.FP_LEFT_ARM;
+        return mask;
+    }
+
+    /** {@link #hideVanillaRightArm()}, further suppressed while the right arm is yielding to a
+     *  vanilla action. */
+    public boolean effectiveHideVanillaRightArm(net.minecraft.world.entity.LivingEntity entity) {
+        return hideVanillaRightArm() && !isArmYieldingToVanillaAction(entity, true);
+    }
+
+    /** {@link #hideVanillaLeftArm()}, further suppressed while the left arm is yielding to a
+     *  vanilla action. */
+    public boolean effectiveHideVanillaLeftArm(net.minecraft.world.entity.LivingEntity entity) {
+        return hideVanillaLeftArm() && !isArmYieldingToVanillaAction(entity, false);
+    }
+
     public static ThirdPersonPosePayload set(int entityId, String animName, String filePath,
                                               int lookAtMask, int vanillaMask, int vanillaMoveMask,
                                               int allowActionsMask, int keepPosScaleMask) {

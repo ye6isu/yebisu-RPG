@@ -59,6 +59,42 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
     // First-person composite skin / emissive glow
     // -------------------------------------------------------------------------
 
+    /**
+     * Cancels vanilla's first-person arm render entirely for whichever hand has the
+     * "Hide Vanilla Arm" gate active (see {@link AnimationPlayhead#hideVanillaRightArm()}/
+     * {@code hideVanillaLeftArm()}) — the mannequin ({@link ForceRenderCameraEntity}) is
+     * already drawing that arm, so vanilla's own {@code renderRightHand}/{@code renderLeftHand}
+     * (called from {@code ItemInHandRenderer.renderPlayerArm} when the hand is empty) must not
+     * also draw it, or the arm would render twice. Only applies to the empty-hand vanilla arm
+     * path — a held item's own first-person model is unaffected, since this gate is meant for
+     * "replace my bare vanilla arm with the mannequin's," not for hiding held items.
+     */
+    @Inject(method = "renderRightHand", at = @At("HEAD"), cancellable = true)
+    private void yebisurpg$hideVanillaFirstPersonRightArm(
+            PoseStack poseStack, MultiBufferSource buffer, int combinedLight,
+            AbstractClientPlayer player, CallbackInfo ci) {
+        if (yebisurpg$shouldHideVanillaArm(player, true)) ci.cancel();
+    }
+
+    @Inject(method = "renderLeftHand", at = @At("HEAD"), cancellable = true)
+    private void yebisurpg$hideVanillaFirstPersonLeftArm(
+            PoseStack poseStack, MultiBufferSource buffer, int combinedLight,
+            AbstractClientPlayer player, CallbackInfo ci) {
+        if (yebisurpg$shouldHideVanillaArm(player, false)) ci.cancel();
+    }
+
+    private static boolean yebisurpg$shouldHideVanillaArm(AbstractClientPlayer player, boolean right) {
+        ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
+        int entityId = player.getId();
+        AnimationPlayhead playhead = engine.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+        if (playhead != null) {
+            return right ? playhead.hideVanillaRightArm() : playhead.hideVanillaLeftArm();
+        }
+        var tpPose = engine.getThirdPersonPosePayload(entityId);
+        if (tpPose == null) return false;
+        return right ? tpPose.effectiveHideVanillaRightArm(player) : tpPose.effectiveHideVanillaLeftArm(player);
+    }
+
     @ModifyVariable(method = "renderHand", at = @At("STORE"), ordinal = 0)
     private ResourceLocation yebisurpg$useCompositeFirstPersonHandTexture(
             ResourceLocation original,
@@ -126,7 +162,13 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
             if (prone && disableProne) {
                 poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180f - bodyYaw));
                 poseStack.translate(0.0, PRONE_Y_OFFSET, 0.0);
-                int lookMask = playhead != null ? playhead.lookAtMask() : 0;
+                int lookMask;
+                if (playhead != null) {
+                    lookMask = playhead.lookAtMask();
+                } else {
+                    var tpPose = engine.getThirdPersonPosePayload(entityId);
+                    lookMask = tpPose != null ? tpPose.lookAtMask() : 0;
+                }
                 boolean rootYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
                 boolean rootPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
                 if (rootYaw) {
@@ -166,10 +208,12 @@ public abstract class MixinPlayerRenderer extends LivingEntityRenderer<AbstractC
             CallbackInfo ci) {
 
         ClientAnimationEngine engine = ClientAnimationEngine.INSTANCE;
-        AnimationPlayhead playhead = engine.getPlayhead(player.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
+        int entityId = player.getId();
+        AnimationPlayhead playhead = engine.getPlayhead(entityId, AnimationCategory.ENTITY_THIRD_PERSON);
+        var tpPose = playhead == null ? engine.getThirdPersonPosePayload(entityId) : null;
 
-        int lookMask = playhead != null ? playhead.lookAtMask() : 0;
-        int vanMask  = playhead != null ? playhead.vanillaMask() : 0;
+        int lookMask = playhead != null ? playhead.lookAtMask() : (tpPose != null ? tpPose.lookAtMask() : 0);
+        int vanMask  = playhead != null ? playhead.vanillaMask() : (tpPose != null ? tpPose.vanillaMask() : 0);
         boolean rootLookPitch = (lookMask & AnimationPlayhead.LOOK_ROOT_PITCH) != 0;
         boolean rootLookYaw   = (lookMask & AnimationPlayhead.LOOK_ROOT_YAW)   != 0;
         // When swimming/flying without Disable Prone, vanilla already tilts the body
