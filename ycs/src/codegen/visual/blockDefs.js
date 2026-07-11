@@ -1,6 +1,58 @@
 export const BLOCK_DEFS = [
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // HUD — a real, visible, chainable action block placed after Start in a HUD
+  // widget's value-link graph. Whatever's plugged into its [value:number] slot
+  // becomes the widget's bound value — HudLanding.jsx reads this node's `value`
+  // slot directly at Save time (never actually compiled/executed as an action
+  // the way normal chain blocks are, since a HUD value-link graph is only ever
+  // evaluated for its single expression, not run as a statement sequence).
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    opcode: "hud.return_value",
+    category: "HUD", sub: "actions",
+    isAction: true,
+    paletteLabel: "Return Number",
+    label: "Return Number [value:number]",
+    hint: "The value this HUD widget reads — plug in any number-producing block (Get Entity Variable, Get Attribute, math, etc.)",
+    color: "#4d65b4",
+    codegen: {
+      type: "action",
+      template: "", // never actually compiled; HudLanding.jsx reads this node's `value` slot directly
+      slotDefaults: { value: { opcode: "number.literal", fields: { value: "0" } } },
+    },
+  },
+  {
+    opcode: "hud.return_bool",
+    category: "HUD", sub: "actions",
+    isAction: true,
+    paletteLabel: "Return Bool",
+    label: "Return Bool [value:logic]",
+    hint: "The true/false condition this HUD widget's visibility gate reads — plug in any boolean-producing block (Get Entity Variable, comparisons, etc.)",
+    color: "#6494a4",
+    codegen: {
+      type: "action",
+      template: "", // never actually compiled; HudLanding.jsx reads this node's `value` slot directly
+      slotDefaults: { value: { opcode: "logic.true" } },
+    },
+  },
+  {
+    opcode: "hud.return_text",
+    category: "HUD", sub: "actions",
+    isAction: true,
+    paletteLabel: "Return Text",
+    label: "Return Text [value:text]",
+    hint: "The literal text this HUD Text widget reads — plug in any text-producing block (Convert to Text, Get Entity Variable, string concat, etc.)",
+    color: "#5ba558",
+    codegen: {
+      type: "action",
+      template: "", // never actually compiled; HudLanding.jsx reads this node's `value` slot directly
+      slotDefaults: { value: { opcode: "text.literal", fields: { value: "" } } },
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ENTITY — Data
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -205,7 +257,7 @@ export const BLOCK_DEFS = [
     color: "#c46c94",
     codegen: {
       type: "action",
-      template: "if ({{entity}} instanceof LivingEntity livingTarget) { livingTarget.addEffect(new MobEffectInstance({{effect}}, (int)({{duration}}), Math.max(0,(int)({{level}})-1), false, {{showParticles}})); }",
+      template: "if ({{entity}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.addEffect(new MobEffectInstance({{effect}}, (int)({{duration}}), Math.max(0,(int)({{level}})-1), false, {{showParticles}})); }",
       imports: [
         "net.minecraft.world.entity.LivingEntity",
         "net.minecraft.world.effect.MobEffectInstance",
@@ -223,6 +275,43 @@ export const BLOCK_DEFS = [
     fields: {
       effect: { type: "dropdown", source: "effects", default: "MobEffects.REGENERATION" },
       showParticles: { type: "checkbox", default: true },
+    },
+  },
+  {
+    opcode: "entity.get_health",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    label: "Get Health of [entity:entity]",
+    hint: "Get an entity's current health",
+    color: "#4d65b4",
+    codegen: {
+      type: "value",
+      expr: "({{entity}} instanceof LivingEntity {{bind:livingTarget}} ? {{bind:livingTarget}}.getHealth() : 0.0)",
+      imports: [
+        "net.minecraft.world.entity.LivingEntity",
+      ],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+  {
+    opcode: "entity.set_health",
+    category: "Entity", sub: "actions",
+    isAction: true,
+    label: "Set Health to [amount:number] for [entity:entity]",
+    hint: "Set an entity's current health (clamped between 0 and its max health)",
+    color: "#c46c94",
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.setHealth((float)Math.max(0.0, Math.min((double)({{bind:livingTarget}}.getMaxHealth()), (double)({{amount}})))); }",
+      imports: [
+        "net.minecraft.world.entity.LivingEntity",
+      ],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        amount: { opcode: "number.literal", fields: { value: "20" } },
+      },
     },
   },
   {
@@ -376,19 +465,19 @@ export const BLOCK_DEFS = [
     codegen: {
       type: "action",
       variants: {
-        "dmgType == 'mob'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().mobAttack({{attacker}} instanceof LivingEntity livingAttacker ? livingAttacker : null), (float)({{amount}})); }" },
-        "dmgType == 'player'": { template: "if ({{target}} instanceof LivingEntity livingTarget && {{attacker}} instanceof net.minecraft.world.entity.player.Player playerAttacker) { livingTarget.hurt(livingTarget.level().damageSources().playerAttack(playerAttacker), (float)({{amount}})); }" },
-        "dmgType == 'magic'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().magic(), (float)({{amount}})); }" },
-        "dmgType == 'indirect_magic'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().indirectMagic({{attacker}}, {{attacker}}), (float)({{amount}})); }" },
-        "dmgType == 'thorns'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().thorns({{attacker}}), (float)({{amount}})); }" },
-        "dmgType == 'generic'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().generic(), (float)({{amount}})); }" },
-        "dmgType == 'fall'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().fall(), (float)({{amount}})); }" },
-        "dmgType == 'fire'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().onFire(), (float)({{amount}})); }" },
-        "dmgType == 'lava'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().lava(), (float)({{amount}})); }" },
-        "dmgType == 'drown'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().drown(), (float)({{amount}})); }" },
-        "dmgType == 'freeze'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().freeze(), (float)({{amount}})); }" },
-        "dmgType == 'wither'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().wither(), (float)({{amount}})); }" },
-        "dmgType == 'starve'": { template: "if ({{target}} instanceof LivingEntity livingTarget) { livingTarget.hurt(livingTarget.level().damageSources().starve(), (float)({{amount}})); }" },
+        "dmgType == 'mob'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().mobAttack({{attacker}} instanceof LivingEntity {{bind:livingAttacker}} ? {{bind:livingAttacker}} : null), (float)({{amount}})); }" },
+        "dmgType == 'player'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}} && {{attacker}} instanceof net.minecraft.world.entity.player.Player {{bind:playerAttacker}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().playerAttack({{bind:playerAttacker}}), (float)({{amount}})); }" },
+        "dmgType == 'magic'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().magic(), (float)({{amount}})); }" },
+        "dmgType == 'indirect_magic'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().indirectMagic({{attacker}}, {{attacker}}), (float)({{amount}})); }" },
+        "dmgType == 'thorns'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().thorns({{attacker}}), (float)({{amount}})); }" },
+        "dmgType == 'generic'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().generic(), (float)({{amount}})); }" },
+        "dmgType == 'fall'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().fall(), (float)({{amount}})); }" },
+        "dmgType == 'fire'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().onFire(), (float)({{amount}})); }" },
+        "dmgType == 'lava'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().lava(), (float)({{amount}})); }" },
+        "dmgType == 'drown'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().drown(), (float)({{amount}})); }" },
+        "dmgType == 'freeze'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().freeze(), (float)({{amount}})); }" },
+        "dmgType == 'wither'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().wither(), (float)({{amount}})); }" },
+        "dmgType == 'starve'": { template: "if ({{target}} instanceof LivingEntity {{bind:livingTarget}}) { {{bind:livingTarget}}.hurt({{bind:livingTarget}}.level().damageSources().starve(), (float)({{amount}})); }" },
       },
       imports: [
         "net.minecraft.world.entity.LivingEntity",
@@ -887,52 +976,6 @@ export const BLOCK_DEFS = [
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    opcode: "variable.get",
-    category: "Data", sub: "data",
-    linkType: "number",
-    paletteLabel: "Get Variable",
-    label: "Get Variable [varName:dropdown.variables] for [entity:entity]",
-    hint: "Get a declared variable for entity — pick the variable inline on the canvas",
-    color: "#4d65b4",
-    dynamicLinkType: {
-      field: "varType",
-      map: { bool: "logic", string: "text", "*": "number" },
-    },
-    codegen: {
-      type: "value",
-      handler: "variable.get",
-      imports: [
-        "net.ye6isu.yebisuRPG.data.EntityVarCapability",
-        "net.ye6isu.yebisuRPG.data.EntityVar",
-      ],
-      slotDefaults: { entity: { opcode: "entity.event" } },
-    },
-  },
-  {
-    opcode: "variable.set",
-    category: "Data", sub: "actions",
-    isAction: true,
-    paletteLabel: "Set Variable",
-    label: "Set Variable [varName:dropdown.variables] to [value:number] for [entity:entity]",
-    hint: "Set a declared variable for entity — pick the variable inline on the canvas",
-    color: "#4d65b4",
-    dynamicAccepts: {
-      value: { field: "varType", map: { bool: "logic", string: "text", "*": "number" } },
-    },
-    codegen: {
-      type: "action",
-      handler: "variable.set",
-      imports: [
-        "net.ye6isu.yebisuRPG.data.EntityVarCapability",
-        "net.ye6isu.yebisuRPG.data.EntityVar",
-      ],
-      slotDefaults: {
-        value: { opcode: "number.literal", fields: { value: "0" } },
-        entity: { opcode: "entity.event" },
-      },
-    },
-  },
-  {
     opcode: "attribute.get",
     category: "Data", sub: "data",
     linkType: "number",
@@ -941,6 +984,7 @@ export const BLOCK_DEFS = [
     hint: "Read an attribute value (total / base / bonus) for entity",
     color: "#4d65b4",
     fields: {
+      attrId: { source: "attributes", searchable: true },
       layer: {
         type: "dropdown",
         options: [
@@ -970,6 +1014,7 @@ export const BLOCK_DEFS = [
     hint: "Add a named modifier to an attribute on entity",
     color: "#4d65b4",
     fields: {
+      attrId: { source: "attributes", searchable: true },
       operation: {
         type: "dropdown",
         options: [
@@ -1008,6 +1053,7 @@ export const BLOCK_DEFS = [
     hint: "Remove a named modifier from an attribute on entity",
     color: "#4d65b4",
     fields: {
+      attrId: { source: "attributes", searchable: true },
       modifierName: { type: "input", inputType: "text", default: "" },
     },
     codegen: {
@@ -1029,6 +1075,9 @@ export const BLOCK_DEFS = [
     label: "Reset Attribute Base [attrId:dropdown.attributes] for [entity:entity]",
     hint: "Reset an attribute's base value back to its default on entity",
     color: "#4d65b4",
+    fields: {
+      attrId: { source: "attributes", searchable: true },
+    },
     codegen: {
       type: "action",
       handler: "attribute.base.reset",
@@ -1084,8 +1133,54 @@ export const BLOCK_DEFS = [
     },
   },
   {
-    opcode: "overlay.play",
+    opcode: "entityvar.get",
+    category: "Data", sub: "data",
+    linkType: "number",
+    paletteLabel: "Get Entity Variable",
+    label: "Get Entity Variable [varName:dropdown.entityVariables] for [entity:entity]",
+    hint: "Get an entity variable's value",
+    color: "#4d65b4",
+    fields: {
+      varName: { source: "entityVariables", searchable: true },
+    },
+    dynamicLinkType: {
+      field: "varType",
+      map: { boolean: "logic", string: "text", "*": "number" },
+    },
+    codegen: {
+      type: "value",
+      handler: "entityvar.get",
+      imports: ["net.ye6isu.yebisuRPG.entityvar.ModAttachments"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
+    opcode: "entityvar.set",
     category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Entity Variable",
+    label: "Set Entity Variable [varName:dropdown.entityVariables] to [value:number] for [entity:entity]",
+    hint: "Set an entity variable's value",
+    color: "#4d65b4",
+    fields: {
+      varName: { source: "entityVariables", searchable: true },
+    },
+    dynamicAccepts: {
+      value: { field: "varType", map: { boolean: "logic", string: "text", "*": "number" } },
+    },
+    codegen: {
+      type: "action",
+      handler: "entityvar.set",
+      imports: ["net.ye6isu.yebisuRPG.entityvar.ModAttachments"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        value: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "overlay.play",
+    category: "Entity", sub: "actions",
     isAction: true,
     paletteLabel: "Play Overlay Animation",
     label: "Play Texture Overlay [loopMode:dropdown] Speed [speed:number] Ticks/Frame [ticksPerFrame:number] for [entity:entity]",
@@ -1115,7 +1210,7 @@ export const BLOCK_DEFS = [
   },
   {
     opcode: "overlay.stop",
-    category: "Data", sub: "actions",
+    category: "Entity", sub: "actions",
     isAction: true,
     paletteLabel: "Stop Overlay Animation",
     label: "Stop Texture Overlay at Frame [frame:number] for [entity:entity]",
@@ -1133,7 +1228,7 @@ export const BLOCK_DEFS = [
   },
   {
     opcode: "overlay.set",
-    category: "Data", sub: "actions",
+    category: "Entity", sub: "actions",
     isAction: true,
     paletteLabel: "Set Texture Overlay",
     label: "Set Texture Overlay [texture:dropdown.textures] Mask [maskMode:dropdown] at Layer [layer:number] for [entity:entity]",
@@ -1163,7 +1258,7 @@ export const BLOCK_DEFS = [
   },
   {
     opcode: "overlay.remove",
-    category: "Data", sub: "actions",
+    category: "Entity", sub: "actions",
     isAction: true,
     paletteLabel: "Remove Texture Overlay",
     label: "Remove Texture Overlay [texture:dropdown.textures] for [entity:entity]",
@@ -1455,15 +1550,49 @@ export const BLOCK_DEFS = [
     category: "Text", sub: "data",
     linkType: "text",
     paletteLabel: "Convert to Text",
-    label: "Convert [value:number] to Text",
-    hint: "Convert a number to text",
+    label: "Convert [value:number] to Text with [decimals:input.number] decimal places",
+    hint: "Convert a number to text — 0 decimal places shows only the whole value, 1 shows one decimal place, and so on",
     color: "#5ba558",
+    fields: {
+      decimals: { default: "0" },
+    },
     codegen: {
       type: "value",
-      expr: "String.valueOf((double)({{value}}))",
+      expr: "String.format(\"%.{{decimals}}f\", (double)({{value}}))",
       slotDefaults: {
         value: { opcode: "number.literal", fields: { value: "0" } },
       },
+    },
+  },
+  {
+    opcode: "text.combine",
+    category: "Text", sub: "data",
+    linkType: "text",
+    paletteLabel: "Combine Text",
+    label: "Combine Text",
+    hint: "Concatenate multiple text links into one value — plug the result into any text slot (Send Chat, HUD Return Text, etc.)",
+    color: "#5ba558",
+    repeatableSlots: {
+      key: "text",
+      accepts: "text",
+      countField: "textCount",
+      default: 2,
+      min: 1,
+      max: 10,
+      separator: "+",
+    },
+    settings: {
+      _actions: [
+        { label: "+ Text", onClick: { field: "textCount", action: "increment", max: 10 } },
+        { label: "− Text", labelOn: "− Text", labelOff: "− Text", onClick: { field: "textCount", action: "decrement", min: 1 } },
+      ],
+    },
+    fields: {
+      textCount: { type: "hidden", default: 2 },
+    },
+    codegen: {
+      type: "value",
+      handler: "text.combine",
     },
   },
   {

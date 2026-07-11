@@ -43,14 +43,15 @@ export function findNodeByTabId(tree, tabId) {
   return found;
 }
 
-export function StringField({ value, onChange, placeholder, style = {} }) {
+export function StringField({ value, onChange, placeholder, disabled, style = {} }) {
   return (
-    <input 
+    <input
       className="ycs-string-input"
       type="text"
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
+      disabled={disabled}
       style={style}
     />
   );
@@ -261,12 +262,17 @@ export function DropdownField({ value, onChange, options }) {
   );
 }
 
-export function StandardDropdownField({ value, onChange, options }) {
+export function StandardDropdownField({ value, onChange, options, searchable, disabled }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const containerRef = useRef(null);
+  const searchRef = useRef(null);
 
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : value;
+  const filtered = searchable && search
+    ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+    : options;
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -278,18 +284,23 @@ export function StandardDropdownField({ value, onChange, options }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen && searchable) setTimeout(() => searchRef.current?.focus(), 0);
+    if (!isOpen) setSearch('');
+  }, [isOpen, searchable]);
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div
         className="ycs-string-input"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { if (!disabled) setIsOpen(!isOpen); }}
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           width: '100%',
           padding: '0 8px',
-          cursor: 'pointer',
+          cursor: disabled ? 'default' : 'pointer',
           boxSizing: 'border-box',
           height: '24px'
         }}
@@ -301,19 +312,31 @@ export function StandardDropdownField({ value, onChange, options }) {
       </div>
 
       {isOpen && (
-        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100 }}>
-          {options.map((opt) => (
-            <div
-              key={opt.label}
-              className="dropdown-item"
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
+        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100, display: 'flex', flexDirection: 'column', maxHeight: searchable ? 250 : undefined }}>
+          {searchable && (
+            <div style={{ padding: '4px 6px', flexShrink: 0, borderBottom: '1px solid var(--ycs-foreground)' }}>
+              <input
+                ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
+                onClick={e => e.stopPropagation()} placeholder="Search..."
+                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: 'var(--ycs-text)', fontSize: 12, boxSizing: 'border-box' }}
+              />
             </div>
-          ))}
+          )}
+          <div style={{ overflowY: 'auto' }}>
+            {filtered.map((opt) => (
+              <div
+                key={opt.value}
+                className="dropdown-item"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+              >
+                {opt.label}
+              </div>
+            ))}
+            {filtered.length === 0 && <div style={{ padding: '4px 10px', fontSize: 11, opacity: 0.4 }}>No results</div>}
+          </div>
         </div>
       )}
     </div>

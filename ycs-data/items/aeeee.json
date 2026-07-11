@@ -43,10 +43,9 @@
   ],
   "customClass": true,
   "enabledMethods": [
-    "use",
     "interactLivingEntity",
     "hurtEnemy",
-    "inventoryTick"
+    "use"
   ],
   "dataComponents": [
     {
@@ -83,10 +82,6 @@
       "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
       "marker": "YCS_Mod_Items",
       "content": "    public static final DeferredItem<Item> AEEEE = ITEMS.register(\"aeeee\",\n            () -> new AeeeeItem(new Item.Properties().stacksTo(1)));"
-    },
-    {
-      "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/overlay/petrified.png"
     },
     {
       "type": "created-file",

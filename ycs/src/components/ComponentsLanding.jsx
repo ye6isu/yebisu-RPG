@@ -116,7 +116,7 @@ function Checkbox({ checked, onChange, disabled = false }) {
   );
 }
 
-function ComponentEditor({ componentId, onBack, onSaved }) {
+function ComponentEditor({ componentId, onBack }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('double');
   const [defaultValue, setDefaultValue] = useState('');
@@ -174,9 +174,36 @@ function ComponentEditor({ componentId, onBack, onSaved }) {
       }
 
       setStatus({ ok: true, msg: 'Saved.' });
-      if (onSaved) onSaved();
+      if (onBack) onBack();
     } catch (err) {
       setStatus({ ok: false, msg: String(err) });
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+  };
+
+  const handleRemove = async () => {
+    if (!componentId) return;
+    const usages = await invoke('find_component_usage', { componentId }).catch(() => []);
+    if (usages.length > 0) {
+      const confirmed = window.confirm(`This component is used by: ${usages.join(', ')}\n\nDelete anyway? These items will keep a dangling reference until re-saved.`);
+      if (!confirmed) return;
+    } else if (!window.confirm(`Delete component "${componentId}"?`)) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const prev = await invoke('load_ycs_data', { category: 'components', id: componentId }).then(r => JSON.parse(r)).catch(() => null);
+      if (prev?._injections) {
+        for (const inj of prev._injections) {
+          await invoke('remove_marker_content', { file: inj.file, marker: inj.marker, content: inj.content }).catch(() => {});
+        }
+      }
+      await invoke('delete_ycs_data', { category: 'components', id: componentId });
+      if (onBack) onBack();
+    } catch (err) {
+      setStatus({ ok: false, msg: 'Remove failed: ' + err });
     }
     setSaving(false);
   };
@@ -188,6 +215,7 @@ function ComponentEditor({ componentId, onBack, onSaved }) {
           {componentId ? `Edit Component: ${componentId}` : 'New Data Component'}
         </h2>
         {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
+        {componentId && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
         <button className="ycs-button" onClick={onBack}>Cancel</button>
         <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
       </div>
@@ -257,8 +285,8 @@ export default function ComponentsLanding() {
     } catch {}
   };
 
-  if (creating) return <ComponentEditor onBack={() => { setCreating(false); reload(); }} onSaved={() => { setCreating(false); reload(); }} />;
-  if (editing) return <ComponentEditor componentId={editing} onBack={() => { setEditing(null); reload(); }} onSaved={() => reload()} />;
+  if (creating) return <ComponentEditor onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <ComponentEditor componentId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const filtered = components.filter(c => !search || (c.name || c.id).toLowerCase().includes(search.toLowerCase()));
 

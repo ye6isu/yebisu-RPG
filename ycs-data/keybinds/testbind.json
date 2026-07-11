@@ -1,0 +1,49 @@
+{
+  "name": "testbind",
+  "titleText": "YURR",
+  "bindCode": "KEY_Z+ALT",
+  "category": "CATEGORY",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds",
+      "content": "    public static final KeyMapping TESTBIND = bind(\"testbind\", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KeyModifier.ALT, CATEGORY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds_Register",
+      "content": "        event.register(TESTBIND);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/client/ClientKeybindRegistry.java",
+      "marker": "YCS_Keybind_Register",
+      "content": "        ClientKeybindRegistry.register(\"testbind\", ModKeybinds.TESTBIND);"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "key.yebisurpg.testbind"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/KeybindHandlers.java",
+      "marker": "YCS_Keybind_Press_Dispatch",
+      "content": "            case \"testbind\" -> { DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(15), (int)((double)(5)), DashUtil.Easing.EASE_OUT, (_dashSrc, hitEntity) -> {\n    hitEntity.setDeltaMovement((double)(0), (double)(1), (double)(0));\n    if (hitEntity instanceof LivingEntity livingTarget_nrd06gcm) { livingTarget_nrd06gcm.hurt(livingTarget_nrd06gcm.level().damageSources().generic(), (float)(1)); }\n}, null, \"box\", (double)(3), (double)(3), (double)(4), false); }"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/KeybindHandlers.java",
+      "marker": "YCS_Keybind_Handler_Imports",
+      "content": "import net.ye6isu.yebisuRPG.util.DashUtil;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/KeybindHandlers.java",
+      "marker": "YCS_Keybind_Handler_Imports",
+      "content": "import net.minecraft.world.entity.LivingEntity;"
+    }
+  ]
+}

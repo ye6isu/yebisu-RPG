@@ -61,7 +61,6 @@ public final class ModDataComponents {
     }
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> GLOBALNUM = registerDouble("globalnum");
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AXER_TESTNUM = registerDouble("axer_testnum");
 
     /**
      * Which frame of the CURRENT item state's spritesheet texture is showing — completely independent
@@ -78,6 +77,7 @@ public final class ModDataComponents {
      * any item wanting simple on/off overlay layers can reuse this the same way {@code WalkmanItem} does.
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OVERLAY_FLAGS = registerInt("overlay_flags");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AXER_TESTNUM = registerDouble("axer_testnum");
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AEEEE_TAAAAA = registerDouble("aeeee_taaaaa");
     // YCS_Data_Components
 

@@ -12,6 +12,48 @@ const STORAGE_PREFIX = 'ycs-blocky::';
 // via props drilling through CanvasBlock/BlockContent.
 let dynamicDataComponentOptions = [];
 
+// Same pattern as dynamicDataComponentOptions above, but for the global entity-variable pool — read by
+// the "entityVariables" dropdown source (used by "Get/Set Entity Variable").
+let dynamicEntityVariableOptions = [];
+
+// Same pattern as dynamicDataComponentOptions above, but for custom mod attributes (ycs-data/attributes) —
+// merged with the static VANILLA_ATTRIBUTES list below and read by the "attributes" dropdown source.
+let dynamicModAttributeOptions = [];
+
+const VANILLA_ATTRIBUTES = [
+  { label: 'Max Health', value: 'generic.max_health' },
+  { label: 'Max Absorption', value: 'generic.max_absorption' },
+  { label: 'Attack Damage', value: 'generic.attack_damage' },
+  { label: 'Attack Speed', value: 'generic.attack_speed' },
+  { label: 'Attack Knockback', value: 'generic.attack_knockback' },
+  { label: 'Armor', value: 'generic.armor' },
+  { label: 'Armor Toughness', value: 'generic.armor_toughness' },
+  { label: 'Knockback Resistance', value: 'generic.knockback_resistance' },
+  { label: 'Movement Speed', value: 'generic.movement_speed' },
+  { label: 'Flying Speed', value: 'generic.flying_speed' },
+  { label: 'Follow Range', value: 'generic.follow_range' },
+  { label: 'Luck', value: 'generic.luck' },
+  { label: 'Gravity', value: 'generic.gravity' },
+  { label: 'Jump Strength', value: 'generic.jump_strength' },
+  { label: 'Scale', value: 'generic.scale' },
+  { label: 'Step Height', value: 'generic.step_height' },
+  { label: 'Safe Fall Distance', value: 'generic.safe_fall_distance' },
+  { label: 'Fall Damage Multiplier', value: 'generic.fall_damage_multiplier' },
+  { label: 'Burning Time', value: 'generic.burning_time' },
+  { label: 'Explosion Knockback Resistance', value: 'generic.explosion_knockback_resistance' },
+  { label: 'Movement Efficiency', value: 'generic.movement_efficiency' },
+  { label: 'Oxygen Bonus', value: 'generic.oxygen_bonus' },
+  { label: 'Water Movement Efficiency', value: 'generic.water_movement_efficiency' },
+  { label: 'Block Break Speed', value: 'player.block_break_speed' },
+  { label: 'Block Interaction Range', value: 'player.block_interaction_range' },
+  { label: 'Entity Interaction Range', value: 'player.entity_interaction_range' },
+  { label: 'Mining Efficiency', value: 'player.mining_efficiency' },
+  { label: 'Sneaking Speed', value: 'player.sneaking_speed' },
+  { label: 'Submerged Mining Speed', value: 'player.submerged_mining_speed' },
+  { label: 'Sweeping Damage Ratio', value: 'player.sweeping_damage_ratio' },
+  { label: 'Spawn Reinforcements Chance', value: 'zombie.spawn_reinforcements' },
+];
+
 // Same pattern as dynamicDataComponentOptions above, but for the global texture pool — read by the
 // "textures" dropdown source (used by e.g. "Set Entity Texture Overlay").
 let dynamicTextureOptions = [];
@@ -106,9 +148,20 @@ function stripBrackets(label) {
   return (label || '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function resolveDynamicLinkType(bdef, node) {
+  const dyn = bdef?.dynamicLinkType || bdef?.dynamicAccepts?.value;
+  if (!dyn) return null;
+  const fieldVal = node.fields?.[dyn.field];
+  return dyn.map[fieldVal] || dyn.map['*'] || null;
+}
+
 function getBlockColor(node, bdef, inChain) {
   if (node.id === 'start') return BLOCK_COLORS.start;
   if (!inChain && (node.isAction || node.id === 'start')) return BLOCK_COLORS.disconnected;
+  const dynLinkType = resolveDynamicLinkType(bdef, node);
+  if (dynLinkType === 'number') return BLOCK_COLORS.number;
+  if (dynLinkType === 'text') return BLOCK_COLORS.text;
+  if (dynLinkType === 'logic') return BLOCK_COLORS.logic;
   if (bdef?.color) return bdef.color;
   if (node.linkType === 'entity') return BLOCK_COLORS.entity;
   if (node.linkType === 'number') return BLOCK_COLORS.number;
@@ -268,9 +321,13 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
     if (fieldDef?.showIf && !evalCondition(fieldDef.showIf, node.fields)) return null;
     const source = fieldDef?.source || seg.source;
     const isDataComponents = source === 'dataComponents';
+    const isEntityVariables = source === 'entityVariables';
+    const isAttributes = source === 'attributes';
     const isTextures = source === 'textures';
     let options = fieldDef?.options
       || (isDataComponents ? dynamicDataComponentOptions : null)
+      || (isEntityVariables ? dynamicEntityVariableOptions : null)
+      || (isAttributes ? [...VANILLA_ATTRIBUTES, ...dynamicModAttributeOptions] : null)
       || (isTextures ? dynamicTextureOptions : null)
       || (source && DROPDOWN_SOURCES[source])
       || [];
@@ -287,8 +344,21 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
             onFieldChange(nodeId, seg.key, v);
             if (isDataComponents) {
               const opt = options.find(o => o.value === v);
-              onFieldChange(nodeId, 'compType', opt?.compType || 'double');
+              const compType = opt?.compType || 'double';
+              onFieldChange(nodeId, 'compType', compType);
               onFieldChange(nodeId, 'compConstName', opt?.constName || v);
+              if (bdef?.dynamicLinkType?.field === 'compType') {
+                onFieldChange(nodeId, '__linkType', bdef.dynamicLinkType.map[compType] || bdef.dynamicLinkType.map['*']);
+              }
+            }
+            if (isEntityVariables) {
+              const opt = options.find(o => o.value === v);
+              const varType = opt?.varType || 'double';
+              onFieldChange(nodeId, 'varType', varType);
+              onFieldChange(nodeId, 'varConstName', opt?.constName || v);
+              if (bdef?.dynamicLinkType?.field === 'varType') {
+                onFieldChange(nodeId, '__linkType', bdef.dynamicLinkType.map[varType] || bdef.dynamicLinkType.map['*']);
+              }
             }
             if (isTextures) {
               const opt = options.find(o => o.value === v);
@@ -306,6 +376,12 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
     if (isDataComponents) {
       const msg = bdef?.dropdownRequiresCompType ? '(no Item Slots components)' : '(no components)';
       return <span key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: 'sans-serif', padding: '0 6px' }}>{msg}</span>;
+    }
+    if (isEntityVariables) {
+      return <span key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: 'sans-serif', padding: '0 6px' }}>(no variables)</span>;
+    }
+    if (isAttributes) {
+      return <span key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: 'sans-serif', padding: '0 6px' }}>(no attributes)</span>;
     }
     const val = node.fields?.[seg.key] ?? fieldDef?.default ?? '';
     return (
@@ -875,11 +951,14 @@ const METHOD_LABELS = {
   releaseUsing: 'Release Using', finishUsingItem: 'Finished Using',
   inventoryTick: 'Inventory Tick', hurtEnemy: 'Combat / Hurt Entity',
   interactLivingEntity: 'Entity Interaction',
+  keybindPress: 'On Press', keybindRelease: 'On Release',
 };
 
-export default function BlockEditor({ itemId, methodKey, onBack }) {
-  const stableId = `item::${itemId}::${methodKey}`;
-  const methodLabel = METHOD_LABELS[methodKey] || methodKey;
+export default function BlockEditor({ itemId, keybindId, hudWidgetId, methodKey, onBack }) {
+  const stableId = hudWidgetId ? `hudwidget::${hudWidgetId}`
+    : keybindId ? `keybind::${keybindId}::${methodKey}`
+    : `item::${itemId}::${methodKey}`;
+  const methodLabel = hudWidgetId ? 'HUD Value' : (METHOD_LABELS[methodKey] || methodKey);
 
   const canvasAreaRef = useRef(null);
   const panRef = useRef(null);
@@ -953,6 +1032,64 @@ export default function BlockEditor({ itemId, methodKey, onBack }) {
     load();
     return () => { cancelled = true; };
   }, [itemId]);
+
+  const [entityVariableOptions, setEntityVariableOptions] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const options = [];
+      try {
+        const ids = await invoke('list_ycs_data', { category: 'entityvars' });
+        for (const id of ids) {
+          try {
+            const raw = await invoke('load_ycs_data', { category: 'entityvars', id });
+            const v = JSON.parse(raw);
+            options.push({
+              value: v.name || id,
+              label: v.name || id,
+              varType: v.type,
+              constName: v.name || id,
+            });
+          } catch {}
+        }
+      } catch {}
+      if (!cancelled) {
+        dynamicEntityVariableOptions = options;
+        setEntityVariableOptions(options);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const [modAttributeOptions, setModAttributeOptions] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const options = [];
+      try {
+        const ids = await invoke('list_ycs_data', { category: 'attributes' });
+        for (const id of ids) {
+          try {
+            const raw = await invoke('load_ycs_data', { category: 'attributes', id });
+            const a = JSON.parse(raw);
+            options.push({
+              value: a.name || id,
+              label: `${a.titleText || a.name || id} (mod)`,
+            });
+          } catch {}
+        }
+      } catch {}
+      if (!cancelled) {
+        dynamicModAttributeOptions = options;
+        setModAttributeOptions(options);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

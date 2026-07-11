@@ -4,6 +4,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.ye6isu.yebisuRPG.keybind.KeybindTriggerPayload;
+import net.ye6isu.yebisuRPG.keybind.ServerKeybindHandler;
 import net.ye6isu.yebisuRPG.network.animation.*;
 import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
 import net.ye6isu.yebisuRPG.yebisuRPG;
@@ -53,5 +55,10 @@ public final class NetworkRegistry {
                 TextureSyncPayload.TYPE,
                 TextureSyncPayload.STREAM_CODEC,
                 ClientHandlerProxy::onTextureSync);
+
+        registrar.playToServer(
+                KeybindTriggerPayload.TYPE,
+                KeybindTriggerPayload.STREAM_CODEC,
+                ServerKeybindHandler::onKeybindTrigger);
     }
 }
