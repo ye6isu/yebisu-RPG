@@ -17,12 +17,12 @@ public class AxerItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
         if ((player.isCrouching())) {
-              player.getItemInHand(usedHand).set(ModDataComponents.AXER_TESTNUM.get(), (double)((((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AXER_TESTNUM.get(), 0.0)))+(1))));
+              player.getItemInHand(usedHand).set(ModDataComponents.AXER_TESTNUM.get(), (double)(((((double)(player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AXER_TESTNUM.get(), 0.0))))+(1))));
             } else {
-              player.getItemInHand(usedHand).set(ModDataComponents.AXER_TESTNUM.get(), (double)((((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AXER_TESTNUM.get(), 0.0)))-(1))));
+              player.getItemInHand(usedHand).set(ModDataComponents.AXER_TESTNUM.get(), (double)(((((double)(player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AXER_TESTNUM.get(), 0.0))))-(1))));
         }
-        if (player instanceof Player chatPlayer) {
-            chatPlayer.sendSystemMessage(Component.literal(String.valueOf((double)((player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AXER_TESTNUM.get(), 0.0))))));
+        if (player instanceof Player chatPlayer_njmrn8c3) {
+            chatPlayer_njmrn8c3.sendSystemMessage(Component.literal(String.format("%.0f", (double)(((double)(player.getItemInHand(usedHand).getOrDefault(ModDataComponents.AXER_TESTNUM.get(), 0.0)))))));
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

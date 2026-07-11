@@ -1,0 +1,163 @@
+[
+  {
+    "type": "icon",
+    "anchor": "top_left",
+    "x": 9,
+    "y": 13,
+    "width": 211.34776334776342,
+    "height": 29.125541125541076,
+    "color": "#ffffff",
+    "valueSourceId": "",
+    "max": 1,
+    "icon": {
+      "id": "yebisu",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barFilled": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barEmpty": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "name": "asda",
+    "maxSourceId": "",
+    "visibleSourceId": "",
+    "textSourceId": "",
+    "id": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0"
+  },
+  {
+    "type": "bar",
+    "anchor": "center",
+    "x": 0,
+    "y": 0,
+    "width": 200,
+    "height": 20,
+    "color": "#33cc55",
+    "valueSourceId": "testhud_w2_value",
+    "max": 1,
+    "icon": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barFilled": {
+      "id": "filledbar",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barEmpty": {
+      "id": "empty_bar",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "maxSourceId": "testhud_w2_max",
+    "visibleSourceId": "",
+    "fillLerpEnabled": true,
+    "fillLerpStrength": 0.2,
+    "textSourceId": "",
+    "id": "a094b922-ef0b-4cf6-a81c-dbc32a5b172c",
+    "valueLiteral": "5",
+    "anchorTarget": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0"
+  },
+  {
+    "id": "564ae960-4f09-4f3f-99a5-a27b8bf078fd",
+    "type": "text",
+    "anchor": "center",
+    "anchorTarget": "a094b922-ef0b-4cf6-a81c-dbc32a5b172c",
+    "x": 0,
+    "y": 0,
+    "width": 200,
+    "height": 20,
+    "color": "#ffffff",
+    "valueSourceId": "",
+    "maxSourceId": "",
+    "valueLiteral": "0",
+    "maxLiteral": "100",
+    "visibleSourceId": "",
+    "visibleLiteral": true,
+    "fillLerpEnabled": false,
+    "fillLerpStrength": 0.2,
+    "textMode": "text",
+    "textSourceId": "testhud_w1_text",
+    "textLiteral": "",
+    "icon": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barFilled": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barEmpty": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "textAlign": "center",
+    "textFontScale": 1
+  },
+  {
+    "type": "icon",
+    "anchor": "bottom_right",
+    "x": 0,
+    "y": 0,
+    "width": 30,
+    "height": 30,
+    "color": "#ffffff",
+    "valueSourceId": "",
+    "maxSourceId": "",
+    "icon": {
+      "id": "flame",
+      "rows": 4,
+      "animatedOnUse": true,
+      "ticksPerFrame": 2,
+      "defaultFrame": 0,
+      "frameLiteral": "20",
+      "frameSourceId": "testhud_w0_frame_icon"
+    },
+    "barFilled": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barEmpty": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "visibleSourceId": "",
+    "visibilityMode": "always",
+    "textSourceId": "",
+    "id": "077fa737-cfae-49b2-abdc-d0ed01e1d2e2",
+    "visibleLiteral": true
+  }
+]

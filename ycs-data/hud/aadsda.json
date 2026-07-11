@@ -1,0 +1,263 @@
+{
+  "name": "testhud",
+  "widgets": [
+    {
+      "type": "icon",
+      "anchor": "bottom_right",
+      "x": 0,
+      "y": 0,
+      "width": 30,
+      "height": 30,
+      "color": "#ffffff",
+      "valueSourceId": "",
+      "maxSourceId": "",
+      "icon": {
+        "id": "flame",
+        "rows": 4,
+        "animatedOnUse": true,
+        "ticksPerFrame": 2,
+        "defaultFrame": 0,
+        "frameLiteral": "20",
+        "frameSourceId": "testhud_w0_frame_icon"
+      },
+      "barFilled": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barEmpty": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "visibleSourceId": "",
+      "visibilityMode": "always",
+      "textSourceId": "",
+      "id": "077fa737-cfae-49b2-abdc-d0ed01e1d2e2",
+      "visibleLiteral": true
+    },
+    {
+      "id": "564ae960-4f09-4f3f-99a5-a27b8bf078fd",
+      "type": "text",
+      "anchor": "center",
+      "anchorTarget": "a094b922-ef0b-4cf6-a81c-dbc32a5b172c",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 20,
+      "color": "#ffffff",
+      "valueSourceId": "",
+      "maxSourceId": "",
+      "valueLiteral": "0",
+      "maxLiteral": "100",
+      "visibleSourceId": "",
+      "visibleLiteral": true,
+      "fillLerpEnabled": false,
+      "fillLerpStrength": 0.2,
+      "textMode": "text",
+      "textSourceId": "testhud_w1_text",
+      "textLiteral": "",
+      "icon": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barFilled": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barEmpty": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "textAlign": "center",
+      "textFontScale": 1
+    },
+    {
+      "type": "bar",
+      "anchor": "center",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 20,
+      "color": "#33cc55",
+      "valueSourceId": "testhud_w2_value",
+      "max": 1,
+      "icon": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barFilled": {
+        "id": "filledbar",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barEmpty": {
+        "id": "empty_bar",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "maxSourceId": "testhud_w2_max",
+      "visibleSourceId": "",
+      "fillLerpEnabled": true,
+      "fillLerpStrength": 0.2,
+      "textSourceId": "",
+      "id": "a094b922-ef0b-4cf6-a81c-dbc32a5b172c",
+      "valueLiteral": "5",
+      "anchorTarget": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0"
+    },
+    {
+      "type": "icon",
+      "anchor": "top_left",
+      "x": 9,
+      "y": 13,
+      "width": 211.34776334776342,
+      "height": 29.125541125541076,
+      "color": "#ffffff",
+      "valueSourceId": "",
+      "max": 1,
+      "icon": {
+        "id": "yebisu",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barFilled": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barEmpty": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "name": "asda",
+      "maxSourceId": "",
+      "visibleSourceId": "",
+      "textSourceId": "",
+      "id": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0"
+    }
+  ],
+  "previewW": 960,
+  "previewH": 540,
+  "gridW": 10,
+  "gridH": 10,
+  "gridOffsetX": 10,
+  "gridOffsetY": 10,
+  "previewImage": null,
+  "visibleLiteral": true,
+  "visibleSourceId": "",
+  "_injections": [
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/flame.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/filledbar.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/empty_bar.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/yebisu.png"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudValueSources.java",
+      "marker": "YCS_Hud_Value_Sources",
+      "content": "        register(\"testhud_w0_frame_icon\", player -> (double)(((double)(player.getData(ModAttachments.COUNTER.get())))));"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudTextSources.java",
+      "marker": "YCS_Hud_Text_Sources",
+      "content": "        register(\"testhud_w1_text\", player -> (String)((String.valueOf(String.format(\"%.1f\", (double)((player instanceof LivingEntity livingTarget_n1g9b79w ? livingTarget_n1g9b79w.getHealth() : 0.0)))) + \" / \" + String.valueOf(String.format(\"%.1f\", (double)((player instanceof LivingEntity livingTarget_ncs2jq9o ? livingTarget_ncs2jq9o.getAttributeValue(Attributes.MAX_HEALTH) : 0.0)))))));"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudValueSources.java",
+      "marker": "YCS_Hud_Value_Sources",
+      "content": "        register(\"testhud_w2_value\", player -> (double)((player instanceof LivingEntity livingTarget_ne0tx9su ? livingTarget_ne0tx9su.getHealth() : 0.0)));"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudValueSources.java",
+      "marker": "YCS_Hud_Value_Sources",
+      "content": "        register(\"testhud_w2_max\", player -> (double)((player instanceof LivingEntity livingTarget_n0daex5j ? livingTarget_n0daex5j.getAttributeValue(Attributes.MAX_HEALTH) : 0.0)));"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudValueSources.java",
+      "marker": "YCS_Hud_Value_Source_Imports",
+      "content": "import net.ye6isu.yebisuRPG.entityvar.ModAttachments;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudValueSources.java",
+      "marker": "YCS_Hud_Value_Source_Imports",
+      "content": "import net.minecraft.world.entity.LivingEntity;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudValueSources.java",
+      "marker": "YCS_Hud_Value_Source_Imports",
+      "content": "import net.minecraft.world.entity.ai.attributes.Attributes;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudTextSources.java",
+      "marker": "YCS_Hud_Text_Source_Imports",
+      "content": "import net.minecraft.world.entity.ai.attributes.Attributes;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/client/HudTextSources.java",
+      "marker": "YCS_Hud_Text_Source_Imports",
+      "content": "import net.minecraft.world.entity.LivingEntity;"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/hud/testhud.json"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/ModHud.java",
+      "marker": "YCS_Hud_Layouts",
+      "content": "        HudOverlayRenderer.registerLayout(\"testhud\");"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/ModHud.java",
+      "marker": "YCS_Hud_Layouts",
+      "content": "        HudOverlayRenderer.registerLayoutVisibility(\"testhud\", \"\", true);"
+    }
+  ]
+}

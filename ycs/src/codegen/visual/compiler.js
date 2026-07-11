@@ -3,6 +3,14 @@ import { blockDefRegistry } from './blockDefs.js';
 function quoteIfNeeded(v) { if (!v) return '""'; if (v.startsWith('"')) return v; return `"${v.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`; }
 function floatSuffix(v) { return String(v).endsWith('f') ? v : v + 'f'; }
 
+// Per-node-unique Java pattern-match binding name — prevents "illegal attempt to redefine
+// an existing match binding" when two blocks using the same base name (e.g. livingTarget)
+// end up nested inside each other (one block's value slot feeding another's).
+function bindingName(node, base) {
+  const suffix = String(node?.id ?? 'x').replace(/[^a-zA-Z0-9]/g, '');
+  return `${base}_${suffix}`;
+}
+
 export const LINK_ENTITY = "entity";
 export const LINK_NUMBER = "number";
 export const LINK_LOGIC = "logic";
@@ -12,6 +20,11 @@ export const LINK_ITEMSTACK = "itemstack";
 
 function dataComponentConstName(node) {
   const raw = node.fields?.compConstName || node.fields?.compName || "my_value";
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+}
+
+function entityVariableConstName(node) {
+  const raw = node.fields?.varConstName || node.fields?.varName || "my_value";
   return raw.toUpperCase().replace(/[^A-Z0-9]/g, "_");
 }
 
@@ -39,52 +52,6 @@ export function resolveEntityVar(opcode, methodKey) {
     return "target";
   }
   return "entity";
-}
-
-export function varTypeToLink(type) {
-  if (type === "bool") return LINK_LOGIC;
-  if (type === "string") return LINK_TEXT;
-  return LINK_NUMBER;
-}
-export function varGetterMethod(type) {
-  if (type === "bool") return "getBool";
-  if (type === "string") return "getString";
-  if (type === "float") return "getFloat";
-  if (type === "double") return "getDouble";
-  return "getInt";
-}
-export function varSetterMethod(type) {
-  if (type === "bool") return "setBool";
-  if (type === "string") return "setString";
-  if (type === "float") return "setFloat";
-  if (type === "double") return "setDouble";
-  return "setInt";
-}
-export function varDefaultLiteral(type, def) {
-  if (type === "bool") return def ? "true" : "false";
-  if (type === "string") return `"${(def ?? "").toString().replace(/"/g, '\\"')}"`;
-  if (type === "float") return `${parseFloat(def) || 0}f`;
-  if (type === "double") return `${parseFloat(def) || 0}d`;
-  return `${parseInt(def) || 0}`;
-}
-export function varOfFactory(type) {
-  if (type === "bool") return "ofBool";
-  if (type === "string") return "ofString";
-  if (type === "float") return "ofFloat";
-  if (type === "double") return "ofDouble";
-  return "ofInt";
-}
-export function varsExpr(ent) { return `EntityVarCapability.get(${ent})`; }
-export function varDefinedExpr(varName, type, def, ent) {
-  return `${varsExpr(ent)}.define("${varName}", EntityVar.${varOfFactory(type)}(${varDefaultLiteral(type, def)}))`;
-}
-export function varGetExpr(varName, type, def, ent) {
-  type = type || "int";
-  return `(${varDefinedExpr(varName, type, def, ent)}.${varGetterMethod(type)}("${varName}"))`;
-}
-export function varSetStmt(varName, type, def, ent, valueExpr) {
-  type = type || "int";
-  return `${varDefinedExpr(varName, type, def, ent)}.${varSetterMethod(type)}("${varName}", ${valueExpr});`;
 }
 
 export const VANILLA_ATTR_CONST = {
@@ -148,13 +115,9 @@ function interpolate(template, node, nodes, methodKey, def) {
     if (token.startsWith("float:")) { const v = resolveKey(token.slice(6), node, nodes, methodKey, def); return floatSuffix(v); }
     if (token.startsWith("attr:")) return attrRegistryRef(resolveKey(token.slice(5), node, nodes, methodKey, def));
     if (token === "stack" || token.startsWith("stack:")) return resolveStackExpr(methodKey) || "stack";
-    if (token.startsWith("varGet:")) return varGetExpr(node.fields?.varName, node.fields?.varType, node.fields?.varDefault, resolveKey("entity", node, nodes, methodKey, def) || "player");
-    if (token.startsWith("varSet:")) {
-      const valueExpr = resolveKey("value", node, nodes, methodKey, def) || varDefaultLiteral(node.fields?.varType || "int", node.fields?.varDefault);
-      return varSetStmt(node.fields?.varName, node.fields?.varType, node.fields?.varDefault, resolveKey("entity", node, nodes, methodKey, def) || "player", valueExpr);
-    }
     if (token.startsWith("modName:")) return (resolveKey(token.slice(8), node, nodes, methodKey, def) || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
     if (token.startsWith("dcConst:")) return "YCS_" + (resolveKey(token.slice(8), node, nodes, methodKey, def) || "my_value").toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    if (token.startsWith("bind:")) return bindingName(node, token.slice(5));
     return resolveKey(token, node, nodes, methodKey, def);
   });
 }
@@ -307,7 +270,8 @@ export function compileActionNode(node, nodes, methodKey) {
     const dur = resolveSlotValue(node.slots?.duration, nodes, methodKey) ?? (node.fields?.duration ?? "200");
     const lvl = resolveSlotValue(node.slots?.level, nodes, methodKey) ?? (node.fields?.level ?? "1");
     const particles = node.fields?.showParticles !== false;
-    return [`if (${ent} instanceof LivingEntity livingTarget) { livingTarget.addEffect(new MobEffectInstance(${eff}, (int)(${dur}), Math.max(0,(int)(${lvl})-1), false, ${particles})); }`];
+    const lt = bindingName(node, "livingTarget");
+    return [`if (${ent} instanceof LivingEntity ${lt}) { ${lt}.addEffect(new MobEffectInstance(${eff}, (int)(${dur}), Math.max(0,(int)(${lvl})-1), false, ${particles})); }`];
   }
 
   if (node.opcode === "entity.apply_motion") {
@@ -402,25 +366,28 @@ export function compileActionNode(node, nodes, methodKey) {
     const attrRef = attrRegistryRef(node.fields?.attrId);
     const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? (node.fields?.value ?? "0");
     const op = node.fields?.operation || "flat";
-    if (op === "base_set") return [`if (${ent} instanceof LivingEntity livingTarget) {`, `    var attrInstance = livingTarget.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue((double)(${valueExpr}));`, `}`];
-    if (op === "base_add") return [`if (${ent} instanceof LivingEntity livingTarget) {`, `    var attrInstance = livingTarget.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getBaseValue() + (double)(${valueExpr}));`, `}`];
-    if (op === "base_multiply") return [`if (${ent} instanceof LivingEntity livingTarget) {`, `    var attrInstance = livingTarget.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getBaseValue() * (double)(${valueExpr}));`, `}`];
+    const lt1 = bindingName(node, "livingTarget");
+    if (op === "base_set") return [`if (${ent} instanceof LivingEntity ${lt1}) {`, `    var attrInstance = ${lt1}.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue((double)(${valueExpr}));`, `}`];
+    if (op === "base_add") return [`if (${ent} instanceof LivingEntity ${lt1}) {`, `    var attrInstance = ${lt1}.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getBaseValue() + (double)(${valueExpr}));`, `}`];
+    if (op === "base_multiply") return [`if (${ent} instanceof LivingEntity ${lt1}) {`, `    var attrInstance = ${lt1}.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getBaseValue() * (double)(${valueExpr}));`, `}`];
     const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
     const javaOp = op === "multiply" ? "ADD_MULTIPLIED_TOTAL" : "ADD_VALUE";
-    return [`if (${ent} instanceof LivingEntity livingTarget) {`, `    var attrInstance = livingTarget.getAttribute(${attrRef});`, `    if (attrInstance != null) {`, `        var modifierId = ResourceLocation.parse("yebisurpg:${modName}");`, `        attrInstance.removeModifier(modifierId);`, `        attrInstance.addOrUpdateTransientModifier(new AttributeModifier(`, `            modifierId, (double)(${valueExpr}), AttributeModifier.Operation.${javaOp}));`, `    }`, `}`];
+    return [`if (${ent} instanceof LivingEntity ${lt1}) {`, `    var attrInstance = ${lt1}.getAttribute(${attrRef});`, `    if (attrInstance != null) {`, `        var modifierId = ResourceLocation.parse("yebisurpg:${modName}");`, `        attrInstance.removeModifier(modifierId);`, `        attrInstance.addOrUpdateTransientModifier(new AttributeModifier(`, `            modifierId, (double)(${valueExpr}), AttributeModifier.Operation.${javaOp}));`, `    }`, `}`];
   }
 
   if (node.opcode === "attribute.modifier.remove") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const attrRef = attrRegistryRef(node.fields?.attrId);
     const modName = (node.fields?.modifierName || "ycs_modifier").toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    return [`if (${ent} instanceof LivingEntity livingTarget) {`, `    var attrInstance = livingTarget.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.removeModifier(ResourceLocation.parse("yebisurpg:${modName}"));`, `}`];
+    const lt2 = bindingName(node, "livingTarget");
+    return [`if (${ent} instanceof LivingEntity ${lt2}) {`, `    var attrInstance = ${lt2}.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.removeModifier(ResourceLocation.parse("yebisurpg:${modName}"));`, `}`];
   }
 
   if (node.opcode === "attribute.base.reset") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const attrRef = attrRegistryRef(node.fields?.attrId);
-    return [`if (${ent} instanceof LivingEntity livingTarget) {`, `    var attrInstance = livingTarget.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getAttribute().value().getDefaultValue());`, `}`];
+    const lt3 = bindingName(node, "livingTarget");
+    return [`if (${ent} instanceof LivingEntity ${lt3}) {`, `    var attrInstance = ${lt3}.getAttribute(${attrRef});`, `    if (attrInstance != null) attrInstance.setBaseValue(attrInstance.getAttribute().value().getDefaultValue());`, `}`];
   }
 
   if (node.opcode === "chat.send") {
@@ -428,12 +395,19 @@ export function compileActionNode(node, nodes, methodKey) {
     const textParts = [];
     const textCount = node.fields?.textCount || 1;
     for (let i = 0; i < textCount; i++) {
-      const val = resolveSlotValue(node.slots?.["text" + i], nodes, methodKey);
-      if (val !== null) textParts.push(val);
+      const slotId = node.slots?.["text" + i];
+      const val = resolveSlotValue(slotId, nodes, methodKey);
+      if (val === null) continue;
+      // A connected block's resolved value is always valid Java (an expression or a
+      // pre-quoted string literal) EXCEPT text.literal / an unconnected slot, which
+      // resolve to raw, unquoted user-typed text that still needs quoting here.
+      const connectedNode = slotId ? nodes.find(n => n.id === slotId) : null;
+      const isRawText = !connectedNode || connectedNode.opcode === "text.literal";
+      textParts.push(isRawText ? quoteIfNeeded(val) : val);
     }
-    const wrapText = (t) => (t.startsWith('"') || t.startsWith("String.valueOf") || t.startsWith("(")) ? t : quoteIfNeeded(t);
-    const combined = textParts.length > 0 ? textParts.map(t => `Component.literal(${wrapText(t)})`).join(".append(") + ")".repeat(Math.max(0, textParts.length - 1)) : `Component.literal("")`;
-    return [`if (${ent} instanceof Player chatPlayer) {`, `    chatPlayer.sendSystemMessage(${combined});`, `}`];
+    const combined = textParts.length > 0 ? textParts.map(t => `Component.literal(${t})`).join(".append(") + ")".repeat(Math.max(0, textParts.length - 1)) : `Component.literal("")`;
+    const cp = bindingName(node, "chatPlayer");
+    return [`if (${ent} instanceof Player ${cp}) {`, `    ${cp}.sendSystemMessage(${combined});`, `}`];
   }
 
   if (node.opcode === "datacomp.set") {
@@ -444,6 +418,15 @@ export function compileActionNode(node, nodes, methodKey) {
     const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
     if (compType === "boolean" || compType === "string") return [`${stackExpr}.set(${ref}, ${valueExpr});`];
     return [`${stackExpr}.set(${ref}, (double)(${valueExpr}));`];
+  }
+
+  if (node.opcode === "entityvar.set") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const varType = node.fields?.varType || "double";
+    const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? "0";
+    const ref = `ModAttachments.${entityVariableConstName(node)}.get()`;
+    if (varType === "boolean" || varType === "string") return [`${ent}.setData(${ref}, ${valueExpr});`];
+    return [`${ent}.setData(${ref}, (double)(${valueExpr}));`];
   }
 
   if (node.opcode === "overlay.play") {
@@ -497,18 +480,12 @@ export function compileActionNode(node, nodes, methodKey) {
     return [`TextureServerEvents.removeByTexture(${ent}, ${texPath});`];
   }
 
-  if (node.opcode === "variable.set") {
-    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
-    const type = node.fields?.varType || "int";
-    const valueExpr = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? varDefaultLiteral(type, node.fields?.varDefault);
-    return [varSetStmt(node.fields?.varName, type, node.fields?.varDefault, ent, valueExpr)];
-  }
-
   if (node.opcode === "itemstack.set_cooldown") {
     const ent = resolveEntityVar("entity.event", methodKey);
     const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
     const ticks = resolveSlotValue(node.slots?.ticks, nodes, methodKey) || "20";
-    return [`if (${ent} instanceof net.minecraft.world.entity.player.Player cooldownPlayer) { cooldownPlayer.getCooldowns().addCooldown(${stack}.getItem(), (int)((double)(${ticks}))); }`];
+    const cdp = bindingName(node, "cooldownPlayer");
+    return [`if (${ent} instanceof net.minecraft.world.entity.player.Player ${cdp}) { ${cdp}.getCooldowns().addCooldown(${stack}.getItem(), (int)((double)(${ticks}))); }`];
   }
 
   if (node.opcode === "entity.dash") {
@@ -652,40 +629,62 @@ export function resolveSlotValue(slotNodeId, nodes, methodKey) {
     if (node.opcode.includes("client")) return `(${ent}.getViewVector(1.0F).${node.opcode.slice(-1)})`;
     return `(${ent}.getLookAngle().${node.opcode.slice(-1)})`;
   }
-  if (node.opcode === "variable.get") {
-    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
-    return varGetExpr(node.fields?.varName, node.fields?.varType, node.fields?.varDefault, ent);
-  }
-  if (node.opcode === "convert.to_text") {
-    const val = resolveSlotValue(node.slots?.value, nodes, methodKey) ?? "0";
-    return `String.valueOf((double)(${val}))`;
-  }
   if (node.opcode === "datacomp.get") {
     const stackExpr = resolveStackExpr(methodKey);
     if (!stackExpr) return "0";
     const compType = node.fields?.compType || "double";
     const ref = `ModDataComponents.${dataComponentConstName(node)}.get()`;
-    if (compType === "boolean") return `(${stackExpr}.getOrDefault(${ref}, false))`;
-    if (compType === "string") return `(${stackExpr}.getOrDefault(${ref}, ""))`;
-    return `(${stackExpr}.getOrDefault(${ref}, 0.0))`;
+    if (compType === "boolean") return `((boolean)(${stackExpr}.getOrDefault(${ref}, false)))`;
+    if (compType === "string") return `((String)(${stackExpr}.getOrDefault(${ref}, "")))`;
+    return `((double)(${stackExpr}.getOrDefault(${ref}, 0.0)))`;
+  }
+  if (node.opcode === "entityvar.get") {
+    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
+    const varType = node.fields?.varType || "double";
+    const ref = `ModAttachments.${entityVariableConstName(node)}.get()`;
+    if (varType === "boolean") return `((boolean)(${ent}.getData(${ref})))`;
+    if (varType === "string") return `((String)(${ent}.getData(${ref})))`;
+    return `((double)(${ent}.getData(${ref})))`;
   }
   if (node.opcode === "itemstack.is_on_cooldown") {
     const ent = resolveEntityVar("entity.event", methodKey);
     const stack = resolveSlotValue(node.slots?.stack, nodes, methodKey) || "stack";
-    return `(${ent} instanceof net.minecraft.world.entity.player.Player cooldownPlayer && cooldownPlayer.getCooldowns().isOnCooldown(${stack}.getItem()))`;
+    const cdp2 = bindingName(node, "cooldownPlayer");
+    return `(${ent} instanceof net.minecraft.world.entity.player.Player ${cdp2} && ${cdp2}.getCooldowns().isOnCooldown(${stack}.getItem()))`;
   }
   if (node.opcode === "attribute.get") {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const attrRef = attrRegistryRef(node.fields?.attrId);
     const layer = node.fields?.layer || "total";
-    if (layer === "base") return `(${ent} instanceof LivingEntity livingTarget ? livingTarget.getAttributeBaseValue(${attrRef}) : 0.0)`;
-    if (layer === "bonus") return `(${ent} instanceof LivingEntity livingTarget ? (livingTarget.getAttributeValue(${attrRef}) - livingTarget.getAttributeBaseValue(${attrRef})) : 0.0)`;
-    return `(${ent} instanceof LivingEntity livingTarget ? livingTarget.getAttributeValue(${attrRef}) : 0.0)`;
+    const lt4 = bindingName(node, "livingTarget");
+    if (layer === "base") return `(${ent} instanceof LivingEntity ${lt4} ? ${lt4}.getAttributeBaseValue(${attrRef}) : 0.0)`;
+    if (layer === "bonus") return `(${ent} instanceof LivingEntity ${lt4} ? (${lt4}.getAttributeValue(${attrRef}) - ${lt4}.getAttributeBaseValue(${attrRef})) : 0.0)`;
+    return `(${ent} instanceof LivingEntity ${lt4} ? ${lt4}.getAttributeValue(${attrRef}) : 0.0)`;
+  }
+  if (node.opcode === "text.combine") {
+    // A standalone value block wrapping the same expandable-slot mechanism chat.send uses
+    // (gear settings -> +/- Text), but plugged into any text slot instead of hardcoded into
+    // Send Chat — produces a plain concatenated String expression (+, not Component.append).
+    const count = node.fields?.textCount || 1;
+    const parts = [];
+    for (let i = 0; i < count; i++) {
+      const slotId = node.slots?.["text" + i];
+      const val = resolveSlotValue(slotId, nodes, methodKey);
+      if (val === null) continue;
+      const connectedNode = slotId ? nodes.find(n => n.id === slotId) : null;
+      const isRawText = !connectedNode || connectedNode.opcode === "text.literal";
+      parts.push(isRawText ? quoteIfNeeded(val) : `String.valueOf(${val})`);
+    }
+    return parts.length > 0 ? `(${parts.join(" + ")})` : `""`;
   }
   return null;
 }
 
 // ── Import collection ─────────────────────────────────────────────────────
+
+const ATTRIBUTE_OPCODES = new Set([
+  "attribute.get", "attribute.modifier.add", "attribute.modifier.remove", "attribute.base.reset",
+]);
 
 export function collectBlockImports(nodes) {
   const imports = new Set();
@@ -701,6 +700,9 @@ export function collectBlockImports(nodes) {
           for (const imp of condImports) imports.add(imp);
         }
       }
+    }
+    if (ATTRIBUTE_OPCODES.has(node.opcode) && !VANILLA_ATTR_CONST[node.fields?.attrId]) {
+      imports.add("net.ye6isu.yebisuRPG.attribute.ModAttributes");
     }
   }
   return imports;

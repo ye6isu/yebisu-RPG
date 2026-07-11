@@ -11,6 +11,7 @@
   "geoModel": "axer",
   "geoTexture": "axe_texture",
   "displayModel": "axer",
+  "states": [],
   "customClass": true,
   "enabledMethods": [
     "use"

@@ -6,6 +6,10 @@ import TabsLanding from "./components/TabsLanding";
 import TagsLanding from "./components/TagsLanding";
 import TextureManager from "./components/TextureManager";
 import ComponentsLanding from "./components/ComponentsLanding";
+import EntityVariablesLanding from "./components/EntityVariablesLanding";
+import AttributesLanding from "./components/AttributesLanding";
+import KeybindsLanding from "./components/KeybindsLanding";
+import HudLanding from "./components/HudLanding";
 import "./App.css";
 
 function App() {
@@ -68,6 +72,7 @@ function App() {
   const [isRegistryOpen, setIsRegistryOpen] = useState(true);
   const [isDataOpen, setIsDataOpen] = useState(true);
   const [isAssetsOpen, setIsAssetsOpen] = useState(true);
+  const [isInterfaceOpen, setIsInterfaceOpen] = useState(true);
   const resizingRef = useRef(false);
 
   const startResizing = (e) => {
@@ -149,7 +154,11 @@ function App() {
     { key: 'tabs', component: <TabsLanding /> },
     { key: 'tags', component: <TagsLanding /> },
     { key: 'components', component: <ComponentsLanding /> },
+    { key: 'entityvars', component: <EntityVariablesLanding /> },
+    { key: 'attributes', component: <AttributesLanding /> },
+    { key: 'keybinds', component: <KeybindsLanding /> },
     { key: 'textures', component: <TextureManager /> },
+    { key: 'hud', component: <HudLanding /> },
   ];
 
   return (
@@ -182,10 +191,17 @@ function App() {
 
             <SidebarGroup label="Data" isOpen={isDataOpen} onToggle={() => setIsDataOpen(!isDataOpen)}>
               <SidebarTab label="Data Components" tabKey="components" />
+              <SidebarTab label="Entity Variables" tabKey="entityvars" />
+              <SidebarTab label="Attributes" tabKey="attributes" />
+              <SidebarTab label="Keybinds" tabKey="keybinds" />
             </SidebarGroup>
 
             <SidebarGroup label="Assets" isOpen={isAssetsOpen} onToggle={() => setIsAssetsOpen(!isAssetsOpen)}>
               <SidebarTab label="Textures" tabKey="textures" />
+            </SidebarGroup>
+
+            <SidebarGroup label="Interface" isOpen={isInterfaceOpen} onToggle={() => setIsInterfaceOpen(!isInterfaceOpen)}>
+              <SidebarTab label="HUD" tabKey="hud" />
             </SidebarGroup>
 
           </div>
