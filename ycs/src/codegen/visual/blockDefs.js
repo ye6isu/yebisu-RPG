@@ -334,7 +334,14 @@ export const BLOCK_DEFS = [
     codegen: {
       type: "action",
       variants: {
-        "mode == 'set'": { template: "{{entity}}.setDeltaMovement((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
+        // setDeltaMovement() alone only updates server-side state — unlike push() (which sets
+        // NeoForge/vanilla's own hasImpulse flag internally), it does nothing to tell the
+        // client the entity's velocity changed. Without hurtMarked = true right after it, a
+        // client (authoritative over its own reported movement in normal gravity-affected
+        // play) never receives the new velocity and the "launch" has no visible effect —
+        // confirmed against DashUtil.java, the mod's own known-working velocity-based
+        // movement, which sets hurtMarked = true on every tick it calls setDeltaMovement.
+        "mode == 'set'": { template: "{{entity}}.setDeltaMovement((double)({{x}}), (double)({{y}}), (double)({{z}})); {{entity}}.hurtMarked = true;" },
         "mode == 'add'": { template: "{{entity}}.push((double)({{x}}), (double)({{y}}), (double)({{z}}));" },
       },
       slotDefaults: {

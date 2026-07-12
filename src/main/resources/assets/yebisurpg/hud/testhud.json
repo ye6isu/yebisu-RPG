@@ -30,11 +30,13 @@
       "ticksPerFrame": 4,
       "defaultFrame": 0
     },
-    "name": "asda",
+    "name": "",
     "maxSourceId": "",
     "visibleSourceId": "",
     "textSourceId": "",
-    "id": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0"
+    "id": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0",
+    "stateSourceId": "",
+    "states": []
   },
   {
     "type": "bar",
@@ -44,7 +46,7 @@
     "width": 200,
     "height": 20,
     "color": "#33cc55",
-    "valueSourceId": "testhud_w2_value",
+    "valueSourceId": "",
     "max": 1,
     "icon": {
       "id": "",
@@ -54,37 +56,187 @@
       "defaultFrame": 0
     },
     "barFilled": {
-      "id": "filledbar",
-      "rows": 1,
-      "animatedOnUse": false,
+      "id": "filled2",
+      "rows": 2,
+      "animatedOnUse": true,
       "ticksPerFrame": 4,
-      "defaultFrame": 0
+      "defaultFrame": 0,
+      "frameLiteral": "4",
+      "frameSourceId": ""
     },
     "barEmpty": {
-      "id": "empty_bar",
-      "rows": 1,
-      "animatedOnUse": false,
+      "id": "emptyfilled2",
+      "rows": 2,
+      "animatedOnUse": true,
       "ticksPerFrame": 4,
-      "defaultFrame": 0
+      "defaultFrame": 0,
+      "frameLiteral": "20",
+      "frameSourceId": ""
     },
-    "maxSourceId": "testhud_w2_max",
+    "maxSourceId": "",
     "visibleSourceId": "",
     "fillLerpEnabled": true,
     "fillLerpStrength": 0.2,
     "textSourceId": "",
     "id": "a094b922-ef0b-4cf6-a81c-dbc32a5b172c",
     "valueLiteral": "5",
-    "anchorTarget": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0"
+    "anchorTarget": "3741b4b4-77e5-4769-9cc0-62d36ebc76d0",
+    "multiState": true,
+    "states": [
+      {
+        "icon": {
+          "id": "",
+          "rows": 1,
+          "animatedOnUse": false,
+          "ticksPerFrame": 4,
+          "defaultFrame": 0
+        },
+        "barFilled": {
+          "id": "emptyfilled2",
+          "rows": 2,
+          "animatedOnUse": true,
+          "ticksPerFrame": 4,
+          "defaultFrame": 0,
+          "frameLiteral": "4",
+          "frameSourceId": ""
+        },
+        "barEmpty": {
+          "id": "empty_bar",
+          "rows": 1,
+          "animatedOnUse": false,
+          "ticksPerFrame": 4,
+          "defaultFrame": 0,
+          "frameLiteral": "0"
+        }
+      },
+      {
+        "icon": {
+          "id": "",
+          "rows": 1,
+          "animatedOnUse": false,
+          "ticksPerFrame": 4,
+          "defaultFrame": 0
+        },
+        "barFilled": {
+          "id": "filled2",
+          "rows": 2,
+          "animatedOnUse": true,
+          "ticksPerFrame": 4,
+          "defaultFrame": 0,
+          "frameLiteral": "4",
+          "frameSourceId": ""
+        },
+        "barEmpty": {
+          "id": "filledbar",
+          "rows": 1,
+          "animatedOnUse": false,
+          "ticksPerFrame": 4,
+          "defaultFrame": 0,
+          "frameLiteral": "0"
+        }
+      }
+    ],
+    "stateLiteral": "0",
+    "stateSourceId": ""
+  },
+  {
+    "type": "icon",
+    "anchor": "bottom_right",
+    "x": 0,
+    "y": 0,
+    "width": 30,
+    "height": 30,
+    "color": "#ffffff",
+    "valueSourceId": "",
+    "maxSourceId": "",
+    "icon": {
+      "id": "flame",
+      "rows": 4,
+      "animatedOnUse": true,
+      "ticksPerFrame": 2,
+      "defaultFrame": 0,
+      "frameLiteral": "20",
+      "frameSourceId": ""
+    },
+    "barFilled": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barEmpty": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "visibleSourceId": "",
+    "visibilityMode": "always",
+    "textSourceId": "",
+    "id": "077fa737-cfae-49b2-abdc-d0ed01e1d2e2",
+    "visibleLiteral": true,
+    "stateSourceId": "",
+    "states": []
+  },
+  {
+    "id": "41eefd26-e2fb-4529-a01e-8cbe0c8b6e7a",
+    "type": "icon",
+    "anchor": "bottom_left",
+    "anchorTarget": "",
+    "x": 10,
+    "y": -10,
+    "width": 200,
+    "height": 10,
+    "color": "#ffffff",
+    "valueSourceId": "",
+    "maxSourceId": "",
+    "valueLiteral": "0",
+    "maxLiteral": "100",
+    "visibleSourceId": "",
+    "visibleLiteral": true,
+    "fillLerpEnabled": false,
+    "fillLerpStrength": 0.2,
+    "textMode": "number",
+    "textSourceId": "",
+    "textLiteral": "",
+    "icon": {
+      "id": "sprite_0001",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0,
+      "frameLiteral": "0"
+    },
+    "barFilled": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "barEmpty": {
+      "id": "",
+      "rows": 1,
+      "animatedOnUse": false,
+      "ticksPerFrame": 4,
+      "defaultFrame": 0
+    },
+    "multiState": false,
+    "stateSourceId": "",
+    "stateLiteral": "0",
+    "states": []
   },
   {
     "id": "564ae960-4f09-4f3f-99a5-a27b8bf078fd",
     "type": "text",
     "anchor": "center",
-    "anchorTarget": "a094b922-ef0b-4cf6-a81c-dbc32a5b172c",
+    "anchorTarget": "41eefd26-e2fb-4529-a01e-8cbe0c8b6e7a",
     "x": 0,
     "y": 0,
     "width": 200,
-    "height": 20,
+    "height": 8,
     "color": "#ffffff",
     "valueSourceId": "",
     "maxSourceId": "",
@@ -95,8 +247,8 @@
     "fillLerpEnabled": false,
     "fillLerpStrength": 0.2,
     "textMode": "text",
-    "textSourceId": "testhud_w1_text",
-    "textLiteral": "",
+    "textSourceId": "",
+    "textLiteral": "TEST",
     "icon": {
       "id": "",
       "rows": 1,
@@ -119,45 +271,8 @@
       "defaultFrame": 0
     },
     "textAlign": "center",
-    "textFontScale": 1
-  },
-  {
-    "type": "icon",
-    "anchor": "bottom_right",
-    "x": 0,
-    "y": 0,
-    "width": 30,
-    "height": 30,
-    "color": "#ffffff",
-    "valueSourceId": "",
-    "maxSourceId": "",
-    "icon": {
-      "id": "flame",
-      "rows": 4,
-      "animatedOnUse": true,
-      "ticksPerFrame": 2,
-      "defaultFrame": 0,
-      "frameLiteral": "20",
-      "frameSourceId": "testhud_w0_frame_icon"
-    },
-    "barFilled": {
-      "id": "",
-      "rows": 1,
-      "animatedOnUse": false,
-      "ticksPerFrame": 4,
-      "defaultFrame": 0
-    },
-    "barEmpty": {
-      "id": "",
-      "rows": 1,
-      "animatedOnUse": false,
-      "ticksPerFrame": 4,
-      "defaultFrame": 0
-    },
-    "visibleSourceId": "",
-    "visibilityMode": "always",
-    "textSourceId": "",
-    "id": "077fa737-cfae-49b2-abdc-d0ed01e1d2e2",
-    "visibleLiteral": true
+    "textFontScale": 1,
+    "stateSourceId": "",
+    "states": []
   }
 ]

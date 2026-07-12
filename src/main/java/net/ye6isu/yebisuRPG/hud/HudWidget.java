@@ -30,9 +30,21 @@ public record HudWidget(
         Anchor textAlign,
         TextureRef icon,
         TextureRef barFilled,
-        TextureRef barEmpty
+        TextureRef barEmpty,
+        boolean multiState,
+        String stateSourceId,
+        double stateLiteral,
+        java.util.List<StateEntry> states
 ) {
     public enum Type { BAR, TEXT, ICON }
+
+    /**
+     * One entry in a Multi-State widget's {@link #states} list — a fully independent set of
+     * textures (Bar's filled/empty, Icon's icon) selected as a whole by the widget's resolved
+     * state index, so each state can look completely different (e.g. a bar animating between
+     * "calm"/"charging"/"overheated" fill textures). Text widgets don't support Multi-State.
+     */
+    public record StateEntry(TextureRef icon, TextureRef barFilled, TextureRef barEmpty) {}
 
     /**
      * Which screen corner/edge x/y are relative to (widget box position) — also reused for

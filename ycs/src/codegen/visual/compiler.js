@@ -274,16 +274,6 @@ export function compileActionNode(node, nodes, methodKey) {
     return [`if (${ent} instanceof LivingEntity ${lt}) { ${lt}.addEffect(new MobEffectInstance(${eff}, (int)(${dur}), Math.max(0,(int)(${lvl})-1), false, ${particles})); }`];
   }
 
-  if (node.opcode === "entity.apply_motion") {
-    const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
-    const x = resolveSlotValue(node.slots?.x, nodes, methodKey) ?? node.fields?.x ?? "0";
-    const y = resolveSlotValue(node.slots?.y, nodes, methodKey) ?? node.fields?.y ?? "0";
-    const z = resolveSlotValue(node.slots?.z, nodes, methodKey) ?? node.fields?.z ?? "0";
-    const mode = node.fields?.mode || "add";
-    if (mode === "set") return [`${ent}.setDeltaMovement((double)(${x}), (double)(${y}), (double)(${z}));`];
-    return [`${ent}.push((double)(${x}), (double)(${y}), (double)(${z}));`];
-  }
-
   if (node.opcode === "aoe.each" || node.opcode?.startsWith("aoe.each.")) {
     const ent = resolveSlotValue(node.slots?.entity, nodes, methodKey) || resolveEntityVar("entity.event", methodKey);
     const ox = resolveSlotValue(node.slots?.offX, nodes, methodKey) ?? "0";

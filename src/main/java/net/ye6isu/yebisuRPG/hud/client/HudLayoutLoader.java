@@ -79,7 +79,21 @@ public final class HudLayoutLoader {
         HudWidget.TextureRef barFilled = obj.has("barFilled") ? parseTextureRef(obj.getAsJsonObject("barFilled")) : HudWidget.TextureRef.NONE;
         HudWidget.TextureRef barEmpty = obj.has("barEmpty") ? parseTextureRef(obj.getAsJsonObject("barEmpty")) : HudWidget.TextureRef.NONE;
 
-        return new HudWidget(id, type, anchor, anchorTarget, x, y, width, height, color, valueSourceId, maxSourceId, visibleSourceId, textSourceId, textMode, valueLiteral, maxLiteral, visibleLiteral, textLiteral, fillLerpEnabled, fillLerpStrength, textFontScale, textAlign, icon, barFilled, barEmpty);
+        boolean multiState = obj.has("multiState") && obj.get("multiState").getAsBoolean();
+        String stateSourceId = obj.has("stateSourceId") ? obj.get("stateSourceId").getAsString() : "";
+        double stateLiteral = parseLiteralDouble(obj, "stateLiteral", 0.0);
+        List<HudWidget.StateEntry> states = new ArrayList<>();
+        if (obj.has("states")) {
+            for (var el : obj.getAsJsonArray("states")) {
+                JsonObject s = el.getAsJsonObject();
+                HudWidget.TextureRef sIcon = s.has("icon") ? parseTextureRef(s.getAsJsonObject("icon")) : HudWidget.TextureRef.NONE;
+                HudWidget.TextureRef sFilled = s.has("barFilled") ? parseTextureRef(s.getAsJsonObject("barFilled")) : HudWidget.TextureRef.NONE;
+                HudWidget.TextureRef sEmpty = s.has("barEmpty") ? parseTextureRef(s.getAsJsonObject("barEmpty")) : HudWidget.TextureRef.NONE;
+                states.add(new HudWidget.StateEntry(sIcon, sFilled, sEmpty));
+            }
+        }
+
+        return new HudWidget(id, type, anchor, anchorTarget, x, y, width, height, color, valueSourceId, maxSourceId, visibleSourceId, textSourceId, textMode, valueLiteral, maxLiteral, visibleLiteral, textLiteral, fillLerpEnabled, fillLerpStrength, textFontScale, textAlign, icon, barFilled, barEmpty, multiState, stateSourceId, stateLiteral, states);
     }
 
     // valueLiteral/maxLiteral are typed as free-text strings in the YCS editor (a typeable

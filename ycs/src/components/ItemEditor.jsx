@@ -583,70 +583,84 @@ function ItemStates({ itemId, states, onChange, textureOptions, max = 16 }) {
       {states.map((state, i) => {
         const is3DState = state.holdingMode === '3d';
         return (
-          <FieldGroup
-            key={i}
-            label={`State ${i}`}
-            headerExtra={
-              <button className="ycs-button icon" onClick={() => remove(i)} title="Remove State" style={{ flexShrink: 0 }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            }
-          >
-            <FieldRow label="Holding Mode">
-              <StandardDropdownField
-                value={state.holdingMode}
-                onChange={(v) => set(i, { holdingMode: v })}
-                options={[
-                  { label: 'Generated', value: 'generated' },
-                  { label: 'Handheld', value: 'handheld' },
-                  { label: '3D Model', value: '3d' },
-                ]}
-              />
-            </FieldRow>
+          // Same vertical-line grouping as HUD's Multi-State StateList: the "State {i}"
+          // label + remove button sit INSIDE the bordered/lined box (as its first row),
+          // not above/outside it — matches HudLanding.jsx's StateList structure exactly.
+          <div key={i} style={{ display: 'flex', gap: 8 }}>
+            <div style={{ width: 2, flexShrink: 0, background: 'var(--ycs-foreground)', borderRadius: 1 }} />
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 2 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
+                fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px',
+                opacity: 0.4, padding: '4px 0', userSelect: 'none',
+              }}>
+                <span>State {i}</span>
+                <button className="ycs-tiny-button" onClick={() => remove(i)} title="Remove State" style={{ border: '1px solid var(--ycs-foreground)' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
 
-            {is3DState ? (
-              <>
+              <FieldRow label="Holding Mode">
+                <StandardDropdownField
+                  value={state.holdingMode}
+                  onChange={(v) => set(i, { holdingMode: v })}
+                  options={[
+                    { label: 'Generated', value: 'generated' },
+                    { label: 'Handheld', value: 'handheld' },
+                    { label: '3D Model', value: '3d' },
+                  ]}
+                />
+              </FieldRow>
+
+              {is3DState ? (
+                <>
+                  <FieldRow label="Texture">
+                    <DropdownField
+                      value={state.geoTexture}
+                      onChange={(v) => set(i, { geoTexture: v })}
+                      options={[{ label: '(None)', value: '' }, ...textureOptions]}
+                    />
+                  </FieldRow>
+                  <FieldRow label="Model">
+                    <FileDropZone
+                      hasFile={!!state.geoModel}
+                      fileName={`${state.geoModel}.geo.json`}
+                      onImport={(path) => importStateGeoModel(i, path)}
+                      onClear={() => set(i, { geoModel: '' })}
+                    />
+                  </FieldRow>
+                  <FieldRow label="Display Model">
+                    <FileDropZone
+                      hasFile={!!state.displayModel}
+                      fileName={`${state.displayModel}.display.json`}
+                      onImport={(path) => importStateDisplayModel(i, path)}
+                      onClear={() => set(i, { displayModel: '' })}
+                    />
+                  </FieldRow>
+                </>
+              ) : (
                 <FieldRow label="Texture">
                   <DropdownField
-                    value={state.geoTexture}
-                    onChange={(v) => set(i, { geoTexture: v })}
+                    value={state.texture}
+                    onChange={(v) => set(i, { texture: v })}
                     options={[{ label: '(None)', value: '' }, ...textureOptions]}
                   />
                 </FieldRow>
-                <FieldRow label="Model">
-                  <FileDropZone
-                    hasFile={!!state.geoModel}
-                    fileName={`${state.geoModel}.geo.json`}
-                    onImport={(path) => importStateGeoModel(i, path)}
-                    onClear={() => set(i, { geoModel: '' })}
-                  />
-                </FieldRow>
-                <FieldRow label="Display Model">
-                  <FileDropZone
-                    hasFile={!!state.displayModel}
-                    fileName={`${state.displayModel}.display.json`}
-                    onImport={(path) => importStateDisplayModel(i, path)}
-                    onClear={() => set(i, { displayModel: '' })}
-                  />
-                </FieldRow>
-              </>
-            ) : (
-              <FieldRow label="Texture">
-                <DropdownField
-                  value={state.texture}
-                  onChange={(v) => set(i, { texture: v })}
-                  options={[{ label: '(None)', value: '' }, ...textureOptions]}
-                />
-              </FieldRow>
-            )}
-          </FieldGroup>
+              )}
+            </div>
+          </div>
         );
       })}
       {states.length < max && (
-        <button className="ycs-button" style={{ alignSelf: 'flex-start', minWidth: 0, padding: '4px 10px', fontSize: '12px' }} onClick={add}>
-          + Add State
+        <button
+          className="ycs-button field"
+          title="Add State"
+          onClick={add}
+          style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: '0 6px', width: '100%', height: '24px' }}
+        >
+          +
         </button>
       )}
     </div>

@@ -3,9 +3,6 @@ package net.ye6isu.yebisuRPG.hud.client;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.ye6isu.yebisuRPG.entityvar.ModAttachments;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 // YCS_Hud_Value_Source_Imports
 
 import java.util.HashMap;
@@ -41,9 +38,6 @@ public final class HudValueSources {
     }
 
     static {
-        register("testhud_w0_frame_icon", player -> (double)(((double)(player.getData(ModAttachments.COUNTER.get())))));
-        register("testhud_w2_value", player -> (double)((player instanceof LivingEntity livingTarget_ne0tx9su ? livingTarget_ne0tx9su.getHealth() : 0.0)));
-        register("testhud_w2_max", player -> (double)((player instanceof LivingEntity livingTarget_n0daex5j ? livingTarget_n0daex5j.getAttributeValue(Attributes.MAX_HEALTH) : 0.0)));
         // YCS_Hud_Value_Sources
     }
 }

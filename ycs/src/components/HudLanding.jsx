@@ -62,12 +62,18 @@ const ANCHORS = [
 
 const NO_TEXTURE = { id: '', rows: 1, animatedOnUse: false, ticksPerFrame: 4, defaultFrame: 0 };
 
+// A blank Multi-State entry — mirrors the widget's own base texture slots (icon for Icon
+// widgets, barFilled/barEmpty for Bar widgets) so every state is a fully independent look.
+function blankStateEntry() {
+  return { icon: { ...NO_TEXTURE }, barFilled: { ...NO_TEXTURE }, barEmpty: { ...NO_TEXTURE } };
+}
+
 // A compact 3x3 grid picker for any 9-way anchor/alignment value (screen anchor, text align
 // within its own box, etc.) — one button per ANCHORS entry, laid out in the same row-major
 // top-left..bottom-right order used everywhere else in this file.
 function AnchorGrid({ value, onChange, title }) {
   return (
-    <div title={title} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, width: 72 }}>
+    <div title={title} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, width: 96 }}>
       {ANCHORS.map(a => (
         <button
           key={a.value}
@@ -75,7 +81,7 @@ function AnchorGrid({ value, onChange, title }) {
           title={a.label}
           onClick={() => onChange(a.value)}
           style={{
-            width: 22, height: 22, padding: 0, cursor: 'pointer',
+            width: 28, height: 28, padding: 0, cursor: 'pointer',
             border: `1px solid ${value === a.value ? 'var(--ycs-highlight)' : 'var(--ycs-foreground)'}`,
             borderRadius: 'var(--ycs-radius, 4px)',
             background: value === a.value ? 'var(--ycs-highlight)' : 'var(--ycs-bg)',
@@ -317,9 +323,22 @@ function spriteStyle(ref, boxWidth, boxHeight) {
 function WidgetBox({ widget, allWidgets, previewW, previewH, gridW, gridH, gridOffsetX, gridOffsetY, snapEnabled, zoom, selected, onSelect, onDrag, onResize, layerIndex }) {
   const { left, top } = resolveWidgetRect(widget, allWidgets, previewW, previewH);
 
-  const iconRef = useTextureRefWithUrl(widget.icon);
-  const filledRef = useTextureRefWithUrl(widget.barFilled);
-  const emptyRef = useTextureRefWithUrl(widget.barEmpty);
+  // Canvas preview can't evaluate a bound State Index Blocky link (it's compiled Java, not
+  // runnable here) — but the hardcoded literal fallback CAN, so show whichever state it
+  // points at (clamped into range), same "unrunnable link, show the literal" convention the
+  // texture-frame preview already uses in spriteStyle(). Falls back to State 0 only when no
+  // literal is set yet (mirrors "unset -> first state" at render/compile time).
+  const previewState = (() => {
+    if (!widget.multiState || !widget.states?.length) return null;
+    const literal = widget.stateLiteral !== undefined && widget.stateLiteral !== '' ? parseInt(widget.stateLiteral, 10) : null;
+    const idx = literal !== null && !Number.isNaN(literal)
+      ? Math.max(0, Math.min(widget.states.length - 1, literal))
+      : 0;
+    return widget.states[idx];
+  })();
+  const iconRef = useTextureRefWithUrl(previewState ? previewState.icon : widget.icon);
+  const filledRef = useTextureRefWithUrl(previewState ? previewState.barFilled : widget.barFilled);
+  const emptyRef = useTextureRefWithUrl(previewState ? previewState.barEmpty : widget.barEmpty);
 
   // Sample fill for a live preview — 65% full, purely illustrative (not the bound value).
   const sampleFrac = 0.65;
@@ -446,8 +465,8 @@ function WidgetBox({ widget, allWidgets, previewW, previewH, gridW, gridH, gridO
               whiteSpace: 'nowrap', fontFamily: 'monospace', lineHeight: 1,
             }}>
               {widget.textMode === 'text'
-                ? (widget.textSourceId ? 'Sample Text' : '(unbound)')
-                : (widget.valueSourceId ? '42' : '(unbound)')}
+                ? (widget.textSourceId ? 'Sample Text' : (widget.textLiteral || '(unbound)'))
+                : (widget.valueSourceId ? '42' : (widget.valueLiteral || '(unbound)'))}
             </span>
           </div>
         );
@@ -510,12 +529,14 @@ function LayerList({ widgets, selected, onSelect, onReorder, onDelete, onAddWidg
       <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
         <span style={{ opacity: 0.6 }}>Layers</span>
         <button
-          className="ycs-button field"
+          className="ycs-tiny-button"
           title="Add Widget"
           onClick={() => setAddMenuOpen(v => !v)}
-          style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: '0 6px', width: 'auto', height: '20px', textTransform: 'none', opacity: 1 }}
+          style={{ border: '1px solid var(--ycs-foreground)' }}
         >
-          +
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
         </button>
         {addMenuOpen && (
           <>
@@ -664,7 +685,7 @@ function LayoutPanel({
   visibleLiteral, setVisibleLiteral, hasVisibleLink, onEditVisible, onRemoveVisibleLink,
 }) {
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 }}>
       <FieldRow label="Name">
         <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} style={{ width: '100%' }} />
       </FieldRow>
@@ -717,31 +738,21 @@ function CanvasToolbar({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          Resolution
-          <select
-            className="ycs-string-input"
-            value={resolution}
-            onChange={e => { setResolution(e.target.value); applyResAndScale(e.target.value, guiScale); }}
-            style={{ width: 130 }}
-          >
-            {RESOLUTION_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          GUI Scale
-          <select
-            className="ycs-string-input"
-            value={guiScale}
-            onChange={e => { const s = parseInt(e.target.value); setGuiScale(s); applyResAndScale(resolution, s); }}
-            style={{ width: 60 }}
-          >
-            {GUI_SCALES.map(s => <option key={s} value={s}>{s}×</option>)}
-          </select>
-        </label>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', fontSize: 11 }}>
+      <FieldRow label="Resolution">
+        <StandardDropdownField
+          value={resolution}
+          options={RESOLUTION_PRESETS}
+          onChange={v => { setResolution(v); applyResAndScale(v, guiScale); }}
+        />
+      </FieldRow>
+      <FieldRow label="GUI Scale">
+        <StandardDropdownField
+          value={String(guiScale)}
+          options={GUI_SCALES.map(s => ({ label: `${s}×`, value: String(s) }))}
+          onChange={v => { const s = parseInt(v); setGuiScale(s); applyResAndScale(resolution, s); }}
+        />
+      </FieldRow>
       <FieldRow label="Show Grid">
         <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} />
       </FieldRow>
@@ -872,51 +883,133 @@ function PannableCanvas({ previewW, previewH, gridStyle, onDeselect, children })
 // switches what's shown: unbound shows the literal input + a "set" button to open Blocky;
 // bound shows only "edit"/"remove" (the literal underneath stays whatever it last was, but
 // is hidden and inert until the link is removed again).
+
+// The literal-input + set/edit/remove-button control on its own, with no FieldRow/label
+// wrapper — used both as LinkableValueField's own body and standalone (e.g. inline next to
+// the Multi-State checkbox, where a separate label row would be redundant).
+function LinkableValueFieldInline({ mode = 'number', literalValue, onLiteralChange, hasLink, onEditLink, onRemoveLink, width }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: width ?? '100%' }}>
+      <div style={{ flex: 1, opacity: hasLink ? 0.4 : 1, minWidth: 0 }}>
+        {mode === 'bool' ? (
+          <StandardDropdownField
+            value={literalValue ? 'true' : 'false'}
+            onChange={v => onLiteralChange(v === 'true')}
+            options={[{ label: 'True', value: 'true' }, { label: 'False', value: 'false' }]}
+            disabled={hasLink}
+          />
+        ) : (
+          <StringField
+            value={literalValue ?? ''}
+            onChange={onLiteralChange}
+            disabled={hasLink}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+        )}
+      </div>
+      {/* Fixed-width (not auto-sized to "set" vs "edit" text) so the button never shifts
+          left/right depending on label length — matches the Data Component row's tiny
+          buttons, which are always a fixed 24x24 regardless of what's inside them. The
+          parent flex's own `gap: 6` already spaces every child evenly, so no extra
+          margin/padding is added here. */}
+      <button
+        className="ycs-button field"
+        title={hasLink ? 'Edit Blocky Link' : 'Set Blocky Link'}
+        onClick={onEditLink}
+        style={{ flexShrink: 0, fontSize: '11px', padding: 0, width: '36px', height: '24px' }}
+      >
+        {hasLink ? 'edit' : 'set'}
+      </button>
+      {hasLink && onRemoveLink && (
+        <button className="ycs-tiny-button" onClick={onRemoveLink} title="Remove Blocky Link" style={{ border: '1px solid var(--ycs-foreground)' }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function LinkableValueField({ label, mode = 'number', literalValue, onLiteralChange, hasLink, onEditLink, onRemoveLink }) {
   return (
     <FieldRow label={label}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
-        <div style={{ flex: 1, opacity: hasLink ? 0.4 : 1, paddingRight: 6 }}>
-          {mode === 'bool' ? (
-            <StandardDropdownField
-              value={literalValue ? 'true' : 'false'}
-              onChange={v => onLiteralChange(v === 'true')}
-              options={[{ label: 'True', value: 'true' }, { label: 'False', value: 'false' }]}
-              disabled={hasLink}
-            />
-          ) : (
-            <StringField
-              value={literalValue ?? ''}
-              onChange={onLiteralChange}
-              disabled={hasLink}
-              style={{ width: '100%' }}
-            />
-          )}
-        </div>
-        <button
-          className="ycs-button field"
-          title={hasLink ? 'Edit Blocky Link' : 'Set Blocky Link'}
-          onClick={onEditLink}
-          style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: '0 6px', width: 'auto', height: '24px', marginRight: hasLink && onRemoveLink ? 6 : 0 }}
-        >
-          {hasLink ? 'edit' : 'set'}
-        </button>
-        {hasLink && onRemoveLink && (
-          <button
-            className="ycs-button field"
-            title="Remove Blocky Link"
-            onClick={onRemoveLink}
-            style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: 0, width: '24px', height: '24px', color: '#e05252' }}
-          >
-            ✕
-          </button>
-        )}
-      </div>
+      <LinkableValueFieldInline
+        mode={mode} literalValue={literalValue} onLiteralChange={onLiteralChange}
+        hasLink={hasLink} onEditLink={onEditLink} onRemoveLink={onRemoveLink}
+      />
     </FieldRow>
   );
 }
 
-function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, previewH, onChange, onEditValue, onEditMax, onEditVisible, onEditText, onEditFrame, onRemoveLink }) {
+// ── Multi-State list editor — each entry is a fully independent set of textures (Bar's
+// filled/empty, Icon's icon), selected as a whole by the widget's resolved State Index.
+// Per-state texture frame links are keyed "state_<i>_icon"/"state_<i>_barFilled"/"state_<i>_barEmpty"
+// so each state's own spritesheet frame binds independently, same pattern as the base
+// (non-Multi-State) texture slots' "frame_<slot>" keys.
+function StateList({ widget, onChange, hasLink, onEditFrame, onRemoveLink }) {
+  const states = widget.states || [];
+  const setState = (i, patch) => {
+    const next = states.map((s, si) => si === i ? { ...s, ...patch } : s);
+    onChange({ ...widget, states: next });
+  };
+  const addState = () => onChange({ ...widget, states: [...states, blankStateEntry()] });
+  const removeState = (i) => onChange({ ...widget, states: states.filter((_, si) => si !== i) });
+
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 15 }}>
+      <div style={{ width: 2, flexShrink: 0, background: 'var(--ycs-foreground)', borderRadius: 1 }} />
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {states.map((s, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <div style={{ width: 2, flexShrink: 0, background: 'var(--ycs-foreground)', borderRadius: 1 }} />
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, opacity: 0.6 }}>State {i}</span>
+                <button className="ycs-tiny-button" onClick={() => removeState(i)} title="Remove State" style={{ border: '1px solid var(--ycs-foreground)' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              {widget.type === 'icon' && (
+                <TexturePicker
+                  label="Icon Texture" value={s.icon} onChange={v => setState(i, { icon: v })}
+                  hasFrameLink={hasLink(`state_${i}_icon`)} onEditFrameLink={() => onEditFrame(`state_${i}_icon`)}
+                  onRemoveFrameLink={() => onRemoveLink(`state_${i}_icon`)}
+                />
+              )}
+              {widget.type === 'bar' && (
+                <>
+                  <TexturePicker
+                    label="Filled Texture" value={s.barFilled} onChange={v => setState(i, { barFilled: v })}
+                    hasFrameLink={hasLink(`state_${i}_barFilled`)} onEditFrameLink={() => onEditFrame(`state_${i}_barFilled`)}
+                    onRemoveFrameLink={() => onRemoveLink(`state_${i}_barFilled`)}
+                  />
+                  <TexturePicker
+                    label="Empty Texture" value={s.barEmpty} onChange={v => setState(i, { barEmpty: v })}
+                    hasFrameLink={hasLink(`state_${i}_barEmpty`)} onEditFrameLink={() => onEditFrame(`state_${i}_barEmpty`)}
+                    onRemoveFrameLink={() => onRemoveLink(`state_${i}_barEmpty`)}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+        <button
+          className="ycs-button field"
+          title="Add State"
+          onClick={addState}
+          style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: '0 6px', width: '100%', height: '24px' }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, previewH, onChange, onEditValue, onEditMax, onEditVisible, onEditText, onEditState, onEditFrame, onRemoveLink }) {
   if (!widget) return <div style={{ padding: 16, opacity: 0.4, fontSize: 12 }}>Select a widget to edit its properties.</div>;
   const set = (key, value) => onChange({ ...widget, [key]: value });
   const hasLink = kind => !!localStorage.getItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${widgetIndex}::${kind}`);
@@ -960,7 +1053,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
   };
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 }}>
       <FieldRow label="Name">
         <StringField value={widget.name || ''} onChange={v => set('name', v)} style={{ width: '100%' }} />
       </FieldRow>
@@ -977,9 +1070,12 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
           ]}
         />
       </FieldRow>
-      <FieldRow label="Anchor">
-        <AnchorGrid value={widget.anchor} onChange={setAnchor} title="Anchor" />
-      </FieldRow>
+      <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 15 }}>
+        <div style={{ minWidth: 140, width: 'auto', paddingRight: 16, paddingTop: 4, fontSize: 13, color: 'var(--ycs-text)', userSelect: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}>Anchor</div>
+        <div style={{ flex: 1 }}>
+          <AnchorGrid value={widget.anchor} onChange={setAnchor} title="Anchor" />
+        </div>
+      </div>
       <FieldRow label="Offset X">
         <StringField value={String(widget.x)} onChange={v => set('x', parseInt(v) || 0)} style={{ width: '100%' }} />
       </FieldRow>
@@ -999,29 +1095,73 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
         hasLink={hasLink('visible')} onEditLink={onEditVisible} onRemoveLink={() => onRemoveLink('visible')}
       />
 
-      {widget.type === 'icon' && (
-        <TexturePicker
-          label="Icon Texture" value={widget.icon} onChange={v => set('icon', v)}
-          hasFrameLink={hasLink('frame_icon')} onEditFrameLink={() => onEditFrame('icon')}
-          onRemoveFrameLink={() => onRemoveLink('frame_icon')}
-        />
+      {(widget.type === 'icon' || widget.type === 'bar') && (
+        <FieldRow label="Multiple States">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={!!widget.multiState}
+              onChange={e => {
+                const on = e.target.checked;
+                set('multiState', on);
+                if (on && (!widget.states || widget.states.length === 0)) {
+                  onChange({ ...widget, multiState: on, states: [blankStateEntry()] });
+                }
+              }}
+            />
+            {widget.multiState && (
+              <LinkableValueFieldInline
+                mode="number"
+                literalValue={widget.stateLiteral} onLiteralChange={v => set('stateLiteral', v)}
+                hasLink={hasLink('state')} onEditLink={onEditState} onRemoveLink={() => onRemoveLink('state')}
+              />
+            )}
+          </div>
+        </FieldRow>
       )}
 
-      {widget.type === 'bar' && (
+      {(widget.type === 'icon' || widget.type === 'bar') && widget.multiState ? (
         <>
-          <TexturePicker
-            label="Filled Texture" value={widget.barFilled} onChange={v => set('barFilled', v)}
-            hasFrameLink={hasLink('frame_barFilled')} onEditFrameLink={() => onEditFrame('barFilled')}
-            onRemoveFrameLink={() => onRemoveLink('frame_barFilled')}
+          <StateList
+            widget={widget}
+            onChange={onChange}
+            hasLink={hasLink}
+            onEditFrame={onEditFrame}
+            onRemoveLink={onRemoveLink}
           />
-          <TexturePicker
-            label="Empty Texture" value={widget.barEmpty} onChange={v => set('barEmpty', v)}
-            hasFrameLink={hasLink('frame_barEmpty')} onEditFrameLink={() => onEditFrame('barEmpty')}
-            onRemoveFrameLink={() => onRemoveLink('frame_barEmpty')}
-          />
-          <FieldRow label="Fallback Color">
-            <StringField value={widget.color} onChange={v => set('color', v)} style={{ width: '100%' }} />
-          </FieldRow>
+          {widget.type === 'bar' && (
+            <FieldRow label="Fallback Color">
+              <StringField value={widget.color} onChange={v => set('color', v)} style={{ width: '100%' }} />
+            </FieldRow>
+          )}
+        </>
+      ) : (
+        <>
+          {widget.type === 'icon' && (
+            <TexturePicker
+              label="Icon Texture" value={widget.icon} onChange={v => set('icon', v)}
+              hasFrameLink={hasLink('frame_icon')} onEditFrameLink={() => onEditFrame('icon')}
+              onRemoveFrameLink={() => onRemoveLink('frame_icon')}
+            />
+          )}
+
+          {widget.type === 'bar' && (
+            <>
+              <TexturePicker
+                label="Filled Texture" value={widget.barFilled} onChange={v => set('barFilled', v)}
+                hasFrameLink={hasLink('frame_barFilled')} onEditFrameLink={() => onEditFrame('barFilled')}
+                onRemoveFrameLink={() => onRemoveLink('frame_barFilled')}
+              />
+              <TexturePicker
+                label="Empty Texture" value={widget.barEmpty} onChange={v => set('barEmpty', v)}
+                hasFrameLink={hasLink('frame_barEmpty')} onEditFrameLink={() => onEditFrame('barEmpty')}
+                onRemoveFrameLink={() => onRemoveLink('frame_barEmpty')}
+              />
+              <FieldRow label="Fallback Color">
+                <StringField value={widget.color} onChange={v => set('color', v)} style={{ width: '100%' }} />
+              </FieldRow>
+            </>
+          )}
         </>
       )}
       {widget.type === 'text' && (
@@ -1039,9 +1179,12 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
         </FieldRow>
       )}
       {widget.type === 'text' && (
-        <FieldRow label="Text Align">
-          <AnchorGrid value={widget.textAlign || 'top_left'} onChange={v => set('textAlign', v)} title="Text Align" />
-        </FieldRow>
+        <div className="ycs-field-row" style={{ alignItems: 'flex-start', marginBottom: 15 }}>
+          <div className="ycs-field-label">Text Align</div>
+          <div className="ycs-field-control" style={{ padding: '4px 0' }}>
+            <AnchorGrid value={widget.textAlign || 'top_left'} onChange={v => set('textAlign', v)} title="Text Align" />
+          </div>
+        </div>
       )}
 
       {widget.type === 'text' && (
@@ -1194,6 +1337,7 @@ function HudEditor({ layoutId, onBack }) {
         fillLerpEnabled: false, fillLerpStrength: 0.2,
         textMode: 'number', textSourceId: '', textLiteral: '',
         icon: { ...NO_TEXTURE }, barFilled: { ...NO_TEXTURE }, barEmpty: { ...NO_TEXTURE },
+        multiState: false, stateSourceId: '', stateLiteral: '0', states: [],
       }];
       setSelected(next.length - 1);
       return next;
@@ -1203,19 +1347,64 @@ function HudEditor({ layoutId, onBack }) {
   const updateWidget = (index, next) => setWidgets(w => w.map((x, i) => i === index ? next : x));
   const dragWidget = (index, x, y) => setWidgets(w => w.map((x0, i) => i === index ? { ...x0, x, y } : x0));
   const resizeWidget = (index, patch) => setWidgets(w => w.map((x0, i) => i === index ? { ...x0, ...patch } : x0));
+
+  // Every localStorage kind-suffix a widget's Blocky bindings can live under — the fixed set
+  // plus one frame_state_<i>_<slot> triple per Multi-State entry. Bindings are keyed by
+  // ARRAY INDEX (ycs-blocky::hudwidget::<layoutId>::<index>::<kind>), not by the widget's own
+  // stable id, so any operation that changes a widget's index (delete, reorder) must move its
+  // bindings to the new index alongside it — otherwise the widget silently starts reading
+  // whatever binding happens to already be under its new index (or nothing at all).
+  const widgetBindingKinds = (w) => {
+    const kinds = ['value', 'max', 'visible', 'text', 'state', 'frame_icon', 'frame_barFilled', 'frame_barEmpty'];
+    for (let i = 0; i < (w?.states?.length || 0); i++) {
+      kinds.push(`frame_state_${i}_icon`, `frame_state_${i}_barFilled`, `frame_state_${i}_barEmpty`);
+    }
+    return kinds;
+  };
+  const moveWidgetBindings = (w, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    for (const kind of widgetBindingKinds(w)) {
+      const key = `ycs-blocky::hudwidget::${layoutId || 'new'}::${fromIndex}::${kind}`;
+      const raw = localStorage.getItem(key);
+      localStorage.removeItem(key);
+      if (raw !== null) localStorage.setItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${toIndex}::${kind}`, raw);
+    }
+  };
+  const deleteWidgetBindings = (w, index) => {
+    for (const kind of widgetBindingKinds(w)) {
+      localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::${kind}`);
+    }
+  };
+
   const deleteWidget = index => {
-    setWidgets(w => w.filter((_, i) => i !== index));
+    // Every widget AFTER the deleted one shifts down by one index once it's removed from the
+    // array — move each of their bindings down to match BEFORE deleting the target's own, so
+    // nothing collides mid-shift (ascending order: each destination slot is only written after
+    // being vacated by the previous step). The trailing slot is cleared using the LAST widget's
+    // own kind list (not the deleted widget's) since that's whose bindings end up duplicated
+    // there once everything above shifts down.
+    for (let i = index + 1; i < widgets.length; i++) {
+      moveWidgetBindings(widgets[i], i, i - 1);
+    }
+    deleteWidgetBindings(widgets[widgets.length - 1], widgets.length - 1);
+    setWidgets(ws => ws.filter((_, i) => i !== index));
     setSelected(s => s === index ? null : (s > index ? s - 1 : s));
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::value`);
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::max`);
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::visible`);
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::text`);
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::frame_icon`);
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::frame_barFilled`);
-    localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::${index}::frame_barEmpty`);
   };
   const reorderWidgets = (from, to) => {
     if (from === to) return;
+    // Moving widget `from` to `to` shifts every widget strictly between the two positions by
+    // one index (toward `from`), same as the array splice below — relocate their bindings
+    // to match, then move `from`'s own bindings to its final resting place `to`.
+    const movingBindings = widgets.map((w, i) => ({ w, i }));
+    if (from < to) {
+      for (let i = from + 1; i <= to; i++) moveWidgetBindings(movingBindings[i].w, i, i - 1);
+    } else {
+      // Shifting UP (to < from): must process in DESCENDING order so each destination slot
+      // is vacated (already moved out) before something else is written into it — ascending
+      // order here would overwrite a not-yet-moved neighbor's bindings.
+      for (let i = from - 1; i >= to; i--) moveWidgetBindings(movingBindings[i].w, i, i + 1);
+    }
+    moveWidgetBindings(widgets[from], from, to);
     setWidgets(w => {
       const arr = [...w];
       const [m] = arr.splice(from, 1);
@@ -1352,6 +1541,11 @@ function HudEditor({ layoutId, onBack }) {
         for (const ref of [w.icon, w.barFilled, w.barEmpty]) {
           if (ref?.id) textureIds.add(ref.id);
         }
+        for (const s of w.states || []) {
+          for (const ref of [s.icon, s.barFilled, s.barEmpty]) {
+            if (ref?.id) textureIds.add(ref.id);
+          }
+        }
       }
       for (const texId of textureIds) {
         const destFile = `${RES_BASE}/textures/hud/${texId}.png`;
@@ -1382,6 +1576,11 @@ function HudEditor({ layoutId, onBack }) {
         }
         visibleSourceIdOut = await compileBoolBinding(i, trimmed, id, injections, allBoolImports);
 
+        let stateSourceIdOut = '';
+        if (w.multiState && (w.type === 'bar' || w.type === 'icon')) {
+          stateSourceIdOut = await compileBinding(widgetsOut, i, 'state', trimmed, id, injections, allImports);
+        }
+
         // Each texture slot's optional frame/ticks-per-frame Blocky link (spritesheets only)
         // compiles as just another numeric HudValueSources entry, same as Value/Max.
         let icon = w.icon, barFilled = w.barFilled, barEmpty = w.barEmpty;
@@ -1395,7 +1594,29 @@ function HudEditor({ layoutId, onBack }) {
           barEmpty = { ...barEmpty, frameSourceId: await compileBinding(widgetsOut, i, 'frame_barEmpty', trimmed, id, injections, allImports) };
         }
 
-        widgetsOut.push({ ...w, valueSourceId, maxSourceId, visibleSourceId: visibleSourceIdOut, textSourceId: textSourceIdOut, icon, barFilled, barEmpty });
+        // Multi-State entries mirror the same frame-link compilation per state, keyed
+        // "state_<si>_<slot>" so each state's own spritesheet frame binds independently.
+        let states = w.states || [];
+        if (w.multiState) {
+          const nextStates = [];
+          for (let si = 0; si < states.length; si++) {
+            let s = states[si];
+            let sIcon = s.icon, sFilled = s.barFilled, sEmpty = s.barEmpty;
+            if (sIcon && (sIcon.rows || 1) > 1) {
+              sIcon = { ...sIcon, frameSourceId: await compileBinding(widgetsOut, i, `state_${si}_icon`, trimmed, id, injections, allImports) };
+            }
+            if (sFilled && (sFilled.rows || 1) > 1) {
+              sFilled = { ...sFilled, frameSourceId: await compileBinding(widgetsOut, i, `state_${si}_barFilled`, trimmed, id, injections, allImports) };
+            }
+            if (sEmpty && (sEmpty.rows || 1) > 1) {
+              sEmpty = { ...sEmpty, frameSourceId: await compileBinding(widgetsOut, i, `state_${si}_barEmpty`, trimmed, id, injections, allImports) };
+            }
+            nextStates.push({ icon: sIcon, barFilled: sFilled, barEmpty: sEmpty });
+          }
+          states = nextStates;
+        }
+
+        widgetsOut.push({ ...w, valueSourceId, maxSourceId, visibleSourceId: visibleSourceIdOut, textSourceId: textSourceIdOut, stateSourceId: stateSourceIdOut, icon, barFilled, barEmpty, states });
       }
 
       const layoutVisibleSourceId = await compileBoolBinding('layout', trimmed, id, injections, allBoolImports);
@@ -1490,8 +1711,7 @@ function HudEditor({ layoutId, onBack }) {
       }
       await invoke('delete_ycs_data', { category: 'hud', id: layoutId });
       for (let i = 0; i < widgets.length; i++) {
-        localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId}::${i}::value`);
-        localStorage.removeItem(`ycs-blocky::hudwidget::${layoutId}::${i}::max`);
+        deleteWidgetBindings(widgets[i], i);
       }
       if (onBack) onBack();
     } catch (err) {
@@ -1565,6 +1785,7 @@ function HudEditor({ layoutId, onBack }) {
                 onEditMax={() => setEditingBinding({ index: selected, kind: 'max' })}
                 onEditVisible={() => setEditingBinding({ index: selected, kind: 'visible' })}
                 onEditText={() => setEditingBinding({ index: selected, kind: 'text' })}
+                onEditState={() => setEditingBinding({ index: selected, kind: 'state' })}
                 onEditFrame={slot => setEditingBinding({ index: selected, kind: `frame_${slot}` })}
                 onRemoveLink={kind => removeBindingLink(selected, kind)}
               />

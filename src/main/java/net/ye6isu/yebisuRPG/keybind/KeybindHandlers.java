@@ -28,10 +28,7 @@ public final class KeybindHandlers {
 
     private static void dispatchPress(String keybindId, ServerPlayer player) {
         switch (keybindId) {
-            case "testbind" -> { DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(15), (int)((double)(5)), DashUtil.Easing.EASE_OUT, (_dashSrc, hitEntity) -> {
-    hitEntity.setDeltaMovement((double)(0), (double)(1), (double)(0));
-    if (hitEntity instanceof LivingEntity livingTarget_nrd06gcm) { livingTarget_nrd06gcm.hurt(livingTarget_nrd06gcm.level().damageSources().generic(), (float)(1)); }
-}, null, "box", (double)(3), (double)(3), (double)(4), false); }
+            case "testbind" -> { player.setDeltaMovement((double)((((player.getLookAngle().x))*(5))), (double)((((player.getLookAngle().y))*(5))), (double)((((player.getLookAngle().z))*(5)))); player.hurtMarked = true; }
             // YCS_Keybind_Press_Dispatch
             default -> {}
         }
