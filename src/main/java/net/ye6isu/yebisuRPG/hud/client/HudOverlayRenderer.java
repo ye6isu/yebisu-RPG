@@ -177,6 +177,18 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
         return next;
     }
 
+    /**
+     * Resolves which Multi-State entry is active (clamped into range), or {@code null} if
+     * Multi-State isn't enabled or has no states defined — the caller falls back to the
+     * widget's own base texture fields in that case. Index 0 is "the first state".
+     */
+    private static HudWidget.StateEntry currentState(HudWidget w, Player player) {
+        if (!w.multiState() || w.states().isEmpty()) return null;
+        double idx = resolveSource(w.stateSourceId(), player, w.stateLiteral());
+        int i = Math.max(0, Math.min(w.states().size() - 1, (int) Math.round(idx)));
+        return w.states().get(i);
+    }
+
     private static void renderBar(GuiGraphics g, HudWidget w, Player player, int x, int y, long tick) {
         double value = resolveSource(w.valueSourceId(), player, w.valueLiteral());
         double max = resolveSource(w.maxSourceId(), player, w.maxLiteral());
@@ -187,15 +199,19 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
                 : targetFrac;
         int filledWidth = (int) Math.round(w.width() * frac);
 
-        if (w.barEmpty().isSet()) {
-            drawTexture(g, w.barEmpty(), player, x, y, w.width(), w.height(), tick);
+        HudWidget.StateEntry state = currentState(w, player);
+        HudWidget.TextureRef barEmpty = state != null ? state.barEmpty() : w.barEmpty();
+        HudWidget.TextureRef barFilled = state != null ? state.barFilled() : w.barFilled();
+
+        if (barEmpty.isSet()) {
+            drawTexture(g, barEmpty, player, x, y, w.width(), w.height(), tick);
         } else {
             g.fill(x, y, x + w.width(), y + w.height(), 0xFF202020);
         }
 
         if (filledWidth <= 0) return;
-        if (w.barFilled().isSet()) {
-            drawTextureClipped(g, w.barFilled(), player, x, y, w.width(), w.height(), filledWidth, tick);
+        if (barFilled.isSet()) {
+            drawTextureClipped(g, barFilled, player, x, y, w.width(), w.height(), filledWidth, tick);
         } else {
             g.fill(x, y, x + filledWidth, y + w.height(), w.color());
         }
@@ -234,8 +250,10 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
     }
 
     private static void renderIcon(GuiGraphics g, HudWidget w, Player player, int x, int y, long tick) {
-        if (!w.icon().isSet()) return;
-        drawTexture(g, w.icon(), player, x, y, w.width(), w.height(), tick);
+        HudWidget.StateEntry state = currentState(w, player);
+        HudWidget.TextureRef icon = state != null ? state.icon() : w.icon();
+        if (!icon.isSet()) return;
+        drawTexture(g, icon, player, x, y, w.width(), w.height(), tick);
     }
 
     /** Draws a (possibly animated spritesheet) texture ref fully within its widget box. */

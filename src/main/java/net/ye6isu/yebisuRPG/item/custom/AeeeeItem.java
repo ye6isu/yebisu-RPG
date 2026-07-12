@@ -20,9 +20,9 @@ public class AeeeeItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
         if ((player.isCrouching())) {
-              player.setData(ModAttachments.COUNTER.get(), (double)(20));
+              player.setData(ModAttachments.COUNTER.get(), (double)(1));
             } else {
-              player.setData(ModAttachments.COUNTER.get(), (double)(4));
+              player.setData(ModAttachments.COUNTER.get(), (double)(0));
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }

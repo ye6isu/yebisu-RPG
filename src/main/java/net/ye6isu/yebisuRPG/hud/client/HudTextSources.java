@@ -3,8 +3,6 @@ package net.ye6isu.yebisuRPG.hud.client;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.LivingEntity;
 // YCS_Hud_Text_Source_Imports
 
 import java.util.HashMap;
@@ -39,7 +37,6 @@ public final class HudTextSources {
     }
 
     static {
-        register("testhud_w1_text", player -> (String)((String.valueOf(String.format("%.1f", (double)((player instanceof LivingEntity livingTarget_n1g9b79w ? livingTarget_n1g9b79w.getHealth() : 0.0)))) + " / " + String.valueOf(String.format("%.1f", (double)((player instanceof LivingEntity livingTarget_ncs2jq9o ? livingTarget_ncs2jq9o.getAttributeValue(Attributes.MAX_HEALTH) : 0.0)))))));
         // YCS_Hud_Text_Sources
     }
 }
