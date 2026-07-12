@@ -301,6 +301,61 @@ fn rename_geo_model(old_id: &str, new_id: &str) -> Result<String, String> {
     Ok(format!("Renamed model files from {} to {}", old_id, new_id))
 }
 
+// ── Animation file management (Entities) ───────────────────────────
+
+#[tauri::command]
+fn import_animation_file(id: &str, source_path: &str) -> Result<String, String> {
+    let dir = ycs_data_dir().join("models");
+    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create directory: {}", e))?;
+    let dest = dir.join(format!("{}.animation.json", id));
+    fs::copy(source_path, &dest).map_err(|e| format!("Failed to copy: {}", e))?;
+    Ok(dest.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn load_animation_file_path(id: &str) -> Result<String, String> {
+    let path = ycs_data_dir().join("models").join(format!("{}.animation.json", id));
+    if path.exists() {
+        Ok(path.to_string_lossy().to_string())
+    } else {
+        Err(format!("No animation file found for {}", id))
+    }
+}
+
+#[tauri::command]
+fn delete_animation_file(id: &str) -> Result<String, String> {
+    let path = ycs_data_dir().join("models").join(format!("{}.animation.json", id));
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| format!("Failed to delete animation file: {}", e))?;
+    }
+    Ok(format!("Deleted animation file for {}", id))
+}
+
+#[tauri::command]
+fn copy_animation_file_to_mod(id: &str, dest_file: &str) -> Result<String, String> {
+    let src = ycs_data_dir().join("models").join(format!("{}.animation.json", id));
+    if !src.exists() {
+        return Err(format!("No animation file found for {}", id));
+    }
+    let dest = src_root().join(dest_file);
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
+    }
+    fs::copy(&src, &dest).map_err(|e| format!("Failed to copy: {}", e))?;
+    Ok(format!("Copied to {:?}", dest))
+}
+
+#[tauri::command]
+fn rename_animation_file(old_id: &str, new_id: &str) -> Result<String, String> {
+    let dir = ycs_data_dir().join("models");
+    let src = dir.join(format!("{}.animation.json", old_id));
+    if src.exists() {
+        let dest = dir.join(format!("{}.animation.json", new_id));
+        fs::rename(&src, &dest).map_err(|e| format!("Failed to rename animation file: {}", e))?;
+    }
+    Ok(format!("Renamed animation file from {} to {}", old_id, new_id))
+}
+
 #[tauri::command]
 fn import_display_model(id: &str, source_path: &str) -> Result<String, String> {
     let dir = ycs_data_dir().join("models");
@@ -576,6 +631,11 @@ pub fn run() {
             import_display_model,
             load_display_model,
             copy_display_model_to_mod,
+            import_animation_file,
+            load_animation_file_path,
+            delete_animation_file,
+            copy_animation_file_to_mod,
+            rename_animation_file,
             get_mod_root,
         ])
         .run(tauri::generate_context!())

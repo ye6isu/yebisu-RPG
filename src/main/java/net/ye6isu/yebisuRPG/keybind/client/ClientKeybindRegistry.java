@@ -26,7 +26,6 @@ public final class ClientKeybindRegistry {
     }
 
     static {
-        ClientKeybindRegistry.register("testbind", ModKeybinds.TESTBIND);
         // YCS_Keybind_Register
     }
 
