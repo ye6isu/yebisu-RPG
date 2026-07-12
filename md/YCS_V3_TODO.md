@@ -43,6 +43,13 @@ HUD editor built out this session, well beyond the original "read-only overlay" 
 - [ ] No usage-scanner before delete (Blocky graph refs live in browser `localStorage`, not scannable from Rust) — deleting a variable only warns generically, doesn't check for stale references.
 - [ ] Item-typed variable / spatial entity-storage (llama-style inventory without a physical item) was explicitly descoped from this pass — revisit as a separate feature if needed.
 
+## Entities — Follow-up
+- [ ] No AI beyond passive wander/look-at-player — no combat, no targeting, no ranged/melee attacks. Activation-mode-style ability wiring (see Chopping Block's Ability Creator prerequisite) is a separate, much larger effort; a bare mob is not blocked on it, but a mob that *fights* is.
+- [ ] No death/hurt/attack animations, no sounds, no loot table, no breeding/taming, no spawn egg — the only way to place one right now is `/summon yebisurpg:<id>`.
+- [ ] No usage-scanner before delete — same gap as every other Blocky-graph/reference-owning object type (not applicable to idle/walk animation *names*, which are plain strings, not Blocky refs, but the texture/geo-model/animation-file references themselves aren't usage-checked before a shared texture is deleted).
+- [ ] No validation that the entity's `.animation.json` actually contains the named idle/walk animations — a typo'd animation name silently no-ops (`HandAnimationLoader.get` returns `null`, `GeoEntityModel.setupAnim` just returns early) rather than erroring in the editor.
+- [ ] Not manually launch-tested yet — worth a launch + `/summon` pass with a hand-authored test entity next session (same verification approach HUD's and Keybinds' original builds used), particularly to confirm the Bedrock-rotation-sign convention (`-rot[0]/-rot[1]/+rot[2]`, ported from `GeoItemRenderer.eulerToQuat`'s Euler-order convention) reads correctly against `uploaded/tester.geo.json` + `tester.animation.json`.
+
 ## Attributes — Follow-up
 - [ ] `attribute.modifier.add`'s UI only exposes 3 of 5 compiler-supported operations (`base_add`/`base_multiply` are unreachable from the block's dropdown) — inherited as-is from old_mod, not fixed in this pass.
 - [ ] No usage-scanner before delete — same gap as Entity Variables (Blocky refs live in `localStorage`, invisible to Rust-side checks).

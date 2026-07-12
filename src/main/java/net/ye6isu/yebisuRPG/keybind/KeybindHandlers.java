@@ -1,8 +1,6 @@
 package net.ye6isu.yebisuRPG.keybind;
 
 import net.minecraft.server.level.ServerPlayer;
-import net.ye6isu.yebisuRPG.util.DashUtil;
-import net.minecraft.world.entity.LivingEntity;
 // YCS_Keybind_Handler_Imports
 
 /**
@@ -28,7 +26,6 @@ public final class KeybindHandlers {
 
     private static void dispatchPress(String keybindId, ServerPlayer player) {
         switch (keybindId) {
-            case "testbind" -> { player.setDeltaMovement((double)((((player.getLookAngle().x))*(5))), (double)((((player.getLookAngle().y))*(5))), (double)((((player.getLookAngle().z))*(5)))); player.hurtMarked = true; }
             // YCS_Keybind_Press_Dispatch
             default -> {}
         }

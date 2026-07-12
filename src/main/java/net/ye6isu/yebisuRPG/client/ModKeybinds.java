@@ -27,14 +27,12 @@ public final class ModKeybinds {
     /** Controls-screen category label. Translation key defined in en_us.json. */
     public static final String CATEGORY = "key.categories.yebisurpg";
 
-    public static final KeyMapping TESTBIND = bind("testbind", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KeyModifier.ALT, CATEGORY);
     // YCS_Mod_Keybinds
 
     private ModKeybinds() {}
 
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
-        event.register(TESTBIND);
         // YCS_Mod_Keybinds_Register
     }
 

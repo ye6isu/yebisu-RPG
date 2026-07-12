@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Titlebar from "./components/Titlebar/Titlebar";
 import PreferencesPageNew from "./components/PreferencesPageNew";
 import ItemsLanding from "./components/ItemsLanding";
+import EntitiesLanding from "./components/EntitiesLanding";
 import TabsLanding from "./components/TabsLanding";
 import TagsLanding from "./components/TagsLanding";
 import TextureManager from "./components/TextureManager";
@@ -151,6 +152,7 @@ function App() {
 
   const tabs = [
     { key: 'items', component: <ItemsLanding /> },
+    { key: 'entities', component: <EntitiesLanding /> },
     { key: 'tabs', component: <TabsLanding /> },
     { key: 'tags', component: <TagsLanding /> },
     { key: 'components', component: <ComponentsLanding /> },
@@ -185,6 +187,7 @@ function App() {
 
             <SidebarGroup label="Registry" isOpen={isRegistryOpen} onToggle={() => setIsRegistryOpen(!isRegistryOpen)}>
               <SidebarTab label="Items" tabKey="items" />
+              <SidebarTab label="Entities" tabKey="entities" />
               <SidebarTab label="Creative Tabs" tabKey="tabs" />
               <SidebarTab label="Tags" tabKey="tags" />
             </SidebarGroup>

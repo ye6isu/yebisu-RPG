@@ -3,6 +3,8 @@ package net.ye6isu.yebisuRPG;
 import net.ye6isu.yebisuRPG.attribute.AttributeRangeFix;
 import net.ye6isu.yebisuRPG.attribute.ModAttributes;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
+import net.ye6isu.yebisuRPG.entity.ModEntities;
+import net.ye6isu.yebisuRPG.entity.ModEntityEvents;
 import net.ye6isu.yebisuRPG.entityvar.ModAttachments;
 import net.ye6isu.yebisuRPG.hud.ModHud;
 import net.ye6isu.yebisuRPG.item.ModCreativeModeTabs;
@@ -30,6 +32,8 @@ public class yebisuRPG
         ModDataComponents.register(modEventBus);
         ModAttachments.register(modEventBus);
         ModAttributes.register(modEventBus);
+        ModEntities.register(modEventBus);
+        ModEntityEvents.register(modEventBus);
         ModCreativeModeTabs.register(modEventBus);
         modEventBus.addListener(ModCreativeTabContents::buildTabContents);
         modEventBus.addListener(this::commonSetup);
@@ -40,6 +44,7 @@ public class yebisuRPG
             modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.GeoItemRegistry::onRegisterAdditionalModels);
             modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.EntityTextureRenderHooks::onRegisterShaders);
             modEventBus.addListener(net.ye6isu.yebisuRPG.client.renderer.EntityTextureRenderHooks::onAddLayers);
+            modEventBus.addListener(net.ye6isu.yebisuRPG.entity.client.ModEntityRendererRegistry::onRegisterRenderers);
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> TabIconCycler.onClientTick());
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE.tick());
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> net.ye6isu.yebisuRPG.keybind.client.ClientKeybindTracker.INSTANCE.tick());
