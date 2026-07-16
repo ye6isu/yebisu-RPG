@@ -85,6 +85,10 @@
     },
     {
       "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/overlay/petrified.png"
+    },
+    {
+      "type": "created-file",
       "file": "java/net/ye6isu/yebisuRPG/item/custom/AeeeeItem.java"
     },
     {

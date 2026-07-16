@@ -50,7 +50,7 @@ export default function ItemsLanding() {
           }
         } catch {}
       }
-      await invoke('delete_geo_model', { id: item.id }).catch(() => {});
+      await invoke('delete_geo_model', { kind: 'items', id: item.id }).catch(() => {});
       await invoke('delete_ycs_data', { category: 'items', id: item.id });
       await reload();
     } catch (err) {

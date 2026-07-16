@@ -1,23 +1,80 @@
 # Ongoing Work
 
-## Entity Creator (new this session)
-Added a bare-minimum "Entity Creator" to YCS — custom mobs with id, display name, texture, geo model, `.animation.json`, idle/walk animation names, and max health/movement speed/hitbox stats. Verified working in-game (`/summon yebisurpg:testerent` renders and animates correctly as of this session).
+## Multi-Hitbox Parts feature (this session)
 
-**Scope, deliberately narrow:** passive wander + look-at-player AI only (no combat/targeting), no death/hurt/attack animations, no sounds, no loot table, no breeding/taming, no spawn egg (test via `/summon`). Full writeup: `YCS_V3_Injection_and_Lifecycle.md`'s new `## Entities` section. Follow-up gaps tracked in `YCS_V3_TODO.md`'s `## Entities — Follow-up`.
+Added the ability for a YCS entity to have extra, independently-hittable hitboxes
+("parts") that track a named bone every tick — the same mechanism vanilla's Ender
+Dragon uses (`EnderDragonPart`/NeoForge's `PartEntity<T>`). Full design/architecture
+is documented in `YCS_V3_Injection_and_Lifecycle.md`'s "Multi-Hitbox Parts" section
+under Entities — read that first for the mechanism (server-safe bone solver,
+`YcsMobPartEntity`, the "On Part Hit" Blocky hook). This file only tracks
+session-to-session state/bugs found via live testing.
 
-**Architecture, one generic class per concern (not one class per mob):**
-- `net.ye6isu.yebisuRPG.entity.custom.YcsMobEntity` — the single `PathfinderMob` subclass every YCS mob shares.
-- `net.ye6isu.yebisuRPG.entity.ModEntities` / `ModEntityEvents` — `EntityType` registration + `EntityAttributeCreationEvent` attribute wiring (a **separate mechanism** from the existing custom-`Attribute`-type system in `attribute/ModAttributes.java`).
-- `net.ye6isu.yebisuRPG.entity.client.GeoEntityModelLoader` / `GeoEntityModel` / `GeoEntityRenderer` / `ModEntityRendererRegistry` — geo model parsing + rendering.
-- New YCS frontend page: `ycs/src/components/EntitiesLanding.jsx`, wired into `App.jsx`'s Registry sidebar group.
-- New Tauri commands (`ycs/src-tauri/src/lib.rs`): `import_animation_file`/`load_animation_file_path`/`delete_animation_file`/`copy_animation_file_to_mod`/`rename_animation_file`, mirroring the existing geo-model commands.
+### Bugs found and fixed via live testing this session
+1. **Parts invisible in F3+B and never hit-detectable at all** — `YcsMobEntity` never
+   overrode NeoForge's `isMultipartEntity()` (defaults to `false`, separate from
+   `getParts()`). Both the hitbox debug renderer and vanilla's part-aware entity
+   lookups gate on this flag, not just on `getParts()` returning something. Fixed:
+   `isMultipartEntity()` now returns `hitboxParts.length > 0`, matching `EnderDragon`.
+2. **`ConcurrentModificationException` crash on `runClient`** — `ServerGeoModelLoader`/
+   `ServerAnimationSampler`'s caches were plain `HashMap`/`HashSet`. In a `runClient`/
+   singleplayer setup, the client tick thread and the integrated server's own tick
+   thread both call `YcsMobEntity.tick()` concurrently, so these are genuinely
+   multi-threaded. Fixed: switched both to `ConcurrentHashMap`/`ConcurrentHashMap.newKeySet()`.
+3. **Parts visually "teleported" every tick instead of smoothly tracking their bone** —
+   a `PartEntity` is never itself ticked by the level, so `Entity.setPos()` never
+   updates its `xOld`/`yOld`/`zOld`. The F3+B debug renderer interpolates every
+   entity's rendered position via `Mth.lerp(partialTick, xOld, getX())`, so a stale
+   `xOld` made each tick's fresh position look like a jump. Fixed: `YcsMobEntity.
+   tickHitboxParts()` now snapshots each part's pre-move position and restores it
+   into `xOld`/`yOld`/`zOld` *after* moving all parts, exactly mirroring
+   `EnderDragon.aiStep`'s own snapshot/restore dance around its `tickPart(...)` calls.
+4. **Attacking a part's hitbox never forwarded damage to the parent entity** — root
+   cause was a *timing* bug, not a forwarding-logic bug: `hitboxParts` was being
+   built lazily on the first `tick()`, but vanilla registers a multipart entity's
+   parts into the level's id-lookup table (`ServerLevel.dragonParts`, which combat/
+   network entity-id resolution actually consults) exactly once — when the entity
+   is first added to the level, via the tracking-start callback, before any tick
+   ever runs. The array was still empty at that moment, so parts rendered fine but
+   were never actually reachable by hit-detection. Fixed: `hitboxParts` is now built
+   directly in `YcsMobEntity`'s constructor (matching exactly how `EnderDragon`
+   builds its own `subEntities` array in its constructor), not lazily.
 
-**Two real bugs hit and fixed during this session, both worth remembering:**
-1. **`PathfinderMob` requires `Attributes.FOLLOW_RANGE`** — its constructor builds a `GroundPathNavigation` immediately, before any data-driven config runs, and that reads `FOLLOW_RANGE` off the attribute map. Omitting it threw `IllegalArgumentException: Can't find attribute minecraft:generic.follow_range` *during entity construction*, which vanilla's `EntityType.loadStaticEntity`/`SummonCommand` catch silently and surface only as a generic "Unable to summon entity" in chat — the real stack trace only ever appears in the server log (`"Exception loading entity: "`). Fixed by hardcoding `FOLLOW_RANGE` (16.0) into `YcsMobEntity.createAttributes`, not exposing it as a YCS field. **Lesson: for any future "silently fails to spawn/load" symptom, check the log first, not the chat message.**
-2. **Bedrock geo models don't fit vanilla's `ModelPart`/`CubeListBuilder` API** — vanilla's cube builder only supports the single classic "box UV" layout (one `[u,v]` origin), with no public API for Bedrock's per-face UV objects (`"uv": {"north": {...}, "east": {...}, ...}`), which is exactly what `uploaded/tester.geo.json` uses. Solved by **not** using `ModelPart` at all — `GeoEntityModelLoader` now parses into the same `BakedGeoModel`/`BakedBone`/`BakedCube` records `GeoItemRenderer` already uses for items (promoted from private to shared public types), and `GeoEntityModel.renderToBuffer` does manual per-face vertex emission ported from `GeoItemRenderer.renderBone`/`renderCube`/`quad`/`emitPerFace`, correctly handling both UV layouts.
-3. **Reusing that item-pipeline math inside the entity pipeline rendered mobs upside down** — `LivingEntityRenderer.render` (vanilla's mob path) already applies its own `poseStack.scale(-1,-1,1)` before calling into the model, a flip `GeoItemRenderer`'s own pipeline (`renderByItem`) never applies. Fixed with one extra compensating `poseStack.scale(1,-1,1)` in `GeoEntityModel.renderToBuffer`. **Lesson: when porting PoseStack/geometry math between the item and entity render pipelines, check what transform the calling pipeline already applied — don't assume it transfers as-is.**
+### Current known limitation — hard to position by hand
+Right now a part is a plain axis-aligned box (`EntityDimensions.scalable(width,
+height)`) centered on the tracked bone's **pivot point** — width/height are typed
+numbers in the Hitbox Parts sub-page, with no offset field. This makes it genuinely
+hard to line a part up with the actual mesh by hand (confirmed by the user directly
+— "its hard for me to get the hitbox at the position as it is right now"), since a
+bone's pivot is often at a joint (e.g. top of a leg), not the visual center of the
+limb the part is meant to cover, and there's no way to nudge the box off-pivot.
 
-**Not yet done / next session:**
-- Broader launch-testing beyond the one `testerent` test entity (different bone counts/hierarchies, box-UV-only cubes, multi-cube bones).
-- Everything in `YCS_V3_TODO.md`'s Entities Follow-up list (no usage-scanner before delete, no animation-name validation in the editor, etc).
-- Not reconciled into a "Chopping Block" or scoped-out item yet — Entities is now a real, working YCS category, not a stub.
+## Not yet done / next session
+
+1. **Blockbench-authored hitbox shape/offset (the actual next task, explicitly
+   requested)** — instead of typing width/height + implicitly centering on the
+   bone's raw pivot, let the user author the hitbox's size AND offset visually in
+   Blockbench as a cube on the tracked bone/group, then have YCS read that cube's
+   `origin`/`size` straight out of the already-imported `.geo.json` instead of
+   free-typed numbers. Concretely:
+   - Still fundamentally one axis-aligned `EntityDimensions` box at runtime — Minecraft
+     has no rotated-hitbox concept, so this doesn't change *what* a part physically
+     is, only *how it's specified* (removes the guesswork of manually typing an
+     offset-less width/height).
+   - Need a convention for *which* cube on the bone is "the hitbox" — e.g. first cube
+     on the bone, or a specifically-named cube (like a cube literally named `hitbox`
+     in Blockbench) so a bone can have both visible mesh cubes and a separate,
+     invisible-in-game hitbox-defining cube.
+   - Width/height derive from the cube's `size`; the offset is the cube's `origin`
+     relative to the bone's own `pivot` — `BonePoseSolver.resolveBoneWorldPos` needs
+     to add this local offset (still just a translation, no rotation) on top of the
+     bone's resolved world position.
+   - `EntityPartsPage.jsx` would drop the manual width/height fields (or keep them as
+     a fallback/override) in favor of just picking the bone — the cube itself defines
+     the box.
+   - User explicitly deferred this to next session rather than doing it now — this is
+     the concrete next task, not just a backlog idea.
+2. Everything in `YCS_V3_TODO.md`'s Entities — Follow-up list for parts is still
+   accurate/outstanding (no per-part rotation, no attacker-entity context in On Part
+   Hit, no usage-scanner before delete) — this session's fixes were all bugs found
+   via live testing, not new scope.

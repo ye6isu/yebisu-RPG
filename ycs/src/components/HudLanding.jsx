@@ -682,6 +682,8 @@ function LayoutPanel({
   gridOffsetX, setGridOffsetX, gridOffsetY, setGridOffsetY,
   showGrid, setShowGrid, snapEnabled, setSnapEnabled,
   previewImage, onPickPreviewImage, onClearPreviewImage,
+  previewImageFit, setPreviewImageFit,
+  previewImageOpacity, setPreviewImageOpacity,
   visibleLiteral, setVisibleLiteral, hasVisibleLink, onEditVisible, onRemoveVisibleLink,
 }) {
   return (
@@ -716,6 +718,32 @@ function LayoutPanel({
             onImport={onPickPreviewImage}
             onClear={onClearPreviewImage}
           />
+          {previewImage && (
+            <>
+              <StandardDropdownField
+                value={previewImageFit}
+                options={[
+                  { label: 'Fit', value: 'contain' },
+                  { label: 'Fill', value: 'cover' },
+                ]}
+                onChange={setPreviewImageFit}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={previewImageOpacity}
+                  onChange={e => setPreviewImageOpacity(Number(e.target.value))}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ width: 34, textAlign: 'right', fontSize: 11, opacity: 0.7 }}>
+                  {Math.round(previewImageOpacity * 100)}%
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </FieldRow>
     </div>
@@ -779,7 +807,7 @@ function CanvasToolbar({
 // scroll wheel zooms (centered on the cursor), middle-mouse or empty-space drag pans. The
 // viewport box itself never changes size — only its content (the reference-resolution
 // rectangle + widgets) pans/zooms within it via a CSS transform.
-function PannableCanvas({ previewW, previewH, gridStyle, onDeselect, children }) {
+function PannableCanvas({ previewW, previewH, gridStyle, previewImage, previewImageFit, previewImageOpacity, onDeselect, children }) {
   const areaRef = useRef(null);
   const panRef = useRef({ x: 40, y: 40 });
   const zoomRef = useRef(1);
@@ -860,9 +888,37 @@ function PannableCanvas({ previewW, previewH, gridStyle, onDeselect, children })
             position: 'relative', width: previewW, height: previewH,
             background: 'linear-gradient(135deg, #2a2a3a, #1a1a24)',
             border: '1px solid var(--ycs-foreground)', overflow: 'hidden',
-            ...gridStyle,
           }}
         >
+          {previewImage && (
+            <img
+              src={previewImage}
+              alt=""
+              draggable={false}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: previewImageFit,
+                opacity: previewImageOpacity,
+                pointerEvents: 'none',
+                userSelect: 'none',
+                zIndex: 0,
+              }}
+            />
+          )}
+          {Object.keys(gridStyle).length > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                zIndex: 1,
+                ...gridStyle,
+              }}
+            />
+          )}
           {Children.map(children, child => cloneElement(child, { zoom }))}
         </div>
       </div>
@@ -1266,6 +1322,8 @@ function HudEditor({ layoutId, onBack }) {
   const [showGrid, setShowGrid] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
+  const [previewImageFit, setPreviewImageFit] = useState('contain');
+  const [previewImageOpacity, setPreviewImageOpacity] = useState(0.5);
   const [sidebarWidth, setSidebarWidth] = useState(() => parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || 280);
   const [inspectorHeight, setInspectorHeight] = useState(() => {
     const v = parseInt(localStorage.getItem(INSPECTOR_HEIGHT_KEY));
@@ -1314,6 +1372,8 @@ function HudEditor({ layoutId, onBack }) {
         if (data.gridOffsetX) setGridOffsetX(data.gridOffsetX);
         if (data.gridOffsetY) setGridOffsetY(data.gridOffsetY);
         if (data.previewImage) setPreviewImage(data.previewImage);
+        if (data.previewImageFit) setPreviewImageFit(data.previewImageFit);
+        if (typeof data.previewImageOpacity === 'number') setPreviewImageOpacity(data.previewImageOpacity);
         setVisibleLiteral(data.visibleLiteral !== false);
       })
       .catch(() => {});
@@ -1676,7 +1736,8 @@ function HudEditor({ layoutId, onBack }) {
       injections.push({ type: 'java-marker', file: `${JAVA_BASE}/hud/ModHud.java`, marker: 'YCS_Hud_Layouts', content: visRegLine });
 
       const payload = {
-        name: trimmed, widgets: widgetsOut, previewW, previewH, gridW, gridH, gridOffsetX, gridOffsetY, previewImage,
+        name: trimmed, widgets: widgetsOut, previewW, previewH, gridW, gridH, gridOffsetX, gridOffsetY,
+        previewImage, previewImageFit, previewImageOpacity,
         visibleLiteral, visibleSourceId: layoutVisibleSourceId, _injections: injections,
       };
       await invoke('save_ycs_data', { category: 'hud', id, content: JSON.stringify(payload, null, 2) });
@@ -1754,6 +1815,9 @@ function HudEditor({ layoutId, onBack }) {
         <PannableCanvas
           previewW={previewW} previewH={previewH}
           gridStyle={gridStyle}
+          previewImage={previewImage}
+          previewImageFit={previewImageFit}
+          previewImageOpacity={previewImageOpacity}
           onDeselect={() => setSelected(null)}
         >
           {widgets.map((w, i) => (
@@ -1802,6 +1866,8 @@ function HudEditor({ layoutId, onBack }) {
                 showGrid={showGrid} setShowGrid={setShowGrid}
                 snapEnabled={snapEnabled} setSnapEnabled={setSnapEnabled}
                 previewImage={previewImage} onPickPreviewImage={pickPreviewImage} onClearPreviewImage={() => setPreviewImage(null)}
+                previewImageFit={previewImageFit} setPreviewImageFit={setPreviewImageFit}
+                previewImageOpacity={previewImageOpacity} setPreviewImageOpacity={setPreviewImageOpacity}
                 visibleLiteral={visibleLiteral} setVisibleLiteral={setVisibleLiteral}
                 hasVisibleLink={!!localStorage.getItem(`ycs-blocky::hudwidget::${layoutId || 'new'}::layout::visible`)}
                 onEditVisible={() => setEditingBinding({ index: 'layout', kind: 'visible' })}

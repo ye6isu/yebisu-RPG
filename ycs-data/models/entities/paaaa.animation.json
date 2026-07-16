@@ -1,0 +1,39 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"idle": {
+			"loop": "loop",
+			"animation_length": 2,
+			"bones": {
+				"Right Arm": {
+					"rotation": {
+						"0": {
+							"vector": [-90, 0, 0]
+						},
+						"2": {
+							"vector": [-90, 0, 0]
+						}
+					}
+				},
+				"Left Arm": {
+					"rotation": {
+						"0": {
+							"vector": [-90, 0, 0]
+						},
+						"1": {
+							"vector": [-90, -52.5, 0]
+						},
+						"2": {
+							"vector": [-90, 0, 0]
+						}
+					}
+				},
+				"Left Leg": {
+					"rotation": {
+						"vector": [0, 0, 0]
+					}
+				}
+			}
+		}
+	}
+}
