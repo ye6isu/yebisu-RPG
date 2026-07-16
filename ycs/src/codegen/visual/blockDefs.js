@@ -77,6 +77,7 @@ export const BLOCK_DEFS = [
         "onEffectStarted": "livingEntity",
         "onEffectTick": "livingEntity",
         "onEffectEnd": "livingEntity",
+        "entityPartHit": "self",
         "*": "player",
       },
     },
@@ -95,6 +96,30 @@ export const BLOCK_DEFS = [
         "interactLivingEntity": "interactionTarget",
         "*": "target",
       },
+    },
+  },
+  {
+    opcode: "entity.part_hit_name",
+    category: "Entity", sub: "data",
+    linkType: "text",
+    label: "Hit Part Name",
+    hint: "Which configured hitbox part was struck (On Part Hit graphs only) — compare against a part's name to branch per-part, e.g. for a tailswipe ability",
+    color: "#5ba558",
+    codegen: {
+      type: "value",
+      expr: "partName",
+    },
+  },
+  {
+    opcode: "entity.part_hit_damage",
+    category: "Entity", sub: "data",
+    linkType: "number",
+    label: "Hit Part Damage Amount",
+    hint: "The damage amount that struck the part (On Part Hit graphs only)",
+    color: "#4d65b4",
+    codegen: {
+      type: "value",
+      expr: "((double)(damageAmount))",
     },
   },
   {

@@ -22,8 +22,10 @@ public final class ModEntities {
 
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
         DeferredRegister.create(Registries.ENTITY_TYPE, yebisuRPG.MODID);
-
-    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> TESTERENT = ENTITY_TYPES.register("testerent", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(0.6F, 1.8F).build("testerent"));
+    
+    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> TESTEN = ENTITY_TYPES.register("testen", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(0.5F, 0.6F).build("testen"));
+    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> PLL = ENTITY_TYPES.register("pll", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(0.6F, 1.8F).eyeHeight(4F).build("pll"));
+    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> PAAAA = ENTITY_TYPES.register("paaaa", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(0.6F, 1.8F).build("paaaa"));
     // YCS_Mod_Entities
 
     private ModEntities() {}

@@ -2,11 +2,95 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FieldRow, StringField, StandardDropdownField } from './Field/Field';
+import { attrRegistryRef, compileChain, collectBlockImports } from '../codegen/visual/compiler.js';
+import EntityAttributesPage, { DEFAULT_ENTITY_ATTRIBUTES } from './EntityAttributesPage';
+import EntityGoalsPage from './EntityGoalsPage';
+import EntityAnimationsPage from './EntityAnimationsPage';
+import EntityPartsPage from './EntityPartsPage';
+import BlockEditor from './BlockEditor';
 
 const JAVA_BASE = 'java/net/ye6isu/yebisuRPG';
 
 function entityConstName(id) {
   return id.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+}
+
+function formatModelNumber(value) {
+  return Number.parseFloat(value.toFixed(4)).toString();
+}
+
+function readModelVec3(obj, key) {
+  const arr = obj?.[key];
+  return Array.isArray(arr) ? [
+    Number(arr[0]) || 0,
+    Number(arr[1]) || 0,
+    Number(arr[2]) || 0,
+  ] : [0, 0, 0];
+}
+
+function modelHitboxPartsFromGeo(raw) {
+  const parsed = JSON.parse(raw);
+  const geometry = parsed?.['minecraft:geometry'];
+  const bones = Array.isArray(geometry?.[0]?.bones) ? geometry[0].bones : [];
+  return bones
+    .filter(bone => typeof bone?.name === 'string' && bone.name.startsWith('hb_'))
+    .map((bone) => {
+      const cube = Array.isArray(bone.cubes) ? bone.cubes[0] : null;
+      const pivot = readModelVec3(bone, 'pivot');
+      const origin = readModelVec3(cube, 'origin');
+      const size = readModelVec3(cube, 'size').map(v => Math.abs(v));
+      const center = [
+        origin[0] + size[0] / 2,
+        origin[1] + size[1] / 2,
+        origin[2] + size[2] / 2,
+      ];
+      return {
+        name: bone.name,
+        boneName: bone.name,
+        width: formatModelNumber(Math.max(size[0], size[2]) / 16 || 1),
+        height: formatModelNumber(size[1] / 16 || 1),
+        offsetX: formatModelNumber(center[0] - pivot[0]),
+        offsetY: formatModelNumber(origin[1] - pivot[1]),
+        offsetZ: formatModelNumber(center[2] - pivot[2]),
+        source: 'model',
+      };
+    });
+}
+
+async function loadModelHitboxParts(entityId) {
+  const raw = await invoke('load_geo_model_content', { kind: 'entities', id: entityId });
+  return modelHitboxPartsFromGeo(raw);
+}
+
+function FieldIconButton({ onClick, title, hasData, disabled }) {
+  return (
+    <button className="ycs-button field" onClick={onClick} title={title} disabled={disabled}
+      style={{ flexShrink: 0, fontSize: '11px', minWidth: 'unset', padding: '0 6px', width: 'auto', height: '24px' }}>
+      {hasData ? 'edit' : 'set'}
+    </button>
+  );
+}
+
+function FieldGroup({ label, headerExtra, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
+        fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px',
+        opacity: 0.4, padding: '4px 0', userSelect: 'none',
+      }}>
+        <span>{label}</span>
+        {headerExtra}
+      </div>
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: '4px',
+        borderLeft: '1px solid var(--ycs-foreground)',
+        paddingLeft: '12px', marginLeft: '4px',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function FileDropZone({ hasFile, fileName, onImport, accept }) {
@@ -129,17 +213,23 @@ function EntityEditor({ entityId, onBack }) {
   const [textures, setTextures] = useState([]);
   const [geoModelSet, setGeoModelSet] = useState(false);
   const [animFileSet, setAnimFileSet] = useState(false);
-  const [maxHealth, setMaxHealth] = useState('20');
-  const [movementSpeed, setMovementSpeed] = useState('0.25');
   const [hitboxWidth, setHitboxWidth] = useState('0.6');
   const [hitboxHeight, setHitboxHeight] = useState('1.8');
+  const [eyeHeight, setEyeHeight] = useState('');
+  const [hostility, setHostility] = useState('passive');
+  const [attributes, setAttributes] = useState(DEFAULT_ENTITY_ATTRIBUTES);
+  const [goals, setGoals] = useState([]);
+  const [parts, setParts] = useState([]);
+  const [blockEditing, setBlockEditing] = useState(null); // { entityId, methodKey }
+  const [headBone, setHeadBone] = useState('');
   const [idleAnim, setIdleAnim] = useState('idle');
-  const [walkAnim, setWalkAnim] = useState('walk');
+  const [walkAnim, setWalkAnim] = useState('');
   const [currentInjections, setCurrentInjections] = useState([]);
   const [lastSavedId, setLastSavedId] = useState(entityId || null);
   const [injected, setInjected] = useState(false);
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [subpage, setSubpage] = useState(null); // null | 'attributes' | 'goals' | 'animations'
 
   useEffect(() => {
     invoke('list_textures').then(async (ids) => {
@@ -162,19 +252,23 @@ function EntityEditor({ entityId, onBack }) {
         setId(data.id || entityId);
         setDisplayName(data.displayName || '');
         setTextureId(data.texture || '');
-        setMaxHealth(String(data.maxHealth ?? 20));
-        setMovementSpeed(String(data.movementSpeed ?? 0.25));
         setHitboxWidth(String(data.hitboxWidth ?? 0.6));
         setHitboxHeight(String(data.hitboxHeight ?? 1.8));
+        setEyeHeight(data.eyeHeight != null ? String(data.eyeHeight) : '');
+        setHostility(data.hostility || 'passive');
+        setAttributes(Array.isArray(data.attributes) && data.attributes.length > 0 ? data.attributes : DEFAULT_ENTITY_ATTRIBUTES);
+        setGoals(Array.isArray(data.goals) ? data.goals : []);
+        setParts(Array.isArray(data.hitboxParts) ? data.hitboxParts : []);
+        setHeadBone(data.headBone || '');
         setIdleAnim(data.idleAnim || 'idle');
-        setWalkAnim(data.walkAnim || 'walk');
+        setWalkAnim(data.walkAnim || '');
         setCurrentInjections(Array.isArray(data._injections) ? data._injections : []);
         setInjected((data._injections || []).length > 0);
         setLastSavedId(entityId);
       })
       .catch(() => {});
-    invoke('load_geo_model_path', { id: entityId }).then(() => setGeoModelSet(true)).catch(() => setGeoModelSet(false));
-    invoke('load_animation_file_path', { id: entityId }).then(() => setAnimFileSet(true)).catch(() => setAnimFileSet(false));
+    invoke('load_geo_model_path', { kind: 'entities', id: entityId }).then(() => setGeoModelSet(true)).catch(() => setGeoModelSet(false));
+    invoke('load_animation_file_path', { kind: 'entities', id: entityId }).then(() => setAnimFileSet(true)).catch(() => setAnimFileSet(false));
   }, [entityId]);
 
   const importGeoModel = async (droppedPath) => {
@@ -186,9 +280,11 @@ function EntityEditor({ entityId, onBack }) {
       filePath = typeof file === 'string' ? file : file.path;
     }
     try {
-      await invoke('import_geo_model', { id, sourcePath: filePath });
+      await invoke('import_geo_model', { kind: 'entities', id, sourcePath: filePath });
+      const detectedParts = await loadModelHitboxParts(id).catch(() => []);
+      setParts(detectedParts);
       setGeoModelSet(true);
-      setStatus({ ok: true, msg: 'Geo model imported.' });
+      setStatus({ ok: true, msg: detectedParts.length > 0 ? `Geo model imported. Found ${detectedParts.length} hitbox part${detectedParts.length === 1 ? '' : 's'}.` : 'Geo model imported.' });
     } catch (err) {
       setStatus({ ok: false, msg: 'Failed to import model: ' + err });
     }
@@ -203,7 +299,7 @@ function EntityEditor({ entityId, onBack }) {
       filePath = typeof file === 'string' ? file : file.path;
     }
     try {
-      await invoke('import_animation_file', { id, sourcePath: filePath });
+      await invoke('import_animation_file', { kind: 'entities', id, sourcePath: filePath });
       setAnimFileSet(true);
       setStatus({ ok: true, msg: 'Animation file imported.' });
     } catch (err) {
@@ -242,36 +338,91 @@ function EntityEditor({ entityId, onBack }) {
       }
       if (lastSavedId && lastSavedId !== trimmed) {
         await invoke('delete_ycs_data', { category: 'entities', id: lastSavedId }).catch(() => {});
-        await invoke('delete_geo_model', { id: lastSavedId }).catch(() => {});
-        await invoke('delete_animation_file', { id: lastSavedId }).catch(() => {});
+        await invoke('delete_geo_model', { kind: 'entities', id: lastSavedId }).catch(() => {});
+        await invoke('delete_animation_file', { kind: 'entities', id: lastSavedId }).catch(() => {});
+        // Carry over the On Part Hit Blocky graph under the new id, same convention
+        // Keybinds use for renamed On Press/On Release graphs.
+        const oldKey = `ycs-blocky::entity::${lastSavedId}::entityPartHit`;
+        const raw = localStorage.getItem(oldKey);
+        if (raw) {
+          localStorage.setItem(`ycs-blocky::entity::${trimmed}::entityPartHit`, raw);
+          localStorage.removeItem(oldKey);
+        }
       }
 
       const injections = [];
       const constName = entityConstName(trimmed);
-      const maxHealthNum = parseFloat(maxHealth) || 1;
-      const moveSpeedNum = parseFloat(movementSpeed) || 0;
       const hbW = parseFloat(hitboxWidth) || 0.6;
       const hbH = parseFloat(hitboxHeight) || 1.8;
+      const eyeH = parseFloat(eyeHeight);
+      const eyeHeightCall = Number.isFinite(eyeH) ? `.eyeHeight(${eyeH}F)` : '';
+      const hostilityEnum = hostility.toUpperCase();
 
       // Entity type registration
-      const entityLine = `    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> ${constName} = ENTITY_TYPES.register("${trimmed}", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(${hbW}F, ${hbH}F).build("${trimmed}"));`;
+      const entityLine = `    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> ${constName} = ENTITY_TYPES.register("${trimmed}", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(${hbW}F, ${hbH}F)${eyeHeightCall}.build("${trimmed}"));`;
       await invoke('inject_marker', { file: `${JAVA_BASE}/entity/ModEntities.java`, marker: 'YCS_Mod_Entities', content: entityLine });
       injections.push({ type: 'java-marker', file: `${JAVA_BASE}/entity/ModEntities.java`, marker: 'YCS_Mod_Entities', content: entityLine });
 
-      // Attribute registration
-      const attrLine = `        event.put(ModEntities.${constName}.get(), YcsMobEntity.createAttributes(${maxHealthNum}D, ${moveSpeedNum}D).build());`;
+      // Attribute registration — open-ended list, generated directly as a .add(...) chain
+      // since a fixed-arity Java helper can't represent an arbitrary set of attributes.
+      const attrCalls = attributes.map(a => `.add(${attrRegistryRef(a.id)}, ${parseFloat(a.value) || 0}D)`).join('');
+      const attrLine = `        event.put(ModEntities.${constName}.get(), LivingEntity.createLivingAttributes().add(Attributes.FOLLOW_RANGE, 16.0)${attrCalls}.build());`;
       await invoke('inject_marker', { file: `${JAVA_BASE}/entity/ModEntityEvents.java`, marker: 'YCS_Entity_Attributes', content: attrLine });
       injections.push({ type: 'java-marker', file: `${JAVA_BASE}/entity/ModEntityEvents.java`, marker: 'YCS_Entity_Attributes', content: attrLine });
 
+      // Hostility / Goal Builder registration — one builder-chain call covering
+      // hostility, every extra goal, and an optional ranged attack config.
+      const rangedGoal = goals.find(g => g.type === 'ranged_attack');
+      const goalCalls = goals.filter(g => g.type !== 'ranged_attack').map(g => {
+        const p = g.params || {};
+        switch (g.type) {
+          case 'float':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.FLOAT, 0D, 0D, 0F, false, null))`;
+          case 'wander':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.WANDER, ${parseFloat(p.speedModifier) || 1}D, 0D, 0F, false, null))`;
+          case 'look_at_player':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AT_PLAYER, 0D, 0D, ${parseFloat(p.maxDistance) || 8}F, false, null))`;
+          case 'look_around':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AROUND, 0D, 0D, 0F, false, null))`;
+          case 'avoid_entity':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.AVOID_ENTITY, ${parseFloat(p.speedModifier) || 1}D, ${parseFloat(p.sprintSpeedModifier) || 1.5}D, ${parseFloat(p.maxDistance) || 8}F, false, null))`;
+          case 'panic':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.PANIC, ${parseFloat(p.speedModifier) || 1.25}D, 0D, 0F, false, null))`;
+          case 'tempt':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.TEMPT, ${parseFloat(p.speedModifier) || 1}D, 0D, 0F, ${!!p.canScare}, "${p.itemId || 'minecraft:wheat'}"))`;
+          case 'breed':
+            return `.withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.BREED, ${parseFloat(p.speedModifier) || 1}D, 0D, 0F, false, null)).withBreedingItem("${p.itemId || 'minecraft:wheat'}")`;
+          default:
+            return '';
+        }
+      }).join('');
+      const rangedCall = rangedGoal
+        ? (() => {
+            const p = rangedGoal.params || {};
+            return `.withRangedAttack(new YcsMobData.RangedAttackConfig(${parseFloat(p.speedModifier) || 1}D, ${parseInt(p.attackInterval) || 20}, ${parseFloat(p.attackRadius) || 10}F, ${parseFloat(p.damage) || 3}D))`;
+          })()
+        : '';
+      const headBoneCall = headBone ? `.withHeadBone("${headBone}")` : '';
+      const animNamesCall = `.withAnimNames("${idleAnim || ''}", "${walkAnim || ''}")`;
+      const detectedParts = await loadModelHitboxParts(trimmed).catch(() => parts);
+      const savedParts = Array.isArray(detectedParts) ? detectedParts : [];
+      const partCalls = savedParts.map(p =>
+        `.withPart("${p.name}", "${p.boneName}", ${parseFloat(p.width) || 1}F, ${parseFloat(p.height) || 1}F, ${parseFloat(p.offsetX) || 0}F, ${parseFloat(p.offsetY) || 0}F, ${parseFloat(p.offsetZ) || 0}F)`
+      ).join('');
+      const hostilityLine = `        YcsMobData.register(ModEntities.${constName}.get(), new YcsMobData.Config(YcsMobData.Hostility.${hostilityEnum})${goalCalls}${rangedCall}${headBoneCall}${animNamesCall}${partCalls});`;
+      await invoke('inject_marker', { file: `${JAVA_BASE}/entity/ModEntityEvents.java`, marker: 'YCS_Entity_Hostility', content: hostilityLine });
+      injections.push({ type: 'java-marker', file: `${JAVA_BASE}/entity/ModEntityEvents.java`, marker: 'YCS_Entity_Hostility', content: hostilityLine });
+
       // Renderer registration
       const animFilePath = `yebisurpg:animations/entity/${trimmed}.animation.json`;
-      const rendererLine = `        ModEntityRendererRegistry.tryRegister(specs, ModEntities.${constName}.get(), "${trimmed}", "${animFilePath}", "${idleAnim}", "${walkAnim}");`;
+      const headBoneArg = headBone ? `"${headBone}"` : 'null';
+      const rendererLine = `        ModEntityRendererRegistry.tryRegister(specs, ModEntities.${constName}.get(), "${trimmed}", "${animFilePath}", "${idleAnim}", "${walkAnim}", ${headBoneArg});`;
       await invoke('inject_marker', { file: `${JAVA_BASE}/entity/client/ModEntityRendererRegistry.java`, marker: 'YCS_Entity_Renderer_Collect', content: rendererLine });
       injections.push({ type: 'java-marker', file: `${JAVA_BASE}/entity/client/ModEntityRendererRegistry.java`, marker: 'YCS_Entity_Renderer_Collect', content: rendererLine });
 
       // Copy geo model / texture / animation file into mod resources
       const geoDest = `resources/assets/yebisurpg/geo/entity/${trimmed}.geo.json`;
-      await invoke('copy_geo_model_to_mod', { modelId: trimmed, destFile: geoDest });
+      await invoke('copy_geo_model_to_mod', { kind: 'entities', modelId: trimmed, destFile: geoDest });
       injections.push({ type: 'created-file', file: geoDest });
 
       const texDest = `resources/assets/yebisurpg/textures/entity/${trimmed}.png`;
@@ -279,7 +430,7 @@ function EntityEditor({ entityId, onBack }) {
       injections.push({ type: 'created-file', file: texDest });
 
       const animDest = `resources/assets/yebisurpg/animations/entity/${trimmed}.animation.json`;
-      await invoke('copy_animation_file_to_mod', { id: trimmed, destFile: animDest });
+      await invoke('copy_animation_file_to_mod', { kind: 'entities', id: trimmed, destFile: animDest });
       injections.push({ type: 'created-file', file: animDest });
 
       // Lang key
@@ -287,11 +438,36 @@ function EntityEditor({ entityId, onBack }) {
       await invoke('set_json_key', { file: 'resources/assets/yebisurpg/lang/en_us.json', key: langKey, value: displayName || trimmed });
       injections.push({ type: 'json-key', file: 'resources/assets/yebisurpg/lang/en_us.json', key: langKey });
 
+      // On Part Hit Blocky graph — compiled into EntityPartHitHandlers.java, one
+      // case per entity id (mirrors KeybindHandlers' On Press/On Release dispatch).
+      const partHitRaw = localStorage.getItem(`ycs-blocky::entity::${trimmed}::entityPartHit`);
+      if (partHitRaw) {
+        try {
+          const nodes = JSON.parse(partHitRaw);
+          const startNode = nodes.find(n => n.id === 'start');
+          if (startNode?.nextId) {
+            const lines = compileChain(startNode.nextId, nodes, 'entityPartHit');
+            const caseLine = `            case "${trimmed}" -> { ${lines.join(' ')} }`;
+            await invoke('inject_marker', { file: `${JAVA_BASE}/entity/EntityPartHitHandlers.java`, marker: 'YCS_Entity_Part_Hit_Dispatch', content: caseLine });
+            injections.push({ type: 'java-marker', file: `${JAVA_BASE}/entity/EntityPartHitHandlers.java`, marker: 'YCS_Entity_Part_Hit_Dispatch', content: caseLine });
+
+            for (const imp of collectBlockImports(nodes)) {
+              const importLine = `import ${imp};`;
+              await invoke('inject_marker', { file: `${JAVA_BASE}/entity/EntityPartHitHandlers.java`, marker: 'YCS_Entity_Part_Hit_Imports', content: importLine });
+              injections.push({ type: 'java-marker', file: `${JAVA_BASE}/entity/EntityPartHitHandlers.java`, marker: 'YCS_Entity_Part_Hit_Imports', content: importLine });
+            }
+          }
+        } catch (e) {
+          console.error('Block compile error for entityPartHit', e);
+        }
+      }
+
       const payload = {
         id: trimmed, displayName, texture: textureId,
-        maxHealth: maxHealthNum, movementSpeed: moveSpeedNum,
         hitboxWidth: hbW, hitboxHeight: hbH,
-        idleAnim, walkAnim,
+        eyeHeight: Number.isFinite(eyeH) ? eyeH : null,
+        hostility, attributes, goals, hitboxParts: savedParts,
+        headBone, idleAnim, walkAnim,
         _injections: injections,
       };
       await invoke('save_ycs_data', { category: 'entities', id: trimmed, content: JSON.stringify(payload, null, 2) });
@@ -314,9 +490,10 @@ function EntityEditor({ entityId, onBack }) {
     setSaving(true);
     try {
       await removeExistingInjections(currentInjections);
-      await invoke('delete_geo_model', { id: lastSavedId }).catch(() => {});
-      await invoke('delete_animation_file', { id: lastSavedId }).catch(() => {});
+      await invoke('delete_geo_model', { kind: 'entities', id: lastSavedId }).catch(() => {});
+      await invoke('delete_animation_file', { kind: 'entities', id: lastSavedId }).catch(() => {});
       await invoke('delete_ycs_data', { category: 'entities', id: lastSavedId });
+      localStorage.removeItem(`ycs-blocky::entity::${lastSavedId}::entityPartHit`);
       if (onBack) onBack();
     } catch (err) {
       setStatus({ ok: false, msg: 'Remove failed: ' + err });
@@ -326,60 +503,147 @@ function EntityEditor({ entityId, onBack }) {
 
   const textureOptions = textures.map(t => ({ value: t.id, label: t.label || t.id }));
 
+  if (subpage === 'attributes') {
+    return (
+      <EntityAttributesPage
+        entityId={id}
+        attributes={attributes}
+        onChange={setAttributes}
+        onBack={() => setSubpage(null)}
+      />
+    );
+  }
+  if (subpage === 'goals') {
+    return (
+      <EntityGoalsPage
+        entityId={id}
+        goals={goals}
+        onChange={setGoals}
+        onBack={() => setSubpage(null)}
+      />
+    );
+  }
+  if (subpage === 'animations') {
+    return (
+      <EntityAnimationsPage
+        entityId={id}
+        headBone={headBone}
+        idleAnim={idleAnim}
+        walkAnim={walkAnim}
+        onChangeHeadBone={setHeadBone}
+        onChangeIdleAnim={setIdleAnim}
+        onChangeWalkAnim={setWalkAnim}
+        onBack={() => setSubpage(null)}
+      />
+    );
+  }
+  if (subpage === 'parts') {
+    return (
+      <EntityPartsPage
+        entityId={id || lastSavedId}
+        parts={parts}
+        onChange={setParts}
+        onOpenPartHitEditor={(entId, methodKey) => setBlockEditing({ entityId: entId, methodKey })}
+        onBack={() => setSubpage(null)}
+      />
+    );
+  }
+  if (blockEditing) {
+    return (
+      <BlockEditor
+        entityId={blockEditing.entityId}
+        methodKey={blockEditing.methodKey}
+        onBack={() => setBlockEditing(null)}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
           {entityId ? `Edit Entity: ${entityId}` : 'New Entity'}
         </h2>
+        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
+        {injected && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
+        <button className="ycs-button" onClick={onBack}>Cancel</button>
+        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
       </div>
 
       <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <FieldRow label="Id">
-          <StringField value={id} onChange={v => setId(v.toLowerCase().replace(/\s/g, '_'))} disabled={!!entityId} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Display Name">
-          <StringField value={displayName} onChange={setDisplayName} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Texture">
-          <StandardDropdownField value={textureId} onChange={setTextureId} options={textureOptions} searchable />
-        </FieldRow>
-        <FieldRow label="Geo Model">
-          <FileDropZone hasFile={geoModelSet} fileName={geoModelSet ? `${id}.geo.json` : ''} onImport={importGeoModel} accept=".json" />
-        </FieldRow>
-        <FieldRow label="Animation File">
-          <FileDropZone hasFile={animFileSet} fileName={animFileSet ? `${id}.animation.json` : ''} onImport={importAnimationFile} accept=".json" />
-        </FieldRow>
-        <FieldRow label="Idle Animation Name">
-          <StringField value={idleAnim} onChange={setIdleAnim} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Walk Animation Name">
-          <StringField value={walkAnim} onChange={setWalkAnim} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Max Health">
-          <StringField value={maxHealth} onChange={setMaxHealth} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Movement Speed">
-          <StringField value={movementSpeed} onChange={setMovementSpeed} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Hitbox Width">
-          <StringField value={hitboxWidth} onChange={setHitboxWidth} style={{ width: '100%' }} />
-        </FieldRow>
-        <FieldRow label="Hitbox Height">
-          <StringField value={hitboxHeight} onChange={setHitboxHeight} style={{ width: '100%' }} />
-        </FieldRow>
-      </div>
+        <FieldGroup label="Identity">
+          <FieldRow label="Id">
+            <StringField value={id} onChange={v => setId(v.toLowerCase().replace(/\s/g, '_'))} disabled={!!entityId} style={{ width: '100%' }} />
+          </FieldRow>
+          <FieldRow label="Display Name">
+            <StringField value={displayName} onChange={setDisplayName} style={{ width: '100%' }} />
+          </FieldRow>
+        </FieldGroup>
 
-      <div style={{
-        padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px',
-        borderTop: '1px solid var(--ycs-foreground)', flexShrink: 0,
-      }}>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252', marginRight: 'auto' }}>{status.msg}</span>}
-        {injected && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+        <FieldGroup label="Appearance">
+          <FieldRow label="Texture">
+            <StandardDropdownField value={textureId} onChange={setTextureId} options={textureOptions} searchable />
+          </FieldRow>
+          <FieldRow label="Geo Model">
+            <FileDropZone hasFile={geoModelSet} fileName={geoModelSet ? `${id}.geo.json` : ''} onImport={importGeoModel} accept=".json" />
+          </FieldRow>
+        </FieldGroup>
+
+        <FieldGroup label="Animations">
+          <FieldRow label="Animation File">
+            <FileDropZone hasFile={animFileSet} fileName={animFileSet ? `${id}.animation.json` : ''} onImport={importAnimationFile} accept=".json" />
+          </FieldRow>
+          <FieldRow label="Head Bone & Poses">
+            <FieldIconButton title="Manage Animations" hasData={!!headBone || !!walkAnim} onClick={() => setSubpage('animations')} />
+            <span style={{ fontSize: 11, opacity: 0.5 }}>{idleAnim || '(idle unset)'}{walkAnim ? ` / ${walkAnim}` : ''}</span>
+          </FieldRow>
+        </FieldGroup>
+
+        <FieldGroup label="Attributes">
+          <FieldRow label="Stats & Combat">
+            <FieldIconButton title="Manage Attributes" hasData={attributes.length > 0} onClick={() => setSubpage('attributes')} />
+            <span style={{ fontSize: 11, opacity: 0.5 }}>{attributes.length} attribute{attributes.length === 1 ? '' : 's'}</span>
+          </FieldRow>
+        </FieldGroup>
+
+        <FieldGroup label="Combat">
+          <FieldRow label="Hostility">
+            <StandardDropdownField
+              value={hostility}
+              onChange={setHostility}
+              options={[
+                { value: 'passive', label: 'Passive' },
+                { value: 'hostile', label: 'Hostile' },
+                { value: 'neutral', label: 'Neutral' },
+              ]}
+            />
+          </FieldRow>
+        </FieldGroup>
+
+        <FieldGroup label="AI Goals">
+          <FieldRow label="Goal Builder">
+            <FieldIconButton title="Manage Goals" hasData={goals.length > 0} onClick={() => setSubpage('goals')} />
+            <span style={{ fontSize: 11, opacity: 0.5 }}>{goals.length} extra goal{goals.length === 1 ? '' : 's'}</span>
+          </FieldRow>
+        </FieldGroup>
+
+        <FieldGroup label="Hitbox">
+          <FieldRow label="Hitbox Width">
+            <StringField value={hitboxWidth} onChange={setHitboxWidth} style={{ width: '100%' }} />
+          </FieldRow>
+          <FieldRow label="Hitbox Height">
+            <StringField value={hitboxHeight} onChange={setHitboxHeight} style={{ width: '100%' }} />
+          </FieldRow>
+          <FieldRow label="Eye Height">
+            <StringField value={eyeHeight} onChange={setEyeHeight} placeholder="Default (75% of height)" style={{ width: '100%' }} />
+          </FieldRow>
+          <FieldRow label="Extra Hitbox Parts">
+            <FieldIconButton title="Manage Parts" hasData={parts.length > 0} onClick={() => setSubpage('parts')} />
+            <span style={{ fontSize: 11, opacity: 0.5 }}>{parts.length} part{parts.length === 1 ? '' : 's'}</span>
+          </FieldRow>
+        </FieldGroup>
       </div>
     </div>
   );
@@ -430,8 +694,8 @@ export default function EntitiesLanding() {
           }
         } catch {}
       }
-      await invoke('delete_geo_model', { id: entity.id }).catch(() => {});
-      await invoke('delete_animation_file', { id: entity.id }).catch(() => {});
+      await invoke('delete_geo_model', { kind: 'entities', id: entity.id }).catch(() => {});
+      await invoke('delete_animation_file', { kind: 'entities', id: entity.id }).catch(() => {});
       await invoke('delete_ycs_data', { category: 'entities', id: entity.id });
       await reload();
     } catch (err) {

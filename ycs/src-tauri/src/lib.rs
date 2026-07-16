@@ -219,10 +219,19 @@ fn read_image_base64(path: &str) -> Result<String, String> {
 }
 
 // ── Geo model management ───────────────────────────────────────────
+//
+// Models are grouped by owning object type — ycs-data/models/<kind>/<id>.* —
+// instead of one flat pool, so items and entities (and any future model-owning
+// type) don't sit mixed together on disk. `kind` is caller-supplied ("items",
+// "entities", etc.) since every call site already knows which editor it's in.
+
+fn models_dir(kind: &str) -> PathBuf {
+    ycs_data_dir().join("models").join(kind)
+}
 
 #[tauri::command]
-fn import_geo_model(id: &str, source_path: &str) -> Result<String, String> {
-    let dir = ycs_data_dir().join("models");
+fn import_geo_model(kind: &str, id: &str, source_path: &str) -> Result<String, String> {
+    let dir = models_dir(kind);
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     let dest = dir.join(format!("{}.geo.json", id));
     fs::copy(source_path, &dest).map_err(|e| format!("Failed to copy: {}", e))?;
@@ -230,8 +239,8 @@ fn import_geo_model(id: &str, source_path: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn load_geo_model_path(id: &str) -> Result<String, String> {
-    let path = ycs_data_dir().join("models").join(format!("{}.geo.json", id));
+fn load_geo_model_path(kind: &str, id: &str) -> Result<String, String> {
+    let path = models_dir(kind).join(format!("{}.geo.json", id));
     if path.exists() {
         Ok(path.to_string_lossy().to_string())
     } else {
@@ -240,8 +249,14 @@ fn load_geo_model_path(id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn delete_geo_model(id: &str) -> Result<String, String> {
-    let dir = ycs_data_dir().join("models");
+fn load_geo_model_content(kind: &str, id: &str) -> Result<String, String> {
+    let path = models_dir(kind).join(format!("{}.geo.json", id));
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read geo model: {}", e))
+}
+
+#[tauri::command]
+fn delete_geo_model(kind: &str, id: &str) -> Result<String, String> {
+    let dir = models_dir(kind);
     let geo = dir.join(format!("{}.geo.json", id));
     if geo.exists() {
         fs::remove_file(&geo).map_err(|e| format!("Failed to delete geo: {}", e))?;
@@ -254,8 +269,8 @@ fn delete_geo_model(id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn list_geo_models() -> Result<Vec<String>, String> {
-    let dir = ycs_data_dir().join("models");
+fn list_geo_models(kind: &str) -> Result<Vec<String>, String> {
+    let dir = models_dir(kind);
     if !dir.exists() {
         return Ok(vec![]);
     }
@@ -272,8 +287,8 @@ fn list_geo_models() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn copy_geo_model_to_mod(model_id: &str, dest_file: &str) -> Result<String, String> {
-    let src = ycs_data_dir().join("models").join(format!("{}.geo.json", model_id));
+fn copy_geo_model_to_mod(kind: &str, model_id: &str, dest_file: &str) -> Result<String, String> {
+    let src = models_dir(kind).join(format!("{}.geo.json", model_id));
     if !src.exists() {
         return Err(format!("No geo model found for {}", model_id));
     }
@@ -286,8 +301,8 @@ fn copy_geo_model_to_mod(model_id: &str, dest_file: &str) -> Result<String, Stri
 }
 
 #[tauri::command]
-fn rename_geo_model(old_id: &str, new_id: &str) -> Result<String, String> {
-    let dir = ycs_data_dir().join("models");
+fn rename_geo_model(kind: &str, old_id: &str, new_id: &str) -> Result<String, String> {
+    let dir = models_dir(kind);
     let geo_src = dir.join(format!("{}.geo.json", old_id));
     if geo_src.exists() {
         let geo_dest = dir.join(format!("{}.geo.json", new_id));
@@ -304,8 +319,8 @@ fn rename_geo_model(old_id: &str, new_id: &str) -> Result<String, String> {
 // ── Animation file management (Entities) ───────────────────────────
 
 #[tauri::command]
-fn import_animation_file(id: &str, source_path: &str) -> Result<String, String> {
-    let dir = ycs_data_dir().join("models");
+fn import_animation_file(kind: &str, id: &str, source_path: &str) -> Result<String, String> {
+    let dir = models_dir(kind);
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     let dest = dir.join(format!("{}.animation.json", id));
     fs::copy(source_path, &dest).map_err(|e| format!("Failed to copy: {}", e))?;
@@ -313,8 +328,8 @@ fn import_animation_file(id: &str, source_path: &str) -> Result<String, String> 
 }
 
 #[tauri::command]
-fn load_animation_file_path(id: &str) -> Result<String, String> {
-    let path = ycs_data_dir().join("models").join(format!("{}.animation.json", id));
+fn load_animation_file_path(kind: &str, id: &str) -> Result<String, String> {
+    let path = models_dir(kind).join(format!("{}.animation.json", id));
     if path.exists() {
         Ok(path.to_string_lossy().to_string())
     } else {
@@ -323,8 +338,8 @@ fn load_animation_file_path(id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn delete_animation_file(id: &str) -> Result<String, String> {
-    let path = ycs_data_dir().join("models").join(format!("{}.animation.json", id));
+fn delete_animation_file(kind: &str, id: &str) -> Result<String, String> {
+    let path = models_dir(kind).join(format!("{}.animation.json", id));
     if path.exists() {
         fs::remove_file(&path).map_err(|e| format!("Failed to delete animation file: {}", e))?;
     }
@@ -332,8 +347,8 @@ fn delete_animation_file(id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn copy_animation_file_to_mod(id: &str, dest_file: &str) -> Result<String, String> {
-    let src = ycs_data_dir().join("models").join(format!("{}.animation.json", id));
+fn copy_animation_file_to_mod(kind: &str, id: &str, dest_file: &str) -> Result<String, String> {
+    let src = models_dir(kind).join(format!("{}.animation.json", id));
     if !src.exists() {
         return Err(format!("No animation file found for {}", id));
     }
@@ -346,8 +361,8 @@ fn copy_animation_file_to_mod(id: &str, dest_file: &str) -> Result<String, Strin
 }
 
 #[tauri::command]
-fn rename_animation_file(old_id: &str, new_id: &str) -> Result<String, String> {
-    let dir = ycs_data_dir().join("models");
+fn rename_animation_file(kind: &str, old_id: &str, new_id: &str) -> Result<String, String> {
+    let dir = models_dir(kind);
     let src = dir.join(format!("{}.animation.json", old_id));
     if src.exists() {
         let dest = dir.join(format!("{}.animation.json", new_id));
@@ -357,8 +372,8 @@ fn rename_animation_file(old_id: &str, new_id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn import_display_model(id: &str, source_path: &str) -> Result<String, String> {
-    let dir = ycs_data_dir().join("models");
+fn import_display_model(kind: &str, id: &str, source_path: &str) -> Result<String, String> {
+    let dir = models_dir(kind);
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     let dest = dir.join(format!("{}.display.json", id));
     fs::copy(source_path, &dest).map_err(|e| format!("Failed to copy: {}", e))?;
@@ -366,8 +381,8 @@ fn import_display_model(id: &str, source_path: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn load_display_model(id: &str) -> Result<String, String> {
-    let path = ycs_data_dir().join("models").join(format!("{}.display.json", id));
+fn load_display_model(kind: &str, id: &str) -> Result<String, String> {
+    let path = models_dir(kind).join(format!("{}.display.json", id));
     if path.exists() {
         fs::read_to_string(&path).map_err(|e| format!("Failed to read: {}", e))
     } else {
@@ -376,8 +391,8 @@ fn load_display_model(id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn copy_display_model_to_mod(model_id: &str, dest_file: &str) -> Result<String, String> {
-    let src = ycs_data_dir().join("models").join(format!("{}.display.json", model_id));
+fn copy_display_model_to_mod(kind: &str, model_id: &str, dest_file: &str) -> Result<String, String> {
+    let src = models_dir(kind).join(format!("{}.display.json", model_id));
     if !src.exists() {
         return Err(format!("No display model found for {}", model_id));
     }
@@ -624,6 +639,7 @@ pub fn run() {
             delete_mod_file,
             import_geo_model,
             load_geo_model_path,
+            load_geo_model_content,
             delete_geo_model,
             list_geo_models,
             copy_geo_model_to_mod,

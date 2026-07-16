@@ -44,6 +44,7 @@ export function resolveEntityVar(opcode, methodKey) {
     if (methodKey === "inventoryTick") return "entity";
     if (methodKey === "hurtEnemy") return "attacker";
     if (methodKey === "onEffectStarted" || methodKey === "onEffectTick" || methodKey === "onEffectEnd") return "livingEntity";
+    if (methodKey === "entityPartHit") return "self";
     return "player";
   }
   if (opcode === "entity.target") {

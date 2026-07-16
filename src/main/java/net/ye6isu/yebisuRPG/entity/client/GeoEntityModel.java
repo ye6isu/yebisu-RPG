@@ -45,20 +45,29 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
     private final String animationFile;
     private final String idleAnim;
     private final String walkAnim;
+    private final String headBone;
 
     private HandAnimationLoader.AnimData activeAnim;
     private float animTime;
+    private float headYaw;
+    private float headPitch;
 
-    public GeoEntityModel(BakedGeoModel model, String animationFile, String idleAnim, String walkAnim) {
+    public GeoEntityModel(BakedGeoModel model, String animationFile, String idleAnim, String walkAnim, String headBone) {
         this.model = model;
         this.animationFile = animationFile;
         this.idleAnim = idleAnim;
         this.walkAnim = walkAnim;
+        this.headBone = headBone;
     }
 
     @Override
     public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
         activeAnim = null;
+        // Mirrors vanilla HumanoidModel.setupAnim's head.yRot/head.xRot — plain degrees
+        // converted to radians, applied as an additional local rotation on the named head
+        // bone in renderBone below (added on top of whatever the current animation pose sets).
+        this.headYaw = netHeadYaw * ((float) Math.PI / 180F);
+        this.headPitch = headPitch * ((float) Math.PI / 180F);
 
         boolean walking = limbSwingAmount > 0.05f;
         String animName = walking ? walkAnim : idleAnim;
@@ -88,6 +97,18 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
         // never applies that flip, so cube Y coordinates here are unflipped Bedrock Y-up space.
         // Counteract the inherited flip so bones don't end up upside down.
         poseStack.scale(1.0F, -1.0F, 1.0F);
+        // LivingEntityRenderer.render() also applies poseStack.translate(0, -1.501, 0) before
+        // calling here — vanilla ModelPart geometry is authored with its vertical origin at
+        // roughly eye height, so vanilla shifts that down to the feet before rendering. Bedrock
+        // geo models (see uploaded/tester.geo.json) are authored with the origin already at the
+        // feet, so that shift must be undone here, in our own (unflipped) coordinate space —
+        // otherwise every mob floats ~1.5 blocks above its hitbox.
+        poseStack.translate(0.0F, -1.501F, 0.0F);
+        // Bedrock geo cubes are authored in 16-units-per-block space with the origin at the
+        // entity's feet — GeoItemRenderer.renderByItem applies this exact same 1/16 scale-down
+        // (it needs no feet-to-center translate since items pivot at block-center, not feet).
+        // Omitting this renders the whole model 16x too large.
+        poseStack.scale(1.0F / 16.0F, 1.0F / 16.0F, 1.0F / 16.0F);
         for (BakedBone bone : model.bones()) {
             renderBone(bone, poseStack, buffer, packedLight, packedOverlay, model.texWidth(), model.texHeight());
         }
@@ -117,11 +138,17 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
 
         Quaternionf q = eulerToQuat(
                 (float) Math.toRadians(-(bone.rotX() + animRX)),
-                (float) Math.toRadians(-(bone.rotY() + animRY)),
+                (float) Math.toRadians(-bone.rotY() + animRY),
                 (float) Math.toRadians(bone.rotZ() + animRZ));
 
         poseStack.translate(px, py, pz);
         poseStack.mulPose(q);
+        // Look At Player's tracked yaw/pitch is applied as an additional local rotation on
+        // the entity's configured head bone, on top of its animated pose — matches vanilla
+        // HumanoidModel applying head.yRot/head.xRot directly onto the head ModelPart.
+        if (headBone != null && !headBone.isEmpty() && headBone.equals(bone.name())) {
+            poseStack.mulPose(new Quaternionf().rotationYXZ(headYaw, -headPitch, 0f));
+        }
         poseStack.translate(-px, -py, -pz);
         if (animPX != 0f || animPY != 0f || animPZ != 0f) {
             poseStack.translate(animPX, -animPY, animPZ);

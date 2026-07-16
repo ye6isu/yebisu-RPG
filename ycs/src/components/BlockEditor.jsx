@@ -20,7 +20,7 @@ let dynamicEntityVariableOptions = [];
 // merged with the static VANILLA_ATTRIBUTES list below and read by the "attributes" dropdown source.
 let dynamicModAttributeOptions = [];
 
-const VANILLA_ATTRIBUTES = [
+export const VANILLA_ATTRIBUTES = [
   { label: 'Max Health', value: 'generic.max_health' },
   { label: 'Max Absorption', value: 'generic.max_absorption' },
   { label: 'Attack Damage', value: 'generic.attack_damage' },
@@ -952,11 +952,13 @@ const METHOD_LABELS = {
   inventoryTick: 'Inventory Tick', hurtEnemy: 'Combat / Hurt Entity',
   interactLivingEntity: 'Entity Interaction',
   keybindPress: 'On Press', keybindRelease: 'On Release',
+  entityPartHit: 'On Part Hit',
 };
 
-export default function BlockEditor({ itemId, keybindId, hudWidgetId, methodKey, onBack }) {
+export default function BlockEditor({ itemId, keybindId, hudWidgetId, entityId, methodKey, onBack }) {
   const stableId = hudWidgetId ? `hudwidget::${hudWidgetId}`
     : keybindId ? `keybind::${keybindId}::${methodKey}`
+    : entityId ? `entity::${entityId}::${methodKey}`
     : `item::${itemId}::${methodKey}`;
   const methodLabel = hudWidgetId ? 'HUD Value' : (METHOD_LABELS[methodKey] || methodKey);
 

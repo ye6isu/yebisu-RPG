@@ -558,7 +558,7 @@ function ItemStates({ itemId, states, onChange, textureOptions, max = 16 }) {
     }
     const stateModelId = `${itemId}_state${i}`;
     try {
-      await invoke('import_geo_model', { id: stateModelId, sourcePath: filePath });
+      await invoke('import_geo_model', { kind: 'items', id: stateModelId, sourcePath: filePath });
       set(i, { geoModel: stateModelId });
     } catch {}
   };
@@ -573,7 +573,7 @@ function ItemStates({ itemId, states, onChange, textureOptions, max = 16 }) {
     }
     const stateModelId = `${itemId}_state${i}`;
     try {
-      await invoke('import_display_model', { id: stateModelId, sourcePath: filePath });
+      await invoke('import_display_model', { kind: 'items', id: stateModelId, sourcePath: filePath });
       set(i, { displayModel: stateModelId });
     } catch {}
   };
@@ -1006,7 +1006,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
       filePath = typeof file === 'string' ? file : file.path;
     }
     try {
-      await invoke('import_geo_model', { id: itemId, sourcePath: filePath });
+      await invoke('import_geo_model', { kind: 'items', id: itemId, sourcePath: filePath });
       setGeoModel(itemId);
       setStatus({ ok: true, msg: 'Geo model imported.' });
     } catch (err) {
@@ -1026,7 +1026,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
       filePath = typeof file === 'string' ? file : file.path;
     }
     try {
-      await invoke('import_display_model', { id: itemId, sourcePath: filePath });
+      await invoke('import_display_model', { kind: 'items', id: itemId, sourcePath: filePath });
       setDisplayModel(itemId);
       setStatus({ ok: true, msg: 'Display model imported.' });
     } catch (err) {
@@ -1041,7 +1041,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
       await removeExistingInjections();
       if (lastSavedId && lastSavedId !== itemId) {
         await invoke('delete_ycs_data', { category: 'items', id: lastSavedId }).catch(() => {});
-        await invoke('delete_geo_model', { id: lastSavedId }).catch(() => {});
+        await invoke('delete_geo_model', { kind: 'items', id: lastSavedId }).catch(() => {});
       }
 
       const payload = buildPayload();
@@ -1340,13 +1340,13 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           if (state.holdingMode === '3d') {
             const modelSourceId = state.geoModel || state.displayModel;
             if (modelSourceId && modelSourceId !== stateId) {
-              await invoke('rename_geo_model', { oldId: modelSourceId, newId: stateId }).catch(() => {});
+              await invoke('rename_geo_model', { kind: 'items', oldId: modelSourceId, newId: stateId }).catch(() => {});
             }
 
-            const hasGeo = await invoke('load_geo_model_path', { id: stateId }).then(() => true).catch(() => false);
+            const hasGeo = await invoke('load_geo_model_path', { kind: 'items', id: stateId }).then(() => true).catch(() => false);
             if (hasGeo) {
               const geoDestPath = `${RES_BASE}/geo/item/${stateId}.geo.json`;
-              await invoke('copy_geo_model_to_mod', { modelId: stateId, destFile: geoDestPath });
+              await invoke('copy_geo_model_to_mod', { kind: 'items', modelId: stateId, destFile: geoDestPath });
               injections.push({ type: 'created-file', file: geoDestPath });
             }
 
@@ -1364,9 +1364,9 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
             specs.push(`new GeoItemRegistry.StateSpec("geo", "${stateId}", ${stateIsFrameSheet ? stateTexMeta.rows : 0}, ${stateIsFrameSheet ? !!stateTexMeta.animatedOnUse : false}, ${stateIsFrameSheet ? (parseInt(stateTexMeta.ticksPerFrame) || 4) : 0}, ${stateDefaultFrame})`);
 
             const displayModelPath = `${RES_BASE}/models/item/${stateId}.json`;
-            const hasDisplay = await invoke('load_display_model', { id: stateId }).then(() => true).catch(() => false);
+            const hasDisplay = await invoke('load_display_model', { kind: 'items', id: stateId }).then(() => true).catch(() => false);
             if (hasDisplay) {
-              await invoke('copy_display_model_to_mod', { modelId: stateId, destFile: displayModelPath });
+              await invoke('copy_display_model_to_mod', { kind: 'items', modelId: stateId, destFile: displayModelPath });
             } else {
               const fallbackModel = JSON.stringify({ parent: "minecraft:builtin/entity" }, null, 2);
               await invoke('write_mod_file', { file: displayModelPath, content: fallbackModel });
@@ -1458,14 +1458,14 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
         // If ID changed since last import, rename stored model files to match new ID
         const modelSourceId = geoModel || displayModel;
         if (modelSourceId && modelSourceId !== itemId) {
-          await invoke('rename_geo_model', { oldId: modelSourceId, newId: itemId }).catch(() => {});
+          await invoke('rename_geo_model', { kind: 'items', oldId: modelSourceId, newId: itemId }).catch(() => {});
         }
 
         // Copy geo model to mod
-        const hasGeo = await invoke('load_geo_model_path', { id: itemId }).then(() => true).catch(() => false);
+        const hasGeo = await invoke('load_geo_model_path', { kind: 'items', id: itemId }).then(() => true).catch(() => false);
         if (hasGeo) {
           const geoDestPath = `${RES_BASE}/geo/item/${itemId}.geo.json`;
-          await invoke('copy_geo_model_to_mod', { modelId: itemId, destFile: geoDestPath });
+          await invoke('copy_geo_model_to_mod', { kind: 'items', modelId: itemId, destFile: geoDestPath });
           injections.push({ type: 'created-file', file: geoDestPath });
         }
 
@@ -1492,9 +1492,9 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
 
         // Copy display model to mod (or write fallback)
         const displayModelPath = `${RES_BASE}/models/item/${itemId}.json`;
-        const hasDisplay = await invoke('load_display_model', { id: itemId }).then(() => true).catch(() => false);
+        const hasDisplay = await invoke('load_display_model', { kind: 'items', id: itemId }).then(() => true).catch(() => false);
         if (hasDisplay) {
-          await invoke('copy_display_model_to_mod', { modelId: itemId, destFile: displayModelPath });
+          await invoke('copy_display_model_to_mod', { kind: 'items', modelId: itemId, destFile: displayModelPath });
         } else {
           const fallbackModel = JSON.stringify({ parent: "minecraft:builtin/entity" }, null, 2);
           await invoke('write_mod_file', { file: displayModelPath, content: fallbackModel });
@@ -1654,7 +1654,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     setSaving(true);
     try {
       await removeExistingInjections();
-      await invoke('delete_geo_model', { id: targetId }).catch(() => {});
+      await invoke('delete_geo_model', { kind: 'items', id: targetId }).catch(() => {});
       await invoke('delete_ycs_data', { category: 'items', id: targetId });
       setStatus({ ok: true, msg: 'Removed and cleaned up.' });
       setInjected(false);

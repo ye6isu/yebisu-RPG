@@ -24,8 +24,6 @@ public final class ModHud {
     }
 
     public static void registerLayouts() {
-        HudOverlayRenderer.registerLayout("testhud");
-        HudOverlayRenderer.registerLayoutVisibility("testhud", "", true);
         // YCS_Hud_Layouts
     }
 }

@@ -25,16 +25,20 @@ public final class ModEntityRendererRegistry {
 
     private ModEntityRendererRegistry() {}
 
-    /** One YCS-authored mob's render data — geo model, texture, animation file, idle/walk animation names. */
+    /** One YCS-authored mob's render data — geo model, texture, animation file, idle/walk
+     * animation names, and the bone (if any) Look At Player rotates as the head. */
     public record EntitySpec(EntityType<? extends YcsMobEntity> type, ResourceLocation geoLoc,
-                              ResourceLocation texture, String animationFile, String idleAnim, String walkAnim) {}
+                              ResourceLocation texture, String animationFile, String idleAnim,
+                              String walkAnim, String headBone) {}
 
     private static List<EntitySpec> SPECS;
 
     private static List<EntitySpec> collectGeoEntities() {
         List<EntitySpec> specs = new ArrayList<>();
 
-        ModEntityRendererRegistry.tryRegister(specs, ModEntities.TESTERENT.get(), "testerent", "yebisurpg:animations/entity/testerent.animation.json", "idle", "walk");
+        ModEntityRendererRegistry.tryRegister(specs, ModEntities.TESTEN.get(), "testen", "yebisurpg:animations/entity/testen.animation.json", "idle", "walk", "bone2");
+        ModEntityRendererRegistry.tryRegister(specs, ModEntities.PLL.get(), "pll", "yebisurpg:animations/entity/pll.animation.json", "idle", "", "Head");
+        ModEntityRendererRegistry.tryRegister(specs, ModEntities.PAAAA.get(), "paaaa", "yebisurpg:animations/entity/paaaa.animation.json", "idle", "", null);
         // YCS_Entity_Renderer_Collect
 
         return specs;
@@ -47,9 +51,14 @@ public final class ModEntityRendererRegistry {
 
     public static void tryRegister(List<EntitySpec> specs, EntityType<? extends YcsMobEntity> type,
                                     String id, String animationFile, String idleAnim, String walkAnim) {
+        tryRegister(specs, type, id, animationFile, idleAnim, walkAnim, null);
+    }
+
+    public static void tryRegister(List<EntitySpec> specs, EntityType<? extends YcsMobEntity> type,
+                                    String id, String animationFile, String idleAnim, String walkAnim, String headBone) {
         ResourceLocation geoLoc = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "geo/entity/" + id + ".geo.json");
         ResourceLocation texture = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "textures/entity/" + id + ".png");
-        specs.add(new EntitySpec(type, geoLoc, texture, animationFile, idleAnim, walkAnim));
+        specs.add(new EntitySpec(type, geoLoc, texture, animationFile, idleAnim, walkAnim, headBone));
     }
 
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
@@ -58,7 +67,7 @@ public final class ModEntityRendererRegistry {
             EntityType<YcsMobEntity> type = (EntityType<YcsMobEntity>) spec.type();
             event.registerEntityRenderer(type, context -> {
                 GeoEntityModelLoader.BakedGeoModel bakedModel = GeoEntityModelLoader.load(context.getResourceManager(), spec.geoLoc());
-                GeoEntityModel<YcsMobEntity> model = new GeoEntityModel<>(bakedModel, spec.animationFile(), spec.idleAnim(), spec.walkAnim());
+                GeoEntityModel<YcsMobEntity> model = new GeoEntityModel<>(bakedModel, spec.animationFile(), spec.idleAnim(), spec.walkAnim(), spec.headBone());
                 return new GeoEntityRenderer<>(context, model, spec.texture());
             });
         }

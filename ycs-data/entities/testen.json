@@ -1,0 +1,102 @@
+{
+  "id": "testen",
+  "displayName": "Tester",
+  "texture": "tester",
+  "hitboxWidth": 0.5,
+  "hitboxHeight": 0.6,
+  "hostility": "hostile",
+  "attributes": [
+    {
+      "id": "generic.max_health",
+      "value": 20
+    },
+    {
+      "id": "generic.movement_speed",
+      "value": 0.25
+    },
+    {
+      "id": "generic.attack_damage",
+      "value": 2
+    },
+    {
+      "id": "generic.armor",
+      "value": 0
+    },
+    {
+      "id": "generic.armor_toughness",
+      "value": 0
+    },
+    {
+      "id": "generic.knockback_resistance",
+      "value": 0
+    },
+    {
+      "id": "generic.scale",
+      "value": 1
+    }
+  ],
+  "goals": [
+    {
+      "type": "wander",
+      "params": {
+        "speedModifier": "1.0"
+      }
+    },
+    {
+      "type": "look_at_player",
+      "params": {
+        "maxDistance": "8"
+      }
+    },
+    {
+      "type": "look_around",
+      "params": {}
+    }
+  ],
+  "headBone": "bone2",
+  "idleAnim": "idle",
+  "walkAnim": "walk",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntities.java",
+      "marker": "YCS_Mod_Entities",
+      "content": "    public static final DeferredHolder<EntityType<?>, EntityType<YcsMobEntity>> TESTEN = ENTITY_TYPES.register(\"testen\", () -> EntityType.Builder.of(YcsMobEntity::new, MobCategory.CREATURE).sized(0.5F, 0.6F).build(\"testen\"));"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Entity_Attributes",
+      "content": "        event.put(ModEntities.TESTEN.get(), LivingEntity.createLivingAttributes().add(Attributes.FOLLOW_RANGE, 16.0).add(Attributes.MAX_HEALTH, 20D).add(Attributes.MOVEMENT_SPEED, 0.25D).add(Attributes.ATTACK_DAMAGE, 2D).add(Attributes.ARMOR, 0D).add(Attributes.ARMOR_TOUGHNESS, 0D).add(Attributes.KNOCKBACK_RESISTANCE, 0D).add(Attributes.SCALE, 1D).build());"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Entity_Hostility",
+      "content": "        YcsMobData.register(ModEntities.TESTEN.get(), new YcsMobData.Config(YcsMobData.Hostility.HOSTILE).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.WANDER, 1D, 0D, 0F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AT_PLAYER, 0D, 0D, 8F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AROUND, 0D, 0D, 0F, false, null)).withHeadBone(\"bone2\"));"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/client/ModEntityRendererRegistry.java",
+      "marker": "YCS_Entity_Renderer_Collect",
+      "content": "        ModEntityRendererRegistry.tryRegister(specs, ModEntities.TESTEN.get(), \"testen\", \"yebisurpg:animations/entity/testen.animation.json\", \"idle\", \"walk\", \"bone2\");"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/geo/entity/testen.geo.json"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/entity/testen.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/animations/entity/testen.animation.json"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "entity.yebisurpg.testen"
+    }
+  ]
+}
