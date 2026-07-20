@@ -1,5 +1,6 @@
 package net.ye6isu.yebisuRPG.hud.client;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,6 +12,10 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.hud.HudWidget;
+import net.ye6isu.yebisuRPG.keybind.AbilityDefinition;
+import net.ye6isu.yebisuRPG.keybind.AbilityRegistry;
+import net.ye6isu.yebisuRPG.keybind.PlayerAbilities;
+import net.ye6isu.yebisuRPG.keybind.client.AbilityBarClientState;
 import net.ye6isu.yebisuRPG.texture.FrameLoopMode;
 import net.ye6isu.yebisuRPG.texture.TextureFrameClock;
 import net.ye6isu.yebisuRPG.yebisuRPG;
@@ -20,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -93,12 +99,20 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
         long tick = player.level().getGameTime();
 
         for (Map.Entry<String, List<HudWidget>> entry : widgetsByLayout().entrySet()) {
+            if ("alt_ability".equals(entry.getKey()) && !AbilityBarClientState.isAltBarActive()) continue;
             String layoutVisSourceId = LAYOUT_VISIBILITY.get(entry.getKey());
             boolean layoutVisLiteral = LAYOUT_VISIBILITY_LITERAL.getOrDefault(entry.getKey(), true);
             if (!resolveVisible(layoutVisSourceId, player, layoutVisLiteral)) continue;
 
             List<HudWidget> layoutWidgets = entry.getValue();
             for (HudWidget widget : layoutWidgets) {
+                int abilitySlot = abilitySlotForWidget(widget);
+                if (abilitySlot > 0) {
+                    String abilityId = isAltAbilityWidget(widget)
+                            ? PlayerAbilities.getAltSlot(player, abilitySlot)
+                            : PlayerAbilities.getEffectiveSlot(player, abilitySlot);
+                    if (abilityId.isBlank()) continue;
+                }
                 if (!resolveVisible(widget.visibleSourceId(), player, widget.visibleLiteral())) continue;
                 int[] pos = resolveRect(widget, layoutWidgets, screenWidth, screenHeight, new HashSet<>());
                 int x = pos[0], y = pos[1];
@@ -219,7 +233,18 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
 
     private static void renderText(GuiGraphics g, HudWidget w, Player player, int x, int y) {
         String text;
-        if (w.textMode()) {
+        int abilityCooldownSlot = abilityCooldownSlotForWidget(w);
+        if (abilityCooldownSlot > 0) {
+            long remainingTicks = PlayerAbilities.cooldownRemainingTicks(player, abilityCooldownSlot);
+            if (isAltAbilityWidget(w)) {
+                remainingTicks = PlayerAbilities.cooldownRemainingTicks(player, PlayerAbilities.getAltSlot(player, abilityCooldownSlot));
+            }
+            if (remainingTicks <= 0) return;
+            double remainingSeconds = remainingTicks / 20.0;
+            text = remainingSeconds < 1.0
+                    ? String.format(Locale.ROOT, "%.1f", remainingSeconds)
+                    : String.valueOf((long) Math.ceil(remainingSeconds));
+        } else if (w.textMode()) {
             text = HudTextSources.resolve(w.textSourceId(), player, w.textLiteral() != null ? w.textLiteral() : "");
         } else {
             double value = resolveSource(w.valueSourceId(), player, w.valueLiteral());
@@ -251,18 +276,88 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
 
     private static void renderIcon(GuiGraphics g, HudWidget w, Player player, int x, int y, long tick) {
         HudWidget.StateEntry state = currentState(w, player);
-        HudWidget.TextureRef icon = state != null ? state.icon() : w.icon();
+        HudWidget.TextureRef icon = abilityIconForWidget(w, player);
+        if (icon == null) icon = state != null ? state.icon() : w.icon();
         if (!icon.isSet()) return;
-        drawTexture(g, icon, player, x, y, w.width(), w.height(), tick);
+        int abilitySlot = abilityIconSlotForWidget(w);
+        long remaining = isAltAbilityWidget(w)
+                ? PlayerAbilities.cooldownRemainingTicks(player, PlayerAbilities.getAltSlot(player, abilitySlot))
+                : PlayerAbilities.cooldownRemainingTicks(player, abilitySlot);
+        float alpha = abilitySlot > 0 && remaining > 0 ? 0.5f : 1.0f;
+        drawTexture(g, icon, player, x, y, w.width(), w.height(), tick, alpha);
+    }
+
+    private static HudWidget.TextureRef abilityIconForWidget(HudWidget widget, Player player) {
+        int slot = abilityIconSlotForWidget(widget);
+        if (slot <= 0) return null;
+        String abilityId = isAltAbilityWidget(widget)
+                ? PlayerAbilities.getAltSlot(player, slot)
+                : PlayerAbilities.getEffectiveSlot(player, slot);
+        AbilityDefinition ability = AbilityRegistry.get(abilityId);
+        if (ability == null || ability.icon().isBlank()) return HudWidget.TextureRef.NONE;
+        return new HudWidget.TextureRef(ability.icon(), 1, false, 4, 0, "", 0);
+    }
+
+    private static int abilitySlotForWidget(HudWidget widget) {
+        int iconSlot = abilityIconSlotForWidget(widget);
+        return iconSlot > 0 ? iconSlot : abilityCooldownSlotForWidget(widget);
+    }
+
+    private static int abilityIconSlotForWidget(HudWidget widget) {
+        String name = widget.name();
+        if (name == null) return 0;
+        if (name.startsWith("Alt Ability ")) {
+            if (name.contains("Cooldown") || name.contains("Frame")) return 0;
+            return parseTrailingSlot(name.substring("Alt Ability ".length()), 9);
+        }
+        if (!name.startsWith("Ability ")) return 0;
+        if (name.contains("Cooldown") || name.contains("Frame")) return 0;
+        return parseTrailingSlot(name.substring("Ability ".length()), 6);
+    }
+
+    private static int abilityCooldownSlotForWidget(HudWidget widget) {
+        String name = widget.name();
+        if (name == null || !name.endsWith(" Cooldown")) return 0;
+        if (name.startsWith("Alt Ability ")) {
+            String slotText = name.substring("Alt Ability ".length(), name.length() - " Cooldown".length());
+            return parseTrailingSlot(slotText, 9);
+        }
+        if (!name.startsWith("Ability ")) return 0;
+        String slotText = name.substring("Ability ".length(), name.length() - " Cooldown".length());
+        return parseTrailingSlot(slotText, 6);
+    }
+
+    private static boolean isAltAbilityWidget(HudWidget widget) {
+        String name = widget.name();
+        return name != null && name.startsWith("Alt Ability ");
+    }
+
+    private static int parseTrailingSlot(String text, int maxSlot) {
+        try {
+            int slot = Integer.parseInt(text.trim());
+            return slot >= 1 && slot <= maxSlot ? slot : 0;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     /** Draws a (possibly animated spritesheet) texture ref fully within its widget box. */
     private static void drawTexture(GuiGraphics g, HudWidget.TextureRef ref, Player player, int x, int y, int width, int height, long tick) {
+        drawTexture(g, ref, player, x, y, width, height, tick, 1.0f);
+    }
+
+    private static void drawTexture(GuiGraphics g, HudWidget.TextureRef ref, Player player, int x, int y, int width, int height, long tick, float alpha) {
         ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "textures/hud/" + ref.id() + ".png");
         int frame = currentFrame(ref, player, tick);
         int frameHeight = height;
         int textureHeight = frameHeight * ref.rows();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, alpha);
+        g.setColor(1.0f, 1.0f, 1.0f, alpha);
         g.blit(loc, x, y, width, height, 0f, frame * frameHeight, width, frameHeight, width, textureHeight);
+        g.setColor(1.0f, 1.0f, 1.0f, 1.0f);
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
     /** Draws only the left {@code clipWidth} pixels of a texture ref — used for a bar's filled portion. */

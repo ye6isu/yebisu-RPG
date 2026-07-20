@@ -38,7 +38,7 @@ public final class ModEntityRendererRegistry {
 
         ModEntityRendererRegistry.tryRegister(specs, ModEntities.TESTEN.get(), "testen", "yebisurpg:animations/entity/testen.animation.json", "idle", "walk", "bone2");
         ModEntityRendererRegistry.tryRegister(specs, ModEntities.PLL.get(), "pll", "yebisurpg:animations/entity/pll.animation.json", "idle", "", "Head");
-        ModEntityRendererRegistry.tryRegister(specs, ModEntities.PAAAA.get(), "paaaa", "yebisurpg:animations/entity/paaaa.animation.json", "idle", "", null);
+        ModEntityRendererRegistry.tryRegister(specs, ModEntities.PAAAA.get(), "paaaa", "yebisurpg:animations/entity/paaaa.animation.json", "idle", "walk", "Head");
         // YCS_Entity_Renderer_Collect
 
         return specs;

@@ -1,0 +1,31 @@
+{
+  "name": "main_slot_3",
+  "titleText": "Use Main Ability 3",
+  "bindCode": "KEY_C",
+  "category": "CATEGORY",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds",
+      "content": "    public static final KeyMapping MAIN_SLOT_3 = bind(\"main_slot_3\", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_C, KeyModifier.NONE, CATEGORY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds_Register",
+      "content": "        event.register(MAIN_SLOT_3);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/client/ClientKeybindRegistry.java",
+      "marker": "YCS_Keybind_Register",
+      "content": "        ClientKeybindRegistry.register(\"main_slot_3\", ModKeybinds.MAIN_SLOT_3);"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "key.yebisurpg.main_slot_3"
+    }
+  ]
+}

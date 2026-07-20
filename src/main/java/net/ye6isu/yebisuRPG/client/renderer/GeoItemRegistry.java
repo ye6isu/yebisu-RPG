@@ -74,8 +74,8 @@ public class GeoItemRegistry {
 
     private static List<Item> collectGeoItems() {
         List<Item> items = new ArrayList<>();
-        tryRegister(items, ModItems.AXER, "axer");
         tryRegisterMixedStates(items, ModItems.AEEEE, java.util.List.of(new GeoItemRegistry.StateSpec("flat", "aeeee_state0", 0, false, 0, 0), new GeoItemRegistry.StateSpec("flat", "aeeee_state1", 0, false, 0, 0), new GeoItemRegistry.StateSpec("geo", "aeeee_state2", 0, false, 0, 0), new GeoItemRegistry.StateSpec("geo", "aeeee_state3", 2, true, 4, 0)));
+        tryRegister(items, ModItems.AXER, "axer");
         // YCS_Geo_Collect
         return items;
     }

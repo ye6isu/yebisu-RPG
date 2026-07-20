@@ -1,6 +1,12 @@
 package net.ye6isu.yebisuRPG.entity.custom;
 
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.Mth;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.AnimationEntry;
+import net.ye6isu.yebisuRPG.animation.AnimationLayerState;
+import net.ye6isu.yebisuRPG.animation.AnimationRegistry;
+import net.ye6isu.yebisuRPG.animation.ClientAnimationStateProxy;
 import net.ye6isu.yebisuRPG.entity.client.GeoEntityModelLoader.BakedBone;
 import net.ye6isu.yebisuRPG.entity.client.GeoEntityModelLoader.BakedCube;
 import net.ye6isu.yebisuRPG.entity.client.GeoEntityModelLoader.BakedGeoModel;
@@ -9,13 +15,16 @@ import org.joml.Quaternionf;
 import org.joml.Vector4f;
 import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Server-safe equivalent of the bone-position half of {@link
  * net.ye6isu.yebisuRPG.entity.client.GeoEntityModel#renderBone} — walks the same
  * baked bone tree, applies the exact same pivot/rotation/animation-offset math,
  * but accumulates a {@link Matrix4f} directly instead of pushing onto a client-only
  * {@code PoseStack}, and returns a bone's resolved pivot as a world-space {@link Vec3}
- * (after applying the entity's own position + yRot) rather than rendering anything.
+ * after applying the rendered body yaw and entity position.
  *
  * <p>Used exclusively by {@link YcsMobEntity} to reposition its {@link
  * YcsMobPartEntity}s server-side every tick — every transform here (the model-space
@@ -25,14 +34,17 @@ import net.minecraft.world.phys.AABB;
  */
 public final class BonePoseSolver {
 
+    private static final int IDLE_PRIORITY = 0;
+    private static final int WALK_PRIORITY = 100;
+    private static final int ACTION_PRIORITY = 200;
+
     private BonePoseSolver() {}
 
     /**
      * Resolves {@code boneName}'s pivot to a world-space position for {@code entity},
-     * sampling {@code entity}'s current idle/walk animation exactly like {@code
-     * GeoEntityModel.setupAnim} does (limb-swing-driven walk selection, age-in-ticks
-     * idle timing, loop-mode-aware clamping). Returns {@code null} if the entity has
-     * no geo model, the bone doesn't exist, or has no animation configured.
+     * sampling {@code entity}'s prioritized idle/walk/action layers exactly like
+     * {@code GeoEntityModel.setupAnim}. Returns {@code null} if the entity has no
+     * geo model, the bone doesn't exist, or has no animation configured.
      */
     public static Vec3 resolveBoneWorldPos(YcsMobEntity entity, String boneName) {
         return resolveBoneWorldPos(entity, boneName, 0.0F, 0.0F, 0.0F);
@@ -46,21 +58,14 @@ public final class BonePoseSolver {
         BakedGeoModel model = ServerGeoModelLoader.load(entityId);
         if (model == null) return null;
 
-        String animName = resolveActiveAnimName(entity);
-        ServerAnimationSampler.AnimData anim = null;
-        float animTime = 0f;
-        if (animName != null && !animName.isEmpty()) {
-            String animFile = "yebisurpg:animations/entity/" + entityId + ".animation.json";
-            anim = ServerAnimationSampler.get(animName, animFile);
-            if (anim != null) animTime = computeAnimTime(entity, anim);
-        }
+        AnimationLayers animations = resolveAnimationLayers(entity, entityId);
 
         Matrix4f mat = new Matrix4f();
 
         Vector4f result = new Vector4f();
         boolean[] found = {false};
         for (BakedBone bone : model.bones()) {
-            if (walkBone(bone, boneName, offsetX, offsetY, offsetZ, new Matrix4f(mat), anim, animTime, result, found)) {
+            if (walkBone(bone, boneName, offsetX, offsetY, offsetZ, new Matrix4f(mat), animations, result, found)) {
                 found[0] = true;
                 break;
             }
@@ -73,7 +78,7 @@ public final class BonePoseSolver {
         float localX = result.x / 16.0F;
         float localY = result.y / 16.0F;
         float localZ = -result.z / 16.0F;
-        float yawRad = (float) Math.toRadians(-entity.getYRot());
+        float yawRad = (float) Math.toRadians(entity.yBodyRot);
         float cos = (float) Math.cos(yawRad), sin = (float) Math.sin(yawRad);
         float worldX = localX * cos - localZ * sin;
         float worldZ = localX * sin + localZ * cos;
@@ -88,18 +93,11 @@ public final class BonePoseSolver {
         BakedGeoModel model = ServerGeoModelLoader.load(entityId);
         if (model == null) return null;
 
-        String animName = resolveActiveAnimName(entity);
-        ServerAnimationSampler.AnimData anim = null;
-        float animTime = 0f;
-        if (animName != null && !animName.isEmpty()) {
-            String animFile = "yebisurpg:animations/entity/" + entityId + ".animation.json";
-            anim = ServerAnimationSampler.get(animName, animFile);
-            if (anim != null) animTime = computeAnimTime(entity, anim);
-        }
+        AnimationLayers animations = resolveAnimationLayers(entity, entityId);
 
         Bounds bounds = new Bounds();
         for (BakedBone bone : model.bones()) {
-            if (walkBoneBox(entity, bone, boneName, new Matrix4f(), anim, animTime, bounds)) {
+            if (walkBoneBox(entity, bone, boneName, new Matrix4f(), animations, bounds)) {
                 break;
             }
         }
@@ -110,27 +108,30 @@ public final class BonePoseSolver {
     private static boolean walkBone(BakedBone bone, String targetName,
                                      float offsetX, float offsetY, float offsetZ,
                                      Matrix4f mat,
-                                     ServerAnimationSampler.AnimData anim, float animTime,
+                                     AnimationLayers animations,
                                      Vector4f out, boolean[] found) {
         float px = bone.pivotX(), py = bone.pivotY(), pz = bone.pivotZ();
 
         float animRX = 0f, animRY = 0f, animRZ = 0f;
         float animPX = 0f, animPY = 0f, animPZ = 0f;
         float animSX = 1f, animSY = 1f, animSZ = 1f;
-        if (anim != null) {
-            ServerAnimationSampler.BonePose bonePose = anim.bone(bone.name());
-            animRX = bonePose.rotation().evalX(animTime);
-            animRY = bonePose.rotation().evalY(animTime);
-            animRZ = bonePose.rotation().evalZ(animTime);
-            animPX = bonePose.position().evalX(animTime);
-            animPY = bonePose.position().evalY(animTime);
-            animPZ = bonePose.position().evalZ(animTime);
-            animSX = bonePose.scale().evalX(animTime);
-            animSY = bonePose.scale().evalY(animTime);
-            animSZ = bonePose.scale().evalZ(animTime);
+        SampledBone sampledBone = animations.sample(bone.name());
+        if (sampledBone != null) {
+            ServerAnimationSampler.BonePose bonePose = sampledBone.pose();
+            float time = sampledBone.time();
+            animRX = bonePose.rotation().evalX(time);
+            animRY = bonePose.rotation().evalY(time);
+            animRZ = bonePose.rotation().evalZ(time);
+            animPX = bonePose.position().evalX(time);
+            animPY = bonePose.position().evalY(time);
+            animPZ = bonePose.position().evalZ(time);
+            animSX = bonePose.scale().evalX(time);
+            animSY = bonePose.scale().evalY(time);
+            animSZ = bonePose.scale().evalZ(time);
         }
 
-        applyBoneTransform(mat, bone, animRX, animRY, animRZ, animPX, animPY, animPZ, animSX, animSY, animSZ);
+        applyBoneTransform(mat, bone, animations,
+                animRX, animRY, animRZ, animPX, animPY, animPZ, animSX, animSY, animSZ);
 
         if (bone.name().equals(targetName)) {
             Vector4f pivot = new Vector4f(px + offsetX, py + offsetY, pz + offsetZ, 1.0f);
@@ -139,7 +140,7 @@ public final class BonePoseSolver {
         }
 
         for (BakedBone child : bone.children()) {
-            if (walkBone(child, targetName, offsetX, offsetY, offsetZ, new Matrix4f(mat), anim, animTime, out, found)) {
+            if (walkBone(child, targetName, offsetX, offsetY, offsetZ, new Matrix4f(mat), animations, out, found)) {
                 return true;
             }
         }
@@ -148,25 +149,28 @@ public final class BonePoseSolver {
 
     private static boolean walkBoneBox(YcsMobEntity entity, BakedBone bone, String targetName,
                                        Matrix4f mat,
-                                       ServerAnimationSampler.AnimData anim, float animTime,
+                                       AnimationLayers animations,
                                        Bounds bounds) {
         float animRX = 0f, animRY = 0f, animRZ = 0f;
         float animPX = 0f, animPY = 0f, animPZ = 0f;
         float animSX = 1f, animSY = 1f, animSZ = 1f;
-        if (anim != null) {
-            ServerAnimationSampler.BonePose bonePose = anim.bone(bone.name());
-            animRX = bonePose.rotation().evalX(animTime);
-            animRY = bonePose.rotation().evalY(animTime);
-            animRZ = bonePose.rotation().evalZ(animTime);
-            animPX = bonePose.position().evalX(animTime);
-            animPY = bonePose.position().evalY(animTime);
-            animPZ = bonePose.position().evalZ(animTime);
-            animSX = bonePose.scale().evalX(animTime);
-            animSY = bonePose.scale().evalY(animTime);
-            animSZ = bonePose.scale().evalZ(animTime);
+        SampledBone sampledBone = animations.sample(bone.name());
+        if (sampledBone != null) {
+            ServerAnimationSampler.BonePose bonePose = sampledBone.pose();
+            float time = sampledBone.time();
+            animRX = bonePose.rotation().evalX(time);
+            animRY = bonePose.rotation().evalY(time);
+            animRZ = bonePose.rotation().evalZ(time);
+            animPX = bonePose.position().evalX(time);
+            animPY = bonePose.position().evalY(time);
+            animPZ = bonePose.position().evalZ(time);
+            animSX = bonePose.scale().evalX(time);
+            animSY = bonePose.scale().evalY(time);
+            animSZ = bonePose.scale().evalZ(time);
         }
 
-        applyBoneTransform(mat, bone, animRX, animRY, animRZ, animPX, animPY, animPZ, animSX, animSY, animSZ);
+        applyBoneTransform(mat, bone, animations,
+                animRX, animRY, animRZ, animPX, animPY, animPZ, animSX, animSY, animSZ);
 
         if (bone.name().equals(targetName)) {
             if (bone.cubes().isEmpty()) {
@@ -182,14 +186,14 @@ public final class BonePoseSolver {
         }
 
         for (BakedBone child : bone.children()) {
-            if (walkBoneBox(entity, child, targetName, new Matrix4f(mat), anim, animTime, bounds)) {
+            if (walkBoneBox(entity, child, targetName, new Matrix4f(mat), animations, bounds)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static void applyBoneTransform(Matrix4f mat, BakedBone bone,
+    private static void applyBoneTransform(Matrix4f mat, BakedBone bone, AnimationLayers animations,
                                            float animRX, float animRY, float animRZ,
                                            float animPX, float animPY, float animPZ,
                                            float animSX, float animSY, float animSZ) {
@@ -201,6 +205,10 @@ public final class BonePoseSolver {
 
         mat.translate(px, py, pz);
         mat.rotate(q);
+        if (animations.isHeadBone(bone.name())) {
+            mat.rotate(new Quaternionf().rotationYXZ(
+                    animations.headYaw(), -animations.headPitch(), 0.0F));
+        }
         mat.translate(-px, -py, -pz);
         if (animPX != 0f || animPY != 0f || animPZ != 0f) {
             mat.translate(animPX, -animPY, animPZ);
@@ -250,7 +258,7 @@ public final class BonePoseSolver {
         float localX = modelPos.x / 16.0F;
         float localY = modelPos.y / 16.0F;
         float localZ = -modelPos.z / 16.0F;
-        float yawRad = (float) Math.toRadians(-entity.getYRot());
+        float yawRad = (float) Math.toRadians(entity.yBodyRot);
         float cos = (float) Math.cos(yawRad), sin = (float) Math.sin(yawRad);
         float worldX = localX * cos - localZ * sin;
         float worldZ = localX * sin + localZ * cos;
@@ -281,25 +289,98 @@ public final class BonePoseSolver {
         }
     }
 
-    /** Mirrors {@code GeoEntityModel.setupAnim}'s walking/idle choice via vanilla's own
-     *  synced {@code walkAnimation} state — the same server-visible motion signal used
-     *  everywhere else in the mod (see AGENTS.md's dedicated-server checklist). */
-    private static String resolveActiveAnimName(YcsMobEntity entity) {
+    /** Mirrors {@code GeoEntityModel.setupAnim}'s idle-base/walk-overlay composition
+     *  using vanilla's server-visible {@code walkAnimation} state. */
+    private static AnimationLayers resolveAnimationLayers(YcsMobEntity entity, String entityId) {
         boolean walking = entity.walkAnimation.speed() > 0.05f;
         YcsMobData.Config cfg = YcsMobData.get(entity.getType());
-        return walking ? cfg.walkAnim() : cfg.idleAnim();
+        String animFile = "yebisurpg:animations/entity/" + entityId + ".animation.json";
+        List<AnimationLayer> layers = new ArrayList<>(3);
+
+        ServerAnimationSampler.AnimData idle = loadAnimation(cfg.idleAnim(), animFile);
+        if (idle != null) {
+            layers.add(new AnimationLayer(
+                    IDLE_PRIORITY, idle, sampleTime(idle, entity.tickCount / 20.0f)));
+        }
+
+        ServerAnimationSampler.AnimData walk = walking ? loadAnimation(cfg.walkAnim(), animFile) : null;
+        if (walk != null) {
+            layers.add(new AnimationLayer(
+                    WALK_PRIORITY, walk,
+                    sampleTime(walk, entity.walkAnimation.position() * 0.1f)));
+        }
+
+        AnimationLayerState actionState = resolveActionState(entity);
+        if (actionState != null) {
+            String actionFile = actionState.filePath() != null
+                    && !actionState.filePath().isEmpty()
+                    ? actionState.filePath()
+                    : animFile;
+            ServerAnimationSampler.AnimData action =
+                    loadAnimation(actionState.animId(), actionFile);
+            if (action != null && !isFinishedPlayOnce(action, actionState.timeSecs())) {
+                layers.add(new AnimationLayer(
+                        ACTION_PRIORITY, action, sampleTime(action, actionState.timeSecs())));
+            }
+        }
+
+        float headYaw = (float) Math.toRadians(
+                Mth.wrapDegrees(entity.yHeadRot - entity.yBodyRot));
+        float headPitch = (float) Math.toRadians(entity.getXRot());
+        return new AnimationLayers(layers, cfg.headBone(), headYaw, headPitch);
     }
 
-    private static float computeAnimTime(YcsMobEntity entity, ServerAnimationSampler.AnimData anim) {
-        boolean walking = entity.walkAnimation.speed() > 0.05f;
-        float timeSecs = walking
-                ? entity.walkAnimation.position() * 0.1f
-                : entity.tickCount / 20.0f;
+    private static ServerAnimationSampler.AnimData loadAnimation(String name, String file) {
+        return name == null || name.isEmpty() ? null : ServerAnimationSampler.get(name, file);
+    }
+
+    private static float sampleTime(ServerAnimationSampler.AnimData anim, float timeSecs) {
         float length = anim.length() <= 0f ? 1f : anim.length();
         return switch (anim.loopMode()) {
             case LOOP -> ((timeSecs % length) + length) % length;
             case HOLD_LAST, PLAY_ONCE -> Math.min(timeSecs, length);
         };
+    }
+
+    private static boolean isFinishedPlayOnce(ServerAnimationSampler.AnimData animation, float timeSecs) {
+        return animation.loopMode() == net.ye6isu.yebisuRPG.animation.AnimationLoopMode.PLAY_ONCE
+                && timeSecs >= animation.length();
+    }
+
+    private static AnimationLayerState resolveActionState(YcsMobEntity entity) {
+        if (entity.level().isClientSide()) {
+            return ClientAnimationStateProxy.thirdPersonAction(entity.getId());
+        }
+
+        AnimationEntry entry = AnimationRegistry.get().get(
+                entity.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
+        if (entry == null) return null;
+        float timeSecs = entry.elapsedTicks(entity.level().getGameTime()) / 20.0F;
+        return new AnimationLayerState(entry.animId(), entry.filePath(), timeSecs);
+    }
+
+    private record SampledBone(ServerAnimationSampler.BonePose pose, float time) {}
+
+    private record AnimationLayer(int priority, ServerAnimationSampler.AnimData animation, float time) {}
+
+    private record AnimationLayers(List<AnimationLayer> layers, String headBone,
+                                   float headYaw, float headPitch) {
+        SampledBone sample(String boneName) {
+            AnimationLayer resolved = null;
+            for (AnimationLayer layer : layers) {
+                if (layer.animation().bones().containsKey(boneName)
+                        && (resolved == null || layer.priority() > resolved.priority())) {
+                    resolved = layer;
+                }
+            }
+            return resolved != null
+                    ? new SampledBone(resolved.animation().bone(boneName), resolved.time())
+                    : null;
+        }
+
+        boolean isHeadBone(String boneName) {
+            return headBone != null && !headBone.isEmpty() && headBone.equals(boneName);
+        }
     }
 
     private static String idFromEntityType(YcsMobEntity entity) {

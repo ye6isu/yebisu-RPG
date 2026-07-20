@@ -1,0 +1,138 @@
+{
+  "name": "alt_ability",
+  "widgets": [
+    {
+      "id": "1d312914-5f7c-4149-9628-00d89cf2d992",
+      "type": "icon",
+      "anchor": "center_right",
+      "anchorTarget": "",
+      "x": 0,
+      "y": 0,
+      "width": 22,
+      "height": 22,
+      "color": "#ffffff",
+      "valueSourceId": "",
+      "maxSourceId": "",
+      "valueLiteral": "0",
+      "maxLiteral": "100",
+      "visibleSourceId": "",
+      "visibleLiteral": true,
+      "fillLerpEnabled": false,
+      "fillLerpStrength": 0.2,
+      "textMode": "number",
+      "textSourceId": "",
+      "textLiteral": "",
+      "icon": {
+        "id": "ability_frame",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0,
+        "frameLiteral": "0"
+      },
+      "barFilled": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barEmpty": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "multiState": false,
+      "stateSourceId": "",
+      "stateLiteral": "0",
+      "states": []
+    },
+    {
+      "id": "61da9370-b90a-4818-9e09-b8b4bdcdd911",
+      "type": "icon",
+      "anchor": "center_right",
+      "anchorTarget": "",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 212,
+      "color": "#ffffff",
+      "valueSourceId": "",
+      "maxSourceId": "",
+      "valueLiteral": "0",
+      "maxLiteral": "100",
+      "visibleSourceId": "",
+      "visibleLiteral": true,
+      "fillLerpEnabled": false,
+      "fillLerpStrength": 0.2,
+      "textMode": "number",
+      "textSourceId": "",
+      "textLiteral": "",
+      "icon": {
+        "id": "alt_ability_bar",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0,
+        "frameLiteral": "0"
+      },
+      "barFilled": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "barEmpty": {
+        "id": "",
+        "rows": 1,
+        "animatedOnUse": false,
+        "ticksPerFrame": 4,
+        "defaultFrame": 0
+      },
+      "multiState": false,
+      "stateSourceId": "",
+      "stateLiteral": "0",
+      "states": []
+    }
+  ],
+  "previewW": 960,
+  "previewH": 540,
+  "gridW": 10,
+  "gridH": 10,
+  "gridOffsetX": 0,
+  "gridOffsetY": 0,
+  "previewImage": null,
+  "previewImageFit": "contain",
+  "previewImageOpacity": 0.5,
+  "visibleLiteral": true,
+  "visibleSourceId": "",
+  "_injections": [
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/ability_frame.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/alt_ability_bar.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/hud/alt_ability.json"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/ModHud.java",
+      "marker": "YCS_Hud_Layouts",
+      "content": "        HudOverlayRenderer.registerLayout(\"alt_ability\");"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/ModHud.java",
+      "marker": "YCS_Hud_Layouts",
+      "content": "        HudOverlayRenderer.registerLayoutVisibility(\"alt_ability\", \"\", true);"
+    }
+  ]
+}

@@ -71,14 +71,25 @@ public final class ModDataComponents {
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> ITEM_FRAME = registerInt("item_frame");
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ITEM_HAS_ABILITIES = registerBoolean("item_has_abilities");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_1 = registerString("item_ability_slot_1");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_2 = registerString("item_ability_slot_2");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_3 = registerString("item_ability_slot_3");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_4 = registerString("item_ability_slot_4");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_5 = registerString("item_ability_slot_5");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_6 = registerString("item_ability_slot_6");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_7 = registerString("item_ability_slot_7");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_8 = registerString("item_ability_slot_8");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> ITEM_ABILITY_SLOT_9 = registerString("item_ability_slot_9");
+
     /**
      * Generic per-stack bitflag storage for items that toggle entity texture overlay layers on/off
      * (e.g. a wearable-cosmetic item where each bit is a separate layer). Not tied to any one item —
      * any item wanting simple on/off overlay layers can reuse this the same way {@code WalkmanItem} does.
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OVERLAY_FLAGS = registerInt("overlay_flags");
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AXER_TESTNUM = registerDouble("axer_testnum");
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AEEEE_TAAAAA = registerDouble("aeeee_taaaaa");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Double>> AXER_TESTNUM = registerDouble("axer_testnum");
     // YCS_Data_Components
 
     private ModDataComponents() {}

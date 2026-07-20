@@ -7,6 +7,7 @@ package net.ye6isu.yebisuRPG.hud;
  */
 public record HudWidget(
         String id,
+        String name,
         Type type,
         Anchor anchor,
         String anchorTarget,

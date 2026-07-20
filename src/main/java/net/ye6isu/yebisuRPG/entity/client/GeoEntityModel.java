@@ -3,6 +3,9 @@ package net.ye6isu.yebisuRPG.entity.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.EntityModel;
+import net.ye6isu.yebisuRPG.animation.AnimationCategory;
+import net.ye6isu.yebisuRPG.animation.client.AnimationPlayhead;
+import net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine;
 import net.ye6isu.yebisuRPG.animation.client.HandAnimationLoader;
 import net.ye6isu.yebisuRPG.entity.client.GeoEntityModelLoader.BakedBone;
 import net.ye6isu.yebisuRPG.entity.client.GeoEntityModelLoader.BakedCube;
@@ -13,6 +16,9 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A generic {@link EntityModel} whose bones/cubes come entirely from a mob's own
@@ -32,14 +38,17 @@ import org.joml.Vector3f;
  * {@link #setupAnim}/{@link #renderToBuffer} at the right time — only the bone/cube
  * geometry emission itself bypasses {@code ModelPart}.</p>
  *
- * <p>Idle vs. walk is chosen purely from vanilla's own {@code limbSwingAmount}
- * (already server-synced per-entity motion state, see {@code AGENTS.md}'s
- * dedicated-server checklist) — a locally-computed, wall-clock-driven pose, not
- * routed through {@link net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine}'s
- * packet-triggered playhead system, since idle/walk aren't server-triggered
- * gameplay animations.</p>
+ * <p>Animation is resolved per bone from fixed-priority layers: idle (0), walk
+ * (100), then an active third-person action (200). The highest active layer that
+ * actually authors a bone owns that bone, so walk arms work normally until an
+ * action overrides them while walk-only legs continue underneath. Idle/walk use
+ * vanilla-synced movement state; actions use the existing synchronized playhead.</p>
  */
 public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
+
+    private static final int IDLE_PRIORITY = 0;
+    private static final int WALK_PRIORITY = 100;
+    private static final int ACTION_PRIORITY = 200;
 
     private final BakedGeoModel model;
     private final String animationFile;
@@ -47,8 +56,7 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
     private final String walkAnim;
     private final String headBone;
 
-    private HandAnimationLoader.AnimData activeAnim;
-    private float animTime;
+    private final List<AnimationLayer> animationLayers = new ArrayList<>(3);
     private float headYaw;
     private float headPitch;
 
@@ -62,29 +70,43 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
 
     @Override
     public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        activeAnim = null;
+        animationLayers.clear();
         // Mirrors vanilla HumanoidModel.setupAnim's head.yRot/head.xRot — plain degrees
         // converted to radians, applied as an additional local rotation on the named head
         // bone in renderBone below (added on top of whatever the current animation pose sets).
         this.headYaw = netHeadYaw * ((float) Math.PI / 180F);
         this.headPitch = headPitch * ((float) Math.PI / 180F);
 
+        if (idleAnim != null && !idleAnim.isEmpty()) {
+            HandAnimationLoader.AnimData animation =
+                    HandAnimationLoader.INSTANCE.get(idleAnim, animationFile);
+            if (animation != null) {
+                animationLayers.add(new AnimationLayer(
+                        IDLE_PRIORITY, animation, sampleTime(animation, ageInTicks / 20.0f)));
+            }
+        }
+
         boolean walking = limbSwingAmount > 0.05f;
-        String animName = walking ? walkAnim : idleAnim;
-        if (animName == null || animName.isEmpty()) return;
+        if (walking && walkAnim != null && !walkAnim.isEmpty()) {
+            HandAnimationLoader.AnimData animation =
+                    HandAnimationLoader.INSTANCE.get(walkAnim, animationFile);
+            if (animation != null) {
+                animationLayers.add(new AnimationLayer(
+                        WALK_PRIORITY, animation, sampleTime(animation, limbSwing * 0.1f)));
+            }
+        }
 
-        HandAnimationLoader.AnimData anim = HandAnimationLoader.INSTANCE.get(animName, animationFile);
-        if (anim == null) return;
-
-        float timeSecs = walking ? limbSwing * 0.1f : ageInTicks / 20.0f;
-        float length = anim.length() <= 0f ? 1f : anim.length();
-        float t = switch (anim.loopMode()) {
-            case LOOP -> ((timeSecs % length) + length) % length;
-            case HOLD_LAST, PLAY_ONCE -> Math.min(timeSecs, length);
-        };
-
-        activeAnim = anim;
-        animTime = t;
+        AnimationPlayhead action = ClientAnimationEngine.INSTANCE.getPlayhead(
+                entity.getId(), AnimationCategory.ENTITY_THIRD_PERSON);
+        if (action != null && action.isPlaying()) {
+            String file = action.filePath() != null ? action.filePath() : animationFile;
+            HandAnimationLoader.AnimData animation =
+                    HandAnimationLoader.INSTANCE.get(action.animId(), file);
+            if (animation != null) {
+                animationLayers.add(new AnimationLayer(
+                        ACTION_PRIORITY, animation, sampleTime(animation, action.getCurrentTimeSecs())));
+            }
+        }
     }
 
     @Override
@@ -123,17 +145,18 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
         float animRX = 0f, animRY = 0f, animRZ = 0f;
         float animPX = 0f, animPY = 0f, animPZ = 0f;
         float animSX = 1f, animSY = 1f, animSZ = 1f;
-        if (activeAnim != null) {
-            HandAnimationLoader.BonePose bonePose = activeAnim.bone(bone.name());
-            animRX = bonePose.rotation().evalX(animTime);
-            animRY = bonePose.rotation().evalY(animTime);
-            animRZ = bonePose.rotation().evalZ(animTime);
-            animPX = bonePose.position().evalX(animTime);
-            animPY = bonePose.position().evalY(animTime);
-            animPZ = bonePose.position().evalZ(animTime);
-            animSX = bonePose.scale().evalX(animTime);
-            animSY = bonePose.scale().evalY(animTime);
-            animSZ = bonePose.scale().evalZ(animTime);
+        AnimationLayer layer = resolveLayer(bone.name());
+        if (layer != null) {
+            HandAnimationLoader.BonePose bonePose = layer.animation().bone(bone.name());
+            animRX = bonePose.rotation().evalX(layer.time());
+            animRY = bonePose.rotation().evalY(layer.time());
+            animRZ = bonePose.rotation().evalZ(layer.time());
+            animPX = bonePose.position().evalX(layer.time());
+            animPY = bonePose.position().evalY(layer.time());
+            animPZ = bonePose.position().evalZ(layer.time());
+            animSX = bonePose.scale().evalX(layer.time());
+            animSY = bonePose.scale().evalY(layer.time());
+            animSZ = bonePose.scale().evalZ(layer.time());
         }
 
         Quaternionf q = eulerToQuat(
@@ -246,4 +269,25 @@ public class GeoEntityModel<T extends YcsMobEntity> extends EntityModel<T> {
     private static Quaternionf eulerToQuat(float rx, float ry, float rz) {
         return new Quaternionf().rotationZYX(rz, ry, rx);
     }
+
+    private static float sampleTime(HandAnimationLoader.AnimData animation, float timeSecs) {
+        float length = animation.length() <= 0f ? 1f : animation.length();
+        return switch (animation.loopMode()) {
+            case LOOP -> ((timeSecs % length) + length) % length;
+            case HOLD_LAST, PLAY_ONCE -> Math.min(timeSecs, length);
+        };
+    }
+
+    private AnimationLayer resolveLayer(String boneName) {
+        AnimationLayer resolved = null;
+        for (AnimationLayer layer : animationLayers) {
+            if (layer.animation().bones().containsKey(boneName)
+                    && (resolved == null || layer.priority() > resolved.priority())) {
+                resolved = layer;
+            }
+        }
+        return resolved;
+    }
+
+    private record AnimationLayer(int priority, HandAnimationLoader.AnimData animation, float time) {}
 }

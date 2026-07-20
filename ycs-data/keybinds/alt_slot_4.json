@@ -1,0 +1,31 @@
+{
+  "name": "alt_slot_4",
+  "titleText": "Use Ability 4",
+  "bindCode": "KEY_4",
+  "category": "CATEGORY",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds",
+      "content": "    public static final KeyMapping ALT_SLOT_4 = bind(\"alt_slot_4\", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_4, KeyModifier.NONE, CATEGORY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds_Register",
+      "content": "        event.register(ALT_SLOT_4);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/client/ClientKeybindRegistry.java",
+      "marker": "YCS_Keybind_Register",
+      "content": "        ClientKeybindRegistry.register(\"alt_slot_4\", ModKeybinds.ALT_SLOT_4);"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "key.yebisurpg.alt_slot_4"
+    }
+  ]
+}

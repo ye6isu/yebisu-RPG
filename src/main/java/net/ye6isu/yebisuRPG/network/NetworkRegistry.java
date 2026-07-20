@@ -60,5 +60,10 @@ public final class NetworkRegistry {
                 KeybindTriggerPayload.TYPE,
                 KeybindTriggerPayload.STREAM_CODEC,
                 ServerKeybindHandler::onKeybindTrigger);
+
+        registrar.playToServer(
+                net.ye6isu.yebisuRPG.keybind.AbilitySlotSetPayload.TYPE,
+                net.ye6isu.yebisuRPG.keybind.AbilitySlotSetPayload.STREAM_CODEC,
+                ServerKeybindHandler::onAbilitySlotSet);
     }
 }

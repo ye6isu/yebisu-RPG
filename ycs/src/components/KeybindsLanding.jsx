@@ -14,6 +14,7 @@ const KEY_OPTIONS = (() => {
   for (let i = 0; i <= 9; i++) opts.push({ value: 'KEY_' + i, label: String(i) });
   for (let i = 1; i <= 25; i++) opts.push({ value: 'KEY_F' + i, label: 'F' + i });
   Object.values(CODE_TO_GLFW_KEY).forEach(name => { if (!opts.some(o => o.value === 'KEY_' + name)) opts.push({ value: 'KEY_' + name, label: name.replace(/_/g, ' ') }); });
+  opts.push({ value: 'MOD_ALT', label: 'Alt' }, { value: 'MOD_CTRL', label: 'Ctrl' }, { value: 'MOD_SHIFT', label: 'Shift' });
   opts.push({ value: 'MOUSE_0', label: 'Mouse 1' }, { value: 'MOUSE_1', label: 'Mouse 2' }, { value: 'MOUSE_2', label: 'Mouse 3' }, { value: 'MOUSE_3', label: 'Mouse 4' }, { value: 'MOUSE_4', label: 'Mouse 5' });
   return opts;
 })();
@@ -25,9 +26,15 @@ function splitBindCode(code) {
 }
 function joinBindCode(base, mod) {
   if (!base || base === 'NONE') return 'NONE';
+  if (base.startsWith('MOD_')) return base;
   return mod && mod !== 'NONE' ? `${base}+${mod}` : base;
 }
 function domEventToBindCode(e) {
+  if (MODIFIER_CODES.has(e.code)) {
+    if (e.code.startsWith('Alt')) return 'MOD_ALT';
+    if (e.code.startsWith('Control')) return 'MOD_CTRL';
+    if (e.code.startsWith('Shift')) return 'MOD_SHIFT';
+  }
   let base = null;
   if (e.code?.startsWith('Key')) base = 'KEY_' + e.code.slice(3).toUpperCase();
   else if (e.code?.startsWith('Digit')) base = 'KEY_' + e.code.slice(5);
@@ -40,6 +47,9 @@ function domEventToBindCode(e) {
 export function bindCodeLabel(code) {
   const { base, mod } = splitBindCode(code);
   if (base === 'NONE') return '(none)';
+  if (base === 'MOD_ALT') return 'Alt';
+  if (base === 'MOD_CTRL') return 'Ctrl';
+  if (base === 'MOD_SHIFT') return 'Shift';
   const baseLabel = base.startsWith('MOUSE_') ? 'Mouse ' + (parseInt(base.slice(6)) + 1) : base.slice(4).replace(/_/g, ' ');
   const modLabel = mod === 'CTRL' ? 'Ctrl' : mod === 'ALT' ? 'Alt' : mod === 'SHIFT' ? 'Shift' : null;
   return modLabel ? `${modLabel} + ${baseLabel}` : baseLabel;
@@ -49,6 +59,9 @@ export function bindCodeLabel(code) {
 function bindCodeToJava(bindCode) {
   const { base, mod } = splitBindCode(bindCode);
   if (base === 'NONE') return null;
+  if (base === 'MOD_ALT') return { type: 'InputConstants.Type.KEYSYM', code: 'GLFW.GLFW_KEY_LEFT_ALT', modifier: 'NONE' };
+  if (base === 'MOD_CTRL') return { type: 'InputConstants.Type.KEYSYM', code: 'GLFW.GLFW_KEY_LEFT_CONTROL', modifier: 'NONE' };
+  if (base === 'MOD_SHIFT') return { type: 'InputConstants.Type.KEYSYM', code: 'GLFW.GLFW_KEY_LEFT_SHIFT', modifier: 'NONE' };
   const modJava = { NONE: 'NONE', CTRL: 'CONTROL', ALT: 'ALT', SHIFT: 'SHIFT' }[mod] || 'NONE';
   if (base.startsWith('MOUSE_')) {
     const idx = parseInt(base.slice(6));
@@ -123,7 +136,6 @@ function RecordKeyButton({ value, onChange }) {
   useEffect(() => {
     if (!recording) return;
     const onKey = e => {
-      if (MODIFIER_CODES.has(e.code)) return;
       e.preventDefault();
       const code = domEventToBindCode(e);
       if (code) { onChange(code); setRecording(false); }
@@ -152,7 +164,7 @@ function RecordKeyButton({ value, onChange }) {
         </select>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <select className="ycs-string-input" value={mod} onChange={e => onChange(joinBindCode(base, e.target.value))} style={{ width: 120 }}>
+        <select className="ycs-string-input" value={mod} onChange={e => onChange(joinBindCode(base, e.target.value))} disabled={base.startsWith('MOD_')} style={{ width: 120 }}>
           <option value="NONE">No modifier</option>
           <option value="CTRL">Ctrl</option>
           <option value="ALT">Alt</option>

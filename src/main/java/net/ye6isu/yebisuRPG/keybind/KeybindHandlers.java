@@ -17,6 +17,16 @@ public final class KeybindHandlers {
     private KeybindHandlers() {}
 
     public static void dispatch(String keybindId, boolean pressed, ServerPlayer player) {
+        int altAbilitySlot = PlayerAbilities.altSlotFromKeybindId(keybindId);
+        if (altAbilitySlot > 0 && pressed) {
+            PlayerAbilities.useAltSlot(player, altAbilitySlot);
+        }
+
+        int abilitySlot = PlayerAbilities.slotFromKeybindId(keybindId);
+        if (abilitySlot > 0 && pressed) {
+            PlayerAbilities.useSlot(player, abilitySlot);
+        }
+
         if (pressed) {
             dispatchPress(keybindId, player);
         } else {
