@@ -1,0 +1,24 @@
+{
+  "name": "woop",
+  "titleText": "Wooper",
+  "icon": "placehold_ability_2",
+  "cooldownSeconds": 1,
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityRegistry.java",
+      "marker": "YCS_Abilities",
+      "content": "        AbilityRegistry.register(\"woop\", \"placehold_ability_2\", 1);"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/placehold_ability_2.png"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
+      "marker": "YCS_Ability_Use_Dispatch",
+      "content": "            case \"woop\" -> { player.setDeltaMovement((double)((((player.getLookAngle().x))*(2))), (double)((((player.getLookAngle().y))*(2))), (double)((((player.getLookAngle().z))*(2)))); player.hurtMarked = true; }"
+    }
+  ]
+}

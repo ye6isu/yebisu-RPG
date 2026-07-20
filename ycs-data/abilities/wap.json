@@ -1,0 +1,36 @@
+{
+  "name": "wap",
+  "titleText": "Woop",
+  "icon": "placehold_ability",
+  "cooldownSeconds": 3,
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityRegistry.java",
+      "marker": "YCS_Abilities",
+      "content": "        AbilityRegistry.register(\"wap\", \"placehold_ability\", 3);"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/placehold_ability.png"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
+      "marker": "YCS_Ability_Use_Dispatch",
+      "content": "            case \"wap\" -> { DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(15), (int)((double)(5)), DashUtil.Easing.EASE_OUT, null, null, \"sphere\", (double)(1.5), (double)(0), (double)(0), false); }"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
+      "marker": "YCS_Ability_Handler_Imports",
+      "content": "import net.ye6isu.yebisuRPG.util.DashUtil;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
+      "marker": "YCS_Ability_Handler_Imports",
+      "content": "import net.minecraft.world.entity.LivingEntity;"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "debug",
+  "titleText": "Debug",
+  "bindCode": "KEY_APOSTROPHE",
+  "category": "CATEGORY",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds",
+      "content": "    public static final KeyMapping DEBUG = bind(\"debug\", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_APOSTROPHE, KeyModifier.NONE, CATEGORY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds_Register",
+      "content": "        event.register(DEBUG);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/client/ClientKeybindRegistry.java",
+      "marker": "YCS_Keybind_Register",
+      "content": "        ClientKeybindRegistry.register(\"debug\", ModKeybinds.DEBUG);"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "key.yebisurpg.debug"
+    }
+  ]
+}

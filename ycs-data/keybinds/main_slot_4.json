@@ -1,0 +1,31 @@
+{
+  "name": "main_slot_4",
+  "titleText": "Use Main Ability 4",
+  "bindCode": "KEY_V",
+  "category": "CATEGORY",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds",
+      "content": "    public static final KeyMapping MAIN_SLOT_4 = bind(\"main_slot_4\", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KeyModifier.NONE, CATEGORY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds_Register",
+      "content": "        event.register(MAIN_SLOT_4);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/client/ClientKeybindRegistry.java",
+      "marker": "YCS_Keybind_Register",
+      "content": "        ClientKeybindRegistry.register(\"main_slot_4\", ModKeybinds.MAIN_SLOT_4);"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "key.yebisurpg.main_slot_4"
+    }
+  ]
+}

@@ -1931,7 +1931,9 @@ export default function HudLanding() {
   if (creating) return <HudEditor onBack={() => { setCreating(false); reload(); }} />;
   if (editing) return <HudEditor layoutId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
-  const filtered = layouts.filter(l => !search || (l.name || l.id).toLowerCase().includes(search.toLowerCase()));
+  const filtered = layouts
+    .filter(l => (l.id || l.name) !== 'ability')
+    .filter(l => !search || (l.name || l.id).toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

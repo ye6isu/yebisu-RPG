@@ -1,0 +1,31 @@
+{
+  "name": "toggle_ability_bar",
+  "titleText": "Toggle Ability Bar",
+  "bindCode": "MOD_ALT",
+  "category": "CATEGORY",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds",
+      "content": "    public static final KeyMapping TOGGLE_ABILITY_BAR = bind(\"toggle_ability_bar\", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, KeyModifier.NONE, CATEGORY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/client/ModKeybinds.java",
+      "marker": "YCS_Mod_Keybinds_Register",
+      "content": "        event.register(TOGGLE_ABILITY_BAR);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/client/ClientKeybindRegistry.java",
+      "marker": "YCS_Keybind_Register",
+      "content": "        ClientKeybindRegistry.register(\"toggle_ability_bar\", ModKeybinds.TOGGLE_ABILITY_BAR);"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "key.yebisurpg.toggle_ability_bar"
+    }
+  ]
+}

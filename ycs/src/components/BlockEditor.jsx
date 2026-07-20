@@ -952,13 +952,15 @@ const METHOD_LABELS = {
   inventoryTick: 'Inventory Tick', hurtEnemy: 'Combat / Hurt Entity',
   interactLivingEntity: 'Entity Interaction',
   keybindPress: 'On Press', keybindRelease: 'On Release',
+  abilityUse: 'On Use',
   entityPartHit: 'On Part Hit',
 };
 
-export default function BlockEditor({ itemId, keybindId, hudWidgetId, entityId, methodKey, onBack }) {
+export default function BlockEditor({ itemId, keybindId, hudWidgetId, entityId, abilityId, methodKey, onBack }) {
   const stableId = hudWidgetId ? `hudwidget::${hudWidgetId}`
     : keybindId ? `keybind::${keybindId}::${methodKey}`
     : entityId ? `entity::${entityId}::${methodKey}`
+    : abilityId ? `ability::${abilityId}::${methodKey}`
     : `item::${itemId}::${methodKey}`;
   const methodLabel = hudWidgetId ? 'HUD Value' : (METHOD_LABELS[methodKey] || methodKey);
 

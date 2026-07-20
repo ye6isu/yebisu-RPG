@@ -24,6 +24,12 @@ public final class ModHud {
     }
 
     public static void registerLayouts() {
+        HudOverlayRenderer.registerLayout("aaaa");
+        HudOverlayRenderer.registerLayoutVisibility("aaaa", "", false);
+        HudOverlayRenderer.registerLayout("ability");
+        HudOverlayRenderer.registerLayoutVisibility("ability", "", true);
+        HudOverlayRenderer.registerLayout("alt_ability");
+        HudOverlayRenderer.registerLayoutVisibility("alt_ability", "", true);
         // YCS_Hud_Layouts
     }
 }

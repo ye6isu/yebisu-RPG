@@ -10,6 +10,7 @@ import ComponentsLanding from "./components/ComponentsLanding";
 import EntityVariablesLanding from "./components/EntityVariablesLanding";
 import AttributesLanding from "./components/AttributesLanding";
 import KeybindsLanding from "./components/KeybindsLanding";
+import AbilitiesLanding from "./components/AbilitiesLanding";
 import HudLanding from "./components/HudLanding";
 import "./App.css";
 
@@ -159,6 +160,7 @@ function App() {
     { key: 'entityvars', component: <EntityVariablesLanding /> },
     { key: 'attributes', component: <AttributesLanding /> },
     { key: 'keybinds', component: <KeybindsLanding /> },
+    { key: 'abilities', component: <AbilitiesLanding /> },
     { key: 'textures', component: <TextureManager /> },
     { key: 'hud', component: <HudLanding /> },
   ];
@@ -197,6 +199,7 @@ function App() {
               <SidebarTab label="Entity Variables" tabKey="entityvars" />
               <SidebarTab label="Attributes" tabKey="attributes" />
               <SidebarTab label="Keybinds" tabKey="keybinds" />
+              <SidebarTab label="Abilities" tabKey="abilities" />
             </SidebarGroup>
 
             <SidebarGroup label="Assets" isOpen={isAssetsOpen} onToggle={() => setIsAssetsOpen(!isAssetsOpen)}>

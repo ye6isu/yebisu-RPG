@@ -699,6 +699,10 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
   const [dataComponents, setDataComponents] = useState([]);
   const [globalComponents, setGlobalComponents] = useState([]);
 
+  // Item ability defaults
+  const [itemAbilitiesEnabled, setItemAbilitiesEnabled] = useState(false);
+  const [itemAbilitySlots, setItemAbilitySlots] = useState(Array(9).fill(''));
+
   // Combat
   const [attackDamage, setAttackDamage] = useState('');
   const [attackSpeed, setAttackSpeed] = useState('');
@@ -872,6 +876,8 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           setCustomClass(data.customClass || false);
           setEnabledMethods(data.enabledMethods || []);
           setDataComponents(data.dataComponents || []);
+          setItemAbilitiesEnabled(!!data.itemAbilitiesEnabled);
+          setItemAbilitySlots(Array.from({ length: 9 }, (_, i) => data.itemAbilitySlots?.[i] || ''));
           setAttackDamage(data.attackDamage != null ? String(data.attackDamage) : '');
           setAttackSpeed(data.attackSpeed != null ? String(data.attackSpeed) : '');
           setFoodEnabled(data.foodEnabled || false);
@@ -945,6 +951,8 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     customClass,
     enabledMethods,
     dataComponents,
+    itemAbilitiesEnabled,
+    itemAbilitySlots: itemAbilitiesEnabled ? itemAbilitySlots.map(v => (v || '').trim()) : [],
     attackDamage: attackDamage !== '' ? parseFloat(attackDamage) : null,
     attackSpeed: attackSpeed !== '' ? parseFloat(attackSpeed) : null,
     foodEnabled,
@@ -1062,6 +1070,15 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
 
       const parsedStack = parseInt(stackSize) || 64;
       let propsChain = (!isTool && parsedStack !== 64) ? `.stacksTo(${parsedStack})` : '';
+      if (itemAbilitiesEnabled) {
+        propsChain += `.component(ModDataComponents.ITEM_HAS_ABILITIES.get(), true)`;
+        itemAbilitySlots.forEach((abilityId, index) => {
+          const trimmedAbilityId = (abilityId || '').trim();
+          if (trimmedAbilityId) {
+            propsChain += `.component(ModDataComponents.ITEM_ABILITY_SLOT_${index + 1}.get(), "${trimmedAbilityId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
+          }
+        });
+      }
       if (foodEnabled) {
         let foodBuilder = `new FoodProperties.Builder().nutrition(${parseInt(nutrition) || 4}).saturationModifier(${parseFloat(saturation) || 0.3}f)`;
         if (canAlwaysEat) foodBuilder += '.alwaysEdible()';
@@ -1257,6 +1274,12 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           await invoke('inject_marker', { file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
           injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
         }
+      }
+
+      if (itemAbilitiesEnabled) {
+        const importLine = 'import net.ye6isu.yebisuRPG.component.ModDataComponents;';
+        await invoke('inject_marker', { file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
+        injections.push({ type: 'java-marker', file: `${JAVA_BASE}/item/ModItems.java`, marker: 'YCS_Mod_Item_Imports', content: importLine });
       }
 
       // Attribute modifier imports (both tool and non-tool paths use .attributes())
@@ -1859,6 +1882,19 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
           <FieldRow label="Data Components">
             <FieldIconButton title="Data Components" onClick={() => setEditingDataComponents(true)} hasData={dataComponents.length > 0} />
           </FieldRow>
+          <FieldRow label="Item Abilities">
+            <Checkbox checked={itemAbilitiesEnabled} onChange={setItemAbilitiesEnabled} />
+          </FieldRow>
+          {itemAbilitiesEnabled && itemAbilitySlots.map((abilityId, index) => (
+            <FieldRow key={index} label={`Ability Slot ${index + 1}`}>
+              <StringField
+                value={abilityId}
+                onChange={v => setItemAbilitySlots(slots => slots.map((slot, i) => i === index ? v.trim().toLowerCase().replace(/\s+/g, '_') : slot))}
+                placeholder="empty"
+                style={{ width: '100%' }}
+              />
+            </FieldRow>
+          ))}
         </FieldGroup>
 
         <FieldGroup label="Combat">
