@@ -1,9 +1,0 @@
-{
-  "id": "axeanim",
-  "label": "Axeanim",
-  "fileName": "axe_texture._spritepng.png",
-  "rows": 2,
-  "defaultFrame": 0,
-  "animatedOnUse": true,
-  "ticksPerFrame": 4
-}

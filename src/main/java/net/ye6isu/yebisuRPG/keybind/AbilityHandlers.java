@@ -5,6 +5,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.ye6isu.yebisuRPG.util.DashUtil;
 import net.minecraft.world.entity.LivingEntity;
+import net.ye6isu.yebisuRPG.util.ProjectileUtil;
 // YCS_Ability_Handler_Imports
 
 /**
@@ -23,7 +24,7 @@ public final class AbilityHandlers {
         ItemStack stack = player.getMainHandItem();
         switch (abilityId) {
             case "woop" -> { player.setDeltaMovement((double)((((player.getLookAngle().x))*(2))), (double)((((player.getLookAngle().y))*(2))), (double)((((player.getLookAngle().z))*(2)))); player.hurtMarked = true; }
-            case "wap" -> { DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(15), (int)((double)(5)), DashUtil.Easing.EASE_OUT, null, null, "sphere", (double)(1.5), (double)(0), (double)(0), false); }
+            case "wap" -> { ProjectileUtil.fire(player, "minecraft:arrow", (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (float)((double)(4))); }
             // YCS_Ability_Use_Dispatch
             default -> {}
         }

@@ -11,6 +11,7 @@ const DEFAULT_ABILITY = {
   titleText: '',
   icon: '',
   cooldownSeconds: '0',
+  resourceCosts: {},
 };
 
 function sanitizeId(value) {
@@ -19,6 +20,12 @@ function sanitizeId(value) {
 
 function javaString(value) {
   return String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function javaDoubleLiteral(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0.0';
+  return Number.isInteger(number) ? `${number}.0` : String(number);
 }
 
 async function removeInjections(injections) {
@@ -97,6 +104,7 @@ function FieldIconButton({ onClick, title, hasData, disabled }) {
 function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
   const [form, setForm] = useState(DEFAULT_ABILITY);
   const [textureOptions, setTextureOptions] = useState([{ value: '', label: '(none)' }]);
+  const [resourceOptions, setResourceOptions] = useState([]);
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -119,6 +127,25 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    invoke('list_ycs_data', { category: 'resources' })
+      .then(async ids => {
+        const loaded = [];
+        for (const id of ids) {
+          try {
+            const raw = await invoke('load_ycs_data', { category: 'resources', id });
+            const data = JSON.parse(raw);
+            loaded.push({ id, label: data.name || data.id || id, order: data.order ?? 0 });
+          } catch {}
+        }
+        loaded.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+        if (!cancelled) setResourceOptions(loaded);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     if (!abilityId) return;
     invoke('load_ycs_data', { category: 'abilities', id: abilityId })
       .then(raw => {
@@ -128,12 +155,17 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
           ...data,
           name: data.name || abilityId,
           cooldownSeconds: String(data.cooldownSeconds ?? (data.cooldownTicks != null ? Number(data.cooldownTicks) / 20 : DEFAULT_ABILITY.cooldownSeconds)),
+          resourceCosts: data.resourceCosts || {},
         });
       })
       .catch(() => {});
   }, [abilityId]);
 
   const setField = (field, value) => setForm(current => ({ ...current, [field]: value }));
+  const setResourceCost = (resourceId, value) => setForm(current => ({
+    ...current,
+    resourceCosts: { ...(current.resourceCosts || {}), [resourceId]: value },
+  }));
 
   const handleSave = async () => {
     const id = sanitizeId(form.name);
@@ -160,7 +192,16 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
       }
 
       const cooldownSeconds = Math.max(0, parseFloat(form.cooldownSeconds || '0') || 0);
-      const registryLine = `        AbilityRegistry.register("${javaString(id)}", "${javaString(form.icon)}", ${cooldownSeconds});`;
+      const resourceCosts = {};
+      for (const resource of resourceOptions) {
+        const cost = Math.max(0, parseFloat(form.resourceCosts?.[resource.id] || '0') || 0);
+        if (cost > 0) resourceCosts[resource.id] = cost;
+      }
+      const costEntries = Object.entries(resourceCosts);
+      const costsJava = costEntries.length === 0
+        ? 'java.util.Map.of()'
+        : `java.util.Map.ofEntries(${costEntries.map(([resourceId, cost]) => `java.util.Map.entry("${javaString(resourceId)}", ${javaDoubleLiteral(cost)})`).join(', ')})`;
+      const registryLine = `        AbilityRegistry.register("${javaString(id)}", "${javaString(form.icon)}", ${cooldownSeconds}, ${costsJava});`;
       await invoke('inject_marker', {
         file: `${JAVA_BASE}/keybind/AbilityRegistry.java`,
         marker: 'YCS_Abilities',
@@ -211,6 +252,7 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
         titleText: form.titleText.trim(),
         icon: form.icon,
         cooldownSeconds,
+        resourceCosts,
         _injections: injections,
       };
 
@@ -271,6 +313,11 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
         <FieldRow label="Cooldown Seconds">
           <NumberInput value={form.cooldownSeconds} onChange={v => setField('cooldownSeconds', v)} style={{ width: '120px' }} />
         </FieldRow>
+        {resourceOptions.map(resource => (
+          <FieldRow key={resource.id} label={`${resource.label} Cost`}>
+            <NumberInput value={form.resourceCosts?.[resource.id] ?? '0'} onChange={value => setResourceCost(resource.id, value)} style={{ width: '120px' }} />
+          </FieldRow>
+        ))}
         <FieldRow label="On Use">
           <FieldIconButton
             title="On Use"

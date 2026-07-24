@@ -378,6 +378,29 @@ export const BLOCK_DEFS = [
     },
   },
   {
+    opcode: "projectile.fire",
+    category: "Entity", sub: "actions",
+    isAction: true,
+    label: "Fire [projectile:dropdown.projectiles] from [entity:entity] dir X [x:number] Y [y:number] Z [z:number] power [power:number]",
+    hint: "Spawn a vanilla projectile on the server and shoot it in the given direction. Use Look Direction blocks for aim, or Direction blocks to aim at a target.",
+    color: "#c46c94",
+    fields: {
+      projectile: { type: "dropdown", source: "projectiles", default: "minecraft:arrow", searchable: true },
+    },
+    codegen: {
+      type: "action",
+      template: "ProjectileUtil.fire({{entity}}, {{quote:projectile}}, (double)({{x}}), (double)({{y}}), (double)({{z}}), (float)((double)({{power}})));",
+      imports: ["net.ye6isu.yebisuRPG.util.ProjectileUtil"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        x: { opcode: "entity.look_dir", fields: { axis: "x" } },
+        y: { opcode: "entity.look_dir", fields: { axis: "y" } },
+        z: { opcode: "entity.look_dir", fields: { axis: "z" } },
+        power: { opcode: "number.literal", fields: { value: "1.5" } },
+      },
+    },
+  },
+  {
     opcode: "entity.dash",
     category: "Entity", sub: "actions",
     isAction: true,
