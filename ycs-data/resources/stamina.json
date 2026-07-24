@@ -1,0 +1,30 @@
+{
+  "id": "stamina",
+  "name": "Stamina",
+  "currentVariable": "stamina",
+  "maxAttribute": "stamina",
+  "filledTexture": "stamina",
+  "emptyTexture": "stamina_empty",
+  "order": 0,
+  "regenerationPerSecond": 2,
+  "filledTextureWidth": 9,
+  "filledTextureHeight": 9,
+  "emptyTextureWidth": 9,
+  "emptyTextureHeight": 9,
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java",
+      "marker": "YCS_Player_Resources",
+      "content": "        register(new PlayerResourceDefinition(\"stamina\", 0, \"stamina\", 9, 9, \"stamina_empty\", 9, 9, 2, player -> player.getData(ModAttachments.STAMINA.get()), (player, value) -> player.setData(ModAttachments.STAMINA.get(), value), player -> ((RangedAttribute) ModAttributes.STAMINA.get()).getMaxValue()));"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/stamina.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/stamina_empty.png"
+    }
+  ]
+}

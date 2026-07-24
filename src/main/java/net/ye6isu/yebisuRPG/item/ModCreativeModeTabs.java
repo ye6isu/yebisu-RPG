@@ -11,11 +11,6 @@ public class ModCreativeModeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, yebisuRPG.MODID);
 
-    public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.item.CreativeModeTab, net.minecraft.world.item.CreativeModeTab> YEBISURPG = CREATIVE_MODE_TABS.register("yebisurpg",
-            () -> net.minecraft.world.item.CreativeModeTab.builder()
-                    .title(net.minecraft.network.chat.Component.translatable("itemGroup.yebisurpg.yebisurpg"))
-                    .icon(() -> new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("yebisurpg", "test"))))
-                    .build());
     // YCS_Mod_Creative_Tabs
 
     public static void register(IEventBus eventBus) {

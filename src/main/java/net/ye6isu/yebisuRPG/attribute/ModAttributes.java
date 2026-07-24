@@ -28,6 +28,9 @@ public final class ModAttributes {
         });
     }
 
+    public static final DeferredHolder<Attribute, Attribute> STAMINA = registerAttribute("stamina", 0D, 0D, 100D, true);
+    public static final DeferredHolder<Attribute, Attribute> MANA = registerAttribute("mana", 0D, 0D, 100D, true);
+    public static final DeferredHolder<Attribute, Attribute> CURSED = registerAttribute("cursed", 0D, 0D, 100D, true);
     // YCS_Attributes
 
     private ModAttributes() {}

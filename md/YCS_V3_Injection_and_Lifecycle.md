@@ -5,7 +5,19 @@
 > 1. **Categorize:** Always place new rules into an appropriate existing category, or create a clearly defined new category if one doesn't exist.
 > 2. **Integrate Harmoniously:** **DO NOT** simply append a new line to the bottom of lists. Carefully read the existing content and integrate your new rule. Rephrase or restructure sections if necessary to keep the document clean, highly readable, and logically organized.
 
-This document defines how YCS V3 creates, edits, and deletes objects, and how the injection/manifest system works for any object type.
+This document defines the architecture of YCS V3, how it creates, edits, and deletes objects, and how the injection/manifest system works for any object type.
+
+---
+
+## V3 Architectural Rules
+
+YCS V3 is JSON-driven and uses the following rules for every supported object type:
+
+1. **One JSON per object:** Each object (such as an item, block, or tab) has a dedicated JSON file containing its complete editor state, including its ID, display fields, assignments, methods, and other object-specific settings.
+2. **JSON is the source of truth:** Editors load their fields from the object JSON and save the complete state back to it. UI state must not be maintained as an independent persistent representation that can clear or drift from the saved object.
+3. **Isolated YCS storage:** Object JSON and editor metadata live under `ycs-data/`, separate from the mod's runtime source and resources. Only generated or injected content required by the mod belongs in the mod files.
+4. **Tracked injections:** Every generated change is recorded in the object's `_injections` manifest so it can be removed precisely when the object is edited or deleted.
+5. **Re-injection is authoritative:** Saving an existing object removes its previous injections and rebuilds them from the current JSON state. This keeps edits idempotent and avoids stale generated content.
 
 ---
 
@@ -29,6 +41,8 @@ Key rules:
 - **Object JSONs** (items, blocks, etc.) contain all field data plus an `_injections` manifest array.
 
 ---
+
+Resource Creator objects use `ycs-data/resources/<id>.json`; their selected images remain in the shared `ycs-data/textures/` pool.
 
 ## The `_injections` Manifest
 
@@ -344,6 +358,17 @@ Keybinds are a single key + at most one modifier (Ctrl/Alt/Shift) — deliberate
 
 ---
 
+## Abilities
+
+Ability Creator defines global abilities independently from the keybind or item slot that activates them.
+
+- Stored as `ycs-data/abilities/<id>.json`: `{ name, titleText, icon, cooldownSeconds, resourceCosts, _injections }`. `resourceCosts` is an object keyed by Resource Creator ID; YCS displays one numeric cost field for every saved resource.
+- Save injects an `AbilityRegistry.register(...)` call above `YCS_Abilities`, copies the selected icon into the HUD texture directory, and compiles the optional On Use Blocky graph into `AbilityHandlers`.
+- Activation is server-authoritative. `PlayerAbilities` rejects an ability that is cooling down or cannot afford every positive resource cost. `PlayerResourceRegistry.tryConsume` validates all costs before changing any value, then deducts all of them atomically and clamps each resulting value to its valid range. The cooldown and On Use dispatch only begin after payment succeeds.
+- Cooldowns are persisted in the synced `ABILITY_COOLDOWNS` attachment with an explicit `active|` or `frozen|` prefix. Active values are absolute world-tick deadlines; normal logout converts them to frozen remaining durations and login only resumes values marked frozen. Untagged legacy data is migrated defensively so a forced process exit cannot turn an old absolute deadline into a huge duration.
+
+---
+
 ## HUD (Overlay Only)
 
 HUD covers only the read-only, non-interactive overlay half of "GUI/HUD" — always-on-screen elements drawn every frame with no click handling (bars, text readouts, icons). A clickable interactive screen/menu (its own `Screen` + likely `AbstractContainerMenu` for server-authoritative slot sync) is a separate, not-yet-built system — see `YCS_V3_TODO.md`.
@@ -371,6 +396,20 @@ HUD covers only the read-only, non-interactive overlay half of "GUI/HUD" — alw
   - **Resizing a widget** uses one of 4 corner handles (not a single fixed bottom-right handle) — dragging any corner keeps the *opposite* corner visually anchored in screen space (Photoshop's own resize behavior), independently resizing width/height by default; holding **Shift** locks the aspect ratio, driven by whichever axis moved further. This math is done in absolute screen space (not the widget's anchor-relative `x`/`y` directly) because `anchorOrigin()` itself shifts with width/height for center/right/bottom-anchored widgets — doing the corner-lock in screen space sidesteps having to separately compensate for that shift.
 - **Rendering** (`net.ye6isu.yebisuRPG.hud.client.HudOverlayRenderer`): implements vanilla's `LayeredDraw.Layer` (the modern 1.21.1 GUI-layer interface — NOT the older `IGuiOverlay`, which doesn't exist in this NeoForge version), registered via `RegisterGuiLayersEvent.registerAboveAll(...)` in `ModHud.onRegisterGuiLayers`. Draws Bar (textured or flat-color background + filled portion, the filled portion clipped via `GuiGraphics.enableScissor`/`disableScissor` rather than resizing the source rect, so an animated spritesheet fill still plays correctly even when partially clipped), Text (`GuiGraphics.drawString`), and Icon (`GuiGraphics.blit`) widgets every frame, skipping entirely if `Minecraft.options.hideGui` is set (F1). Animated texture refs use the same stateless `TextureFrameClock.frameAt(...)` clock items already use for spritesheet playback — no new animation system.
 - **YCS editor** (`HudLanding.jsx`): a purpose-built lightweight canvas for layout/position (not a reuse of `BlockEditor`'s pan/zoom/node-graph machinery for *that* part, since widget boxes have no connections between each other — just position+size) — a fixed 480×270 reference-screen preview, draggable/resizable widget boxes, a Photoshop-style layer list panel (select/reorder-by-drag/delete), and a right-side property inspector (name, type, anchor, offset, size, texture pickers, value-link button). Verified end-to-end by actually launching the client with a hand-written test layout before building the canvas — confirms `RegisterGuiLayersEvent`/`LayeredDraw.Layer` registration works and the game doesn't crash, since Mixin/registration-event errors like this only surface at actual launch, not at `compileJava` time (same lesson learned the hard way during Keybinds' aborted combo-row mixin attempt).
+
+---
+
+## Resources
+
+Resource Creator defines compact current/max readouts rendered with the protected `resource` HUD. The replacement vanilla heart stays at the vanilla health position. Authored resources start two pixels to the right of the centered 182-pixel hotbar and two pixels above the bottom screen edge; they are sorted by `order` and stack upward with two pixels between each 9x9 icon.
+
+- Stored as `ycs-data/resources/<id>.json`: `{ id, name, currentVariable, maxAttribute, filledTexture, emptyTexture, order, regenerationPerSecond, filledTextureWidth, filledTextureHeight, emptyTextureWidth, emptyTextureHeight, _injections }`.
+- `currentVariable` must reference a numeric Entity Variable. Its synced player attachment supplies the current amount. `maxAttribute` references a YCS `RangedAttribute`; Resource Creator intentionally reads that attribute definition's configured maximum cap, rather than its runtime base/current value, so an attribute configured with base `0` and max `100` displays a resource maximum of `100`.
+- `filledTexture` and `emptyTexture` come from the shared YCS texture pool. Save copies both to `assets/yebisurpg/textures/hud/` and tracks them as `created-file` injections. The empty texture is drawn first, then the filled texture is horizontally clipped to `current / maximum` and drawn above it.
+- Every resource occupies a fixed 9x9 GUI-space icon box. Its stored source dimensions are passed to `GuiGraphics.blit`, so larger images (for example 18x18) scale into the 9x9 box instead of being cropped. Health and resource text start at `iconX + 11`, `iconY + 1`, giving a two-pixel gap to the right and a one-pixel vertical inset.
+- Save injects one `PlayerResourceDefinition` registration above `YCS_Player_Resources` in the common `PlayerResourceRegistry.java`. Re-save removes the old marker content and copied textures before rebuilding them; rename additionally deletes the old resource JSON; Remove walks `_injections` in reverse and deletes the JSON.
+- `PlayerResourceEvents` runs once every 20 server ticks and adds each definition's non-negative `regenerationPerSecond` to every online player. The common definition setter clamps all regeneration and deductions into `[0, configured attribute maximum]`, so a resource never regenerates above its max or falls below zero.
+- Runtime values are server-owned state. Numeric Entity Variables use NeoForge attachment persistence/sync, while the client renderer only reads the synchronized value. The resource HUD is visible in Survival and Creative, remains hidden in Spectator, and its rendering is purely cosmetic.
 
 ---
 

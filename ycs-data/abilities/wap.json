@@ -3,12 +3,15 @@
   "titleText": "Woop",
   "icon": "placehold_ability",
   "cooldownSeconds": 3,
+  "resourceCosts": {
+    "mana": 10
+  },
   "_injections": [
     {
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityRegistry.java",
       "marker": "YCS_Abilities",
-      "content": "        AbilityRegistry.register(\"wap\", \"placehold_ability\", 3);"
+      "content": "        AbilityRegistry.register(\"wap\", \"placehold_ability\", 3, java.util.Map.ofEntries(java.util.Map.entry(\"mana\", 10.0)));"
     },
     {
       "type": "created-file",
@@ -18,7 +21,7 @@
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
       "marker": "YCS_Ability_Use_Dispatch",
-      "content": "            case \"wap\" -> { DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(15), (int)((double)(5)), DashUtil.Easing.EASE_OUT, null, null, \"sphere\", (double)(1.5), (double)(0), (double)(0), false); }"
+      "content": "            case \"wap\" -> { ProjectileUtil.fire(player, \"minecraft:arrow\", (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (float)((double)(4))); }"
     },
     {
       "type": "java-marker",
@@ -31,6 +34,12 @@
       "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
       "marker": "YCS_Ability_Handler_Imports",
       "content": "import net.minecraft.world.entity.LivingEntity;"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
+      "marker": "YCS_Ability_Handler_Imports",
+      "content": "import net.ye6isu.yebisuRPG.util.ProjectileUtil;"
     }
   ]
 }

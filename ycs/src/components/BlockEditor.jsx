@@ -59,6 +59,27 @@ export const VANILLA_ATTRIBUTES = [
 let dynamicTextureOptions = [];
 
 const DROPDOWN_SOURCES = {
+  projectiles: [
+    { label: 'Arrow', value: 'minecraft:arrow' },
+    { label: 'Spectral Arrow', value: 'minecraft:spectral_arrow' },
+    { label: 'Trident', value: 'minecraft:trident' },
+    { label: 'Snowball', value: 'minecraft:snowball' },
+    { label: 'Egg', value: 'minecraft:egg' },
+    { label: 'Ender Pearl', value: 'minecraft:ender_pearl' },
+    { label: 'Experience Bottle', value: 'minecraft:experience_bottle' },
+    { label: 'Potion', value: 'minecraft:potion' },
+    { label: 'Fireball', value: 'minecraft:fireball' },
+    { label: 'Small Fireball', value: 'minecraft:small_fireball' },
+    { label: 'Dragon Fireball', value: 'minecraft:dragon_fireball' },
+    { label: 'Wither Skull', value: 'minecraft:wither_skull' },
+    { label: 'Wind Charge', value: 'minecraft:wind_charge' },
+    { label: 'Breeze Wind Charge', value: 'minecraft:breeze_wind_charge' },
+    { label: 'Shulker Bullet', value: 'minecraft:shulker_bullet' },
+    { label: 'Llama Spit', value: 'minecraft:llama_spit' },
+    { label: 'Firework Rocket', value: 'minecraft:firework_rocket' },
+    { label: 'Fishing Bobber', value: 'minecraft:fishing_bobber' },
+    { label: 'Eye of Ender', value: 'minecraft:eye_of_ender' },
+  ],
   effects: [
     { label: 'Regeneration', value: 'MobEffects.REGENERATION' },
     { label: 'Speed', value: 'MobEffects.MOVEMENT_SPEED' },

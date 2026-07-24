@@ -1,0 +1,30 @@
+{
+  "id": "mana",
+  "name": "Mana",
+  "currentVariable": "mana",
+  "maxAttribute": "mana",
+  "filledTexture": "mana",
+  "emptyTexture": "mana_empty",
+  "order": 1,
+  "regenerationPerSecond": 1,
+  "filledTextureWidth": 18,
+  "filledTextureHeight": 18,
+  "emptyTextureWidth": 18,
+  "emptyTextureHeight": 18,
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java",
+      "marker": "YCS_Player_Resources",
+      "content": "        register(new PlayerResourceDefinition(\"mana\", 1, \"mana\", 18, 18, \"mana_empty\", 18, 18, 1, player -> player.getData(ModAttachments.MANA.get()), (player, value) -> player.setData(ModAttachments.MANA.get(), value), player -> ((RangedAttribute) ModAttributes.MANA.get()).getMaxValue()));"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/mana.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/mana_empty.png"
+    }
+  ]
+}

@@ -8,7 +8,10 @@ import net.minecraft.client.gui.LayeredDraw;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.ye6isu.yebisuRPG.hud.HudWidget;
@@ -16,6 +19,8 @@ import net.ye6isu.yebisuRPG.keybind.AbilityDefinition;
 import net.ye6isu.yebisuRPG.keybind.AbilityRegistry;
 import net.ye6isu.yebisuRPG.keybind.PlayerAbilities;
 import net.ye6isu.yebisuRPG.keybind.client.AbilityBarClientState;
+import net.ye6isu.yebisuRPG.resource.PlayerResourceDefinition;
+import net.ye6isu.yebisuRPG.resource.PlayerResourceRegistry;
 import net.ye6isu.yebisuRPG.texture.FrameLoopMode;
 import net.ye6isu.yebisuRPG.texture.TextureFrameClock;
 import net.ye6isu.yebisuRPG.yebisuRPG;
@@ -47,10 +52,36 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
     // Layout name -> literal visibility fallback, used only when LAYOUT_VISIBILITY has no link.
     private static final Map<String, Boolean> LAYOUT_VISIBILITY_LITERAL = new LinkedHashMap<>();
     private static Map<String, List<HudWidget>> cachedWidgetsByLayout = null;
+    private static final int RESOURCE_ICON_SIZE = 9;
+    private static final int RESOURCE_GAP = 2;
+    private static final int RESOURCE_ROW_SPACING = RESOURCE_ICON_SIZE + RESOURCE_GAP;
+    private static final int HOTBAR_HALF_WIDTH = 91;
+    private static final int VANILLA_HEALTH_BOTTOM_OFFSET = 39;
     // Bar widgets can optionally smooth their fill toward the target value instead of
     // snapping instantly — keyed by valueSourceId (unique per bound widget) since HudWidget
     // itself is re-parsed fresh from JSON every reload and has no other stable identity.
     private static final Map<String, Double> BAR_DISPLAY_FRAC = new HashMap<>();
+    private final boolean resourceOnly;
+
+    public HudOverlayRenderer() {
+        this(false);
+    }
+
+    private HudOverlayRenderer(boolean resourceOnly) {
+        this.resourceOnly = resourceOnly;
+    }
+
+    public static HudOverlayRenderer resourceOnly() {
+        return new HudOverlayRenderer(true);
+    }
+
+    public static boolean isResourceHudActive() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.player != null
+                && mc.gameMode != null
+                && (mc.gameMode.getPlayerMode() == GameType.SURVIVAL
+                || mc.gameMode.getPlayerMode() == GameType.CREATIVE);
+    }
 
     /** Called once per declared HUD layout by YCS-injected registration code. */
     public static void registerLayout(String name) {
@@ -93,16 +124,23 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player == null || mc.options.hideGui) return;
+        if (resourceOnly && !isResourceHudActive()) return;
 
         int screenWidth = graphics.guiWidth();
         int screenHeight = graphics.guiHeight();
         long tick = player.level().getGameTime();
 
         for (Map.Entry<String, List<HudWidget>> entry : widgetsByLayout().entrySet()) {
+            boolean isResourceLayout = "resource".equals(entry.getKey());
+            if (resourceOnly != isResourceLayout) continue;
             if ("alt_ability".equals(entry.getKey()) && !AbilityBarClientState.isAltBarActive()) continue;
             String layoutVisSourceId = LAYOUT_VISIBILITY.get(entry.getKey());
             boolean layoutVisLiteral = LAYOUT_VISIBILITY_LITERAL.getOrDefault(entry.getKey(), true);
             if (!resolveVisible(layoutVisSourceId, player, layoutVisLiteral)) continue;
+            if (isResourceLayout) {
+                renderResourceHud(graphics, player, screenWidth, screenHeight);
+                continue;
+            }
 
             List<HudWidget> layoutWidgets = entry.getValue();
             for (HudWidget widget : layoutWidgets) {
@@ -123,6 +161,109 @@ public final class HudOverlayRenderer implements LayeredDraw.Layer {
                 }
             }
         }
+    }
+
+    private static void renderResourceHud(GuiGraphics g, Player player, int screenWidth, int screenHeight) {
+        int healthX = screenWidth / 2 - HOTBAR_HALF_WIDTH;
+        int healthY = screenHeight - VANILLA_HEALTH_BOTTOM_OFFSET;
+        renderResourceHeart(g, player, healthX, healthY);
+
+        int resourceX = screenWidth / 2 + HOTBAR_HALF_WIDTH + RESOURCE_GAP;
+        int resourceBottomY = screenHeight - RESOURCE_ICON_SIZE - RESOURCE_GAP;
+        int row = 0;
+        for (PlayerResourceDefinition resource : PlayerResourceRegistry.all()) {
+            renderResourceValue(g, player, resource, resourceX, resourceBottomY - row * RESOURCE_ROW_SPACING);
+            row++;
+        }
+    }
+
+    private static void renderResourceHeart(GuiGraphics g, Player player, int x, int y) {
+        boolean blink = isHeartBlinking(player);
+        boolean hardcore = player.level().getLevelData().isHardcore();
+
+        String containerTexture = "heart_container"
+                + (hardcore ? "_hardcore" : "")
+                + (blink ? "_blinking" : "");
+        drawResourceHeartTexture(g, containerTexture, x, y);
+
+        float maxHealth = Math.max(1.0F, player.getMaxHealth());
+        int filledWidth = (int) Math.ceil(RESOURCE_ICON_SIZE * Math.max(0.0F, Math.min(1.0F, player.getHealth() / maxHealth)));
+        if (filledWidth > 0) {
+            drawResourceHeartTextureClipped(g, resourceHeartTexture(player, hardcore, blink), x, y, filledWidth);
+        }
+
+        String healthText = formatResourceHealth(player.getHealth()) + "/" + formatResourceHealth(maxHealth);
+        drawResourceText(g, healthText, x, y);
+    }
+
+    private static void renderResourceValue(GuiGraphics g, Player player, PlayerResourceDefinition resource, int x, int y) {
+        double current = resource.current(player);
+        double maximum = resource.maximum(player);
+        double fraction = maximum > 0.0 ? Math.max(0.0, Math.min(1.0, current / maximum)) : 0.0;
+
+        drawResourceTexture(g, resource.emptyTexture(), resource.emptyTextureWidth(), resource.emptyTextureHeight(), x, y);
+        int filledWidth = (int) Math.ceil(RESOURCE_ICON_SIZE * fraction);
+        if (filledWidth > 0) {
+            drawResourceTextureClipped(g, resource.filledTexture(), resource.filledTextureWidth(), resource.filledTextureHeight(), x, y, filledWidth);
+        }
+
+        drawResourceText(g, formatResourceNumber(current) + "/" + formatResourceNumber(maximum), x, y);
+    }
+
+    private static void drawResourceText(GuiGraphics g, String text, int iconX, int iconY) {
+        g.drawString(Minecraft.getInstance().font, text, iconX + RESOURCE_ICON_SIZE + RESOURCE_GAP, iconY + 1, 0xFFFFFFFF, true);
+    }
+
+    private static boolean isHeartBlinking(Player player) {
+        int blinkTicks = Math.max(player.hurtTime, player.invulnerableTime);
+        return blinkTicks > 0 && (blinkTicks / 3) % 2 == 1;
+    }
+
+    private static String resourceHeartTexture(Player player, boolean hardcore, boolean blink) {
+        String state = player.hasEffect(MobEffects.POISON) ? "poisoned"
+                : player.hasEffect(MobEffects.WITHER) ? "withered"
+                : player.isFullyFrozen() ? "frozen"
+                : "";
+        String texture = state.isEmpty()
+                ? (hardcore ? "hardcore_full" : "full")
+                : state + (hardcore ? "_hardcore" : "") + "_full";
+        return "heart_" + texture + (blink ? "_blinking" : "");
+    }
+
+    private static String formatResourceHealth(float value) {
+        return formatResourceNumber(Math.max(0.0F, value));
+    }
+
+    private static String formatResourceNumber(double value) {
+        double clamped = Math.max(0.0, value);
+        if (clamped < 1.0 && clamped > 0.0) return String.format(Locale.ROOT, "%.1f", clamped);
+        return String.valueOf(Mth.ceil(clamped));
+    }
+
+    private static void drawResourceHeartTexture(GuiGraphics g, String textureId, int x, int y) {
+        drawResourceTexture(g, textureId, RESOURCE_ICON_SIZE, RESOURCE_ICON_SIZE, x, y);
+    }
+
+    private static void drawResourceHeartTextureClipped(GuiGraphics g, String textureId, int x, int y, int clipWidth) {
+        drawResourceTextureClipped(g, textureId, RESOURCE_ICON_SIZE, RESOURCE_ICON_SIZE, x, y, clipWidth);
+    }
+
+    private static void drawResourceTexture(GuiGraphics g, String textureId, int sourceWidth, int sourceHeight, int x, int y) {
+        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(yebisuRPG.MODID, "textures/hud/" + textureId + ".png");
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        g.blit(loc, x, y, RESOURCE_ICON_SIZE, RESOURCE_ICON_SIZE, 0f, 0f,
+                sourceWidth, sourceHeight, sourceWidth, sourceHeight);
+    }
+
+    private static void drawResourceTextureClipped(GuiGraphics g, String textureId, int sourceWidth, int sourceHeight, int x, int y, int clipWidth) {
+        if (clipWidth >= RESOURCE_ICON_SIZE) {
+            drawResourceTexture(g, textureId, sourceWidth, sourceHeight, x, y);
+            return;
+        }
+        g.enableScissor(x, y, x + clipWidth, y + RESOURCE_ICON_SIZE);
+        drawResourceTexture(g, textureId, sourceWidth, sourceHeight, x, y);
+        g.disableScissor();
     }
 
     private static boolean resolveVisible(String sourceId, Player player, boolean fallback) {

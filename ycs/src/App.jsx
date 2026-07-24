@@ -12,6 +12,7 @@ import AttributesLanding from "./components/AttributesLanding";
 import KeybindsLanding from "./components/KeybindsLanding";
 import AbilitiesLanding from "./components/AbilitiesLanding";
 import HudLanding from "./components/HudLanding";
+import ResourcesLanding from "./components/ResourcesLanding";
 import "./App.css";
 
 function App() {
@@ -162,6 +163,7 @@ function App() {
     { key: 'keybinds', component: <KeybindsLanding /> },
     { key: 'abilities', component: <AbilitiesLanding /> },
     { key: 'textures', component: <TextureManager /> },
+    { key: 'resources', component: <ResourcesLanding /> },
     { key: 'hud', component: <HudLanding /> },
   ];
 
@@ -207,6 +209,7 @@ function App() {
             </SidebarGroup>
 
             <SidebarGroup label="Interface" isOpen={isInterfaceOpen} onToggle={() => setIsInterfaceOpen(!isInterfaceOpen)}>
+              <SidebarTab label="Resources" tabKey="resources" />
               <SidebarTab label="HUD" tabKey="hud" />
             </SidebarGroup>
 

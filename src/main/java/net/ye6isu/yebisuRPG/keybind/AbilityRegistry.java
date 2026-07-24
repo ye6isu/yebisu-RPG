@@ -11,7 +11,11 @@ public final class AbilityRegistry {
     private AbilityRegistry() {}
 
     public static void register(String id, String icon, double cooldownSeconds) {
-        DEFINITIONS.put(id, new AbilityDefinition(id, icon, cooldownSeconds));
+        register(id, icon, cooldownSeconds, Map.of());
+    }
+
+    public static void register(String id, String icon, double cooldownSeconds, Map<String, Double> resourceCosts) {
+        DEFINITIONS.put(id, new AbilityDefinition(id, icon, cooldownSeconds, resourceCosts));
     }
 
     public static AbilityDefinition get(String id) {
@@ -19,8 +23,8 @@ public final class AbilityRegistry {
     }
 
     static {
-        AbilityRegistry.register("woop", "placehold_ability_2", 1);
-        AbilityRegistry.register("wap", "placehold_ability", 3);
+        AbilityRegistry.register("woop", "placehold_ability_2", 1, java.util.Map.ofEntries(java.util.Map.entry("stamina", 15.0)));
+        AbilityRegistry.register("wap", "placehold_ability", 3, java.util.Map.ofEntries(java.util.Map.entry("mana", 10.0)));
         // YCS_Abilities
     }
 }

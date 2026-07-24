@@ -49,6 +49,7 @@ public class yebisuRPG
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> net.ye6isu.yebisuRPG.animation.client.ClientAnimationEngine.INSTANCE.tick());
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Pre e) -> net.ye6isu.yebisuRPG.keybind.client.ClientKeybindTracker.INSTANCE.preTick());
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post e) -> net.ye6isu.yebisuRPG.keybind.client.ClientKeybindTracker.INSTANCE.tick());
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.ye6isu.yebisuRPG.hud.client.HudLayerHider::onRenderGuiLayerPre);
             modEventBus.addListener(ModHud::onRegisterGuiLayers);
             modEventBus.addListener(ModHud::onRegisterReloadListeners);
             ModHud.registerLayouts();

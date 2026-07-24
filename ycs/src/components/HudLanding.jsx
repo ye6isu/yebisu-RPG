@@ -1931,8 +1931,9 @@ export default function HudLanding() {
   if (creating) return <HudEditor onBack={() => { setCreating(false); reload(); }} />;
   if (editing) return <HudEditor layoutId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
+  const protectedLayoutIds = new Set(['ability', 'alt_ability', 'resource']);
   const filtered = layouts
-    .filter(l => (l.id || l.name) !== 'ability')
+    .filter(l => !protectedLayoutIds.has(l.id || l.name))
     .filter(l => !search || (l.name || l.id).toLowerCase().includes(search.toLowerCase()));
 
   return (

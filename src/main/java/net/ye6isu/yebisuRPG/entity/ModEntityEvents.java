@@ -31,14 +31,8 @@ public final class ModEntityEvents {
 
     private static void registerAttributes(EntityAttributeCreationEvent event) {
 
-        event.put(ModEntities.TESTEN.get(), LivingEntity.createLivingAttributes().add(Attributes.FOLLOW_RANGE, 16.0).add(Attributes.MAX_HEALTH, 20D).add(Attributes.MOVEMENT_SPEED, 0.25D).add(Attributes.ATTACK_DAMAGE, 2D).add(Attributes.ARMOR, 0D).add(Attributes.ARMOR_TOUGHNESS, 0D).add(Attributes.KNOCKBACK_RESISTANCE, 0D).add(Attributes.SCALE, 1D).build());
-        event.put(ModEntities.PLL.get(), LivingEntity.createLivingAttributes().add(Attributes.FOLLOW_RANGE, 16.0).add(Attributes.MAX_HEALTH, 20D).add(Attributes.MOVEMENT_SPEED, 0.25D).add(Attributes.ATTACK_DAMAGE, 2D).add(Attributes.ARMOR, 0D).add(Attributes.ARMOR_TOUGHNESS, 0D).add(Attributes.KNOCKBACK_RESISTANCE, 0D).add(Attributes.SCALE, 1D).build());
-        event.put(ModEntities.PAAAA.get(), LivingEntity.createLivingAttributes().add(Attributes.FOLLOW_RANGE, 16.0).add(Attributes.MAX_HEALTH, 20D).add(Attributes.MOVEMENT_SPEED, 0.25D).build());
         // YCS_Entity_Attributes
 
-        YcsMobData.register(ModEntities.TESTEN.get(), new YcsMobData.Config(YcsMobData.Hostility.HOSTILE).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.WANDER, 1D, 0D, 0F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AT_PLAYER, 0D, 0D, 8F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AROUND, 0D, 0D, 0F, false, null)).withHeadBone("bone2"));
-        YcsMobData.register(ModEntities.PLL.get(), new YcsMobData.Config(YcsMobData.Hostility.PASSIVE).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.WANDER, 1D, 0D, 0F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AT_PLAYER, 0D, 0D, 8F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AROUND, 0D, 0D, 0F, false, null)).withHeadBone("Head").withAnimNames("idle", "").withPart("Head", "Head", 1F, 0.5F).withPart("RLegs", "Right Leg", 0.5F, 1F));
-        YcsMobData.register(ModEntities.PAAAA.get(), new YcsMobData.Config(YcsMobData.Hostility.PASSIVE).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.WANDER, 1D, 0D, 0F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.FLOAT, 0D, 0D, 0F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AT_PLAYER, 0D, 0D, 8F, false, null)).withGoal(new YcsMobData.GoalEntry(YcsMobData.GoalType.LOOK_AROUND, 0D, 0D, 0F, false, null)).withHeadBone("Head").withAnimNames("idle", "walk").withPart("hb_head", "hb_head", 0.625F, 0.625F, 0F, -1F, 0F).withPart("hb_rarm", "hb_rarm", 0.375F, 0.875F, -8F, -1F, 0F).withPart("hb_larm", "hb_larm", 0.375F, 0.875F, 4F, -1F, 0F).withPart("hb_rleg", "hb_rleg", 0.375F, 0.875F, -4F, -13F, 0F));
         // YCS_Entity_Hostility
     }
 }

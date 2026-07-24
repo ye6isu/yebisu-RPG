@@ -6,12 +6,16 @@ import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.ye6isu.yebisuRPG.component.ModDataComponents;
 import net.ye6isu.yebisuRPG.entityvar.ModAttachments;
+import net.ye6isu.yebisuRPG.resource.PlayerResourceRegistry;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Server-owned player ability loadout and cooldown helpers. */
 public final class PlayerAbilities {
+
+    private static final String ACTIVE_COOLDOWNS_PREFIX = "active|";
+    private static final String FROZEN_COOLDOWNS_PREFIX = "frozen|";
 
     private PlayerAbilities() {}
 
@@ -35,6 +39,7 @@ public final class PlayerAbilities {
         AbilityDefinition ability = AbilityRegistry.get(abilityId);
         if (ability == null) return false;
         if (cooldownRemainingTicks(player, abilityId) > 0) return false;
+        if (!PlayerResourceRegistry.tryConsume(player, ability.resourceCosts())) return false;
 
         setCooldownEnd(player, abilityId, player.level().getGameTime() + ability.cooldownTicks());
         AbilityHandlers.dispatch(abilityId, player);
@@ -85,7 +90,10 @@ public final class PlayerAbilities {
     }
 
     public static long cooldownRemainingTicks(Player player, String abilityId) {
-        long remaining = getCooldownEnd(player, abilityId) - player.level().getGameTime();
+        if (abilityId == null || abilityId.isBlank()) return 0L;
+        CooldownState state = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
+        long stored = state.values().getOrDefault(abilityId, 0L);
+        long remaining = state.frozen() ? stored : stored - player.level().getGameTime();
         return Math.max(0L, remaining);
     }
 
@@ -111,40 +119,59 @@ public final class PlayerAbilities {
 
     public static void freezeCooldowns(Player player) {
         if (player == null || player.level().isClientSide()) return;
+        CooldownState state = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
+        if (state.frozen()) return;
         long now = player.level().getGameTime();
-        Map<String, Long> cooldowns = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
+        Map<String, Long> cooldowns = state.values();
         cooldowns.replaceAll((id, endTick) -> Math.max(0L, endTick - now));
         cooldowns.entrySet().removeIf(entry -> entry.getValue() <= 0L);
-        player.setData(ModAttachments.ABILITY_COOLDOWNS.get(), writeCooldowns(cooldowns));
+        player.setData(ModAttachments.ABILITY_COOLDOWNS.get(), writeCooldowns(cooldowns, true));
     }
 
     public static void resumeCooldowns(Player player) {
         if (player == null || player.level().isClientSide()) return;
         long now = player.level().getGameTime();
-        Map<String, Long> cooldowns = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
-        cooldowns.replaceAll((id, remainingTicks) -> now + Math.max(0L, remainingTicks));
+        CooldownState state = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
+        Map<String, Long> cooldowns = state.values();
+        if (state.frozen()) {
+            cooldowns.replaceAll((id, remainingTicks) -> now + Math.max(0L, remainingTicks));
+        } else if (state.legacy()) {
+            cooldowns.replaceAll((id, storedValue) -> migrateLegacyCooldown(id, storedValue, now));
+        }
         cooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
-        player.setData(ModAttachments.ABILITY_COOLDOWNS.get(), writeCooldowns(cooldowns));
-    }
-
-    private static long getCooldownEnd(Player player, String abilityId) {
-        if (abilityId == null || abilityId.isBlank()) return 0L;
-        return parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get())).getOrDefault(abilityId, 0L);
+        player.setData(ModAttachments.ABILITY_COOLDOWNS.get(), writeCooldowns(cooldowns, false));
     }
 
     private static void setCooldownEnd(Player player, String abilityId, long endTick) {
         if (abilityId == null || abilityId.isBlank()) return;
-        Map<String, Long> cooldowns = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
         long now = player.level().getGameTime();
+        CooldownState state = parseCooldowns(player.getData(ModAttachments.ABILITY_COOLDOWNS.get()));
+        Map<String, Long> cooldowns = state.values();
+        if (state.frozen()) {
+            cooldowns.replaceAll((id, remainingTicks) -> now + Math.max(0L, remainingTicks));
+        } else if (state.legacy()) {
+            cooldowns.replaceAll((id, storedValue) -> migrateLegacyCooldown(id, storedValue, now));
+        }
         cooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
         cooldowns.put(abilityId, endTick);
-        player.setData(ModAttachments.ABILITY_COOLDOWNS.get(), writeCooldowns(cooldowns));
+        player.setData(ModAttachments.ABILITY_COOLDOWNS.get(), writeCooldowns(cooldowns, false));
     }
 
-    private static Map<String, Long> parseCooldowns(String raw) {
+    private static long migrateLegacyCooldown(String abilityId, long storedValue, long now) {
+        AbilityDefinition ability = AbilityRegistry.get(abilityId);
+        long maximumDuration = ability != null ? ability.cooldownTicks() : 0L;
+        if (storedValue > maximumDuration) return storedValue;
+        return now + Math.max(0L, storedValue);
+    }
+
+    private static CooldownState parseCooldowns(String raw) {
         Map<String, Long> result = new LinkedHashMap<>();
-        if (raw == null || raw.isBlank()) return result;
-        for (String entry : raw.split(";")) {
+        if (raw == null || raw.isBlank()) return new CooldownState(false, false, result);
+        boolean frozen = raw.startsWith(FROZEN_COOLDOWNS_PREFIX);
+        boolean active = raw.startsWith(ACTIVE_COOLDOWNS_PREFIX);
+        String body = frozen ? raw.substring(FROZEN_COOLDOWNS_PREFIX.length())
+                : active ? raw.substring(ACTIVE_COOLDOWNS_PREFIX.length()) : raw;
+        for (String entry : body.split(";")) {
             int sep = entry.lastIndexOf('=');
             if (sep <= 0 || sep >= entry.length() - 1) continue;
             try {
@@ -152,19 +179,21 @@ public final class PlayerAbilities {
             } catch (NumberFormatException ignored) {
             }
         }
-        return result;
+        return new CooldownState(frozen, !frozen && !active, result);
     }
 
-    private static String writeCooldowns(Map<String, Long> cooldowns) {
-        StringBuilder out = new StringBuilder();
+    private static String writeCooldowns(Map<String, Long> cooldowns, boolean frozen) {
+        StringBuilder out = new StringBuilder(frozen ? FROZEN_COOLDOWNS_PREFIX : ACTIVE_COOLDOWNS_PREFIX);
         for (Map.Entry<String, Long> entry : cooldowns.entrySet()) {
             String id = entry.getKey();
             if (id == null || id.isBlank() || id.indexOf(';') >= 0 || id.indexOf('=') >= 0) continue;
-            if (!out.isEmpty()) out.append(';');
+            if (out.length() > (frozen ? FROZEN_COOLDOWNS_PREFIX.length() : ACTIVE_COOLDOWNS_PREFIX.length())) out.append(';');
             out.append(id).append('=').append(entry.getValue());
         }
         return out.toString();
     }
+
+    private record CooldownState(boolean frozen, boolean legacy, Map<String, Long> values) {}
 
     private static DeferredHolder<AttachmentType<?>, AttachmentType<String>> slotHolder(int slot) {
         return switch (slot) {

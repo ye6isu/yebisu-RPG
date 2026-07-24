@@ -57,8 +57,6 @@ public final class ModAttachments {
                 .build());
     }
 
-    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Boolean>> CHCKER = registerBoolean("chcker", false);
-    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> COUNTER = registerDouble("counter", 0);
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<String>> ABILITY_SLOT_1 = registerString("ability_slot_1", "");
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<String>> ABILITY_SLOT_2 = registerString("ability_slot_2", "");
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<String>> ABILITY_SLOT_3 = registerString("ability_slot_3", "");
@@ -81,6 +79,9 @@ public final class ModAttachments {
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Long>> ABILITY_SLOT_4_COOLDOWN_END = registerLong("ability_slot_4_cooldown_end", 0L);
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Long>> ABILITY_SLOT_5_COOLDOWN_END = registerLong("ability_slot_5_cooldown_end", 0L);
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Long>> ABILITY_SLOT_6_COOLDOWN_END = registerLong("ability_slot_6_cooldown_end", 0L);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> STAMINA = registerDouble("stamina", 0);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> MANA = registerDouble("mana", 20);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURSED = registerDouble("cursed", 0);
     // YCS_Entity_Attachments
 
     private ModAttachments() {}
