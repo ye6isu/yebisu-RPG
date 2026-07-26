@@ -172,15 +172,46 @@
 }
 .vfx-timeline-controls {
   min-width: 0;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   padding: 4px 8px;
 }
-.vfx-timeline-scrubber { min-width: 0; display: flex; align-items: center; }
-.vfx-timeline-scrubber .ycs-slider { width: calc(100% - 6px); margin: 0 3px; }
-.vfx-timeline-rows { min-height: 0; overflow: auto; }
+.vfx-timeline-controls .vfx-transport-button {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  padding: 4px;
+}
+.vfx-transport-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+.vfx-tick-input {
+  width: 42px !important;
+  min-width: 0;
+  height: 24px;
+  padding: 2px 3px;
+  text-align: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.vfx-tick-total {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.vfx-timeline-scrubber { min-width: 0; display: flex; align-items: center; gap: 4px; }
+.vfx-timeline-scrubber .ycs-slider { flex: 1 1 auto; width: auto; min-width: 0; margin: 0 3px; }
+.vfx-graph-toggle.active {
+  color: #ffffff;
+  background: var(--ycs-highlight);
+}
+.vfx-timeline-rows { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; }
 .vfx-timeline-layer { border-bottom: 1px solid color-mix(in srgb, var(--ycs-foreground) 60%, transparent); }
 .vfx-timeline-row { height: 30px; display: grid; grid-template-columns: var(--vfx-hierarchy-width, 230px) 1fr; cursor: pointer; }
 .vfx-timeline-layer.selected > .vfx-timeline-layer-row { background: color-mix(in srgb, var(--ycs-highlight) 20%, transparent); }
@@ -209,10 +240,39 @@
   transition: transform 0.1s ease-in-out;
 }
 .vfx-disclosure.expanded > span { transform: rotate(90deg); }
-.vfx-timeline-property-row { height: 26px; border-top: 1px solid color-mix(in srgb, var(--ycs-foreground) 35%, transparent); }
-.vfx-timeline-property-row > span { padding-left: 36px; opacity: 0.7; }
-.vfx-timeline-property-row .vfx-track { margin-top: 5px; margin-bottom: 5px; }
+.vfx-timeline-property-row { height: 28px; border-top: 1px solid color-mix(in srgb, var(--ycs-foreground) 35%, transparent); }
+.vfx-timeline-property-row > span { padding: 4px 8px 4px 36px; }
+.vfx-timeline-property-row .vfx-track { margin-top: 6px; margin-bottom: 6px; }
+.vfx-timeline-property-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; opacity: 0.8; }
+.vfx-keyframe-actions { display: flex; align-items: center; gap: 2px; }
+.vfx-keyframe-actions button {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius);
+  background: var(--ycs-bg);
+  color: var(--ycs-text);
+  cursor: pointer;
+  line-height: 1;
+}
+.vfx-keyframe-actions button:hover:not(:disabled) { background: var(--ycs-foreground); }
+.vfx-keyframe-actions button:disabled { opacity: 0.3; cursor: default; }
+.vfx-keyframe-actions .vfx-separate-dimensions {
+  width: 31px;
+  font-size: 8px;
+  font-weight: 600;
+}
+.vfx-keyframe-actions .vfx-separate-dimensions.active {
+  color: #ffffff;
+  background: var(--ycs-highlight);
+}
+.vfx-timeline-axis-row > span { padding-left: 52px; }
 .vfx-track { position: relative; margin: 7px 10px; background: var(--ycs-foreground); }
+.vfx-active-track,
+.vfx-keyframe-track { clip-path: inset(-8px 0 -8px 0); }
 .vfx-track-range {
   position: absolute;
   top: 1px;
@@ -224,7 +284,6 @@
 .vfx-track-range.dragging.move { cursor: grabbing; }
 .vfx-track-range.dragging.start,
 .vfx-track-range.dragging.end { cursor: ew-resize; }
-.vfx-track-range.summary { opacity: 0.38; pointer-events: none; }
 .vfx-track-handle {
   position: absolute;
   top: -2px;
@@ -244,6 +303,337 @@
 .vfx-track-handle.start::after { left: 3px; }
 .vfx-track-handle.end { right: -3px; }
 .vfx-track-handle.end::after { right: 3px; }
+.vfx-keyframe {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ycs-text) 75%, transparent);
+  background: var(--ycs-highlight);
+  transform: translate(-50%, -50%) rotate(45deg);
+  cursor: ew-resize;
+  z-index: 2;
+}
+.vfx-keyframe.dragging { cursor: ew-resize; }
+.vfx-keyframe.selected {
+  background: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ycs-highlight) 70%, transparent);
+}
+.vfx-selection-marquee {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ycs-highlight) 90%, white);
+  background: color-mix(in srgb, var(--ycs-highlight) 20%, transparent);
+}
+.vfx-graph-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  background: color-mix(in srgb, var(--ycs-bg) 94%, black);
+}
+.vfx-graph-tabs {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--ycs-foreground);
+}
+.vfx-graph-tab-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius);
+  overflow: hidden;
+}
+.vfx-graph-tab-group button {
+  min-width: 48px;
+  height: 20px;
+  padding: 1px 7px;
+  border: 0;
+  border-right: 1px solid var(--ycs-foreground);
+  background: var(--ycs-bg);
+  color: var(--ycs-text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.vfx-graph-tab-group button:last-child { border-right: 0; }
+.vfx-graph-tab-group button:hover { background: var(--ycs-foreground); }
+.vfx-graph-tab-group button.active {
+  color: #ffffff;
+  background: var(--ycs-highlight);
+}
+.vfx-graph-layout-toggle {
+  min-width: 54px;
+  height: 22px;
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius);
+  background: var(--ycs-bg);
+  color: var(--ycs-text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.vfx-graph-layout-toggle:hover { background: var(--ycs-foreground); }
+.vfx-graph-layout-toggle.active {
+  color: #ffffff;
+  background: var(--ycs-highlight);
+}
+.vfx-graph-empty {
+  margin: auto;
+  padding: 16px;
+  font-size: 12px;
+  opacity: 0.5;
+}
+.vfx-graph-legend {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--ycs-foreground);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.vfx-graph-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.vfx-graph-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.vfx-graph-plots {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.vfx-graph-view.full .vfx-graph-plots {
+  display: grid;
+  grid-template-columns: var(--vfx-hierarchy-width, 230px) minmax(0, 1fr);
+  align-items: stretch;
+  justify-content: stretch;
+}
+.vfx-graph-view.square .vfx-graph-plots {
+  display: grid;
+  grid-template-columns: var(--vfx-hierarchy-width, 230px) minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+}
+.vfx-graph-view.full .vfx-graph-canvas {
+  grid-column: 2;
+  grid-row: 1;
+}
+.vfx-graph-view.square .vfx-graph-canvas {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: center;
+}
+.vfx-graph-presets {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 7px 8px 10px;
+  border-right: 1px solid var(--ycs-foreground);
+  background: color-mix(in srgb, var(--ycs-bg) 97%, black);
+  box-sizing: border-box;
+}
+.vfx-graph-presets-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+}
+.vfx-graph-presets-header span,
+.vfx-graph-presets p {
+  margin: 0;
+  font-size: 9px;
+  opacity: 0.55;
+}
+.vfx-graph-presets p { padding: 3px 0 7px; }
+.vfx-graph-easing-clipboard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding-top: 6px;
+}
+.vfx-graph-elastic-amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+.vfx-graph-elastic-amount > span,
+.vfx-graph-easing-family > span {
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.72;
+}
+.vfx-graph-elastic-amount > input {
+  width: 100%;
+  height: 22px;
+  min-width: 0;
+  padding: 2px 5px;
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius);
+  background: var(--ycs-bg);
+  color: var(--ycs-text);
+  box-sizing: border-box;
+  font-size: 9px;
+}
+.vfx-graph-linear-preset {
+  margin-bottom: 5px;
+}
+.vfx-graph-linear-preset button {
+  width: 100%;
+}
+.vfx-graph-easing-family {
+  display: grid;
+  grid-template-columns: 43px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.vfx-graph-easing-family > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+}
+.vfx-graph-easing-family button,
+.vfx-graph-linear-preset button,
+.vfx-graph-easing-clipboard button {
+  min-width: 0;
+  height: 22px;
+  overflow: hidden;
+  padding: 2px 4px;
+  border: 1px solid var(--ycs-foreground);
+  border-radius: var(--ycs-radius);
+  background: var(--ycs-bg);
+  color: var(--ycs-text);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vfx-graph-easing-family button:hover:not(:disabled),
+.vfx-graph-linear-preset button:hover:not(:disabled),
+.vfx-graph-easing-clipboard button:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--ycs-highlight);
+}
+.vfx-graph-easing-family button:disabled,
+.vfx-graph-linear-preset button:disabled,
+.vfx-graph-easing-clipboard button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.vfx-graph-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 70px;
+  min-height: 70px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 28px 10px;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--ycs-foreground) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--ycs-foreground) 55%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: 0 0;
+  background-origin: content-box;
+  background-clip: content-box;
+}
+.vfx-graph-canvas.square {
+  flex: 0 1 auto;
+  align-self: center;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  padding: 28px;
+  aspect-ratio: 1 / 1;
+}
+.vfx-graph-canvas svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.vfx-graph-axis {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ycs-foreground) 75%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.vfx-graph-line {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.vfx-graph-playhead {
+  stroke: #ffffff;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.vfx-graph-point-outline,
+.vfx-graph-point,
+.vfx-graph-handle-knob-outline,
+.vfx-graph-handle-knob {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.vfx-graph-point-outline {
+  stroke: #ffffff;
+  stroke-width: 14;
+  pointer-events: none;
+}
+.vfx-graph-point {
+  stroke-width: 10;
+  pointer-events: stroke;
+  cursor: move;
+}
+.vfx-graph-handle-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ycs-text) 65%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.vfx-graph-handle-knob-outline {
+  stroke: #ffffff;
+  stroke-width: 10;
+  pointer-events: none;
+}
+.vfx-graph-handle-knob {
+  stroke: var(--ycs-bg);
+  stroke-width: 7;
+  pointer-events: stroke;
+  cursor: crosshair;
+}
+.vfx-graph-value {
+  position: absolute;
+  left: 5px;
+  z-index: 1;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ycs-bg) 80%, transparent);
+  font-size: 9px;
+  pointer-events: none;
+}
+.vfx-graph-value.max { top: 4px; }
+.vfx-graph-value.min { bottom: 4px; }
 .vfx-playhead { position: absolute; top: -7px; bottom: -7px; width: 1px; background: #ffffff; pointer-events: none; }
 .vfx-empty { padding: 12px; font-size: 12px; opacity: 0.45; }
 .status-ok { color: #5ba558; font-size: 11px; }
