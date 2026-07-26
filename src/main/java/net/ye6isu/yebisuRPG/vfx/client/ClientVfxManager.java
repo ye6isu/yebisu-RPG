@@ -24,6 +24,7 @@ import net.ye6isu.yebisuRPG.texture.TextureFrameClock;
 import net.ye6isu.yebisuRPG.vfx.network.VfxStartPayload;
 import com.mojang.math.Axis;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -130,8 +131,15 @@ public final class ClientVfxManager {
             VfxDefinition.Plane plane,
             double elapsed
     ) {
-        Vec3 worldPosition = transform.origin().add(rotateLocalOffset(transform, plane.x(), plane.y(), plane.z()));
-        double radius = Math.max(plane.width() * Math.abs(plane.scaleX()), plane.height() * Math.abs(plane.scaleY()));
+        VfxDefinition.Position position = plane.positionAt(elapsed);
+        VfxDefinition.Position rotation = plane.rotationAt(elapsed);
+        VfxDefinition.Position scale = plane.scaleAt(elapsed);
+        Vec3 worldPosition = transform.origin().add(rotateLocalOffset(
+                transform,
+                position.x(),
+                position.y(),
+                position.z()));
+        double radius = Math.max(plane.width() * Math.abs(scale.x()), plane.height() * Math.abs(scale.y()));
         if (!event.getFrustum().isVisible(new AABB(
                 worldPosition.x - radius,
                 worldPosition.y - radius,
@@ -149,8 +157,7 @@ public final class ClientVfxManager {
         poseStack.pushPose();
         Minecraft minecraft = Minecraft.getInstance();
         if (transform.cancelViewSway() && minecraft.options.bobView().get()) {
-            float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
-            cancelViewSway(poseStack, minecraft.player, partialTick);
+            cancelViewSway(poseStack, event, minecraft.player, event.getCamera().getPartialTickTime());
         }
         poseStack.translate(
                 worldPosition.x - camera.x,
@@ -158,15 +165,15 @@ public final class ClientVfxManager {
                 worldPosition.z - camera.z);
         if (plane.billboard()) {
             poseStack.mulPose(event.getCamera().rotation());
-            poseStack.mulPose(Axis.ZP.rotationDegrees(plane.rotationZ()));
+            poseStack.mulPose(Axis.ZP.rotationDegrees((float)rotation.z()));
         } else {
             poseStack.mulPose(Axis.YP.rotationDegrees(-transform.yawDegrees()));
             poseStack.mulPose(Axis.XP.rotationDegrees(transform.pitchDegrees()));
-            poseStack.mulPose(Axis.YP.rotationDegrees(plane.rotationY()));
-            poseStack.mulPose(Axis.XP.rotationDegrees(plane.rotationX()));
-            poseStack.mulPose(Axis.ZP.rotationDegrees(plane.rotationZ()));
+            poseStack.mulPose(Axis.YP.rotationDegrees((float)rotation.y()));
+            poseStack.mulPose(Axis.XP.rotationDegrees((float)rotation.x()));
+            poseStack.mulPose(Axis.ZP.rotationDegrees((float)rotation.z()));
         }
-        poseStack.scale(plane.scaleX(), plane.scaleY(), plane.scaleZ());
+        poseStack.scale((float)scale.x(), (float)scale.y(), (float)scale.z());
 
         int frame = TextureFrameClock.frameAt(
                 (long) Math.floor(instance.startTick() + elapsed),
@@ -182,7 +189,7 @@ public final class ClientVfxManager {
         int red = color >> 16 & 255;
         int green = color >> 8 & 255;
         int blue = color & 255;
-        int alpha = color >>> 24;
+        int alpha = Math.round(Mth.clamp(plane.opacityAt(elapsed), 0.0f, 1.0f) * 255.0f);
         int light = plane.fullBright()
                 ? 0x00F000F0
                 : LevelRenderer.getLightColor(level, BlockPos.containing(worldPosition));
@@ -195,8 +202,18 @@ public final class ClientVfxManager {
         poseStack.popPose();
     }
 
-    /** Removes the walking view-bob transform already present on the level render pose. */
-    private static void cancelViewSway(PoseStack poseStack, Player player, float partialTick) {
+    /**
+     * Removes walking view bob from the projection while preserving the camera's
+     * yaw and pitch. Vanilla applies bob in camera space before the camera's
+     * world-to-view rotation, so the inverse must be conjugated into world space
+     * before it is added to this object pose.
+     */
+    private static void cancelViewSway(
+            PoseStack poseStack,
+            RenderLevelStageEvent event,
+            Player player,
+            float partialTick
+    ) {
         if (player == null) return;
 
         float walkDelta = player.walkDist - player.walkDistO;
@@ -207,10 +224,13 @@ public final class ClientVfxManager {
         float rotateZ = Mth.sin(walkPhase * (float) Math.PI) * bob * 3.0F;
         float rotateX = Math.abs(Mth.cos(walkPhase * (float) Math.PI - 0.2F) * bob) * 5.0F;
 
+        Quaternionf cameraRotation = new Quaternionf(event.getCamera().rotation());
+        poseStack.mulPose(cameraRotation);
         // Vanilla applies translate, Z rotation, then X rotation; undo it in reverse order.
         poseStack.mulPose(Axis.XP.rotationDegrees(-rotateX));
         poseStack.mulPose(Axis.ZP.rotationDegrees(-rotateZ));
         poseStack.translate(-translateX, -translateY, 0.0F);
+        poseStack.mulPose(new Quaternionf(cameraRotation).conjugate());
     }
 
     private static InstanceTransform resolveTransform(
