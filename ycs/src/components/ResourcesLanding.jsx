@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { DropdownField, FieldRow, NumberInput, StandardDropdownField, StringField } from './Field/Field';
+import { DropdownField, FieldRow, NumberInput, StringField } from './Field/Field';
 
 const JAVA_FILE = 'java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java';
 const JAVA_MARKER = 'YCS_Player_Resources';
+const VARIABLE_JAVA_FILE = 'java/net/ye6isu/yebisuRPG/entityvar/ModAttachments.java';
+const VARIABLE_JAVA_MARKER = 'YCS_Entity_Attachments';
+const ATTRIBUTE_JAVA_FILE = 'java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java';
+const ATTRIBUTE_JAVA_MARKER = 'YCS_Attributes';
+const PLAYER_ATTRIBUTE_JAVA_FILE = 'java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java';
+const PLAYER_ATTRIBUTE_JAVA_MARKER = 'YCS_Player_Resource_Attributes';
 const HUD_TEXTURE_DIR = 'resources/assets/yebisurpg/textures/hud';
+const ATTRIBUTE_LIMIT = 1_000_000_000;
 
 function constName(id) {
   return id.toUpperCase().replace(/[^A-Z0-9]/g, '_');
@@ -12,6 +19,24 @@ function constName(id) {
 
 function normalizeId(value) {
   return value.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+}
+
+function managedIds(id) {
+  return {
+    currentVariable: `current_${id}`,
+    maxAttribute: `max_${id}`,
+    regenerationAttribute: `${id}_regeneration`,
+  };
+}
+
+function javaDouble(value) {
+  return `${Object.is(value, -0) ? 0 : value}D`;
+}
+
+function compareResourceOrder(a, b) {
+  if (a.id === 'stamina') return b.id === 'stamina' ? 0 : -1;
+  if (b.id === 'stamina') return 1;
+  return (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id);
 }
 
 function imageDimensions(dataUrl) {
@@ -65,24 +90,40 @@ async function removeInjections(injections) {
   }
 }
 
-function ResourcePreview({ filled, empty, currentVariable, maxAttribute }) {
-  const current = Number(currentVariable?.defaultValue ?? 0);
-  const maximum = Number(maxAttribute?.max ?? 0);
+async function removeManagedDefinitions(resource) {
+  if (!resource) return;
+  const ids = {
+    ...managedIds(resource.id),
+    currentVariable: resource.currentVariable || managedIds(resource.id).currentVariable,
+    maxAttribute: resource.maxAttribute || managedIds(resource.id).maxAttribute,
+    regenerationAttribute: resource.regenerationAttribute || managedIds(resource.id).regenerationAttribute,
+  };
+  const removeData = async (category, id) => {
+    const data = await invoke('load_ycs_data', { category, id })
+      .then(raw => JSON.parse(raw)).catch(() => null);
+    await removeInjections(data?._injections);
+    await invoke('delete_ycs_data', { category, id }).catch(() => {});
+  };
+  await removeData('entityvars', ids.currentVariable);
+  await removeData('attributes', ids.maxAttribute);
+  await removeData('attributes', ids.regenerationAttribute);
+}
+
+function ResourcePreview({ bar, currentDefault, maximumDefault }) {
+  const current = Number(currentDefault) || 0;
+  const maximum = Number(maximumDefault) || 0;
   const fraction = maximum > 0 ? Math.max(0, Math.min(1, current / maximum)) : 0;
   const format = value => Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
 
   return (
     <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', height: 9 }}>
-        <div style={{ width: 9, height: 9, position: 'relative', flexShrink: 0 }}>
-          {empty?.dataUrl && <img src={empty.dataUrl} alt="" style={{ position: 'absolute', inset: 0, width: 9, height: 9, imageRendering: 'pixelated' }} />}
-          {filled?.dataUrl && (
-            <div style={{ position: 'absolute', inset: 0, width: `${fraction * 100}%`, overflow: 'hidden' }}>
-              <img src={filled.dataUrl} alt="" style={{ width: 9, height: 9, maxWidth: 'none', imageRendering: 'pixelated' }} />
-            </div>
-          )}
-        </div>
-        <span style={{ marginLeft: 1, marginTop: 1, fontSize: 9, lineHeight: '9px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+      <div style={{ width: 137, height: 10, position: 'relative', background: '#211d25', border: '1px solid #62576b', boxSizing: 'border-box' }}>
+        {bar?.dataUrl && (
+          <div style={{ position: 'absolute', left: 2, top: 2, width: `${132 * fraction}px`, height: 4, overflow: 'hidden' }}>
+            <img src={bar.dataUrl} alt="" style={{ width: 132, height: 4, maxWidth: 'none', imageRendering: 'pixelated' }} />
+          </div>
+        )}
+        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: '9px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
           {format(Math.max(0, current))}/{format(Math.max(0, maximum))}
         </span>
       </div>
@@ -93,26 +134,29 @@ function ResourcePreview({ filled, empty, currentVariable, maxAttribute }) {
 function ResourceEditor({ resourceId, onBack }) {
   const [id, setId] = useState(resourceId || '');
   const [name, setName] = useState('');
-  const [currentVariable, setCurrentVariable] = useState('');
-  const [maxAttribute, setMaxAttribute] = useState('');
-  const [filledTexture, setFilledTexture] = useState('');
-  const [emptyTexture, setEmptyTexture] = useState('');
+  const [currentDefault, setCurrentDefault] = useState('0');
+  const [maximumDefault, setMaximumDefault] = useState('100');
+  const [regenerationDefault, setRegenerationDefault] = useState('0');
+  const [barTexture, setBarTexture] = useState('');
   const [order, setOrder] = useState('0');
-  const [regenerationPerSecond, setRegenerationPerSecond] = useState('0');
-  const [variables, setVariables] = useState([]);
-  const [attributes, setAttributes] = useState([]);
   const [textures, setTextures] = useState([]);
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadCategory('entityvars'), loadCategory('attributes'), loadTextures()])
-      .then(([variableValues, attributeValues, textureValues]) => {
-        setVariables(variableValues.filter(variable => variable.type === 'double'));
-        setAttributes(attributeValues);
-        setTextures(textureValues);
-      });
+    loadTextures().then(setTextures);
   }, []);
+
+  useEffect(() => {
+    if (resourceId) return undefined;
+    let cancelled = false;
+    loadCategory('resources').then(existing => {
+      if (cancelled) return;
+      const highestOrder = existing.reduce((highest, resource) => Math.max(highest, Number(resource.order) || 0), 0);
+      setOrder(String(highestOrder + 1));
+    });
+    return () => { cancelled = true; };
+  }, [resourceId]);
 
   useEffect(() => {
     if (!resourceId) return;
@@ -121,69 +165,128 @@ function ResourceEditor({ resourceId, onBack }) {
         const data = JSON.parse(raw);
         setId(data.id || resourceId);
         setName(data.name || resourceId);
-        setCurrentVariable(data.currentVariable || '');
-        setMaxAttribute(data.maxAttribute || '');
-        setFilledTexture(data.filledTexture || '');
-        setEmptyTexture(data.emptyTexture || '');
+        setCurrentDefault(String(data.currentDefault ?? 0));
+        setMaximumDefault(String(data.maximumDefault ?? 100));
+        setRegenerationDefault(String(data.regenerationDefault ?? data.regenerationPerSecond ?? 0));
+        setBarTexture(data.barTexture || data.filledTexture || '');
         setOrder(String(data.order ?? 0));
-        setRegenerationPerSecond(String(data.regenerationPerSecond ?? 0));
       })
       .catch(() => {});
   }, [resourceId]);
 
-  const variableOptions = variables.map(variable => ({ value: variable.id, label: variable.name || variable.id }));
-  const attributeOptions = attributes.map(attribute => ({ value: attribute.id, label: attribute.titleText || attribute.name || attribute.id }));
   const textureOptions = textures.map(texture => ({ value: texture.id, label: texture.label || texture.id, img: texture.dataUrl }));
-  const selectedFilled = textures.find(texture => texture.id === filledTexture);
-  const selectedEmpty = textures.find(texture => texture.id === emptyTexture);
-  const selectedVariable = variables.find(variable => variable.id === currentVariable);
-  const selectedAttribute = attributes.find(attribute => attribute.id === maxAttribute);
+  const selectedBar = textures.find(texture => texture.id === barTexture);
 
   const save = async () => {
     const trimmed = normalizeId(id || name);
-    if (!trimmed || !currentVariable || !maxAttribute || !selectedFilled || !selectedEmpty) {
-      setStatus({ ok: false, msg: 'ID, variable, attribute, and both textures are required.' });
+    if (resourceId === 'stamina' && trimmed !== 'stamina') {
+      setStatus({ ok: false, msg: 'Stamina is required and its ID cannot be changed.' });
+      return;
+    }
+    if (!trimmed || !selectedBar) {
+      setStatus({ ok: false, msg: 'ID and bar texture are required.' });
+      return;
+    }
+
+    const parsedCurrent = Number.parseFloat(currentDefault);
+    const parsedMaximum = Number.parseFloat(maximumDefault);
+    const parsedRegeneration = Number.parseFloat(regenerationDefault);
+    if (![parsedCurrent, parsedMaximum, parsedRegeneration].every(Number.isFinite)
+        || parsedCurrent < 0 || parsedMaximum < 0 || parsedCurrent > parsedMaximum || parsedRegeneration < 0
+        || parsedMaximum > ATTRIBUTE_LIMIT || parsedRegeneration > ATTRIBUTE_LIMIT) {
+      setStatus({ ok: false, msg: `Defaults must be non-negative, current cannot exceed maximum, and attributes cannot exceed ${ATTRIBUTE_LIMIT}.` });
       return;
     }
 
     setSaving(true);
     setStatus(null);
     try {
+      const ids = managedIds(trimmed);
       let previous = null;
       if (resourceId) {
         previous = await invoke('load_ycs_data', { category: 'resources', id: resourceId })
           .then(raw => JSON.parse(raw)).catch(() => null);
+      }
+
+      if (resourceId !== trimmed) {
+        const existingResource = await invoke('load_ycs_data', { category: 'resources', id: trimmed })
+          .then(() => true).catch(() => false);
+        if (existingResource) throw new Error(`Resource ID "${trimmed}" already exists.`);
+      }
+
+      for (const [category, generatedId] of [
+        ['entityvars', ids.currentVariable],
+        ['attributes', ids.maxAttribute],
+        ['attributes', ids.regenerationAttribute],
+      ]) {
+        const existing = await invoke('load_ycs_data', { category, id: generatedId })
+          .then(raw => JSON.parse(raw)).catch(() => null);
+        if (existing && (!existing.resourceManaged || existing.ownerResource !== resourceId)) {
+          throw new Error(`Generated ID "${generatedId}" is already in use.`);
+        }
+      }
+
+      if (previous) {
         await removeInjections(previous?._injections);
+        await removeManagedDefinitions(previous);
         if (resourceId !== trimmed) {
           await invoke('delete_ycs_data', { category: 'resources', id: resourceId }).catch(() => {});
         }
       }
 
-      const parsedOrder = Number.parseInt(order, 10) || 0;
-      const parsedRegeneration = Math.max(0, Number.parseFloat(regenerationPerSecond) || 0);
-      const line = `        register(new PlayerResourceDefinition("${trimmed}", ${parsedOrder}, "${filledTexture}", ${selectedFilled.width}, ${selectedFilled.height}, "${emptyTexture}", ${selectedEmpty.width}, ${selectedEmpty.height}, ${parsedRegeneration}, player -> player.getData(ModAttachments.${constName(currentVariable)}.get()), (player, value) -> player.setData(ModAttachments.${constName(currentVariable)}.get(), value), player -> ((RangedAttribute) ModAttributes.${constName(maxAttribute)}.get()).getMaxValue()));`;
-      await invoke('inject_marker', { file: JAVA_FILE, marker: JAVA_MARKER, content: line });
-
-      const injections = [{ type: 'java-marker', file: JAVA_FILE, marker: JAVA_MARKER, content: line }];
-      for (const textureId of new Set([filledTexture, emptyTexture])) {
-        const file = `${HUD_TEXTURE_DIR}/${textureId}.png`;
-        await invoke('copy_texture_to_mod', { textureId, destFile: file });
-        injections.push({ type: 'created-file', file });
+      const parsedOrder = trimmed === 'stamina' ? 0 : (Number.parseInt(order, 10) || 0);
+      const runtimeBarTexture = `${trimmed}_bar`;
+      const variableLine = `    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> ${constName(ids.currentVariable)} = registerDouble("${ids.currentVariable}", ${javaDouble(parsedCurrent)});`;
+      const maxAttributeLine = `    public static final DeferredHolder<Attribute, Attribute> ${constName(ids.maxAttribute)} = registerAttribute("${ids.maxAttribute}", 0D, ${javaDouble(parsedMaximum)}, 1.0E9D, true);`;
+      const regenerationAttributeLine = `    public static final DeferredHolder<Attribute, Attribute> ${constName(ids.regenerationAttribute)} = registerAttribute("${ids.regenerationAttribute}", 0D, ${javaDouble(parsedRegeneration)}, 1.0E9D, true);`;
+      const maxPlayerAttributeLine = `        event.add(EntityType.PLAYER, ModAttributes.${constName(ids.maxAttribute)});`;
+      const regenerationPlayerAttributeLine = `        event.add(EntityType.PLAYER, ModAttributes.${constName(ids.regenerationAttribute)});`;
+      const resourceLine = `        register(new PlayerResourceDefinition("${trimmed}", ${parsedOrder}, "${runtimeBarTexture}", ${selectedBar.width}, ${selectedBar.height}, player -> player.getData(ModAttachments.${constName(ids.currentVariable)}.get()), (player, value) -> player.setData(ModAttachments.${constName(ids.currentVariable)}.get(), value), player -> player.getAttributeValue(ModAttributes.${constName(ids.maxAttribute)}), player -> player.getAttributeValue(ModAttributes.${constName(ids.regenerationAttribute)})));`;
+      const javaInjections = [
+        { file: VARIABLE_JAVA_FILE, marker: VARIABLE_JAVA_MARKER, content: variableLine },
+        { file: ATTRIBUTE_JAVA_FILE, marker: ATTRIBUTE_JAVA_MARKER, content: maxAttributeLine },
+        { file: ATTRIBUTE_JAVA_FILE, marker: ATTRIBUTE_JAVA_MARKER, content: regenerationAttributeLine },
+        { file: PLAYER_ATTRIBUTE_JAVA_FILE, marker: PLAYER_ATTRIBUTE_JAVA_MARKER, content: maxPlayerAttributeLine },
+        { file: PLAYER_ATTRIBUTE_JAVA_FILE, marker: PLAYER_ATTRIBUTE_JAVA_MARKER, content: regenerationPlayerAttributeLine },
+        { file: JAVA_FILE, marker: JAVA_MARKER, content: resourceLine },
+      ];
+      for (const injection of javaInjections) {
+        await invoke('inject_marker', injection);
       }
+
+      const injections = javaInjections.map(injection => ({ type: 'java-marker', ...injection }));
+      const textureFile = `${HUD_TEXTURE_DIR}/${runtimeBarTexture}.png`;
+      await invoke('copy_texture_to_mod', { textureId: barTexture, destFile: textureFile });
+      injections.push({ type: 'created-file', file: textureFile });
+
+      const ownerFields = { resourceManaged: true, ownerResource: trimmed, _injections: [] };
+      await invoke('save_ycs_data', {
+        category: 'entityvars',
+        id: ids.currentVariable,
+        content: JSON.stringify({ name: ids.currentVariable, type: 'double', defaultValue: String(parsedCurrent), ...ownerFields }, null, 2),
+      });
+      await invoke('save_ycs_data', {
+        category: 'attributes',
+        id: ids.maxAttribute,
+        content: JSON.stringify({ name: ids.maxAttribute, titleText: `Maximum ${name.trim() || trimmed}`, min: 0, base: parsedMaximum, max: ATTRIBUTE_LIMIT, syncToClient: true, ...ownerFields }, null, 2),
+      });
+      await invoke('save_ycs_data', {
+        category: 'attributes',
+        id: ids.regenerationAttribute,
+        content: JSON.stringify({ name: ids.regenerationAttribute, titleText: `${name.trim() || trimmed} Regeneration`, min: 0, base: parsedRegeneration, max: ATTRIBUTE_LIMIT, syncToClient: true, ...ownerFields }, null, 2),
+      });
 
       const payload = {
         id: trimmed,
         name: name.trim() || trimmed,
-        currentVariable,
-        maxAttribute,
-        filledTexture,
-        emptyTexture,
+        ...ids,
+        currentDefault: parsedCurrent,
+        maximumDefault: parsedMaximum,
+        regenerationDefault: parsedRegeneration,
+        barTexture,
         order: parsedOrder,
-        regenerationPerSecond: parsedRegeneration,
-        filledTextureWidth: selectedFilled.width,
-        filledTextureHeight: selectedFilled.height,
-        emptyTextureWidth: selectedEmpty.width,
-        emptyTextureHeight: selectedEmpty.height,
+        barTextureWidth: selectedBar.width,
+        barTextureHeight: selectedBar.height,
         _injections: injections,
       };
       await invoke('save_ycs_data', { category: 'resources', id: trimmed, content: JSON.stringify(payload, null, 2) });
@@ -195,12 +298,13 @@ function ResourceEditor({ resourceId, onBack }) {
   };
 
   const remove = async () => {
-    if (!resourceId) return;
+    if (!resourceId || resourceId === 'stamina') return;
     setSaving(true);
     try {
       const previous = await invoke('load_ycs_data', { category: 'resources', id: resourceId })
         .then(raw => JSON.parse(raw)).catch(() => null);
       await removeInjections(previous?._injections);
+      await removeManagedDefinitions(previous);
       await invoke('delete_ycs_data', { category: 'resources', id: resourceId });
       onBack();
     } catch (error) {
@@ -214,22 +318,21 @@ function ResourceEditor({ resourceId, onBack }) {
       <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, flex: 1 }}>{resourceId ? `Edit Resource: ${resourceId}` : 'New Resource'}</h2>
         {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {resourceId && <button className="ycs-button" onClick={remove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
+        {resourceId && resourceId !== 'stamina' && <button className="ycs-button" onClick={remove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
         <button className="ycs-button" onClick={onBack}>Cancel</button>
         <button className="ycs-button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
       </div>
       <div style={{ height: 1, backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <FieldRow label="Name"><StringField value={name} onChange={setName} style={{ width: '100%' }} /></FieldRow>
-        <FieldRow label="ID"><StringField value={id} onChange={value => setId(normalizeId(value))} style={{ width: '100%' }} /></FieldRow>
-        <FieldRow label="Current Variable"><StandardDropdownField value={currentVariable} onChange={setCurrentVariable} options={variableOptions} searchable /></FieldRow>
-        <FieldRow label="Maximum Attribute"><StandardDropdownField value={maxAttribute} onChange={setMaxAttribute} options={attributeOptions} searchable /></FieldRow>
-        <FieldRow label="Filled Texture"><DropdownField value={filledTexture} onChange={setFilledTexture} options={textureOptions} /></FieldRow>
-        <FieldRow label="Empty Texture"><DropdownField value={emptyTexture} onChange={setEmptyTexture} options={textureOptions} /></FieldRow>
-        <FieldRow label="Order"><NumberInput value={order} onChange={setOrder} /></FieldRow>
-        <FieldRow label="Regeneration / Second"><NumberInput value={regenerationPerSecond} onChange={setRegenerationPerSecond} /></FieldRow>
+        <FieldRow label="ID"><StringField value={id} onChange={value => setId(normalizeId(value))} disabled={resourceId === 'stamina'} style={{ width: '100%' }} /></FieldRow>
+        <FieldRow label="Current Default"><NumberInput value={currentDefault} onChange={setCurrentDefault} /></FieldRow>
+        <FieldRow label="Maximum Default"><NumberInput value={maximumDefault} onChange={setMaximumDefault} /></FieldRow>
+        <FieldRow label="Regeneration Default"><NumberInput value={regenerationDefault} onChange={setRegenerationDefault} /></FieldRow>
+        <FieldRow label="Bar Texture"><DropdownField value={barTexture} onChange={setBarTexture} options={textureOptions} /></FieldRow>
+        {resourceId !== 'stamina' && <FieldRow label="Order"><NumberInput value={order} onChange={setOrder} /></FieldRow>}
         <FieldRow label="Preview">
-          <ResourcePreview filled={selectedFilled} empty={selectedEmpty} currentVariable={selectedVariable} maxAttribute={selectedAttribute} />
+          <ResourcePreview bar={selectedBar} currentDefault={currentDefault} maximumDefault={maximumDefault} />
         </FieldRow>
       </div>
     </div>
@@ -237,15 +340,41 @@ function ResourceEditor({ resourceId, onBack }) {
 }
 
 function ResourceRow({ resource, onEdit, onDelete }) {
+  const protectedResource = resource.id === 'stamina';
   return (
-    <div onClick={onEdit} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', border: '1px solid var(--ycs-foreground)', borderRadius: 'var(--ycs-radius)', cursor: 'pointer', minWidth: 180, maxWidth: 300, flex: '1 1 180px' }}>
+    <div
+      onClick={onEdit}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', border: '1px solid var(--ycs-foreground)', borderRadius: 'var(--ycs-radius)', cursor: 'pointer', transition: 'background-color 0.1s, border-color 0.1s', boxSizing: 'border-box', minWidth: 180, maxWidth: 300, flex: '1 1 180px' }}
+      onMouseEnter={event => {
+        event.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
+        event.currentTarget.style.borderColor = 'var(--ycs-highlight)';
+        const deleteButton = event.currentTarget.querySelector('.row-delete');
+        if (deleteButton) deleteButton.style.opacity = '1';
+      }}
+      onMouseLeave={event => {
+        event.currentTarget.style.backgroundColor = 'transparent';
+        event.currentTarget.style.borderColor = 'var(--ycs-foreground)';
+        const deleteButton = event.currentTarget.querySelector('.row-delete');
+        if (deleteButton) deleteButton.style.opacity = '0';
+      }}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{resource.name || resource.id}</div>
         <div style={{ fontSize: 10, opacity: 0.5 }}>{resource.currentVariable} / {resource.maxAttribute}</div>
       </div>
-      <button className="ycs-button icon" onClick={event => { event.stopPropagation(); onDelete(); }} title="Delete" style={{ color: '#e05252' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-      </button>
+      {!protectedResource && (
+        <div
+          className="row-delete"
+          onClick={event => { event.stopPropagation(); onDelete(); }}
+          title="Delete"
+          style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0, transition: 'opacity 0.1s', flexShrink: 0 }}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18">
+            <circle cx="9" cy="9" r="9" fill="white" />
+            <line x1="5" y1="9" x2="13" y2="9" stroke="black" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -261,11 +390,13 @@ export default function ResourcesLanding() {
 
   const filtered = useMemo(() => resources
     .filter(resource => !search || (resource.name || resource.id).toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id)), [resources, search]);
+    .sort(compareResourceOrder), [resources, search]);
 
   const deleteResource = async resource => {
+    if (resource.id === 'stamina') return;
     if (!window.confirm(`Delete resource "${resource.name || resource.id}"?`)) return;
     await removeInjections(resource._injections);
+    await removeManagedDefinitions(resource);
     await invoke('delete_ycs_data', { category: 'resources', id: resource.id }).catch(() => {});
     reload();
   };

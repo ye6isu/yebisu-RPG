@@ -43,6 +43,7 @@ public final class ClientKeybindRegistry {
         ClientKeybindRegistry.register("alt_slot_8", ModKeybinds.ALT_SLOT_8);
         ClientKeybindRegistry.register("alt_slot_9", ModKeybinds.ALT_SLOT_9);
         ClientKeybindRegistry.register("toggle_ability_bar", ModKeybinds.TOGGLE_ABILITY_BAR);
+        ClientKeybindRegistry.register("tester", ModKeybinds.TESTER);
         // YCS_Keybind_Register
     }
 

@@ -1,30 +1,56 @@
 {
   "id": "mana",
   "name": "Mana",
-  "currentVariable": "mana",
-  "maxAttribute": "mana",
-  "filledTexture": "mana",
-  "emptyTexture": "mana_empty",
-  "order": 1,
-  "regenerationPerSecond": 1,
-  "filledTextureWidth": 18,
-  "filledTextureHeight": 18,
-  "emptyTextureWidth": 18,
-  "emptyTextureHeight": 18,
+  "currentVariable": "current_mana",
+  "maxAttribute": "max_mana",
+  "regenerationAttribute": "mana_regeneration",
+  "currentDefault": 20,
+  "maximumDefault": 100,
+  "regenerationDefault": 1,
+  "barTexture": "mana_bar",
+  "order": 2,
+  "barTextureWidth": 132,
+  "barTextureHeight": 4,
   "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entityvar/ModAttachments.java",
+      "marker": "YCS_Entity_Attachments",
+      "content": "    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURRENT_MANA = registerDouble(\"current_mana\", 20D);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java",
+      "marker": "YCS_Attributes",
+      "content": "    public static final DeferredHolder<Attribute, Attribute> MAX_MANA = registerAttribute(\"max_mana\", 0D, 100D, 1.0E9D, true);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java",
+      "marker": "YCS_Attributes",
+      "content": "    public static final DeferredHolder<Attribute, Attribute> MANA_REGENERATION = registerAttribute(\"mana_regeneration\", 0D, 1D, 1.0E9D, true);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Player_Resource_Attributes",
+      "content": "        event.add(EntityType.PLAYER, ModAttributes.MAX_MANA);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Player_Resource_Attributes",
+      "content": "        event.add(EntityType.PLAYER, ModAttributes.MANA_REGENERATION);"
+    },
     {
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java",
       "marker": "YCS_Player_Resources",
-      "content": "        register(new PlayerResourceDefinition(\"mana\", 1, \"mana\", 18, 18, \"mana_empty\", 18, 18, 1, player -> player.getData(ModAttachments.MANA.get()), (player, value) -> player.setData(ModAttachments.MANA.get(), value), player -> ((RangedAttribute) ModAttributes.MANA.get()).getMaxValue()));"
+      "content": "        register(new PlayerResourceDefinition(\"mana\", 2, \"mana_bar\", 132, 4, player -> player.getData(ModAttachments.CURRENT_MANA.get()), (player, value) -> player.setData(ModAttachments.CURRENT_MANA.get(), value), player -> player.getAttributeValue(ModAttributes.MAX_MANA), player -> player.getAttributeValue(ModAttributes.MANA_REGENERATION)));"
     },
     {
       "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/hud/mana.png"
-    },
-    {
-      "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/hud/mana_empty.png"
+      "file": "resources/assets/yebisurpg/textures/hud/mana_bar.png"
     }
   ]
 }

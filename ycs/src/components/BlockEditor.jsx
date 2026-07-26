@@ -58,6 +58,12 @@ export const VANILLA_ATTRIBUTES = [
 // "textures" dropdown source (used by e.g. "Set Entity Texture Overlay").
 let dynamicTextureOptions = [];
 
+// Resource Creator definitions used by the resource-access action and query blocks.
+let dynamicResourceOptions = [];
+
+// YCS-authored VFX definitions used by the Play/Remove VFX action blocks.
+let dynamicVfxOptions = [];
+
 const DROPDOWN_SOURCES = {
   projectiles: [
     { label: 'Arrow', value: 'minecraft:arrow' },
@@ -345,11 +351,15 @@ function SegmentItem({ seg, i, bdef, node, nodes, onFieldChange, nodeId, onSelec
     const isEntityVariables = source === 'entityVariables';
     const isAttributes = source === 'attributes';
     const isTextures = source === 'textures';
+    const isResources = source === 'resources';
+    const isVfx = source === 'vfx';
     let options = fieldDef?.options
       || (isDataComponents ? dynamicDataComponentOptions : null)
       || (isEntityVariables ? dynamicEntityVariableOptions : null)
       || (isAttributes ? [...VANILLA_ATTRIBUTES, ...dynamicModAttributeOptions] : null)
       || (isTextures ? dynamicTextureOptions : null)
+      || (isResources ? dynamicResourceOptions : null)
+      || (isVfx ? dynamicVfxOptions : null)
       || (source && DROPDOWN_SOURCES[source])
       || [];
     if (isDataComponents && bdef?.dropdownExcludesCompType) {
@@ -1082,6 +1092,63 @@ export default function BlockEditor({ itemId, keybindId, hudWidgetId, entityId, 
       if (!cancelled) {
         dynamicEntityVariableOptions = options;
         setEntityVariableOptions(options);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const [resourceOptions, setResourceOptions] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const options = [];
+      try {
+        const ids = await invoke('list_ycs_data', { category: 'resources' });
+        for (const id of ids) {
+          try {
+            const raw = await invoke('load_ycs_data', { category: 'resources', id });
+            const resource = JSON.parse(raw);
+            options.push({
+              value: resource.id || id,
+              label: resource.id === 'stamina' || id === 'stamina'
+                ? `${resource.name || 'Stamina'} (Always Available)`
+                : resource.name || resource.id || id,
+            });
+          } catch {}
+        }
+      } catch {}
+      options.sort((a, b) => (a.value === 'stamina' ? -1 : b.value === 'stamina' ? 1 : a.label.localeCompare(b.label)));
+      if (!cancelled) {
+        dynamicResourceOptions = options;
+        setResourceOptions(options);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const [vfxOptions, setVfxOptions] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const options = [];
+      try {
+        const ids = await invoke('list_ycs_data', { category: 'vfx' });
+        for (const id of ids) {
+          try {
+            const raw = await invoke('load_ycs_data', { category: 'vfx', id });
+            const effect = JSON.parse(raw);
+            options.push({ value: effect.id || id, label: effect.name || effect.id || id });
+          } catch {}
+        }
+      } catch {}
+      options.sort((a, b) => a.label.localeCompare(b.label));
+      if (!cancelled) {
+        dynamicVfxOptions = options;
+        setVfxOptions(options);
       }
     };
     load();

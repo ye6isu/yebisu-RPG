@@ -2,5 +2,24 @@
   "id": "resource",
   "name": "Resource",
   "widgets": [],
-  "_injections": []
+  "visibleLiteral": false,
+  "visibleSourceId": "",
+  "_injections": [
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/hud/resource.json"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/ModHud.java",
+      "marker": "YCS_Hud_Layouts",
+      "content": "        HudOverlayRenderer.registerLayout(\"resource\");"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/hud/ModHud.java",
+      "marker": "YCS_Hud_Layouts",
+      "content": "        HudOverlayRenderer.registerLayoutVisibility(\"resource\", \"\", false);"
+    }
+  ]
 }

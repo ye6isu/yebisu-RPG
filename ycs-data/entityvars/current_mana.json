@@ -1,0 +1,8 @@
+{
+  "name": "current_mana",
+  "type": "double",
+  "defaultValue": "20",
+  "resourceManaged": true,
+  "ownerResource": "mana",
+  "_injections": []
+}

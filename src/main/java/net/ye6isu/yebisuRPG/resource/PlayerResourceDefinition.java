@@ -9,23 +9,17 @@ import java.util.function.ToDoubleFunction;
 public record PlayerResourceDefinition(
         String id,
         int order,
-        String filledTexture,
-        int filledTextureWidth,
-        int filledTextureHeight,
-        String emptyTexture,
-        int emptyTextureWidth,
-        int emptyTextureHeight,
-        double regenerationPerSecond,
+        String barTexture,
+        int barTextureWidth,
+        int barTextureHeight,
         ToDoubleFunction<Player> currentValue,
         ObjDoubleConsumer<Player> currentValueSetter,
-        ToDoubleFunction<Player> maximumValue
+        ToDoubleFunction<Player> maximumValue,
+        ToDoubleFunction<Player> regenerationValue
 ) {
     public PlayerResourceDefinition {
-        filledTextureWidth = Math.max(1, filledTextureWidth);
-        filledTextureHeight = Math.max(1, filledTextureHeight);
-        emptyTextureWidth = Math.max(1, emptyTextureWidth);
-        emptyTextureHeight = Math.max(1, emptyTextureHeight);
-        regenerationPerSecond = Math.max(0.0, regenerationPerSecond);
+        barTextureWidth = Math.max(1, barTextureWidth);
+        barTextureHeight = Math.max(1, barTextureHeight);
     }
 
     public double current(Player player) {
@@ -34,6 +28,10 @@ public record PlayerResourceDefinition(
 
     public double maximum(Player player) {
         return Math.max(0.0, maximumValue.applyAsDouble(player));
+    }
+
+    public double regeneration(Player player) {
+        return Math.max(0.0, regenerationValue.applyAsDouble(player));
     }
 
     public void setCurrent(Player player, double value) {

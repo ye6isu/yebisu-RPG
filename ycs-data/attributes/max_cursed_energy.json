@@ -1,0 +1,11 @@
+{
+  "name": "max_cursed_energy",
+  "titleText": "Maximum Cursed Energy",
+  "min": 0,
+  "base": 250,
+  "max": 1000000000,
+  "syncToClient": true,
+  "resourceManaged": true,
+  "ownerResource": "cursed_energy",
+  "_injections": []
+}

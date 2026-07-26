@@ -44,6 +44,7 @@ public final class ModKeybinds {
     public static final KeyMapping ALT_SLOT_8 = bind("alt_slot_8", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_8, KeyModifier.NONE, CATEGORY);
     public static final KeyMapping ALT_SLOT_9 = bind("alt_slot_9", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_9, KeyModifier.NONE, CATEGORY);
     public static final KeyMapping TOGGLE_ABILITY_BAR = bind("toggle_ability_bar", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, KeyModifier.NONE, CATEGORY);
+    public static final KeyMapping TESTER = bind("tester", InputConstants.Type.MOUSE, 3, KeyModifier.NONE, CATEGORY);
     // YCS_Mod_Keybinds
 
     private ModKeybinds() {}
@@ -67,6 +68,7 @@ public final class ModKeybinds {
         event.register(ALT_SLOT_8);
         event.register(ALT_SLOT_9);
         event.register(TOGGLE_ABILITY_BAR);
+        event.register(TESTER);
         // YCS_Mod_Keybinds_Register
     }
 

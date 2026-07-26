@@ -393,9 +393,9 @@ export const BLOCK_DEFS = [
       imports: ["net.ye6isu.yebisuRPG.util.ProjectileUtil"],
       slotDefaults: {
         entity: { opcode: "entity.event" },
-        x: { opcode: "entity.look_dir", fields: { axis: "x" } },
-        y: { opcode: "entity.look_dir", fields: { axis: "y" } },
-        z: { opcode: "entity.look_dir", fields: { axis: "z" } },
+        x: { opcode: "number.literal", fields: { value: "0" } },
+        y: { opcode: "number.literal", fields: { value: "0" } },
+        z: { opcode: "number.literal", fields: { value: "0" } },
         power: { opcode: "number.literal", fields: { value: "1.5" } },
       },
     },
@@ -447,6 +447,36 @@ export const BLOCK_DEFS = [
         colWidth: { opcode: "number.literal", fields: { value: "3" } },
         colHeight: { opcode: "number.literal", fields: { value: "3" } },
         colDepth: { opcode: "number.literal", fields: { value: "3" } },
+      },
+    },
+  },
+  {
+    opcode: "entity.projectjjk_dash",
+    category: "Entity", sub: "actions",
+    isAction: true,
+    paletteLabel: "JJK Burst Dash",
+    label: "JJK Burst Dash [entity:entity] X [x:number] Y [y:number] Z [z:number] travel [travel:number] burst [burstTicks:number] ticks decelerate [decelerationTicks:number] ticks keep [endMomentum:number] momentum",
+    hint: "ProjectJJK-style short velocity burst. It is independent from the smooth YCS Dash block and does not include ProjectJJK's VFX, sounds, cooldown, or Speed effect.",
+    color: "#a15f47",
+    fields: {
+      forceAirborne: { type: "hidden", default: true },
+    },
+    settings: {
+      forceAirborne: { type: "checkbox", label: "Force Airborne", default: true },
+    },
+    codegen: {
+      type: "action",
+      template: "ProjectJjkDashUtil.start({{entity}}, (double)({{x}}), (double)({{y}}), (double)({{z}}), (double)({{travel}}), (int)((double)({{burstTicks}})), (int)((double)({{decelerationTicks}})), (double)({{endMomentum}}), {{forceAirborne}});",
+      imports: ["net.ye6isu.yebisuRPG.util.ProjectJjkDashUtil"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        x: { opcode: "entity.look_dir", fields: { axis: "x" } },
+        y: { opcode: "entity.look_dir", fields: { axis: "y" } },
+        z: { opcode: "entity.look_dir", fields: { axis: "z" } },
+        travel: { opcode: "number.literal", fields: { value: "12" } },
+        burstTicks: { opcode: "number.literal", fields: { value: "2" } },
+        decelerationTicks: { opcode: "number.literal", fields: { value: "2" } },
+        endMomentum: { opcode: "number.literal", fields: { value: "0.2" } },
       },
     },
   },
@@ -1234,6 +1264,51 @@ export const BLOCK_DEFS = [
     },
   },
   {
+    opcode: "resource.access.set",
+    category: "Data", sub: "actions",
+    isAction: true,
+    paletteLabel: "Set Resource Access",
+    label: "Set Resource Access [resourceId:dropdown.resources] to [available:logic] for [entity:entity]",
+    hint: "Grant or revoke a player's access to a resource; stamina is always available",
+    color: "#4d65b4",
+    fields: {
+      resourceId: { source: "resources", searchable: true, default: "stamina" },
+    },
+    codegen: {
+      type: "action",
+      template: "if ({{entity}} instanceof Player {{bind:resourcePlayer}}) {\n    PlayerResourceRegistry.setAvailable({{bind:resourcePlayer}}, {{quote:resourceId}}, {{available}});\n}",
+      imports: [
+        "net.minecraft.world.entity.player.Player",
+        "net.ye6isu.yebisuRPG.resource.PlayerResourceRegistry",
+      ],
+      slotDefaults: {
+        available: { opcode: "logic.false" },
+        entity: { opcode: "entity.event" },
+      },
+    },
+  },
+  {
+    opcode: "resource.access.get",
+    category: "Data", sub: "data",
+    linkType: "logic",
+    paletteLabel: "Player Has Resource",
+    label: "Player Has Resource [resourceId:dropdown.resources] for [entity:entity]",
+    hint: "Whether a player currently has access to the selected resource",
+    color: "#4d65b4",
+    fields: {
+      resourceId: { source: "resources", searchable: true, default: "stamina" },
+    },
+    codegen: {
+      type: "value",
+      expr: "({{entity}} instanceof Player {{bind:resourcePlayer}} && PlayerResourceRegistry.isAvailable({{bind:resourcePlayer}}, {{quote:resourceId}}))",
+      imports: [
+        "net.minecraft.world.entity.player.Player",
+        "net.ye6isu.yebisuRPG.resource.PlayerResourceRegistry",
+      ],
+      slotDefaults: { entity: { opcode: "entity.event" } },
+    },
+  },
+  {
     opcode: "overlay.play",
     category: "Entity", sub: "actions",
     isAction: true,
@@ -1872,6 +1947,78 @@ export const BLOCK_DEFS = [
       slotDefaults: {
         delayTicks: { opcode: "number.literal", fields: { value: "0" } },
       },
+    },
+  },
+  // VFX playback is server-authoritative. Only compact start/remove payloads cross
+  // the network; each client renders the selected definition locally.
+  {
+    opcode: "vfx.play",
+    category: "VFX", sub: "Playback",
+    isAction: true,
+    paletteLabel: "Play VFX",
+    label: "Play [effect:dropdown] as [instance:input.text] offset x [offX:number] y [offY:number] z [offZ:number] for [entity:entity]",
+    hint: "Use the gear for anchor, spawn point, rotation-follow, and first-person sway settings. The instance name is a per-entity slot: main is the default, and reusing it replaces the previous effect in that slot.",
+    color: "#a15f47",
+    fields: {
+      effect: { type: "dropdown", source: "vfx", searchable: true, default: "" },
+      instance: { type: "text", default: "main" },
+      anchorMode: { type: "hidden", default: "FIXED" },
+      spawnPoint: { type: "hidden", default: "RAW_POSITION" },
+      followYaw: { type: "hidden", default: false },
+      followPitch: { type: "hidden", default: false },
+      viewSway: { type: "hidden", default: false },
+    },
+    settings: {
+      anchorMode: {
+        type: "dropdown",
+        label: "Anchor Mode",
+        options: [
+          { value: "FIXED", label: "Fixed" },
+          { value: "FOLLOW_ENTITY", label: "Follow Entity" },
+        ],
+        default: "FIXED",
+      },
+      spawnPoint: {
+        type: "dropdown",
+        label: "Spawn Point",
+        options: [
+          { value: "RAW_POSITION", label: "Raw Position" },
+          { value: "EYE_LEVEL", label: "Eye Level" },
+        ],
+        default: "RAW_POSITION",
+      },
+      followYaw: { type: "checkbox", label: "Follow Yaw", default: false },
+      followPitch: { type: "checkbox", label: "Follow Pitch", default: false },
+      viewSway: { type: "checkbox", label: "First-Person View Sway", default: false },
+    },
+    codegen: {
+      type: "action",
+      template: "VfxService.playAtEntity({{quote:effect}}, {{quote:instance}}, {{entity}}, VfxService.AnchorMode.{{anchorMode}}, VfxService.SpawnPoint.{{spawnPoint}}, {{followYaw}}, {{followPitch}}, {{viewSway}}, (double)({{offX}}), (double)({{offY}}), (double)({{offZ}}));",
+      imports: ["net.ye6isu.yebisuRPG.vfx.VfxService"],
+      slotDefaults: {
+        entity: { opcode: "entity.event" },
+        offX: { opcode: "number.literal", fields: { value: "0" } },
+        offY: { opcode: "number.literal", fields: { value: "0" } },
+        offZ: { opcode: "number.literal", fields: { value: "0" } },
+      },
+    },
+  },
+  {
+    opcode: "vfx.remove",
+    category: "VFX", sub: "Playback",
+    isAction: true,
+    paletteLabel: "Remove VFX",
+    label: "Remove VFX named [instance:input.text] from [entity:entity]",
+    hint: "Stop the VFX in this per-entity named slot. Use main to remove an effect played with the default instance name.",
+    color: "#a15f47",
+    fields: {
+      instance: { type: "text", default: "main" },
+    },
+    codegen: {
+      type: "action",
+      template: "VfxService.remove({{quote:instance}}, {{entity}});",
+      imports: ["net.ye6isu.yebisuRPG.vfx.VfxService"],
+      slotDefaults: { entity: { opcode: "entity.event" } },
     },
   },
   {

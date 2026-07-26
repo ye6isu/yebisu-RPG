@@ -8,8 +8,10 @@ public final class HudLayerHider {
     }
 
     public static void onRenderGuiLayerPre(RenderGuiLayerEvent.Pre event) {
+        if (!HealthBarHudRenderer.isActive()) return;
+
         if (VanillaGuiLayers.PLAYER_HEALTH.equals(event.getName())
-                && HudOverlayRenderer.isResourceHudActive()) {
+                || VanillaGuiLayers.ARMOR_LEVEL.equals(event.getName())) {
             event.setCanceled(true);
         }
     }

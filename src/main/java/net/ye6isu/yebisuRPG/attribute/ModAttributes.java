@@ -28,9 +28,12 @@ public final class ModAttributes {
         });
     }
 
-    public static final DeferredHolder<Attribute, Attribute> STAMINA = registerAttribute("stamina", 0D, 0D, 100D, true);
-    public static final DeferredHolder<Attribute, Attribute> MANA = registerAttribute("mana", 0D, 0D, 100D, true);
-    public static final DeferredHolder<Attribute, Attribute> CURSED = registerAttribute("cursed", 0D, 0D, 100D, true);
+    public static final DeferredHolder<Attribute, Attribute> MAX_MANA = registerAttribute("max_mana", 0D, 100D, 1.0E9D, true);
+    public static final DeferredHolder<Attribute, Attribute> MANA_REGENERATION = registerAttribute("mana_regeneration", 0D, 1D, 1.0E9D, true);
+    public static final DeferredHolder<Attribute, Attribute> MAX_STAMINA = registerAttribute("max_stamina", 0D, 100D, 1.0E9D, true);
+    public static final DeferredHolder<Attribute, Attribute> STAMINA_REGENERATION = registerAttribute("stamina_regeneration", 0D, 2D, 1.0E9D, true);
+    public static final DeferredHolder<Attribute, Attribute> MAX_CURSED_ENERGY = registerAttribute("max_cursed_energy", 0D, 250D, 1.0E9D, true);
+    public static final DeferredHolder<Attribute, Attribute> CURSED_ENERGY_REGENERATION = registerAttribute("cursed_energy_regeneration", 0D, 3D, 1.0E9D, true);
     // YCS_Attributes
 
     private ModAttributes() {}
