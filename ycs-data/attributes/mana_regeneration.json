@@ -1,0 +1,11 @@
+{
+  "name": "mana_regeneration",
+  "titleText": "Mana Regeneration",
+  "min": 0,
+  "base": 1,
+  "max": 1000000000,
+  "syncToClient": true,
+  "resourceManaged": true,
+  "ownerResource": "mana",
+  "_injections": []
+}

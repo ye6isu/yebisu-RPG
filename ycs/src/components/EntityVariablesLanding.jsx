@@ -281,7 +281,7 @@ export default function EntityVariablesLanding() {
   if (creating) return <VariableEditor onBack={() => { setCreating(false); reload(); }} />;
   if (editing) return <VariableEditor variableId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
-  const filtered = variables.filter(v => !search || (v.name || v.id).toLowerCase().includes(search.toLowerCase()));
+  const filtered = variables.filter(v => !v.resourceManaged && (!search || (v.name || v.id).toLowerCase().includes(search.toLowerCase())));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

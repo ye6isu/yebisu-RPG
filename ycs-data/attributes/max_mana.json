@@ -1,0 +1,11 @@
+{
+  "name": "max_mana",
+  "titleText": "Maximum Mana",
+  "min": 0,
+  "base": 100,
+  "max": 1000000000,
+  "syncToClient": true,
+  "resourceManaged": true,
+  "ownerResource": "mana",
+  "_injections": []
+}

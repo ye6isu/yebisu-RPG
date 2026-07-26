@@ -259,7 +259,7 @@ export default function AttributesLanding() {
   if (creating) return <AttributeEditor onBack={() => { setCreating(false); reload(); }} />;
   if (editing) return <AttributeEditor attributeId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
-  const filtered = attributes.filter(a => !search || (a.titleText || a.name || a.id).toLowerCase().includes(search.toLowerCase()));
+  const filtered = attributes.filter(a => !a.resourceManaged && (!search || (a.titleText || a.name || a.id).toLowerCase().includes(search.toLowerCase())));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

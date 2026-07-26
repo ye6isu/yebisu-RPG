@@ -105,6 +105,7 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
   const [form, setForm] = useState(DEFAULT_ABILITY);
   const [textureOptions, setTextureOptions] = useState([{ value: '', label: '(none)' }]);
   const [resourceOptions, setResourceOptions] = useState([]);
+  const [selectedResourceId, setSelectedResourceId] = useState('');
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -161,11 +162,26 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
       .catch(() => {});
   }, [abilityId]);
 
+  useEffect(() => {
+    if (selectedResourceId && resourceOptions.some(resource => resource.id === selectedResourceId)) return;
+    const activeResource = resourceOptions.find(resource => Number(form.resourceCosts?.[resource.id]) > 0);
+    const nextResourceId = activeResource?.id || resourceOptions[0]?.id || '';
+    if (nextResourceId !== selectedResourceId) setSelectedResourceId(nextResourceId);
+  }, [form.resourceCosts, resourceOptions, selectedResourceId]);
+
   const setField = (field, value) => setForm(current => ({ ...current, [field]: value }));
   const setResourceCost = (resourceId, value) => setForm(current => ({
     ...current,
     resourceCosts: { ...(current.resourceCosts || {}), [resourceId]: value },
   }));
+
+  const costResourceOptions = resourceOptions.map(resource => {
+    const cost = Number(form.resourceCosts?.[resource.id]) || 0;
+    return {
+      value: resource.id,
+      label: cost > 0 ? `${resource.label} (${cost})` : resource.label,
+    };
+  });
 
   const handleSave = async () => {
     const id = sanitizeId(form.name);
@@ -313,11 +329,23 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
         <FieldRow label="Cooldown Seconds">
           <NumberInput value={form.cooldownSeconds} onChange={v => setField('cooldownSeconds', v)} style={{ width: '120px' }} />
         </FieldRow>
-        {resourceOptions.map(resource => (
-          <FieldRow key={resource.id} label={`${resource.label} Cost`}>
-            <NumberInput value={form.resourceCosts?.[resource.id] ?? '0'} onChange={value => setResourceCost(resource.id, value)} style={{ width: '120px' }} />
-          </FieldRow>
-        ))}
+        <FieldRow label="Resource Cost">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <StandardDropdownField
+                value={selectedResourceId}
+                onChange={setSelectedResourceId}
+                options={costResourceOptions.length ? costResourceOptions : [{ value: '', label: '(no resources)', disabled: true }]}
+                searchable
+              />
+            </div>
+            <NumberInput
+              value={selectedResourceId ? (form.resourceCosts?.[selectedResourceId] ?? '0') : '0'}
+              onChange={value => selectedResourceId && setResourceCost(selectedResourceId, value)}
+              style={{ width: '120px' }}
+            />
+          </div>
+        </FieldRow>
         <FieldRow label="On Use">
           <FieldIconButton
             title="On Use"

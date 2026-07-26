@@ -1,6 +1,11 @@
 package net.ye6isu.yebisuRPG.keybind;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.ye6isu.yebisuRPG.entityvar.ModAttachments;
+import net.minecraft.world.entity.player.Player;
+import net.ye6isu.yebisuRPG.resource.PlayerResourceRegistry;
+import net.ye6isu.yebisuRPG.util.ProjectJjkDashUtil;
+import net.ye6isu.yebisuRPG.vfx.VfxService;
 // YCS_Keybind_Handler_Imports
 
 /**
@@ -36,6 +41,7 @@ public final class KeybindHandlers {
 
     private static void dispatchPress(String keybindId, ServerPlayer player) {
         switch (keybindId) {
+            case "tester" -> { VfxService.playAtEntity("yesss", "main", player, VfxService.AnchorMode.FOLLOW_ENTITY, VfxService.SpawnPoint.EYE_LEVEL, true, true, false, (double)(0), (double)(0), (double)(0)); }
             // YCS_Keybind_Press_Dispatch
             default -> {}
         }

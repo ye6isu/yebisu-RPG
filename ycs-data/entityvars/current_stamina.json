@@ -1,0 +1,8 @@
+{
+  "name": "current_stamina",
+  "type": "double",
+  "defaultValue": "0",
+  "resourceManaged": true,
+  "ownerResource": "stamina",
+  "_injections": []
+}

@@ -4,10 +4,10 @@
     {
       "id": "1d312914-5f7c-4149-9628-00d89cf2d992",
       "type": "icon",
-      "anchor": "center_right",
-      "anchorTarget": "",
-      "x": 0,
-      "y": 0,
+      "anchor": "bottom_left",
+      "anchorTarget": "61da9370-b90a-4818-9e09-b8b4bdcdd911",
+      "x": 3,
+      "y": -1,
       "width": 22,
       "height": 22,
       "color": "#ffffff",
@@ -47,17 +47,18 @@
       "multiState": false,
       "stateSourceId": "",
       "stateLiteral": "0",
-      "states": []
+      "states": [],
+      "name": "Alt Ability 1 Frame"
     },
     {
       "id": "61da9370-b90a-4818-9e09-b8b4bdcdd911",
       "type": "icon",
-      "anchor": "center_right",
+      "anchor": "bottom_center",
       "anchorTarget": "",
       "x": 0,
       "y": 0,
-      "width": 12,
-      "height": 212,
+      "width": 212,
+      "height": 12,
       "color": "#ffffff",
       "valueSourceId": "",
       "maxSourceId": "",
@@ -95,7 +96,8 @@
       "multiState": false,
       "stateSourceId": "",
       "stateLiteral": "0",
-      "states": []
+      "states": [],
+      "name": "Alt Ability Bar"
     }
   ],
   "previewW": 960,

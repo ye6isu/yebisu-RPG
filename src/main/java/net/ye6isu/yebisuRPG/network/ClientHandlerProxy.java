@@ -5,6 +5,8 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.ye6isu.yebisuRPG.network.animation.*;
 import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
+import net.ye6isu.yebisuRPG.vfx.network.VfxRemovePayload;
+import net.ye6isu.yebisuRPG.vfx.network.VfxStartPayload;
 
 public final class ClientHandlerProxy {
 
@@ -51,6 +53,24 @@ public final class ClientHandlerProxy {
             handler.getMethod("handle", TextureSyncPayload.class, IPayloadContext.class).invoke(null, payload, ctx);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to dispatch texture sync payload on client", e);
+        }
+    }
+
+    public static void onVfxStart(VfxStartPayload payload, IPayloadContext ctx) {
+        dispatchVfx("onStart", VfxStartPayload.class, payload, ctx);
+    }
+
+    public static void onVfxRemove(VfxRemovePayload payload, IPayloadContext ctx) {
+        dispatchVfx("onRemove", VfxRemovePayload.class, payload, ctx);
+    }
+
+    private static <T> void dispatchVfx(String method, Class<T> payloadType, T payload, IPayloadContext ctx) {
+        if (FMLEnvironment.dist != Dist.CLIENT) return;
+        try {
+            Class<?> handler = Class.forName("net.ye6isu.yebisuRPG.vfx.client.VfxClientPayloadHandler");
+            handler.getMethod(method, payloadType, IPayloadContext.class).invoke(null, payload, ctx);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to dispatch VFX payload on client", e);
         }
     }
 }

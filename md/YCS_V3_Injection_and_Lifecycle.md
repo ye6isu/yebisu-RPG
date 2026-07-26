@@ -21,6 +21,20 @@ YCS V3 is JSON-driven and uses the following rules for every supported object ty
 
 ---
 
+## External Decompiled References
+
+New external-mod decompilations used for architecture studies live under `Decompiled/<domain>/<ModName>/`, normally with separate `sources/` and `resources/` trees. The directory is ignored by Git and is reference input only; durable findings and YCS design decisions belong in `/md/`.
+
+Rules for using these references:
+1. Inspect both code and bundled resources/metadata before drawing conclusions about a format, lifecycle, or API.
+2. Record the inspected mod/version and the exact subsystem being studied because uploaded decompilations can be replaced or expanded later.
+3. Preserve YCS's zero-runtime-dependency rule. Reimplement the required behavior within Yebisu RPG rather than linking the reference mod.
+4. Treat decompiler output as imperfect evidence: validate suspicious names, control flow, and missing bodies against neighboring callers, codecs, metadata, and resource layouts.
+
+The current VFX reference set is Photon 2.2.0 and Veil 4.3.0 under `Decompiled/VFX/`, plus ProjectJJK 1.2.0 under `Decompiled/ProjectJJK/`. Their architecture study and the resulting YCS boundary are documented in `VFX_Decompiled_Architecture_Study.md`. The authoritative implementation handoff, runtime contract, generated paths, limitations, and next steps are in `YCS_VFX_Current_State.md`.
+
+---
+
 ## Data Storage Layout
 
 ```
@@ -313,6 +327,15 @@ Any codegen that calls `Entity.setDeltaMovement(...)` directly (as opposed to `E
 
 **Where the fix actually had to go — a lesson in the two codegen paths:** `entity.apply_motion` is compiled entirely through `blockDefs.js`'s declarative `codegen.template`/`variants`, NOT through a `compiler.js` native handler — `compileActionNode` checks `blockDefRegistry.get(node.opcode)` first and calls `compileFromDef` (the template path) for *any* block whose def lacks `codegen.handler`, before ever reaching the `if (node.opcode === "...")` chain further down in `compiler.js`. An initial fix was mistakenly added to `compiler.js`'s (nonexistent, since this block never declares `codegen.handler`) native-handler branch for this opcode — it silently never ran, and re-saving the keybind kept generating the old unfixed line. The real fix belongs in `blockDefs.js`'s `"mode == 'set'"` variant template itself: `` "{{entity}}.setDeltaMovement((double)({{x}}), (double)({{y}}), (double)({{z}})); {{entity}}.hurtMarked = true;" ``. **Before editing any block's codegen, check `blockDefs.js` first for a `codegen.template`/`variants` entry for that opcode** — only add/edit a `compiler.js` branch if the block genuinely declares `codegen.handler: true` (meaning it opts out of the template path entirely).
 
+### Blocky Dash Families
+
+The two dash blocks intentionally use different runtimes and state:
+
+- `entity.dash` uses `DashUtil`: a smooth distance-over-duration dash with easing, optional collision actions, a completion body, debug particles, `Is Dashing?`, and `Cancel Dash` support.
+- `entity.projectjjk_dash` uses `ProjectJjkDashUtil`: a short ProjectJJK-style repeated velocity burst followed by multiplicative deceleration and retained momentum. It has no collision/completion bodies and is not reported or cancelled by the existing `DashUtil` query/action blocks.
+
+Do not run both families concurrently on the same entity because both authoritatively write its velocity. The exact ProjectJJK source findings, editable fields, bounds, and verification gaps are documented in `YCS_ProjectJJK_Burst_Dash.md`.
+
 ### Label Convention — Entity Slot Ordering
 
 Any block that takes an `[entity:entity]` slot must place it **last** in the label — `"... to [amount:number] for [entity:entity]"`, not `"... of [entity:entity] to [amount:number]"`. This matches the dominant convention already used by the Attribute, Entity Variable, and texture-overlay blocks (`for [entity:entity]` at the end) and keeps the canvas block's rightmost/last socket consistently the entity being acted on, regardless of how many other value slots the block has. A handful of older blocks (`effect.apply`, `entity.apply_motion`, the animation blocks) predate this convention and have entity mid-label — leave those as-is (not worth the churn of re-touching every existing graph that plugs into them), but every new block must follow entity-last.
@@ -362,7 +385,7 @@ Keybinds are a single key + at most one modifier (Ctrl/Alt/Shift) — deliberate
 
 Ability Creator defines global abilities independently from the keybind or item slot that activates them.
 
-- Stored as `ycs-data/abilities/<id>.json`: `{ name, titleText, icon, cooldownSeconds, resourceCosts, _injections }`. `resourceCosts` is an object keyed by Resource Creator ID; YCS displays one numeric cost field for every saved resource.
+- Stored as `ycs-data/abilities/<id>.json`: `{ name, titleText, icon, cooldownSeconds, resourceCosts, _injections }`. `resourceCosts` is an object keyed by Resource Creator ID. YCS edits this map through one compact resource combobox plus one numeric amount field; switching the selected resource edits another entry without displaying every resource as a separate row, and zero-valued entries are omitted on save.
 - Save injects an `AbilityRegistry.register(...)` call above `YCS_Abilities`, copies the selected icon into the HUD texture directory, and compiles the optional On Use Blocky graph into `AbilityHandlers`.
 - Activation is server-authoritative. `PlayerAbilities` rejects an ability that is cooling down or cannot afford every positive resource cost. `PlayerResourceRegistry.tryConsume` validates all costs before changing any value, then deducts all of them atomically and clamps each resulting value to its valid range. The cooldown and On Use dispatch only begin after payment succeeds.
 - Cooldowns are persisted in the synced `ABILITY_COOLDOWNS` attachment with an explicit `active|` or `frozen|` prefix. Active values are absolute world-tick deadlines; normal logout converts them to frozen remaining durations and login only resumes values marked frozen. Untagged legacy data is migrated defensively so a forced process exit cannot turn an old absolute deadline into a huge duration.
@@ -401,15 +424,20 @@ HUD covers only the read-only, non-interactive overlay half of "GUI/HUD" — alw
 
 ## Resources
 
-Resource Creator defines compact current/max readouts rendered with the protected `resource` HUD. The replacement vanilla heart stays at the vanilla health position. Authored resources start two pixels to the right of the centered 182-pixel hotbar and two pixels above the bottom screen edge; they are sorted by `order` and stack upward with two pixels between each 9x9 icon.
+Resource Creator defines server-owned current/max/regeneration values and one bar-fill texture per resource. The client HUD renders every registered definition, so resource count is open-ended rather than limited to a fixed set.
 
-- Stored as `ycs-data/resources/<id>.json`: `{ id, name, currentVariable, maxAttribute, filledTexture, emptyTexture, order, regenerationPerSecond, filledTextureWidth, filledTextureHeight, emptyTextureWidth, emptyTextureHeight, _injections }`.
-- `currentVariable` must reference a numeric Entity Variable. Its synced player attachment supplies the current amount. `maxAttribute` references a YCS `RangedAttribute`; Resource Creator intentionally reads that attribute definition's configured maximum cap, rather than its runtime base/current value, so an attribute configured with base `0` and max `100` displays a resource maximum of `100`.
-- `filledTexture` and `emptyTexture` come from the shared YCS texture pool. Save copies both to `assets/yebisurpg/textures/hud/` and tracks them as `created-file` injections. The empty texture is drawn first, then the filled texture is horizontally clipped to `current / maximum` and drawn above it.
-- Every resource occupies a fixed 9x9 GUI-space icon box. Its stored source dimensions are passed to `GuiGraphics.blit`, so larger images (for example 18x18) scale into the 9x9 box instead of being cropped. Health and resource text start at `iconX + 11`, `iconY + 1`, giving a two-pixel gap to the right and a one-pixel vertical inset.
-- Save injects one `PlayerResourceDefinition` registration above `YCS_Player_Resources` in the common `PlayerResourceRegistry.java`. Re-save removes the old marker content and copied textures before rebuilding them; rename additionally deletes the old resource JSON; Remove walks `_injections` in reverse and deletes the JSON.
-- `PlayerResourceEvents` runs once every 20 server ticks and adds each definition's non-negative `regenerationPerSecond` to every online player. The common definition setter clamps all regeneration and deductions into `[0, configured attribute maximum]`, so a resource never regenerates above its max or falls below zero.
-- Runtime values are server-owned state. Numeric Entity Variables use NeoForge attachment persistence/sync, while the client renderer only reads the synchronized value. The resource HUD is visible in Survival and Creative, remains hidden in Spectator, and its rendering is purely cosmetic.
+- Stored as `ycs-data/resources/<id>.json`: `{ id, name, currentVariable, maxAttribute, regenerationAttribute, currentDefault, maximumDefault, regenerationDefault, barTexture, order, barTextureWidth, barTextureHeight, _injections }`.
+- Resource IDs own three generated definitions: the synced numeric Entity Variable `current_<id>`, the player attribute `max_<id>`, and the player attribute `<id>_regeneration`. Resource Creator edits their three defaults directly; authors do not select or create these records separately.
+- Generated records carry `resourceManaged: true` and `ownerResource: <id>`. The normal Entity Variables, Attributes, and entity attribute assignment pages omit resource-managed records to prevent independent edits/deletion. Blocky deliberately loads them without that filter so gameplay procedures can read and update all three values.
+- `stamina` is the required baseline player resource. Its Resource Creator ID is locked and both list/editor removal controls are omitted; deletion handlers also reject it so renaming cannot be used as an indirect delete. Runtime display ordering always places it at index 0 (the bottom bar), independent of its stored `order` or registration order. A newly created non-stamina resource defaults to one order higher than the current maximum, so it is added at the top of the existing stack while remaining manually reorderable later.
+- Save injects both attributes into the vanilla player attribute map through `EntityAttributeModificationEvent`. Runtime maximum and per-second regeneration use the player's live attribute values, so Blocky and vanilla attribute modifiers affect resource behavior.
+- `barTexture` comes from the shared YCS texture pool. Save copies it to the resource-owned `assets/yebisurpg/textures/hud/<resource_id>_bar.png` path and tracks that single file as a `created-file` injection, so resources may select the same source texture without sharing deletion ownership. Runtime scales it into the shared 132x4 fill area and horizontally clips it to the lerped `current / maximum` fraction.
+- After the forced stamina-first rule, other available resources are sorted by ascending `order`; later definitions stack upward with a one-pixel gap. The first frame starts one pixel from the left edge and three pixels above the bottom edge. Current/max text is centered on each 137x10 frame.
+- The stack backing is composed dynamically for any number of resources: `bottom_resource_bar.png` is flush bottom-left, `top_resource_bar.png` caps the stack, and the one-pixel-high `mid_resource_bar.png` fills the distance between them.
+- Save injects the generated attachment, both generated attributes, both player-attribute attachments, and one `PlayerResourceDefinition` registration. Re-save removes those marker lines and the copied bar texture before rebuilding them; rename additionally deletes the old resource JSON. Remove walks `_injections` in reverse, deletes all three owned YCS records, and then deletes the resource JSON.
+- Resource access is per player. `stamina` is implicitly available to everyone; every other resource ID must be present in the persisted/synced `UNLOCKED_RESOURCES` attachment before its HUD bar is rendered, its regeneration runs, or an ability may pay a cost from it. Blocky exposes `Set Resource Access` as an action with a connectable Logic input and an entity-last Player target, plus `Player Has Resource` as a Logic value block. Revoking access preserves the current amount so granting it again restores the prior value.
+- `PlayerResourceEvents` runs once every 20 server ticks and adds each available definition's non-negative live regeneration attribute to every online player. The common definition setter clamps all regeneration and deductions into `[0, live max attribute]`, so a resource never regenerates above its max or falls below zero.
+- Runtime values and access are server-owned state. Numeric Entity Variables and the unlocked-resource list use NeoForge attachment persistence/sync, while the client renderer only reads synchronized values. The resource HUD follows the replacement health HUD's `canHurtPlayer()` visibility and its rendering is purely cosmetic.
 
 ---
 

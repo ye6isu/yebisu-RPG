@@ -122,12 +122,12 @@ public final class HudLayoutLoader {
 
     private static List<HudWidget> altAbilityWidgets() {
         List<HudWidget> widgets = new ArrayList<>();
-        widgets.add(iconWidget("alt_bar", "Alt Ability Bar", HudWidget.Anchor.CENTER_RIGHT, "", 0, 0, 12, 212, texture("alt_ability_bar")));
+        widgets.add(iconWidget("alt_bar", "Alt Ability Bar", HudWidget.Anchor.BOTTOM_CENTER, "", 0, 0, 212, 12, texture("alt_ability_bar")));
         for (int i = 1; i <= 9; i++) {
-            int y = -92 + (i - 1) * 23;
+            int x = 3 + (i - 1) * 23;
             String frameId = "alt_frame_" + i;
             String iconId = "alt_icon_" + i;
-            widgets.add(iconWidget(frameId, "Alt Ability " + i + " Frame", HudWidget.Anchor.CENTER_RIGHT, "", -1, y, 22, 22, texture("ability_frame")));
+            widgets.add(iconWidget(frameId, "Alt Ability " + i + " Frame", HudWidget.Anchor.BOTTOM_LEFT, "alt_bar", x, -1, 22, 22, texture("ability_frame")));
             widgets.add(iconWidget(iconId, "Alt Ability " + i, HudWidget.Anchor.CENTER, frameId, 0, 0, 16, 16, texture("placehold_ability")));
             widgets.add(textWidget("alt_cd_" + i, "Alt Ability " + i + " Cooldown", iconId));
         }

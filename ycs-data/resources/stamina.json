@@ -1,30 +1,56 @@
 {
   "id": "stamina",
   "name": "Stamina",
-  "currentVariable": "stamina",
-  "maxAttribute": "stamina",
-  "filledTexture": "stamina",
-  "emptyTexture": "stamina_empty",
+  "currentVariable": "current_stamina",
+  "maxAttribute": "max_stamina",
+  "regenerationAttribute": "stamina_regeneration",
+  "currentDefault": 0,
+  "maximumDefault": 100,
+  "regenerationDefault": 2,
+  "barTexture": "stamina_bar",
   "order": 0,
-  "regenerationPerSecond": 2,
-  "filledTextureWidth": 9,
-  "filledTextureHeight": 9,
-  "emptyTextureWidth": 9,
-  "emptyTextureHeight": 9,
+  "barTextureWidth": 132,
+  "barTextureHeight": 4,
   "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entityvar/ModAttachments.java",
+      "marker": "YCS_Entity_Attachments",
+      "content": "    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURRENT_STAMINA = registerDouble(\"current_stamina\", 0D);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java",
+      "marker": "YCS_Attributes",
+      "content": "    public static final DeferredHolder<Attribute, Attribute> MAX_STAMINA = registerAttribute(\"max_stamina\", 0D, 100D, 1.0E9D, true);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java",
+      "marker": "YCS_Attributes",
+      "content": "    public static final DeferredHolder<Attribute, Attribute> STAMINA_REGENERATION = registerAttribute(\"stamina_regeneration\", 0D, 2D, 1.0E9D, true);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Player_Resource_Attributes",
+      "content": "        event.add(EntityType.PLAYER, ModAttributes.MAX_STAMINA);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Player_Resource_Attributes",
+      "content": "        event.add(EntityType.PLAYER, ModAttributes.STAMINA_REGENERATION);"
+    },
     {
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java",
       "marker": "YCS_Player_Resources",
-      "content": "        register(new PlayerResourceDefinition(\"stamina\", 0, \"stamina\", 9, 9, \"stamina_empty\", 9, 9, 2, player -> player.getData(ModAttachments.STAMINA.get()), (player, value) -> player.setData(ModAttachments.STAMINA.get(), value), player -> ((RangedAttribute) ModAttributes.STAMINA.get()).getMaxValue()));"
+      "content": "        register(new PlayerResourceDefinition(\"stamina\", 0, \"stamina_bar\", 132, 4, player -> player.getData(ModAttachments.CURRENT_STAMINA.get()), (player, value) -> player.setData(ModAttachments.CURRENT_STAMINA.get(), value), player -> player.getAttributeValue(ModAttributes.MAX_STAMINA), player -> player.getAttributeValue(ModAttributes.STAMINA_REGENERATION)));"
     },
     {
       "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/hud/stamina.png"
-    },
-    {
-      "type": "created-file",
-      "file": "resources/assets/yebisurpg/textures/hud/stamina_empty.png"
+      "file": "resources/assets/yebisurpg/textures/hud/stamina_bar.png"
     }
   ]
 }

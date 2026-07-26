@@ -1,0 +1,8 @@
+{
+  "name": "current_cursed_energy",
+  "type": "double",
+  "defaultValue": "0",
+  "resourceManaged": true,
+  "ownerResource": "cursed_energy",
+  "_injections": []
+}

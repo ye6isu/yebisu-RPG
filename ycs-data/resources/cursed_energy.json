@@ -1,0 +1,56 @@
+{
+  "id": "cursed_energy",
+  "name": "Cursed Energy",
+  "currentVariable": "current_cursed_energy",
+  "maxAttribute": "max_cursed_energy",
+  "regenerationAttribute": "cursed_energy_regeneration",
+  "currentDefault": 0,
+  "maximumDefault": 250,
+  "regenerationDefault": 3,
+  "barTexture": "cursed_bar",
+  "order": 0,
+  "barTextureWidth": 132,
+  "barTextureHeight": 4,
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entityvar/ModAttachments.java",
+      "marker": "YCS_Entity_Attachments",
+      "content": "    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURRENT_CURSED_ENERGY = registerDouble(\"current_cursed_energy\", 0D);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java",
+      "marker": "YCS_Attributes",
+      "content": "    public static final DeferredHolder<Attribute, Attribute> MAX_CURSED_ENERGY = registerAttribute(\"max_cursed_energy\", 0D, 250D, 1.0E9D, true);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java",
+      "marker": "YCS_Attributes",
+      "content": "    public static final DeferredHolder<Attribute, Attribute> CURSED_ENERGY_REGENERATION = registerAttribute(\"cursed_energy_regeneration\", 0D, 3D, 1.0E9D, true);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Player_Resource_Attributes",
+      "content": "        event.add(EntityType.PLAYER, ModAttributes.MAX_CURSED_ENERGY);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/entity/ModEntityEvents.java",
+      "marker": "YCS_Player_Resource_Attributes",
+      "content": "        event.add(EntityType.PLAYER, ModAttributes.CURSED_ENERGY_REGENERATION);"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java",
+      "marker": "YCS_Player_Resources",
+      "content": "        register(new PlayerResourceDefinition(\"cursed_energy\", 0, \"cursed_energy_bar\", 132, 4, player -> player.getData(ModAttachments.CURRENT_CURSED_ENERGY.get()), (player, value) -> player.setData(ModAttachments.CURRENT_CURSED_ENERGY.get(), value), player -> player.getAttributeValue(ModAttributes.MAX_CURSED_ENERGY), player -> player.getAttributeValue(ModAttributes.CURSED_ENERGY_REGENERATION)));"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/hud/cursed_energy_bar.png"
+    }
+  ]
+}

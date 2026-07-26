@@ -35,6 +35,7 @@ public class yebisuRPG
         ModEntities.register(modEventBus);
         ModEntityEvents.register(modEventBus);
         ModCreativeModeTabs.register(modEventBus);
+        net.ye6isu.yebisuRPG.vfx.VfxRegistry.bootstrap();
         modEventBus.addListener(ModCreativeTabContents::buildTabContents);
         modEventBus.addListener(this::commonSetup);
 
@@ -52,6 +53,8 @@ public class yebisuRPG
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.ye6isu.yebisuRPG.hud.client.HudLayerHider::onRenderGuiLayerPre);
             modEventBus.addListener(ModHud::onRegisterGuiLayers);
             modEventBus.addListener(ModHud::onRegisterReloadListeners);
+            modEventBus.addListener(net.ye6isu.yebisuRPG.vfx.client.ClientVfxManager::onRegisterReloadListeners);
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.ye6isu.yebisuRPG.vfx.client.ClientVfxManager::onRenderLevelStage);
             ModHud.registerLayouts();
         }
     }

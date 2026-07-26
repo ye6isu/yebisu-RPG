@@ -79,9 +79,10 @@ public final class ModAttachments {
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Long>> ABILITY_SLOT_4_COOLDOWN_END = registerLong("ability_slot_4_cooldown_end", 0L);
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Long>> ABILITY_SLOT_5_COOLDOWN_END = registerLong("ability_slot_5_cooldown_end", 0L);
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Long>> ABILITY_SLOT_6_COOLDOWN_END = registerLong("ability_slot_6_cooldown_end", 0L);
-    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> STAMINA = registerDouble("stamina", 0);
-    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> MANA = registerDouble("mana", 20);
-    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURSED = registerDouble("cursed", 0);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<String>> UNLOCKED_RESOURCES = registerString("unlocked_resources", "");
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURRENT_MANA = registerDouble("current_mana", 20D);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURRENT_STAMINA = registerDouble("current_stamina", 0D);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Double>> CURRENT_CURSED_ENERGY = registerDouble("current_cursed_energy", 0D);
     // YCS_Entity_Attachments
 
     private ModAttachments() {}

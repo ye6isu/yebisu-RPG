@@ -1,0 +1,11 @@
+{
+  "name": "cursed_energy_regeneration",
+  "titleText": "Cursed Energy Regeneration",
+  "min": 0,
+  "base": 3,
+  "max": 1000000000,
+  "syncToClient": true,
+  "resourceManaged": true,
+  "ownerResource": "cursed_energy",
+  "_injections": []
+}

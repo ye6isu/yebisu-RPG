@@ -97,7 +97,8 @@ export default function EntityAttributesPage({ entityId, attributes, onChange, o
       for (const id of ids) {
         try {
           const raw = await invoke('load_ycs_data', { category: 'attributes', id });
-          loaded.push(JSON.parse(raw));
+          const attribute = JSON.parse(raw);
+          if (!attribute.resourceManaged) loaded.push(attribute);
         } catch {}
       }
       setModAttributes(loaded);

@@ -1,0 +1,127 @@
+{
+  "id": "yesss",
+  "name": "Yur",
+  "durationTicks": 20,
+  "objects": [
+    {
+      "id": "plane_1",
+      "name": "Plane 1",
+      "type": "plane",
+      "texture": "placehold_ability_2",
+      "position": {
+        "x": "0",
+        "y": "0",
+        "z": "1"
+      },
+      "rotation": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
+      },
+      "scale": {
+        "x": "1",
+        "y": "1",
+        "z": "1"
+      },
+      "width": "1",
+      "height": "1",
+      "billboard": false,
+      "fullBright": false,
+      "color": "#ffffff",
+      "opacity": "1",
+      "rows": "1",
+      "ticksPerFrame": "2",
+      "textureLoop": false,
+      "startTick": "0",
+      "endTick": "6"
+    },
+    {
+      "id": "plane_2",
+      "name": "Plane 2",
+      "type": "plane",
+      "texture": "placehold_ability",
+      "position": {
+        "x": "0",
+        "y": "0",
+        "z": "2"
+      },
+      "rotation": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
+      },
+      "scale": {
+        "x": "1",
+        "y": "1",
+        "z": "1"
+      },
+      "width": "1",
+      "height": "1",
+      "billboard": false,
+      "fullBright": true,
+      "color": "#ffffff",
+      "opacity": "1",
+      "rows": "1",
+      "ticksPerFrame": "2",
+      "textureLoop": true,
+      "startTick": "6",
+      "endTick": "12"
+    },
+    {
+      "id": "plane_3",
+      "name": "Plane 3",
+      "type": "plane",
+      "texture": "placehold_ability_2",
+      "position": {
+        "x": "0",
+        "y": "0",
+        "z": "3"
+      },
+      "rotation": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
+      },
+      "scale": {
+        "x": "1",
+        "y": "1",
+        "z": "1"
+      },
+      "width": "1",
+      "height": "1",
+      "billboard": false,
+      "fullBright": false,
+      "color": "#ffffff",
+      "opacity": "1",
+      "rows": "1",
+      "ticksPerFrame": "2",
+      "textureLoop": true,
+      "startTick": "12",
+      "endTick": "20"
+    }
+  ],
+  "_injections": [
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/vfx/yesss/plane_1.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/vfx/yesss/plane_2.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/textures/vfx/yesss/plane_3.png"
+    },
+    {
+      "type": "created-file",
+      "file": "resources/assets/yebisurpg/vfx/yesss.json"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/vfx/VfxRegistry.java",
+      "marker": "YCS_Vfx_Definitions",
+      "content": "        VfxRegistry.register(\"yesss\", 20);"
+    }
+  ]
+}

@@ -8,6 +8,8 @@ import net.ye6isu.yebisuRPG.keybind.KeybindTriggerPayload;
 import net.ye6isu.yebisuRPG.keybind.ServerKeybindHandler;
 import net.ye6isu.yebisuRPG.network.animation.*;
 import net.ye6isu.yebisuRPG.texture.network.TextureSyncPayload;
+import net.ye6isu.yebisuRPG.vfx.network.VfxRemovePayload;
+import net.ye6isu.yebisuRPG.vfx.network.VfxStartPayload;
 import net.ye6isu.yebisuRPG.yebisuRPG;
 
 @EventBusSubscriber(modid = yebisuRPG.MODID)
@@ -55,6 +57,16 @@ public final class NetworkRegistry {
                 TextureSyncPayload.TYPE,
                 TextureSyncPayload.STREAM_CODEC,
                 ClientHandlerProxy::onTextureSync);
+
+        registrar.playToClient(
+                VfxStartPayload.TYPE,
+                VfxStartPayload.STREAM_CODEC,
+                ClientHandlerProxy::onVfxStart);
+
+        registrar.playToClient(
+                VfxRemovePayload.TYPE,
+                VfxRemovePayload.STREAM_CODEC,
+                ClientHandlerProxy::onVfxRemove);
 
         registrar.playToServer(
                 KeybindTriggerPayload.TYPE,
