@@ -1,6 +1,18 @@
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::process::{Child, Command};
+use std::sync::{Mutex, OnceLock};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+static GRADLE_TASKS: OnceLock<Mutex<HashMap<String, Child>>> = OnceLock::new();
+
+fn gradle_tasks() -> &'static Mutex<HashMap<String, Child>> {
+    GRADLE_TASKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 fn mod_root() -> PathBuf {
     let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -605,6 +617,108 @@ fn get_mod_root() -> String {
     mod_root().to_string_lossy().to_string()
 }
 
+fn supported_gradle_task(task: &str) -> Result<&'static str, String> {
+    let task = match task {
+        "runClient" => "runClient",
+        "runData" => "runData",
+        _ => return Err(format!("Unsupported Gradle task: {}", task)),
+    };
+    Ok(task)
+}
+
+fn start_gradle_task(task: &str) -> Result<Child, String> {
+    let root = mod_root();
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        const CREATE_NEW_CONSOLE: u32 = 0x00000010;
+        let wrapper = root.join("gradlew.bat");
+        if !wrapper.exists() {
+            return Err(format!("Gradle wrapper not found at {:?}", wrapper));
+        }
+        let mut command = Command::new("cmd.exe");
+        command
+            .arg("/C")
+            .arg(wrapper)
+            .arg(task)
+            .creation_flags(CREATE_NEW_CONSOLE);
+        command
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let mut command = {
+        let wrapper = root.join("gradlew");
+        if !wrapper.exists() {
+            return Err(format!("Gradle wrapper not found at {:?}", wrapper));
+        }
+        let mut command = Command::new(wrapper);
+        command.arg(task);
+        command
+    };
+
+    command
+        .current_dir(&root)
+        .spawn()
+        .map_err(|e| format!("Failed to start Gradle {}: {}", task, e))
+}
+
+fn stop_gradle_task(child: &mut Child) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let pid = child.id().to_string();
+        let status = Command::new("taskkill.exe")
+            .args(["/PID", pid.as_str(), "/T", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map_err(|e| format!("Failed to close Gradle process tree: {}", e))?;
+        if !status.success() && child.try_wait().map_err(|e| e.to_string())?.is_none() {
+            child.kill().map_err(|e| format!("Failed to stop Gradle task: {}", e))?;
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    child.kill().map_err(|e| format!("Failed to stop Gradle task: {}", e))?;
+
+    let _ = child.wait();
+    Ok(())
+}
+
+#[tauri::command]
+fn toggle_gradle_task(task: &str) -> Result<bool, String> {
+    let task = supported_gradle_task(task)?;
+    let mut tasks = gradle_tasks()
+        .lock()
+        .map_err(|_| "Gradle task state is unavailable".to_string())?;
+
+    if let Some(mut child) = tasks.remove(task) {
+        if child.try_wait().map_err(|e| e.to_string())?.is_none() {
+            stop_gradle_task(&mut child)?;
+            return Ok(false);
+        }
+    }
+
+    tasks.insert(task.to_string(), start_gradle_task(task)?);
+    Ok(true)
+}
+
+#[tauri::command]
+fn gradle_task_running(task: &str) -> Result<bool, String> {
+    let task = supported_gradle_task(task)?;
+    let mut tasks = gradle_tasks()
+        .lock()
+        .map_err(|_| "Gradle task state is unavailable".to_string())?;
+    let running = if let Some(child) = tasks.get_mut(task) {
+        child.try_wait().map_err(|e| e.to_string())?.is_none()
+    } else {
+        false
+    };
+    if !running {
+        tasks.remove(task);
+    }
+    Ok(running)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -653,6 +767,8 @@ pub fn run() {
             copy_animation_file_to_mod,
             rename_animation_file,
             get_mod_root,
+            toggle_gradle_task,
+            gradle_task_running,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

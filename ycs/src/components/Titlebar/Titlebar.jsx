@@ -1,11 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { useCurrentTitlebarActions } from './TitlebarActionsContext';
 import './Titlebar.css';
+
+function TitlebarActionIcon({ icon }) {
+  if (icon === 'delete') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7H20M9 7V4H15V7M7 7L8 20H16L17 7M10 10V17M14 10V17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (icon === 'cancel') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 5L19 19M19 5L5 19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 3H17L21 7V21H3V3H5ZM7 3V9H16V3M7 21V14H17V21" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export default function Titlebar({ openPreferences, isSubwindow, title }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const actions = useCurrentTitlebarActions();
 
   // Close menu if clicked outside
   useEffect(() => {
@@ -79,6 +103,41 @@ export default function Titlebar({ openPreferences, isSubwindow, title }) {
           </div>
         )}
       </div>
+
+      {!isSubwindow && actions?.buttons?.length > 0 && (
+        <div className="titlebar-action-buttons" onPointerDown={(event) => event.stopPropagation()}>
+          {actions.buttons.map(button => (
+            <button
+              key={button.id}
+              className={`menu-button titlebar-icon-button ${button.danger ? 'danger' : ''}`}
+              type="button"
+              title={button.title}
+              aria-label={button.ariaLabel ?? button.title}
+              disabled={button.disabled}
+              onClick={button.onClick}
+            >
+              <TitlebarActionIcon icon={button.icon} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!isSubwindow && !actions?.buttons?.length && (
+        <div className="titlebar-search" onPointerDown={(event) => event.stopPropagation()}>
+          <input
+            className="titlebar-search-input"
+            type="search"
+            aria-label="Search current page"
+            value={actions?.search ?? ''}
+            onChange={event => actions?.onSearchChange(event.target.value)}
+          />
+          <button className="menu-button titlebar-icon-button titlebar-add-button" type="button" title="Add" aria-label="Add" onClick={() => actions?.onAdd()}>
+            <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2V22M2 12H22" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Draggable Area Spacer */}
       <div 

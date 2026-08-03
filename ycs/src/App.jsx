@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import Titlebar from "./components/Titlebar/Titlebar";
+import { TitlebarActionsProvider } from "./components/Titlebar/TitlebarActionsContext";
 import PreferencesPageNew from "./components/PreferencesPageNew";
 import ItemsLanding from "./components/ItemsLanding";
 import EntitiesLanding from "./components/EntitiesLanding";
@@ -14,7 +16,14 @@ import AbilitiesLanding from "./components/AbilitiesLanding";
 import HudLanding from "./components/HudLanding";
 import ResourcesLanding from "./components/ResourcesLanding";
 import VfxLanding from "./components/VfxLanding";
+import VfxNewLanding from "./components/VfxNewLanding";
+import OverlayScrollArea from "./components/OverlayScrollArea";
 import "./App.css";
+
+function storedSidebarGroupState(key) {
+  const stored = localStorage.getItem(key);
+  return stored === null ? true : stored === 'true';
+}
 
 function App() {
   const isPreferences = window.location.search.includes('page=preferences');
@@ -73,10 +82,12 @@ function App() {
     return parseInt(localStorage.getItem('ycs-sidebar-width')) || 224;
   });
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ycs-active-tab') || 'items');
-  const [isRegistryOpen, setIsRegistryOpen] = useState(true);
-  const [isDataOpen, setIsDataOpen] = useState(true);
-  const [isAssetsOpen, setIsAssetsOpen] = useState(true);
-  const [isInterfaceOpen, setIsInterfaceOpen] = useState(true);
+  const [isRegistryOpen, setIsRegistryOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-registry-open'));
+  const [isDataOpen, setIsDataOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-data-open'));
+  const [isAssetsOpen, setIsAssetsOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-assets-open'));
+  const [isInterfaceOpen, setIsInterfaceOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-interface-open'));
+  const [runningTasks, setRunningTasks] = useState({ runClient: false, runData: false });
+  const [pendingTasks, setPendingTasks] = useState({ runClient: false, runData: false });
   const resizingRef = useRef(false);
 
   const startResizing = (e) => {
@@ -108,6 +119,41 @@ function App() {
     };
   }, [sidebarWidth]);
 
+  useEffect(() => {
+    if (isPreferences) return undefined;
+    let cancelled = false;
+    const refreshTaskStatus = async () => {
+      try {
+        const [runClient, runData] = await Promise.all([
+          invoke('gradle_task_running', { task: 'runClient' }),
+          invoke('gradle_task_running', { task: 'runData' }),
+        ]);
+        if (!cancelled) setRunningTasks({ runClient, runData });
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    refreshTaskStatus();
+    const timer = window.setInterval(refreshTaskStatus, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isPreferences]);
+
+  const toggleGradleTask = async (task) => {
+    setPendingTasks(current => ({ ...current, [task]: true }));
+    try {
+      const running = await invoke('toggle_gradle_task', { task });
+      setRunningTasks(current => ({ ...current, [task]: running }));
+    } catch (error) {
+      console.error(error);
+      window.alert(`Unable to ${runningTasks[task] ? 'stop' : 'start'} ${task}: ${error}`);
+    } finally {
+      setPendingTasks(current => ({ ...current, [task]: false }));
+    }
+  };
+
   if (isPreferences) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -122,10 +168,18 @@ function App() {
     );
   }
 
-  const SidebarGroup = ({ label, isOpen, onToggle, children }) => (
+  const toggleSidebarGroup = (storageKey, setter) => {
+    setter(current => {
+      const next = !current;
+      localStorage.setItem(storageKey, String(next));
+      return next;
+    });
+  };
+
+  const SidebarGroup = ({ label, isOpen, onToggle, tabKeys, children }) => (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div
-        className="ycs-tab"
+        className={`ycs-tab ${!isOpen && tabKeys.includes(activeTab) ? 'active' : ''}`}
         onClick={onToggle}
         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '8px', userSelect: 'none' }}
       >
@@ -153,20 +207,42 @@ function App() {
     </div>
   );
 
+  const RunTaskIcon = ({ kind, running }) => (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      {kind === 'client' ? (
+        <>
+          <rect x="2.5" y="2.5" width="13" height="10" rx="1" stroke="currentColor" />
+          <path d="M6 15.5h6M9 12.5v3" stroke="currentColor" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <ellipse cx="9" cy="4" rx="6" ry="2.5" stroke="currentColor" />
+          <path d="M3 4v7.5C3 12.88 5.69 14 9 14s6-1.12 6-2.5V4M3 7.75c0 1.38 2.69 2.5 6 2.5s6-1.12 6-2.5" stroke="currentColor" />
+        </>
+      )}
+      {running ? (
+        <rect x="7" y="6" width="4" height="4" rx="0.5" fill="currentColor" />
+      ) : (
+        <path d="M7 5.75L11.5 8 7 10.25V5.75Z" fill="currentColor" />
+      )}
+    </svg>
+  );
+
   const tabs = [
-    { key: 'items', component: <ItemsLanding /> },
-    { key: 'entities', component: <EntitiesLanding /> },
-    { key: 'tabs', component: <TabsLanding /> },
-    { key: 'tags', component: <TagsLanding /> },
-    { key: 'components', component: <ComponentsLanding /> },
-    { key: 'entityvars', component: <EntityVariablesLanding /> },
-    { key: 'attributes', component: <AttributesLanding /> },
-    { key: 'keybinds', component: <KeybindsLanding /> },
-    { key: 'abilities', component: <AbilitiesLanding /> },
-    { key: 'textures', component: <TextureManager /> },
-    { key: 'vfx', component: <VfxLanding /> },
-    { key: 'resources', component: <ResourcesLanding /> },
-    { key: 'hud', component: <HudLanding /> },
+    { key: 'items', component: <ItemsLanding isActive={activeTab === 'items'} /> },
+    { key: 'entities', component: <EntitiesLanding isActive={activeTab === 'entities'} /> },
+    { key: 'tabs', component: <TabsLanding isActive={activeTab === 'tabs'} /> },
+    { key: 'tags', component: <TagsLanding isActive={activeTab === 'tags'} /> },
+    { key: 'components', component: <ComponentsLanding isActive={activeTab === 'components'} /> },
+    { key: 'entityvars', component: <EntityVariablesLanding isActive={activeTab === 'entityvars'} /> },
+    { key: 'attributes', component: <AttributesLanding isActive={activeTab === 'attributes'} /> },
+    { key: 'keybinds', component: <KeybindsLanding isActive={activeTab === 'keybinds'} /> },
+    { key: 'abilities', component: <AbilitiesLanding isActive={activeTab === 'abilities'} /> },
+    { key: 'textures', component: <TextureManager isActive={activeTab === 'textures'} /> },
+    { key: 'vfx', component: <VfxLanding isActive={activeTab === 'vfx'} /> },
+    { key: 'vfx-new', component: <VfxNewLanding isActive={activeTab === 'vfx-new'} /> },
+    { key: 'resources', component: <ResourcesLanding isActive={activeTab === 'resources'} /> },
+    { key: 'hud', component: <HudLanding isActive={activeTab === 'hud'} /> },
   ];
 
   return (
@@ -189,16 +265,31 @@ function App() {
             overflowY: 'hidden'
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', width: '100%', padding: '0 8px', boxSizing: 'border-box', overflowY: 'auto', overflowX: 'hidden', flex: 1 }}>
+          <OverlayScrollArea
+            vertical
+            horizontal={false}
+            style={{ width: '100%', flex: 1, minHeight: 0 }}
+            contentStyle={{ display: 'flex', flexDirection: 'column', gap: '0px', width: '100%', padding: '0 8px', boxSizing: 'border-box' }}
+          >
 
-            <SidebarGroup label="Registry" isOpen={isRegistryOpen} onToggle={() => setIsRegistryOpen(!isRegistryOpen)}>
+            <SidebarGroup
+              label="Registry"
+              isOpen={isRegistryOpen}
+              onToggle={() => toggleSidebarGroup('ycs-sidebar-registry-open', setIsRegistryOpen)}
+              tabKeys={['items', 'entities', 'tabs', 'tags']}
+            >
               <SidebarTab label="Items" tabKey="items" />
               <SidebarTab label="Entities" tabKey="entities" />
               <SidebarTab label="Creative Tabs" tabKey="tabs" />
               <SidebarTab label="Tags" tabKey="tags" />
             </SidebarGroup>
 
-            <SidebarGroup label="Data" isOpen={isDataOpen} onToggle={() => setIsDataOpen(!isDataOpen)}>
+            <SidebarGroup
+              label="Data"
+              isOpen={isDataOpen}
+              onToggle={() => toggleSidebarGroup('ycs-sidebar-data-open', setIsDataOpen)}
+              tabKeys={['components', 'entityvars', 'attributes', 'keybinds', 'abilities']}
+            >
               <SidebarTab label="Data Components" tabKey="components" />
               <SidebarTab label="Entity Variables" tabKey="entityvars" />
               <SidebarTab label="Attributes" tabKey="attributes" />
@@ -206,16 +297,47 @@ function App() {
               <SidebarTab label="Abilities" tabKey="abilities" />
             </SidebarGroup>
 
-            <SidebarGroup label="Assets" isOpen={isAssetsOpen} onToggle={() => setIsAssetsOpen(!isAssetsOpen)}>
+            <SidebarGroup
+              label="Assets"
+              isOpen={isAssetsOpen}
+              onToggle={() => toggleSidebarGroup('ycs-sidebar-assets-open', setIsAssetsOpen)}
+              tabKeys={['textures', 'vfx', 'vfx-new']}
+            >
               <SidebarTab label="Textures" tabKey="textures" />
               <SidebarTab label="VFX" tabKey="vfx" />
+              <SidebarTab label="VFX (New)" tabKey="vfx-new" />
             </SidebarGroup>
 
-            <SidebarGroup label="Interface" isOpen={isInterfaceOpen} onToggle={() => setIsInterfaceOpen(!isInterfaceOpen)}>
+            <SidebarGroup
+              label="Interface"
+              isOpen={isInterfaceOpen}
+              onToggle={() => toggleSidebarGroup('ycs-sidebar-interface-open', setIsInterfaceOpen)}
+              tabKeys={['resources', 'hud']}
+            >
               <SidebarTab label="Resources" tabKey="resources" />
               <SidebarTab label="HUD" tabKey="hud" />
             </SidebarGroup>
 
+          </OverlayScrollArea>
+          <div className="ycs-sidebar-run-bar">
+            <button
+              className={`ycs-button icon ycs-sidebar-run-button ${runningTasks.runClient ? 'running' : ''}`}
+              disabled={pendingTasks.runClient}
+              onClick={() => toggleGradleTask('runClient')}
+              title={runningTasks.runClient ? 'Stop Client' : 'Run Client'}
+              aria-label={runningTasks.runClient ? 'Stop Client' : 'Run Client'}
+            >
+              <RunTaskIcon kind="client" running={runningTasks.runClient} />
+            </button>
+            <button
+              className={`ycs-button icon ycs-sidebar-run-button ${runningTasks.runData ? 'running' : ''}`}
+              disabled={pendingTasks.runData}
+              onClick={() => toggleGradleTask('runData')}
+              title={runningTasks.runData ? 'Stop Data' : 'Run Data'}
+              aria-label={runningTasks.runData ? 'Stop Data' : 'Run Data'}
+            >
+              <RunTaskIcon kind="data" running={runningTasks.runData} />
+            </button>
           </div>
         </div>
 
@@ -261,4 +383,10 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWithTitlebarActions() {
+  return (
+    <TitlebarActionsProvider>
+      <App />
+    </TitlebarActionsProvider>
+  );
+}

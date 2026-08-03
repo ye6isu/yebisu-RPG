@@ -1,0 +1,32 @@
+.three-d-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #101113;
+}
+
+.three-d-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.three-d-viewport-reset {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 2;
+}
+
+.three-d-viewport-reset svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

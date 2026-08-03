@@ -3,15 +3,13 @@
   "titleText": "Woop",
   "icon": "placehold_ability",
   "cooldownSeconds": 1,
-  "resourceCosts": {
-    "mana": 1
-  },
+  "resourceCosts": {},
   "_injections": [
     {
       "type": "java-marker",
       "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityRegistry.java",
       "marker": "YCS_Abilities",
-      "content": "        AbilityRegistry.register(\"wap\", \"placehold_ability\", 1, java.util.Map.ofEntries(java.util.Map.entry(\"mana\", 1.0)));"
+      "content": "        AbilityRegistry.register(\"wap\", \"placehold_ability\", 1, java.util.Map.of());"
     },
     {
       "type": "created-file",

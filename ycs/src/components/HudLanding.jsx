@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Children, cloneElement } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FieldRow, StringField, StandardDropdownField } from './Field/Field';
 import BlockEditor from './BlockEditor';
@@ -1888,11 +1889,13 @@ function HudEditor({ layoutId, onBack }) {
   );
 }
 
-export default function HudLanding() {
+export default function HudLanding({ isActive = false }) {
   const [layouts, setLayouts] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
+
+  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     try {
@@ -1938,20 +1941,6 @@ export default function HudLanding() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '12px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>HUD</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input className="ycs-string-input" type="text" value={search} onChange={e => setSearch(e.target.value)} style={{ width: '160px' }} />
-          <button className="ycs-button icon" onClick={() => setCreating(true)} title="New HUD Layout">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
         {filtered.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

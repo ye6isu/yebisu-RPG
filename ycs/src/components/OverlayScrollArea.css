@@ -1,0 +1,68 @@
+.ycs-overlay-scroll-area {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ycs-overlay-scroll-viewport {
+  position: absolute;
+  inset: 0;
+  scrollbar-width: none;
+}
+
+.ycs-overlay-scroll-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.ycs-overlay-scroll-content {
+  width: 100%;
+  min-width: min-content;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.ycs-overlay-scrollbar {
+  position: absolute;
+  z-index: 20;
+  background: var(--ycs-bg);
+}
+
+.ycs-overlay-scrollbar.vertical {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+}
+
+.ycs-overlay-scrollbar.horizontal {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 8px;
+}
+
+.ycs-overlay-scrollbar-thumb {
+  position: absolute;
+  display: block;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ycs-text) 30%, transparent);
+}
+
+.ycs-overlay-scrollbar.vertical .ycs-overlay-scrollbar-thumb {
+  right: 0;
+  left: 0;
+  min-height: 24px;
+  cursor: ns-resize;
+}
+
+.ycs-overlay-scrollbar.horizontal .ycs-overlay-scrollbar-thumb {
+  top: 0;
+  bottom: 0;
+  min-width: 24px;
+  cursor: ew-resize;
+}
+
+.ycs-overlay-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ycs-text) 50%, transparent);
+}

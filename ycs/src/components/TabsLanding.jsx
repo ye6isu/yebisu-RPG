@@ -1,11 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import TabEditor from './TabEditor';
+import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
 
-export default function TabsLanding() {
+export default function TabsLanding({ isActive = false }) {
   const [tabs, setTabs] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useTitlebarActions({
+    active: isActive,
+    search,
+    onSearchChange: setSearch,
+    onAdd: () => { setEditing(null); setCreating(true); },
+  });
 
   const reload = useCallback(async () => {
     try {
@@ -50,26 +59,16 @@ export default function TabsLanding() {
   if (creating) return <TabEditor onBack={() => { setCreating(false); reload(); }} />;
   if (editing) return <TabEditor tabId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
+  const filtered = tabs.filter(tab =>
+    !search || (tab.displayName || tab.id).toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{
-        padding: '12px 16px', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-      }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Creative Tabs</h2>
-        <button className="ycs-button icon" onClick={() => setCreating(true)} title="New Tab">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {tabs.length > 0 && (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {tabs.map(tab => (
+            {filtered.map(tab => (
               <div
                 key={tab.id}
                 onClick={() => setEditing(tab.id)}

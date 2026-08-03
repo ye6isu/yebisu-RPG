@@ -7,6 +7,8 @@ import { EMPTY_GRID, buildCharMap, gridToPattern, ShapedGrid, ShapelessIngredien
 import { compileChain, collectBlockImports } from '../codegen/visual/compiler.js';
 import { DATA_COMPONENT_TYPES, componentConstName } from './ComponentsLanding';
 import { SpritesheetPreview } from './TextureManager';
+import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
+import OverlayScrollArea from './OverlayScrollArea';
 
 function FieldGroup({ label, headerExtra, children }) {
   return (
@@ -401,7 +403,12 @@ function DataComponentsPage({ components, onChange, globalComponents, onBack }) 
 
       <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <OverlayScrollArea
+        vertical
+        horizontal
+        style={{ flex: 1, minHeight: 0, minWidth: 0 }}
+        contentStyle={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+      >
         <FieldGroup label="Global">
           {refRows.length === 0 && <span style={{ fontSize: '12px', opacity: 0.3 }}>None attached</span>}
           {refRows.map(({ dc, i }) => (
@@ -429,7 +436,7 @@ function DataComponentsPage({ components, onChange, globalComponents, onBack }) 
             />
           ))}
         </FieldGroup>
-      </div>
+      </OverlayScrollArea>
     </div>
   );
 }
@@ -667,7 +674,7 @@ function ItemStates({ itemId, states, onChange, textureOptions, max = 16 }) {
   );
 }
 
-export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEditor }) {
+export default function ItemEditor({ isActive = false, itemId: existingId, onBack, onOpenBlockEditor }) {
   const [itemId, setItemId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [texture, setTexture] = useState('');
@@ -1688,6 +1695,15 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      ...(injected ? [{ id: 'delete', icon: 'delete', title: 'Delete item', danger: true, disabled: saving, onClick: handleRemove }] : []),
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'save', icon: 'save', title: saving ? 'Saving item' : 'Save item', disabled: saving || !itemId, onClick: handleSaveAndInject },
+    ],
+  });
+
   const textureOptions = textures.map(t => ({
     label: t.label,
     value: t.id,
@@ -1719,19 +1735,13 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {showTagPicker && <TagPicker tags={tags} onChange={setTags} onClose={() => setShowTagPicker(false)} />}
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {existingId ? `Edit Item: ${existingId}` : 'New Item'}
-        </h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {injected && <button className="ycs-button" onClick={handleRemove} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSaveAndInject} disabled={saving || !itemId}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <OverlayScrollArea
+        vertical
+        horizontal
+        style={{ flex: 1, minHeight: 0, minWidth: 0 }}
+        contentStyle={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+      >
+        {status && <div style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldGroup label="Identity">
           <FieldRow label="Item ID">
             <StringField value={itemId} onChange={handleIdChange} style={{ width: '100%' }} />
@@ -2111,7 +2121,7 @@ export default function ItemEditor({ itemId: existingId, onBack, onOpenBlockEdit
             );
           })}
         </FieldGroup>
-      </div>
+      </OverlayScrollArea>
 
     </div>
   );

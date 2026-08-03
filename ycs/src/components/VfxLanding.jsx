@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ColorField, FieldRow, NumberInput, StandardDropdownField, StringField } from './Field/Field';
+import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
 import './VfxLanding.css';
 
 const JAVA_BASE = 'java/net/ye6isu/yebisuRPG';
@@ -159,6 +160,120 @@ function sameTimelineTime(first, second) {
   return Math.abs(number(first) - number(second)) < KEYFRAME_TIME_EPSILON;
 }
 
+function uniqueKeyframesByTime(keyframes) {
+  if (!Array.isArray(keyframes)) return [];
+  const byTime = new Map();
+  for (const keyframe of keyframes) {
+    const tick = clamp(timelineTime(keyframe.tick), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK);
+    // Later entries represent the most recently authored value and win when
+    // repairing older data that already contains duplicate timestamps.
+    byTime.set(Math.round(tick * KEYFRAME_TIME_PRECISION), {
+      ...keyframe,
+      tick: String(tick),
+    });
+  }
+  return [...byTime.values()].sort((first, second) => number(first.tick) - number(second.tick));
+}
+
+function uniqueKeyframeCollections(collections) {
+  if (!collections) return {};
+  return Object.fromEntries(Object.entries(collections).map(([property, keyframes]) => (
+    [property, uniqueKeyframesByTime(keyframes)]
+  )));
+}
+
+function hasDuplicateKeyframeTimes(keyframes) {
+  const times = new Set();
+  for (const keyframe of keyframes || []) {
+    const tick = clamp(timelineTime(keyframe.tick), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK);
+    const timeKey = Math.round(tick * KEYFRAME_TIME_PRECISION);
+    if (times.has(timeKey)) return true;
+    times.add(timeKey);
+  }
+  return false;
+}
+
+function availableDraggedKeyframeTime({
+  rawTick,
+  candidateTick,
+  keyframes,
+  movingKeyframeId,
+  minTick,
+  maxTick,
+  direction,
+  step,
+}) {
+  const occupied = new Set((keyframes || [])
+    .filter(keyframe => keyframe.id !== movingKeyframeId)
+    .map(keyframe => timelineTime(keyframe.tick))
+    .filter(tick => tick >= minTick && tick <= maxTick)
+    .map(tick => Math.round(tick * KEYFRAME_TIME_PRECISION)));
+  let candidate = clamp(timelineTime(candidateTick), minTick, maxTick);
+  let candidateKey = Math.round(candidate * KEYFRAME_TIME_PRECISION);
+  if (!occupied.has(candidateKey)) return candidate;
+
+  const pointerSide = Math.sign(number(direction, 0));
+  const side = rawTick < candidate
+    ? -1
+    : rawTick > candidate
+      ? 1
+      : pointerSide;
+  if (side === 0) return null;
+
+  const increment = Math.max(1 / KEYFRAME_TIME_PRECISION, step) * side;
+  do {
+    candidate = timelineTime(candidate + increment);
+    if (candidate < minTick || candidate > maxTick) return null;
+    candidateKey = Math.round(candidate * KEYFRAME_TIME_PRECISION);
+  } while (occupied.has(candidateKey));
+  return candidate;
+}
+
+function availableDraggedKeyframeDelta({
+  rawDelta,
+  candidateDelta,
+  groups,
+  minDelta,
+  maxDelta,
+  direction,
+  step,
+}) {
+  const blocked = new Set();
+  for (const group of groups) {
+    const selectedIds = new Set(group.selectedKeyframes.map(keyframe => keyframe.id));
+    const fixedTicks = group.keyframes
+      .filter(keyframe => !selectedIds.has(keyframe.id))
+      .map(keyframe => timelineTime(keyframe.tick));
+    for (const selected of group.selectedKeyframes) {
+      for (const fixedTick of fixedTicks) {
+        blocked.add(Math.round(
+          timelineTime(fixedTick - selected.startTick) * KEYFRAME_TIME_PRECISION,
+        ));
+      }
+    }
+  }
+
+  let candidate = clamp(timelineTime(candidateDelta), minDelta, maxDelta);
+  let candidateKey = Math.round(candidate * KEYFRAME_TIME_PRECISION);
+  if (!blocked.has(candidateKey)) return candidate;
+
+  const pointerSide = Math.sign(number(direction, 0));
+  const side = rawDelta < candidate
+    ? -1
+    : rawDelta > candidate
+      ? 1
+      : pointerSide;
+  if (side === 0) return null;
+
+  const increment = Math.max(1 / KEYFRAME_TIME_PRECISION, step) * side;
+  do {
+    candidate = timelineTime(candidate + increment);
+    if (candidate < minDelta || candidate > maxDelta) return null;
+    candidateKey = Math.round(candidate * KEYFRAME_TIME_PRECISION);
+  } while (blocked.has(candidateKey));
+  return candidate;
+}
+
 function separatedTransform(property) {
   const match = /^(position|rotation|scale)([XYZ])$/.exec(property || '');
   return match ? { property: match[1], axis: match[2].toLowerCase() } : null;
@@ -260,7 +375,7 @@ function vector(value, fallback = { x: 0, y: 0, z: 0 }) {
 
 function orderedPositionKeyframes(object) {
   if (!Array.isArray(object.positionKeyframes)) return [];
-  return object.positionKeyframes
+  return uniqueKeyframesByTime(object.positionKeyframes)
     .map((keyframe, index) => ({
       id: String(keyframe.id || `position_${index + 1}`),
       tick: clamp(timelineTime(keyframe.tick), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK),
@@ -273,7 +388,7 @@ function orderedPositionKeyframes(object) {
 function orderedVectorKeyframes(object, property, fallback) {
   const source = object?.[`${property}Keyframes`];
   if (!Array.isArray(source)) return [];
-  return source
+  return uniqueKeyframesByTime(source)
     .map((keyframe, index) => ({
       id: String(keyframe.id || `${property}_${index + 1}`),
       tick: clamp(timelineTime(keyframe.tick), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK),
@@ -286,7 +401,7 @@ function orderedVectorKeyframes(object, property, fallback) {
 function orderedScalarKeyframes(object, property, fallback = 0) {
   const source = object?.[`${property}Keyframes`];
   if (!Array.isArray(source)) return [];
-  return source
+  return uniqueKeyframesByTime(source)
     .map((keyframe, index) => ({
       id: String(keyframe.id || `${property}_${index + 1}`),
       tick: clamp(timelineTime(keyframe.tick), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK),
@@ -298,7 +413,7 @@ function orderedScalarKeyframes(object, property, fallback = 0) {
 
 function orderedOpacityKeyframes(object) {
   if (!Array.isArray(object.opacityKeyframes)) return [];
-  return object.opacityKeyframes
+  return uniqueKeyframesByTime(object.opacityKeyframes)
     .map((keyframe, index) => ({
       id: String(keyframe.id || `opacity_${index + 1}`),
       tick: clamp(timelineTime(keyframe.tick), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK),
@@ -1029,7 +1144,19 @@ function KeyframeGraph({
                         graph.rect.height / 1000,
                       );
                     }
-                    const tick = event.shiftKey ? Math.round(rawTick) : timelineTime(rawTick);
+                    const object = effect.objects.find(candidate => candidate.id === point.selection.objectId);
+                    const keyframes = object?.[`${point.selection.property}Keyframes`] || [];
+                    const tick = availableDraggedKeyframeTime({
+                      rawTick,
+                      candidateTick: event.shiftKey ? Math.round(rawTick) : timelineTime(rawTick),
+                      keyframes,
+                      movingKeyframeId: point.selection.keyframeId,
+                      minTick: 0,
+                      maxTick: duration,
+                      direction: Math.sign(event.movementX),
+                      step: event.shiftKey ? 1 : 1 / KEYFRAME_TIME_PRECISION,
+                    });
+                    if (tick === null) return;
                     onChangeKeyframe(point.selection, { tick, axis: point.axis, value });
                     onPreviewTick(clamp(tick, 0, duration));
                   }}
@@ -1289,7 +1416,14 @@ function Timeline({
     const togglePlayback = event => {
       if (event.code !== 'Space' || event.repeat || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
       const target = event.target;
-      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (target instanceof Element) {
+        const editor = target.closest('input, textarea, select, [contenteditable="true"]');
+        if (editor) {
+          const numericInput = editor.matches('input[type="number"], input[inputmode="numeric"]');
+          if (!numericInput) return;
+          editor.blur();
+        }
+      }
       event.preventDefault();
       onPlaying(!playing);
     };
@@ -1361,29 +1495,37 @@ function Timeline({
 
       const rawDeltaTicks = ((event.clientX - drag.startX) / drag.trackWidth) * drag.duration;
       if (drag.kind === 'keyframe') {
-        const rawNextTick = drag.startTick + rawDeltaTicks;
-        const nextTick = clamp(
-          event.shiftKey ? Math.round(rawNextTick) : timelineTime(rawNextTick),
-          0,
-          drag.duration,
-        );
-        if (sameTimelineTime(nextTick, drag.lastTick)) return;
-        if (drag.keyframes.some(keyframe => (
-          keyframe.id !== drag.keyframeId && sameTimelineTime(keyframe.tick, nextTick)
-        ))) return;
+        const pointerDirection = Math.sign(event.clientX - drag.lastPointerX)
+          || Math.sign(rawDeltaTicks - drag.lastDelta);
+        drag.lastPointerX = event.clientX;
+        const nextDelta = availableDraggedKeyframeDelta({
+          rawDelta: rawDeltaTicks,
+          candidateDelta: event.shiftKey ? Math.round(rawDeltaTicks) : timelineTime(rawDeltaTicks),
+          groups: drag.groups,
+          minDelta: drag.minDelta,
+          maxDelta: drag.maxDelta,
+          direction: pointerDirection,
+          step: event.shiftKey ? 1 : 1 / KEYFRAME_TIME_PRECISION,
+        });
+        if (nextDelta === null || sameTimelineTime(nextDelta, drag.lastDelta)) return;
 
-        drag.lastTick = nextTick;
-        const nextKeyframes = drag.keyframes.map(keyframe => (
-          keyframe.id === drag.keyframeId ? { ...keyframe, tick: String(nextTick) } : keyframe
-        ));
-        if (drag.property === 'position') {
-          updatePositionKeyframesRef.current(drag.objectId, nextKeyframes);
-        } else if (drag.property === 'opacity') {
-          updateOpacityKeyframesRef.current(drag.objectId, nextKeyframes);
-        } else {
-          updateKeyframesRef.current(drag.objectId, drag.property, nextKeyframes);
+        drag.lastDelta = nextDelta;
+        for (const group of drag.groups) {
+          const startTicks = new Map(group.selectedKeyframes.map(selected => [selected.id, selected.startTick]));
+          const nextKeyframes = group.keyframes.map(keyframe => (
+            startTicks.has(keyframe.id)
+              ? { ...keyframe, tick: String(timelineTime(startTicks.get(keyframe.id) + nextDelta)) }
+              : keyframe
+          ));
+          if (group.property === 'position') {
+            updatePositionKeyframesRef.current(group.objectId, nextKeyframes);
+          } else if (group.property === 'opacity') {
+            updateOpacityKeyframesRef.current(group.objectId, nextKeyframes);
+          } else {
+            updateKeyframesRef.current(group.objectId, group.property, nextKeyframes);
+          }
         }
-        updatePreviewTickRef.current(nextTick);
+        updatePreviewTickRef.current(timelineTime(drag.startTick + nextDelta));
         return;
       }
 
@@ -1526,14 +1668,16 @@ function Timeline({
     onPlaying(false);
     onSelect(object.id);
     const selection = { objectId: object.id, property, keyframeId: keyframe.id };
+    const alreadySelected = containsSelection(selectedKeyframes, selection);
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
-      const nextSelections = containsSelection(selectedKeyframes, selection)
+      const nextSelections = alreadySelected
         ? selectedKeyframes.filter(candidate => selectionKey(candidate) !== selectionKey(selection))
         : [...selectedKeyframes, selection];
       onSelectKeyframes(nextSelections);
       return;
     }
-    onSelectKeyframes([selection]);
+    const dragSelections = alreadySelected ? selectedKeyframes : [selection];
+    onSelectKeyframes(dragSelections);
     const startTick = clamp(timelineTime(keyframe.tick), 0, duration);
     onPreviewTick(startTick);
     if (property === 'position') {
@@ -1573,21 +1717,49 @@ function Timeline({
       });
     }
 
+    const groupsByTrack = new Map();
+    for (const selectedSelection of dragSelections) {
+      const selectedObject = effect.objects.find(candidate => candidate.id === selectedSelection.objectId);
+      if (!selectedObject) continue;
+      const source = Array.isArray(selectedObject[`${selectedSelection.property}Keyframes`])
+        ? selectedObject[`${selectedSelection.property}Keyframes`]
+        : [];
+      const selectedSourceKeyframe = source.find(candidate => candidate.id === selectedSelection.keyframeId);
+      if (!selectedSourceKeyframe) continue;
+      const groupKey = `${selectedSelection.objectId}\u0000${selectedSelection.property}`;
+      if (!groupsByTrack.has(groupKey)) {
+        groupsByTrack.set(groupKey, {
+          objectId: selectedSelection.objectId,
+          property: selectedSelection.property,
+          keyframes: source,
+          selectedKeyframes: [],
+        });
+      }
+      groupsByTrack.get(groupKey).selectedKeyframes.push({
+        id: selectedSourceKeyframe.id,
+        startTick: clamp(timelineTime(selectedSourceKeyframe.tick), 0, duration),
+      });
+    }
+    const groups = [...groupsByTrack.values()];
+    const movingKeyframes = groups.flatMap(group => group.selectedKeyframes);
+    if (movingKeyframes.length === 0) return;
+    const minDelta = Math.max(...movingKeyframes.map(selected => -selected.startTick));
+    const maxDelta = Math.min(...movingKeyframes.map(selected => duration - selected.startTick));
+
     dragRef.current = {
       kind: 'keyframe',
       objectId: object.id,
       property,
       keyframeId: keyframe.id,
-      keyframes: property === 'position'
-        ? (object.positionKeyframes || [])
-        : property === 'opacity'
-          ? (object.opacityKeyframes || [])
-          : (object[`${property}Keyframes`] || []),
+      groups,
       startX: event.clientX,
       trackWidth: Math.max(1, track.getBoundingClientRect().width),
       duration,
       startTick,
-      lastTick: startTick,
+      minDelta,
+      maxDelta,
+      lastDelta: 0,
+      lastPointerX: event.clientX,
     };
     setDragging({ kind: 'keyframe', objectId: object.id, property, keyframeId: keyframe.id });
     document.body.style.cursor = 'ew-resize';
@@ -2463,14 +2635,18 @@ function VfxEditor({ effectId, onBack }) {
     objects: current.objects.map(object => object.id === selectedId ? { ...object, ...patch } : object),
   }));
   const updateObjectRange = useCallback((objectId, startTick, endTick, shiftedKeyframes = null) => {
+    const keyframeCollision = shiftedKeyframes
+      && Object.values(shiftedKeyframes).some(hasDuplicateKeyframeTimes);
     setEffect(current => ({
       ...current,
       objects: current.objects.map(object => object.id === objectId
-        ? {
+        ? keyframeCollision
+          ? object
+          : {
             ...object,
             startTick,
             endTick,
-            ...(shiftedKeyframes || {}),
+            ...uniqueKeyframeCollections(shiftedKeyframes),
           }
         : object),
     }));
@@ -2479,7 +2655,9 @@ function VfxEditor({ effectId, onBack }) {
     setEffect(current => ({
       ...current,
       objects: current.objects.map(object => object.id === objectId
-        ? { ...object, positionKeyframes }
+        ? hasDuplicateKeyframeTimes(positionKeyframes)
+          ? object
+          : { ...object, positionKeyframes: uniqueKeyframesByTime(positionKeyframes) }
         : object),
     }));
   }, []);
@@ -2487,7 +2665,9 @@ function VfxEditor({ effectId, onBack }) {
     setEffect(current => ({
       ...current,
       objects: current.objects.map(object => object.id === objectId
-        ? { ...object, opacityKeyframes }
+        ? hasDuplicateKeyframeTimes(opacityKeyframes)
+          ? object
+          : { ...object, opacityKeyframes: uniqueKeyframesByTime(opacityKeyframes) }
         : object),
     }));
   }, []);
@@ -2495,7 +2675,9 @@ function VfxEditor({ effectId, onBack }) {
     setEffect(current => ({
       ...current,
       objects: current.objects.map(object => object.id === objectId
-        ? { ...object, [`${property}Keyframes`]: keyframes }
+        ? hasDuplicateKeyframeTimes(keyframes)
+          ? object
+          : { ...object, [`${property}Keyframes`]: uniqueKeyframesByTime(keyframes) }
         : object),
     }));
   }, []);
@@ -3013,11 +3195,13 @@ function VfxRow({ effect, onEdit, onDelete }) {
   );
 }
 
-export default function VfxLanding() {
+export default function VfxLanding({ isActive = false }) {
   const [effects, setEffects] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
+
+  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     const loaded = [];
@@ -3050,11 +3234,6 @@ export default function VfxLanding() {
   const filtered = effects.filter(effect => `${effect.name || ''} ${effect.id || ''}`.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="vfx-landing">
-      <div className="vfx-landing-toolbar">
-        <h2>VFX</h2>
-        <input className="ycs-string-input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search" />
-        <button className="ycs-button icon" onClick={() => setCreating(true)} title="New VFX">+</button>
-      </div>
       <div className="vfx-list">
         {filtered.map(effect => <VfxRow key={effect.id} effect={effect} onEdit={() => setEditing(effect.id)} onDelete={() => deleteEffect(effect)} />)}
         {!filtered.length && <div className="vfx-empty">No VFX yet.</div>}

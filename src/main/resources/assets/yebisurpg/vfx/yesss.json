@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 4,
   "durationTicks": 20,
   "objects": [
     {
@@ -10,12 +10,12 @@
       "position": {
         "x": 0,
         "y": 0,
-        "z": 1
+        "z": 3.9985664423993055
       },
       "rotation": {
         "x": 0,
         "y": 0,
-        "z": 0
+        "z": 720
       },
       "scale": {
         "x": 1,
@@ -32,71 +32,243 @@
       "ticksPerFrame": 2,
       "textureLoop": false,
       "startTick": 0,
-      "endTick": 6
-    },
-    {
-      "id": "plane_2",
-      "name": "Plane 2",
-      "type": "plane",
-      "texture": "yebisurpg:textures/vfx/yesss/plane_2.png",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "z": 2
-      },
-      "rotation": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
-      "scale": {
-        "x": 1,
-        "y": 1,
-        "z": 1
-      },
-      "width": 1,
-      "height": 1,
-      "billboard": false,
-      "fullBright": true,
-      "color": "#ffffff",
-      "opacity": 1,
-      "rows": 1,
-      "ticksPerFrame": 2,
-      "textureLoop": true,
-      "startTick": 6,
-      "endTick": 12
-    },
-    {
-      "id": "plane_3",
-      "name": "Plane 3",
-      "type": "plane",
-      "texture": "yebisurpg:textures/vfx/yesss/plane_3.png",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "z": 3
-      },
-      "rotation": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
-      "scale": {
-        "x": 1,
-        "y": 1,
-        "z": 1
-      },
-      "width": 1,
-      "height": 1,
-      "billboard": false,
-      "fullBright": false,
-      "color": "#ffffff",
-      "opacity": 1,
-      "rows": 1,
-      "ticksPerFrame": 2,
-      "textureLoop": true,
-      "startTick": 12,
-      "endTick": 20
+      "endTick": 20,
+      "positionKeyframes": [],
+      "opacityKeyframes": [],
+      "separatePositionDimensions": false,
+      "positionXKeyframes": [
+        {
+          "id": "x_position_1",
+          "tick": 0,
+          "value": 0,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.6529283953228056,
+            "y1": 0.007226125525017669,
+            "x2": 1,
+            "y2": 0.15588016654647724
+          }
+        },
+        {
+          "id": "x_position_2",
+          "tick": 0.992,
+          "value": 0,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.9173788346761242,
+            "y1": 0.10144265697672585,
+            "x2": 0.9877347046338713,
+            "y2": 0.24137741761637055
+          }
+        },
+        {
+          "id": "x_position_3",
+          "tick": 13,
+          "value": 0,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.3333333333333333,
+            "y1": 0.3333333333333333,
+            "x2": 0.6666666666666666,
+            "y2": 0.6666666666666666
+          }
+        }
+      ],
+      "positionYKeyframes": [
+        {
+          "id": "y_position_1",
+          "tick": 0,
+          "value": 0,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.6529283953228056,
+            "y1": 0.007226125525017669,
+            "x2": 1,
+            "y2": 0.15588016654647724
+          }
+        },
+        {
+          "id": "y_position_2",
+          "tick": 0.992,
+          "value": 0,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.9173788346761242,
+            "y1": 0.10144265697672585,
+            "x2": 0.9877347046338713,
+            "y2": 0.24137741761637055
+          }
+        },
+        {
+          "id": "y_position_3",
+          "tick": 13,
+          "value": 0,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.3333333333333333,
+            "y1": 0.3333333333333333,
+            "x2": 0.6666666666666666,
+            "y2": 0.6666666666666666
+          }
+        }
+      ],
+      "positionZKeyframes": [
+        {
+          "id": "z_position_1",
+          "tick": 0,
+          "value": 1,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.6529283953228056,
+            "y1": 0.007226125525017669,
+            "x2": 1,
+            "y2": 0.15588016654647724
+          }
+        },
+        {
+          "id": "z_position_2",
+          "tick": 0.992,
+          "value": 3.998798188131241,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.9173788346761242,
+            "y1": 0.10144265697672585,
+            "x2": 0.9877347046338713,
+            "y2": 0.24137741761637055
+          }
+        },
+        {
+          "id": "z_position_3",
+          "tick": 13,
+          "value": 3,
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.3333333333333333,
+            "y1": 0.3333333333333333,
+            "x2": 0.6666666666666666,
+            "y2": 0.6666666666666666
+          }
+        }
+      ],
+      "rotationKeyframes": [
+        {
+          "id": "rotation_1",
+          "tick": 0,
+          "value": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0,
+            "y1": 0.55,
+            "x2": 0.45,
+            "y2": 1
+          }
+        },
+        {
+          "id": "rotation_5",
+          "tick": 6,
+          "value": {
+            "x": 0,
+            "y": 0,
+            "z": -45
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0,
+            "y1": 0.55,
+            "x2": 0.45,
+            "y2": 1
+          }
+        },
+        {
+          "id": "rotation_4",
+          "tick": 6.002,
+          "value": {
+            "x": 0,
+            "y": 0,
+            "z": -45
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0,
+            "y1": 0.55,
+            "x2": 0.45,
+            "y2": 1
+          }
+        },
+        {
+          "id": "rotation_6",
+          "tick": 19.994,
+          "value": {
+            "x": 0,
+            "y": 0,
+            "z": 720
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0,
+            "y1": 0.55,
+            "x2": 0.45,
+            "y2": 1
+          }
+        },
+        {
+          "id": "rotation_7",
+          "tick": 20,
+          "value": {
+            "x": 0,
+            "y": 0,
+            "z": 720
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0,
+            "y1": 0.55,
+            "x2": 0.45,
+            "y2": 1
+          }
+        }
+      ],
+      "scaleKeyframes": [],
+      "separateRotationDimensions": false,
+      "rotationXKeyframes": [],
+      "rotationYKeyframes": [],
+      "rotationZKeyframes": [],
+      "separateScaleDimensions": false,
+      "scaleXKeyframes": [],
+      "scaleYKeyframes": [],
+      "scaleZKeyframes": []
     }
   ]
 }

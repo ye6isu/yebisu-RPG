@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { DropdownField, FieldRow, NumberInput, StringField } from './Field/Field';
+import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
 
 const JAVA_FILE = 'java/net/ye6isu/yebisuRPG/resource/PlayerResourceRegistry.java';
 const JAVA_MARKER = 'YCS_Player_Resources';
@@ -379,11 +380,13 @@ function ResourceRow({ resource, onEdit, onDelete }) {
   );
 }
 
-export default function ResourcesLanding() {
+export default function ResourcesLanding({ isActive = false }) {
   const [resources, setResources] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
+
+  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(() => loadCategory('resources').then(setResources), []);
   useEffect(() => { reload(); }, [reload]);
@@ -406,16 +409,6 @@ export default function ResourcesLanding() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500 }}>Resources</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input className="ycs-string-input" value={search} onChange={event => setSearch(event.target.value)} style={{ width: 160 }} />
-          <button className="ycs-button icon" onClick={() => setCreating(true)} title="New Resource">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-        </div>
-      </div>
-      <div style={{ height: 1, backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16 }}>
         {filtered.length ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
