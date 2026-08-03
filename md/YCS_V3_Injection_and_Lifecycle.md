@@ -663,6 +663,8 @@ This mod ships **no runtime dependencies** and must work correctly on a real ded
 - `delete_mod_file(file)` — delete a file from mod resources
 
 ### Utility
+- `toggle_gradle_task(task)` — start the allowlisted `runClient` or `runData` Gradle wrapper task from the mod root in a separate console, or stop that task's current process tree when it is already active
+- `gradle_task_running(task)` — report and clean up the tracked state for an allowlisted Gradle task so YCS can keep each Run/Stop button synchronized
 - `get_mod_root()` — return the mod project root path
 - `read_image_base64(path)` — read any image file as a data URL
 

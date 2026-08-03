@@ -31,6 +31,11 @@ YCS uses the following CSS variables for theming, which map directly to user pre
 - **Icon Button (Inline)**: 
   - **Class**: `.ycs-button.icon`
   - **Usage**: Compact square button specifically sized for SVG icons (28x28px). Ideal for placing adjacent to text inputs in a single row without breaking the layout height.
+- **Icon Button (Titlebar)**:
+  - **Classes**: `.menu-button.titlebar-icon-button`, plus an action-specific positioning class such as `.titlebar-add-button`.
+  - **Usage**: Use for icon-only actions placed in the main titlebar. The shared component is 24x24px, centers its SVG with no inherited menu padding, and retains the File menu's transparent idle and hover styling.
+  - **Icon spacing**: The standard titlebar glyph is 12x12px, producing a 6px gap on every side. Keep the button dimensions fixed and adjust only the SVG dimensions when a different visual weight is required.
+  - **Accessibility**: Always provide both `title` and `aria-label` attributes describing the action.
 - **Inline Row Layout**: 
   - **Class**: `.ycs-inline-group` or standard flex wrappers (`display: flex`, `gap: 4px`, `alignItems: center`)
   - **Usage**: To group standard `.ycs-string-input` elements alongside `.ycs-button.icon` components seamlessly.
@@ -53,6 +58,12 @@ Custom comboboxes and dropdowns avoid the native OS `<select>` styling to fully 
 
 ## Layout Components
 
+### Sidebar Navigation State
+The main sidebar persists both the selected page (`ycs-active-tab`) and each parent group's expanded/collapsed state in local storage. When the parent containing the selected page is collapsed, apply `.active` to that parent so the user's current location remains visible even though its child row is hidden.
+
+### Sidebar Run Actions
+Two `.ycs-button.icon` controls sit in a fixed bottom bar below the scrollable navigation: Run Client and Run Data. They use the same transparent, text-colored idle state and highlight-colored hover/active state as `.ycs-tab`. Each starts its matching Gradle wrapper task in a separate console, changes its icon from Play to Stop while active, and closes the current task process tree when clicked again. Tooltips and accessible labels expose the full action names.
+
 ### Field Rows
 - **Component**: `<FieldRow label="My Label"> {children} </FieldRow>`
 - **Classes**:
@@ -63,12 +74,17 @@ Custom comboboxes and dropdowns avoid the native OS `<select>` styling to fully 
 ## Global Elements
 
 ### Scrollbars
-YCS uses custom Webkit scrollbar CSS (located in `App.css`) to match the app's theme instead of defaulting to the glaring white/grey OS scrollbars.
-- **Track**: `--ycs-bg`
-- **Thumb**: `--ycs-foreground` (rounded). Note: Hover states intentionally retain the exact same color to maintain UI consistency.
+YCS uses two scrollbar implementations with the same visual language:
+- **Overlay component**: Use `OverlayScrollArea.jsx` for editor panels, navigation lists, and any scroll region where a native scrollbar would consume layout space. It supports vertical and horizontal axes, hides the native scrollbar, and renders its 8px tracks over the content instead of beside or below it.
+- **Native fallback**: Global Webkit scrollbar CSS in `App.css` remains available for legacy scroll regions that have not yet migrated.
+- **Track**: `--ycs-bg` (Tile Workspace Color).
+- **Thumb**: A rounded `--ycs-text` mix at 30% opacity, increasing to 50% on hover, with a minimum length of 24px.
 
 ### Titlebar
 The application uses a custom, frameless titlebar (`Titlebar.jsx`). 
 - Features custom SVG window controls (Minimize, Maximize, Close).
 - Handles custom routing and layout for Subwindows (like Preferences).
 - Features the `data-tauri-drag-region` integrated with `startDragging()` API to enforce OS-level window dragging.
+- Landing pages register their search value, filter callback, and create/import action through `TitlebarActionsContext.jsx`. The centered 180px pill-shaped search field and adjacent File-style Add icon are the shared search/add controls; landing pages must not duplicate these controls in local page headers.
+- Search/add controls remain visible throughout the main YCS window. The active page owns their behavior, including while one of its nested editors is open; during the brief absence of a registered page action, the controls remain visible but inert.
+- Editors may replace the centered search/Add pair with a centered group of `.titlebar-icon-button` actions registered through `TitlebarActionsContext.jsx`. Move editor-level Save, Cancel, and Delete actions into this group and remove the duplicated local editor header; destructive actions use the red danger hover treatment.

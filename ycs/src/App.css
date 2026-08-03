@@ -184,6 +184,31 @@ input[type="range"].ycs-slider::-webkit-slider-thumb:hover {
   padding: 0;
 }
 
+.ycs-sidebar-run-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 7px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--ycs-text) 15%, transparent);
+  background-color: var(--ycs-accent);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.ycs-sidebar-run-button.ycs-button.icon {
+  background-color: transparent;
+  color: var(--ycs-text);
+  border: none;
+  border-radius: var(--ycs-radius, 4px);
+}
+
+.ycs-sidebar-run-button.ycs-button.icon:hover,
+.ycs-sidebar-run-button.ycs-button.icon.running {
+  background-color: var(--ycs-highlight);
+}
+
 /* Workspace Tile */
 .workspace-leaf {
   flex: 1;

@@ -5,11 +5,13 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -192,7 +194,7 @@ public final class ClientVfxManager {
         int alpha = Math.round(Mth.clamp(plane.opacityAt(elapsed), 0.0f, 1.0f) * 255.0f);
         int light = plane.fullBright()
                 ? 0x00F000F0
-                : LevelRenderer.getLightColor(level, BlockPos.containing(worldPosition));
+                : samplePlaneLight(level, worldPosition);
         Matrix4f matrix = poseStack.last().pose();
 
         vertex(vertices, matrix, -halfWidth, -halfHeight, 0.0f, red, green, blue, alpha, 0.0f, v1, light);
@@ -200,6 +202,24 @@ public final class ClientVfxManager {
         vertex(vertices, matrix, halfWidth, halfHeight, 0.0f, red, green, blue, alpha, 1.0f, v0, light);
         vertex(vertices, matrix, -halfWidth, halfHeight, 0.0f, red, green, blue, alpha, 0.0f, v0, light);
         poseStack.popPose();
+    }
+
+    /**
+     * Keeps a non-full-bright plane from turning dark as its center crosses into
+     * a solid block. The quad still depth-tests normally; only its lighting is
+     * sampled from the brightest immediately adjacent block boundary.
+     */
+    private static int samplePlaneLight(ClientLevel level, Vec3 worldPosition) {
+        BlockPos center = BlockPos.containing(worldPosition);
+        int light = LevelRenderer.getLightColor(level, center);
+        int blockLight = LightTexture.block(light);
+        int skyLight = LightTexture.sky(light);
+        for (Direction direction : Direction.values()) {
+            int adjacent = LevelRenderer.getLightColor(level, center.relative(direction));
+            blockLight = Math.max(blockLight, LightTexture.block(adjacent));
+            skyLight = Math.max(skyLight, LightTexture.sky(adjacent));
+        }
+        return LightTexture.pack(blockLight, skyLight);
     }
 
     /**
