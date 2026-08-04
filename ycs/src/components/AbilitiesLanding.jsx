@@ -319,16 +319,16 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldRow label="Name">
-          <StringField value={form.name} onChange={v => setField('name', sanitizeId(v))} style={{ width: '100%' }} />
+          <StringField value={form.name} onChange={v => setField('name', sanitizeId(v))} />
         </FieldRow>
         <FieldRow label="Display Text">
-          <StringField value={form.titleText} onChange={v => setField('titleText', v)} style={{ width: '100%' }} />
+          <StringField value={form.titleText} onChange={v => setField('titleText', v)} />
         </FieldRow>
         <FieldRow label="Icon">
           <StandardDropdownField value={form.icon} onChange={v => setField('icon', v)} options={textureOptions} searchable />
         </FieldRow>
         <FieldRow label="Cooldown Seconds">
-          <NumberInput value={form.cooldownSeconds} onChange={v => setField('cooldownSeconds', v)} style={{ width: '120px' }} />
+          <NumberInput value={form.cooldownSeconds} onChange={v => setField('cooldownSeconds', v)} />
         </FieldRow>
         <FieldRow label="Resource Cost">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
@@ -343,7 +343,7 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
             <NumberInput
               value={selectedResourceId ? (form.resourceCosts?.[selectedResourceId] ?? '0') : '0'}
               onChange={value => selectedResourceId && setResourceCost(selectedResourceId, value)}
-              style={{ width: '120px' }}
+              style={{ width: '90px' }}
             />
           </div>
         </FieldRow>
@@ -430,7 +430,7 @@ export default function AbilitiesLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {filtered.map(ability => (
               <AbilityRow
@@ -441,8 +441,6 @@ export default function AbilitiesLanding({ isActive = false }) {
               />
             ))}
           </div>
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No abilities yet. Click + to add one.</div>
         )}
       </div>
     </div>

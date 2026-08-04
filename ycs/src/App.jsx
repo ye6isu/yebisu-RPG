@@ -81,6 +81,9 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     return parseInt(localStorage.getItem('ycs-sidebar-width')) || 224;
   });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('ycs-sidebar-collapsed') === 'true';
+  });
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ycs-active-tab') || 'items');
   const [isRegistryOpen, setIsRegistryOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-registry-open'));
   const [isDataOpen, setIsDataOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-data-open'));
@@ -91,9 +94,18 @@ function App() {
   const resizingRef = useRef(false);
 
   const startResizing = (e) => {
+    if (isSidebarCollapsed) return;
     e.preventDefault();
     resizingRef.current = true;
     document.body.style.cursor = 'col-resize';
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(current => {
+      const next = !current;
+      localStorage.setItem('ycs-sidebar-collapsed', String(next));
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -181,7 +193,7 @@ function App() {
       <div
         className={`ycs-tab ${!isOpen && tabKeys.includes(activeTab) ? 'active' : ''}`}
         onClick={onToggle}
-        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '8px', userSelect: 'none' }}
+        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', padding: '6px 8px', userSelect: 'none' }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.1s ease-out' }}>
           <path d="M9 18l6-6-6-6"/>
@@ -200,7 +212,7 @@ function App() {
     <div
       className={`ycs-tab ${activeTab === tabKey ? 'active' : ''}`}
       onClick={() => { setActiveTab(tabKey); localStorage.setItem('ycs-active-tab', tabKey); }}
-      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '22px' }}
+      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', padding: '6px 22px' }}
     >
       <div style={{ width: '14px', flexShrink: 0 }} />
       {label}
@@ -250,7 +262,8 @@ function App() {
       <Titlebar />
       <main style={{ flexGrow: 1, position: 'relative', display: 'flex', width: '100%', boxSizing: 'border-box', minHeight: 0, overflow: 'hidden' }}>
 
-        <div
+        {!isSidebarCollapsed && <div
+          className="ycs-main-sidebar"
           style={{
             width: `${sidebarWidth}px`,
             minWidth: '224px',
@@ -339,20 +352,35 @@ function App() {
               <RunTaskIcon kind="data" running={runningTasks.runData} />
             </button>
           </div>
-        </div>
+        </div>}
 
-        <div style={{ position: 'relative', width: 0, zIndex: 100 }}>
-          <div
-            onMouseDown={startResizing}
-            style={{
-              position: 'absolute',
-              left: '-5px',
-              width: '10px',
-              height: '100%',
-              cursor: 'col-resize',
-              backgroundColor: 'transparent'
-            }}
-          />
+        <div className={`ycs-sidebar-divider ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+          {!isSidebarCollapsed && (
+            <div
+              className="ycs-sidebar-resize-hitbox"
+              onMouseDown={startResizing}
+              aria-hidden="true"
+            />
+          )}
+          <button
+            type="button"
+            className="ycs-sidebar-collapse-button"
+            onMouseDown={event => event.stopPropagation()}
+            onClick={toggleSidebar}
+            title={isSidebarCollapsed ? 'Show tabs' : 'Hide tabs'}
+            aria-label={isSidebarCollapsed ? 'Show tabs' : 'Hide tabs'}
+            aria-expanded={!isSidebarCollapsed}
+          >
+            <svg width="12" height="18" viewBox="0 0 12 18" fill="none" aria-hidden="true">
+              <path
+                d={isSidebarCollapsed ? 'M4 3.5L9 9L4 14.5' : 'M8 3.5L3 9L8 14.5'}
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
 
         <div style={{

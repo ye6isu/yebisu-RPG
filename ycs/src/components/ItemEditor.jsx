@@ -501,7 +501,8 @@ function FileDropZone({ hasFile, fileName, onImport, onClear }) {
       onClick={() => onImport()}
       className="ycs-string-input"
       style={{
-        flex: 1,
+        width: '180px',
+        flex: '0 0 180px',
         height: '24px',
         display: 'flex',
         alignItems: 'center',
@@ -1744,10 +1745,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
         {status && <div style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldGroup label="Identity">
           <FieldRow label="Item ID">
-            <StringField value={itemId} onChange={handleIdChange} style={{ width: '100%' }} />
+          <StringField value={itemId} onChange={handleIdChange} />
           </FieldRow>
           <FieldRow label="Display Name">
-            <StringField value={displayName} onChange={setDisplayName} style={{ width: '100%' }} />
+          <StringField value={displayName} onChange={setDisplayName} />
           </FieldRow>
           <FieldRow label="Creative Tab">
             <DropdownField
@@ -1821,7 +1822,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
         <FieldGroup label="Properties">
           {!toolEnabled && (
             <FieldRow label="Stack Size">
-              <NumberInput value={stackSize} onChange={setStackSize} style={{ width: '80px' }} />
+              <NumberInput value={stackSize} onChange={setStackSize} />
             </FieldRow>
           )}
           <FieldRow label="Tool">
@@ -1864,7 +1865,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               onClick={() => setShowTagPicker(true)}
               className="ycs-string-input"
               style={{
-                flex: 1, height: '24px', display: 'flex', alignItems: 'center',
+                width: '180px', flex: '0 0 180px', height: '24px', display: 'flex', alignItems: 'center',
                 gap: '6px', cursor: 'pointer', fontSize: '12px', padding: '0 8px',
                 boxSizing: 'border-box', overflow: 'hidden',
                 justifyContent: tags.length === 0 ? 'center' : 'flex-start',
@@ -1901,7 +1902,6 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
                 value={abilityId}
                 onChange={v => setItemAbilitySlots(slots => slots.map((slot, i) => i === index ? v.trim().toLowerCase().replace(/\s+/g, '_') : slot))}
                 placeholder="empty"
-                style={{ width: '100%' }}
               />
             </FieldRow>
           ))}
@@ -1909,10 +1909,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
 
         <FieldGroup label="Combat">
           <FieldRow label="Attack Damage">
-            <NumberInput value={attackDamage} onChange={setAttackDamage} style={{ width: '80px' }} />
+            <NumberInput value={attackDamage} onChange={setAttackDamage} />
           </FieldRow>
           <FieldRow label="Attack Speed">
-            <NumberInput value={attackSpeed} onChange={setAttackSpeed} style={{ width: '80px' }} />
+            <NumberInput value={attackSpeed} onChange={setAttackSpeed} />
           </FieldRow>
         </FieldGroup>
 
@@ -1922,10 +1922,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
           </FieldRow>
           {foodEnabled && <>
             <FieldRow label="Nutrition">
-              <NumberInput value={nutrition} onChange={setNutrition} style={{ width: '80px' }} />
+              <NumberInput value={nutrition} onChange={setNutrition} />
             </FieldRow>
             <FieldRow label="Saturation">
-              <NumberInput value={saturation} onChange={setSaturation} style={{ width: '80px' }} />
+              <NumberInput value={saturation} onChange={setSaturation} />
             </FieldRow>
             <FieldRow label="Can Always Eat">
               <Checkbox checked={canAlwaysEat} onChange={setCanAlwaysEat} />
@@ -1942,7 +1942,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
           </FieldRow>
           {fuelEnabled && (
             <FieldRow label="Burn Time (ticks)">
-              <NumberInput value={fuel} onChange={setFuel} style={{ width: '80px' }} />
+              <NumberInput value={fuel} onChange={setFuel} />
             </FieldRow>
           )}
         </FieldGroup>
@@ -1953,7 +1953,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
           </FieldRow>
           {tooltipEnabled && <>
             <FieldRow label="Normal Text">
-              <StringField value={tooltipNormal} onChange={setTooltipNormal} style={{ width: '100%' }} />
+              <StringField value={tooltipNormal} onChange={setTooltipNormal} />
             </FieldRow>
             <FieldRow label="Shift to Reveal">
               <Checkbox checked={tooltipShift} onChange={setTooltipShift} />
@@ -1964,11 +1964,11 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               </FieldRow>
               {!tooltipUseDefaultHint && (
                 <FieldRow label="Custom Hint">
-                  <StringField value={tooltipShiftHint} onChange={setTooltipShiftHint} style={{ width: '100%' }} />
+              <StringField value={tooltipShiftHint} onChange={setTooltipShiftHint} />
                 </FieldRow>
               )}
               <FieldRow label="Hidden Text">
-                <StringField value={tooltipHidden} onChange={setTooltipHidden} style={{ width: '100%' }} />
+                <StringField value={tooltipHidden} onChange={setTooltipHidden} />
               </FieldRow>
             </>}
           </>}
@@ -1995,7 +1995,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               />
             </FieldRow>
             <FieldRow label="Count">
-              <NumberInput value={shapedEnabled ? shapedCount : shapelessCount} onChange={shapedEnabled ? setShapedCount : setShapelessCount} style={{ width: '64px' }} />
+              <NumberInput value={shapedEnabled ? shapedCount : shapelessCount} onChange={shapedEnabled ? setShapedCount : setShapelessCount} />
             </FieldRow>
           </RecipeSubGroup>
 
@@ -2004,10 +2004,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               <DropdownField value={smeltingIngredient} onChange={setSmeltingIngredient} options={recipeItemOptions} />
             </FieldRow>
             <FieldRow label="Experience">
-              <NumberInput value={smeltingExp} onChange={setSmeltingExp} style={{ width: '80px' }} />
+              <NumberInput value={smeltingExp} onChange={setSmeltingExp} />
             </FieldRow>
             <FieldRow label="Cook Time">
-              <NumberInput value={smeltingTime} onChange={setSmeltingTime} style={{ width: '80px' }} />
+              <NumberInput value={smeltingTime} onChange={setSmeltingTime} />
             </FieldRow>
           </RecipeSubGroup>
 
@@ -2016,10 +2016,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               <DropdownField value={blastingIngredient} onChange={setBlastingIngredient} options={recipeItemOptions} />
             </FieldRow>
             <FieldRow label="Experience">
-              <NumberInput value={blastingExp} onChange={setBlastingExp} style={{ width: '80px' }} />
+              <NumberInput value={blastingExp} onChange={setBlastingExp} />
             </FieldRow>
             <FieldRow label="Cook Time">
-              <NumberInput value={blastingTime} onChange={setBlastingTime} style={{ width: '80px' }} />
+              <NumberInput value={blastingTime} onChange={setBlastingTime} />
             </FieldRow>
           </RecipeSubGroup>
 
@@ -2028,10 +2028,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               <DropdownField value={smokingIngredient} onChange={setSmokingIngredient} options={recipeItemOptions} />
             </FieldRow>
             <FieldRow label="Experience">
-              <NumberInput value={smokingExp} onChange={setSmokingExp} style={{ width: '80px' }} />
+              <NumberInput value={smokingExp} onChange={setSmokingExp} />
             </FieldRow>
             <FieldRow label="Cook Time">
-              <NumberInput value={smokingTime} onChange={setSmokingTime} style={{ width: '80px' }} />
+              <NumberInput value={smokingTime} onChange={setSmokingTime} />
             </FieldRow>
           </RecipeSubGroup>
 
@@ -2040,10 +2040,10 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               <DropdownField value={campfireIngredient} onChange={setCampfireIngredient} options={recipeItemOptions} />
             </FieldRow>
             <FieldRow label="Experience">
-              <NumberInput value={campfireExp} onChange={setCampfireExp} style={{ width: '80px' }} />
+              <NumberInput value={campfireExp} onChange={setCampfireExp} />
             </FieldRow>
             <FieldRow label="Cook Time">
-              <NumberInput value={campfireTime} onChange={setCampfireTime} style={{ width: '80px' }} />
+              <NumberInput value={campfireTime} onChange={setCampfireTime} />
             </FieldRow>
           </RecipeSubGroup>
 
@@ -2052,7 +2052,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
               <DropdownField value={stonecutIngredient} onChange={setStonecutIngredient} options={recipeItemOptions} />
             </FieldRow>
             <FieldRow label="Count">
-              <NumberInput value={stonecutCount} onChange={setStonecutCount} style={{ width: '64px' }} />
+              <NumberInput value={stonecutCount} onChange={setStonecutCount} />
             </FieldRow>
           </RecipeSubGroup>
 
@@ -2084,7 +2084,7 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
                   <Checkbox checked={on} onChange={toggle} disabled={gated} />
                   {on && (m.key === 'continuousUse' ? (
                     <>
-                      <NumberInput value={useDurationValue} onChange={setUseDurationValue} style={{ width: '48px' }} />
+                      <NumberInput value={useDurationValue} onChange={setUseDurationValue} />
                       <span style={{ fontSize: '11px', opacity: 0.4 }}>ticks</span>
                       <StandardDropdownField
                         value={useAnim}

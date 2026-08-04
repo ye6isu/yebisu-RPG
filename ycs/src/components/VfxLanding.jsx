@@ -2413,7 +2413,7 @@ function Timeline({
   );
 }
 
-function VfxEditor({ effectId, onBack }) {
+function VfxEditor({ effectId, onBack, isActive }) {
   const [effect, setEffect] = useState(DEFAULT_EFFECT);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedKeyframes, setSelectedKeyframes] = useState([]);
@@ -3073,15 +3073,18 @@ function VfxEditor({ effectId, onBack }) {
     }
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving VFX' : 'Save VFX', disabled: saving, onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete VFX', danger: true, disabled: saving || !effectId, onClick: handleRemove },
+    ],
+  });
+
   return (
     <div className="vfx-editor">
-      <div className="vfx-editor-toolbar">
-        <h2>{effectId ? `Edit VFX: ${effectId}` : 'New VFX'}</h2>
-        {status && <span className={status.ok ? 'status-ok' : 'status-error'}>{status.message}</span>}
-        {effectId && <button className="ycs-button" onClick={handleRemove} disabled={saving}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
+      {status && <div className={`vfx-editor-status ${status.ok ? 'status-ok' : 'status-error'}`} role="status">{status.message}</div>}
 
       <div
         ref={workspaceRef}
@@ -3201,7 +3204,13 @@ export default function VfxLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({
+    active: isActive,
+    enabled: !creating && !editing,
+    search,
+    onSearchChange: setSearch,
+    onAdd: () => { setEditing(null); setCreating(true); },
+  });
 
   const reload = useCallback(async () => {
     const loaded = [];
@@ -3228,15 +3237,14 @@ export default function VfxLanding({ isActive = false }) {
     reload();
   };
 
-  if (creating) return <VfxEditor onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <VfxEditor effectId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <VfxEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <VfxEditor isActive={isActive} effectId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const filtered = effects.filter(effect => `${effect.name || ''} ${effect.id || ''}`.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="vfx-landing">
       <div className="vfx-list">
         {filtered.map(effect => <VfxRow key={effect.id} effect={effect} onEdit={() => setEditing(effect.id)} onDelete={() => deleteEffect(effect)} />)}
-        {!filtered.length && <div className="vfx-empty">No VFX yet.</div>}
       </div>
     </div>
   );

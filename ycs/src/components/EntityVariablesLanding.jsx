@@ -222,7 +222,7 @@ function VariableEditor({ variableId, onBack }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldRow label="Name">
-          <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} style={{ width: '100%' }} />
+        <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} />
         </FieldRow>
         <FieldRow label="Type">
           <StandardDropdownField value={type} onChange={setType} options={ENTITY_VARIABLE_TYPES} />
@@ -233,7 +233,7 @@ function VariableEditor({ variableId, onBack }) {
           </FieldRow>
         ) : (
           <FieldRow label="Default">
-            <StringField value={defaultValue} onChange={setDefaultValue} style={{ width: '100%' }} />
+          <StringField value={defaultValue} onChange={setDefaultValue} style={{ width: type === 'double' ? '90px' : '180px' }} />
           </FieldRow>
         )}
       </div>
@@ -289,7 +289,7 @@ export default function EntityVariablesLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           ENTITY_VARIABLE_TYPES.map(({ value, label }) => {
             const group = filtered.filter(v => v.type === value);
             if (group.length === 0) return null;
@@ -306,8 +306,6 @@ export default function EntityVariablesLanding({ isActive = false }) {
               </TypeGroup>
             );
           })
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No entity variables yet. Click + to add one.</div>
         )}
       </div>
     </div>

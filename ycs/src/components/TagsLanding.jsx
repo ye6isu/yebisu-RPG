@@ -265,7 +265,7 @@ export default function TagsLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {filtered.map(tag => (
               <div
@@ -324,8 +324,6 @@ export default function TagsLanding({ isActive = false }) {
               </div>
             ))}
           </div>
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No tags yet. Click + to add one.</div>
         )}
       </div>
     </div>

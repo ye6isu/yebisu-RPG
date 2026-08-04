@@ -74,7 +74,7 @@ function AttributeRow({ id, value, label, locked, onChangeValue, onDelete }) {
       <div style={{ fontSize: '13px', fontWeight: '500', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </div>
-      <StringField value={String(value)} onChange={v => onChangeValue(id, v)} style={{ width: '100px' }} />
+          <StringField value={String(value)} onChange={v => onChangeValue(id, v)} style={{ width: '90px' }} />
       {!locked && (
         <div onClick={() => onDelete(id)} title="Remove" style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}>
           <svg width="18" height="18" viewBox="0 0 18 18">

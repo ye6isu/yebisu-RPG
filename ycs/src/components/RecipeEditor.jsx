@@ -372,7 +372,7 @@ export default function RecipeEditor({ recipeId: existingId, onBack }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldGroup label="Identity">
           <FieldRow label="Recipe ID">
-            <StringField value={recipeId} onChange={handleIdChange} style={{ width: '100%' }} />
+              <StringField value={recipeId} onChange={handleIdChange} />
           </FieldRow>
           <FieldRow label="Type">
             <StandardDropdownField
@@ -417,7 +417,7 @@ export default function RecipeEditor({ recipeId: existingId, onBack }) {
           </FieldRow>
           {recipeType !== 'smelting' && recipeType !== 'blasting' && recipeType !== 'smoking' && recipeType !== 'campfire_cooking' && (
             <FieldRow label="Count">
-              <NumberInput value={resultCount} onChange={setResultCount} style={{ width: '64px' }} />
+              <NumberInput value={resultCount} onChange={setResultCount} />
             </FieldRow>
           )}
         </FieldGroup>
@@ -425,10 +425,10 @@ export default function RecipeEditor({ recipeId: existingId, onBack }) {
         {isCooking && (
           <FieldGroup label="Cooking">
             <FieldRow label="Experience">
-              <NumberInput value={experience} onChange={setExperience} style={{ width: '80px' }} />
+              <NumberInput value={experience} onChange={setExperience} />
             </FieldRow>
             <FieldRow label="Cook Time (ticks)">
-              <NumberInput value={cookingTime} onChange={setCookingTime} style={{ width: '80px' }} />
+              <NumberInput value={cookingTime} onChange={setCookingTime} />
             </FieldRow>
           </FieldGroup>
         )}
