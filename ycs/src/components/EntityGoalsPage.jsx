@@ -54,13 +54,13 @@ function GoalParamFields({ goal, onChangeParam }) {
     case 'wander':
       return (
         <LabeledField label="Speed">
-          <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '90px' }} />
         </LabeledField>
       );
     case 'look_at_player':
       return (
         <LabeledField label="Look Distance">
-          <StringField value={p.maxDistance} onChange={v => onChangeParam('maxDistance', v)} style={{ width: '70px' }} />
+        <StringField value={p.maxDistance} onChange={v => onChangeParam('maxDistance', v)} style={{ width: '90px' }} />
         </LabeledField>
       );
     case 'look_around':
@@ -69,30 +69,30 @@ function GoalParamFields({ goal, onChangeParam }) {
       return (
         <>
           <LabeledField label="Speed">
-            <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Sprint Speed">
-            <StringField value={p.sprintSpeedModifier} onChange={v => onChangeParam('sprintSpeedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.sprintSpeedModifier} onChange={v => onChangeParam('sprintSpeedModifier', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Max Distance">
-            <StringField value={p.maxDistance} onChange={v => onChangeParam('maxDistance', v)} style={{ width: '70px' }} />
+        <StringField value={p.maxDistance} onChange={v => onChangeParam('maxDistance', v)} style={{ width: '90px' }} />
           </LabeledField>
         </>
       );
     case 'panic':
       return (
         <LabeledField label="Speed">
-          <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '90px' }} />
         </LabeledField>
       );
     case 'tempt':
       return (
         <>
           <LabeledField label="Speed">
-            <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Item">
-            <StringField value={p.itemId} onChange={v => onChangeParam('itemId', v)} style={{ width: '140px' }} />
+        <StringField value={p.itemId} onChange={v => onChangeParam('itemId', v)} />
           </LabeledField>
           <LabeledField label="Can Scare">
             <Checkbox checked={!!p.canScare} onChange={v => onChangeParam('canScare', v)} />
@@ -103,10 +103,10 @@ function GoalParamFields({ goal, onChangeParam }) {
       return (
         <>
           <LabeledField label="Speed">
-            <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Breeding Item">
-            <StringField value={p.itemId} onChange={v => onChangeParam('itemId', v)} style={{ width: '140px' }} />
+        <StringField value={p.itemId} onChange={v => onChangeParam('itemId', v)} />
           </LabeledField>
         </>
       );
@@ -114,16 +114,16 @@ function GoalParamFields({ goal, onChangeParam }) {
       return (
         <>
           <LabeledField label="Speed">
-            <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '70px' }} />
+        <StringField value={p.speedModifier} onChange={v => onChangeParam('speedModifier', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Attack Interval (ticks)">
-            <StringField value={p.attackInterval} onChange={v => onChangeParam('attackInterval', v)} style={{ width: '90px' }} />
+        <StringField value={p.attackInterval} onChange={v => onChangeParam('attackInterval', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Attack Radius">
-            <StringField value={p.attackRadius} onChange={v => onChangeParam('attackRadius', v)} style={{ width: '80px' }} />
+        <StringField value={p.attackRadius} onChange={v => onChangeParam('attackRadius', v)} style={{ width: '90px' }} />
           </LabeledField>
           <LabeledField label="Damage">
-            <StringField value={p.damage} onChange={v => onChangeParam('damage', v)} style={{ width: '70px' }} />
+        <StringField value={p.damage} onChange={v => onChangeParam('damage', v)} style={{ width: '90px' }} />
           </LabeledField>
         </>
       );

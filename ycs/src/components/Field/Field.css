@@ -24,6 +24,9 @@
 }
 
 .ycs-string-input {
+  width: 180px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
   background: var(--ycs-bg);
   border: 1px solid var(--ycs-foreground);
   color: var(--ycs-text);
@@ -33,6 +36,11 @@
   outline: none;
   font-family: inherit;
   transition: background 0.1s, border-color 0.1s;
+}
+
+.ycs-string-input[type="number"],
+.ycs-string-input[inputmode="numeric"] {
+  width: 90px;
 }
 
 .ycs-string-input:hover {

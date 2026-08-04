@@ -197,19 +197,19 @@ function AttributeEditor({ attributeId, onBack }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldRow label="Name">
-          <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} style={{ width: '100%' }} />
+        <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} />
         </FieldRow>
         <FieldRow label="Display Text">
-          <StringField value={titleText} onChange={setTitleText} style={{ width: '100%' }} />
+        <StringField value={titleText} onChange={setTitleText} />
         </FieldRow>
         <FieldRow label="Min">
-          <StringField value={min} onChange={setMin} style={{ width: '100%' }} />
+        <StringField value={min} onChange={setMin} style={{ width: '90px' }} />
         </FieldRow>
         <FieldRow label="Base">
-          <StringField value={base} onChange={setBase} style={{ width: '100%' }} />
+        <StringField value={base} onChange={setBase} style={{ width: '90px' }} />
         </FieldRow>
         <FieldRow label="Max">
-          <StringField value={max} onChange={setMax} style={{ width: '100%' }} />
+        <StringField value={max} onChange={setMax} style={{ width: '90px' }} />
         </FieldRow>
         <FieldRow label="Sync to Client">
           <Checkbox checked={syncToClient} onChange={setSyncToClient} />
@@ -267,7 +267,7 @@ export default function AttributesLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {filtered.map(attribute => (
               <AttributeRow
@@ -278,8 +278,6 @@ export default function AttributesLanding({ isActive = false }) {
               />
             ))}
           </div>
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No attributes yet. Click + to add one.</div>
         )}
       </div>
     </div>

@@ -325,8 +325,8 @@ function ResourceEditor({ resourceId, onBack }) {
       </div>
       <div style={{ height: 1, backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <FieldRow label="Name"><StringField value={name} onChange={setName} style={{ width: '100%' }} /></FieldRow>
-        <FieldRow label="ID"><StringField value={id} onChange={value => setId(normalizeId(value))} disabled={resourceId === 'stamina'} style={{ width: '100%' }} /></FieldRow>
+      <FieldRow label="Name"><StringField value={name} onChange={setName} /></FieldRow>
+      <FieldRow label="ID"><StringField value={id} onChange={value => setId(normalizeId(value))} disabled={resourceId === 'stamina'} /></FieldRow>
         <FieldRow label="Current Default"><NumberInput value={currentDefault} onChange={setCurrentDefault} /></FieldRow>
         <FieldRow label="Maximum Default"><NumberInput value={maximumDefault} onChange={setMaximumDefault} /></FieldRow>
         <FieldRow label="Regeneration Default"><NumberInput value={regenerationDefault} onChange={setRegenerationDefault} /></FieldRow>
@@ -410,11 +410,11 @@ export default function ResourcesLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16 }}>
-        {filtered.length ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {filtered.map(resource => <ResourceRow key={resource.id} resource={resource} onEdit={() => setEditing(resource.id)} onDelete={() => deleteResource(resource)} />)}
           </div>
-        ) : <div style={{ opacity: 0.3, fontSize: 13, padding: '8px 0' }}>No resources yet.</div>}
+        )}
       </div>
     </div>
   );

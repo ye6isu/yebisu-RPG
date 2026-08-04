@@ -22,6 +22,7 @@ YCS uses the following CSS variables for theming, which map directly to user pre
 ### Textboxes (String / Number Inputs)
 - **Class**: `.ycs-string-input`
 - **Usage**: Used on standard `<input type="text">` or `<input type="number">` to represent typed fields.
+- **Default width**: String fields are fixed at `180px`; number fields are fixed at half that width (`90px`). Vector properties keep one fixed `90px` number field per axis rather than stretching with their panel. Specialized compact controls such as color values, timeline time fields, or controls intentionally filling a constrained parent may override these widths explicitly.
 - **Style**: Solid dark background (`--ycs-bg`), thin border, smooth focus ring.
 
 ### Buttons
@@ -43,10 +44,18 @@ YCS uses the following CSS variables for theming, which map directly to user pre
 ### Comboboxes & Dropdowns (Custom)
 Custom comboboxes and dropdowns avoid the native OS `<select>` styling to fully integrate with the YCS color scheme, supporting both readonly selection and typed entry.
 - **Components**: `DropdownField`, `StandardDropdownField`, `FontComboField` (found in `Field.jsx`).
+- **Default width**: Custom dropdowns, font selectors, and native `<select>` controls use a fixed `180px` width and do not grow or shrink with their parent row.
 - **Inner Classes**:
   - `.dropdown`: The floating popup container for options.
   - `.dropdown-item`: Individual clickable options inside the dropdown.
   - `.dropdown-separator`: 1px divider line between grouped items.
+
+### JSON File Selectors
+- **Default width**: File-drop selectors for JSON-backed fields, including entity/item model and animation JSON files, use a fixed `180px` width and truncate long filenames within that width.
+- **Exception**: Large media drop zones and canvas-oriented import surfaces may retain a purpose-built size.
+
+### Tag Selectors
+- **Default width**: Inline tag-picker controls use a fixed `180px` width and clip overflowing tag chips within the control.
 
 ### Sliders (Range Inputs)
 - **Class**: `.ycs-slider`
@@ -60,9 +69,15 @@ Custom comboboxes and dropdowns avoid the native OS `<select>` styling to fully 
 
 ### Sidebar Navigation State
 The main sidebar persists both the selected page (`ycs-active-tab`) and each parent group's expanded/collapsed state in local storage. When the parent containing the selected page is collapsed, apply `.active` to that parent so the user's current location remains visible even though its child row is hidden.
+- Parent and child tabs use matching left/right padding at their respective hierarchy depth. VFX object-tab lists likewise keep equal outer gutters on both sides.
+- The sidebar's `6px` divider is also its resize rail. Center the borderless collapse control inside that rail at the rail's full width while expanded; do not give it a separate button outline or footprint.
+- Persist the collapsed state under `ycs-sidebar-collapsed`. While collapsed, hide the sidebar and expose the same control as a narrow `16px` reopening notch. Keep the workspace's `6px` right and bottom accent borders so its outer padding remains visually balanced with the collapsed left rail.
 
 ### Sidebar Run Actions
 Two `.ycs-button.icon` controls sit in a fixed bottom bar below the scrollable navigation: Run Client and Run Data. They use the same transparent, text-colored idle state and highlight-colored hover/active state as `.ycs-tab`. Each starts its matching Gradle wrapper task in a separate console, changes its icon from Play to Stop while active, and closes the current task process tree when clicked again. Tooltips and accessible labels expose the full action names.
+
+### Landing Page Empty States
+When a landing page has no saved objects or its search has no matches, leave the list area blank. Do not render instructional placeholder copy such as `No <object> yet. Click + to add one.`; the shared titlebar Add action already communicates how to create an object.
 
 ### Field Rows
 - **Component**: `<FieldRow label="My Label"> {children} </FieldRow>`
@@ -87,4 +102,4 @@ The application uses a custom, frameless titlebar (`Titlebar.jsx`).
 - Features the `data-tauri-drag-region` integrated with `startDragging()` API to enforce OS-level window dragging.
 - Landing pages register their search value, filter callback, and create/import action through `TitlebarActionsContext.jsx`. The centered 180px pill-shaped search field and adjacent File-style Add icon are the shared search/add controls; landing pages must not duplicate these controls in local page headers.
 - Search/add controls remain visible throughout the main YCS window. The active page owns their behavior, including while one of its nested editors is open; during the brief absence of a registered page action, the controls remain visible but inert.
-- Editors may replace the centered search/Add pair with a centered group of `.titlebar-icon-button` actions registered through `TitlebarActionsContext.jsx`. Move editor-level Save, Cancel, and Delete actions into this group and remove the duplicated local editor header; destructive actions use the red danger hover treatment.
+- Editors replace the centered search/Add pair with a centered group of `.titlebar-icon-button` actions registered through `TitlebarActionsContext.jsx`. Arrange editor-level actions as Save, Cancel, then Delete from left to right, remove the duplicated local editor header, and give Delete the red danger hover treatment. Keep Delete present but disabled when a newly created object has not been saved yet.

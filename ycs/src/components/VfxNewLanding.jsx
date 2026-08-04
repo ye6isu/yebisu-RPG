@@ -111,7 +111,6 @@ function VfxNewLanding({ isActive = false }) {
   const [timelineObjects, setTimelineObjects] = useState([
     objectDefaults({ id: 'dummy-1', name: 'Dummy', type: 'dummy', start: 0, end: 25, expanded: false }),
   ]);
-  const [objectSearch, setObjectSearch] = useState('');
   const [selectedObjectId, setSelectedObjectId] = useState('dummy-1');
   const [renamingObject, setRenamingObject] = useState(null);
   const [renameValue, setRenameValue] = useState('');
@@ -140,10 +139,7 @@ function VfxNewLanding({ isActive = false }) {
   const previewPosition = clamp(((previewTick - timelineView.start) / timelineSpan) * 100, 0, 100);
   const previewRulerInterval = rulerInterval(timelineSpan, previewBarWidth);
   const previewRulerTicks = rulerTicks(timelineView.start, timelineView.end, previewRulerInterval);
-  const normalizedObjectSearch = objectSearch.trim().toLowerCase();
-  const visibleTimelineObjects = timelineObjects.filter(object => (
-    !normalizedObjectSearch || `${object.name ?? ''} ${object.id ?? ''}`.toLowerCase().includes(normalizedObjectSearch)
-  ));
+  const visibleTimelineObjects = timelineObjects;
   const selectedObject = timelineObjects.find(object => object.id === selectedObjectId) ?? null;
   let timelineContentHeight = 0;
   const timelineObjectLayout = visibleTimelineObjects.map(object => {
@@ -311,9 +307,11 @@ function VfxNewLanding({ isActive = false }) {
 
   useTitlebarActions({
     active: isActive,
-    search: objectSearch,
-    onSearchChange: setObjectSearch,
-    onAdd: addPlane,
+    buttons: [
+      { id: 'save', icon: 'save', title: 'Save VFX (not connected yet)', disabled: true },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel (not connected yet)', disabled: true },
+      { id: 'delete', icon: 'delete', title: 'Delete VFX (not connected yet)', danger: true, disabled: true },
+    ],
   });
 
   const deleteObject = (objectId, event) => {
@@ -697,10 +695,6 @@ function VfxNewLanding({ isActive = false }) {
 
   return (
     <main className="vfx-new-landing">
-      <header className="vfx-new-toolbar">
-        <h2>VFX (New)</h2>
-      </header>
-
       <div ref={workspaceRef} className="vfx-new-workspace">
         <div className="vfx-new-main-row">
         <aside className="vfx-new-panel vfx-new-panel-left" style={{ width: leftWidth }}>
@@ -737,6 +731,7 @@ function VfxNewLanding({ isActive = false }) {
           </div>
           <div className="vfx-new-objects-header">
             <span>Objects</span>
+            <button className="ycs-button icon" type="button" onClick={addPlane} title="Add Plane" aria-label="Add Plane">+</button>
           </div>
           <div className="vfx-new-object-list-shell">
             <div ref={objectListScrollRef} className="vfx-new-object-list">
@@ -861,14 +856,12 @@ function VfxNewLanding({ isActive = false }) {
                       <StringField
                         value={selectedObject.texture}
                         onChange={texture => updateObject(selectedObject.id, { texture })}
-                        style={{ width: '100%' }}
                       />
                     </FieldRow>
                     <FieldRow label="Opacity">
                       <NumberInput
                         value={selectedObject.opacity}
                         onChange={opacity => updateObject(selectedObject.id, { opacity })}
-                        style={{ width: '100%' }}
                       />
                     </FieldRow>
                     <FieldRow label="Billboard">

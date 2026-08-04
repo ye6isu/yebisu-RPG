@@ -124,7 +124,7 @@ function CategoryPicker({ value, onChange }) {
         if (e.target.value === '__custom__') { setCustomMode(true); onChange(''); }
         else onChange(e.target.value);
       }}
-      style={{ width: '100%' }}
+      style={{ width: 180, flex: '0 0 180px' }}
     >
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
@@ -159,13 +159,13 @@ function RecordKeyButton({ value, onChange }) {
         <button className="ycs-button" onClick={() => setRecording(v => !v)}>
           {recording ? 'Press a key or mouse button…' : 'Record'}
         </button>
-        <select className="ycs-string-input" value={base} onChange={e => onChange(joinBindCode(e.target.value, mod))} style={{ width: 180 }}>
+        <select className="ycs-string-input" value={base} onChange={e => onChange(joinBindCode(e.target.value, mod))} style={{ width: 180, flex: '0 0 180px' }}>
           <option value="NONE">(none)</option>
           {KEY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <select className="ycs-string-input" value={mod} onChange={e => onChange(joinBindCode(base, e.target.value))} disabled={base.startsWith('MOD_')} style={{ width: 120 }}>
+        <select className="ycs-string-input" value={mod} onChange={e => onChange(joinBindCode(base, e.target.value))} disabled={base.startsWith('MOD_')} style={{ width: 180, flex: '0 0 180px' }}>
           <option value="NONE">No modifier</option>
           <option value="CTRL">Ctrl</option>
           <option value="ALT">Alt</option>
@@ -411,10 +411,10 @@ function KeybindEditor({ keybindId, onBack, onOpenBlockEditor }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldRow label="Name">
-          <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} style={{ width: '100%' }} />
+        <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} />
         </FieldRow>
         <FieldRow label="Display Text">
-          <StringField value={titleText} onChange={setTitleText} style={{ width: '100%' }} />
+        <StringField value={titleText} onChange={setTitleText} />
         </FieldRow>
         <FieldRow label="Default Binding">
           <RecordKeyButton value={bindCode} onChange={setBindCode} />
@@ -520,7 +520,7 @@ export default function KeybindsLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {filtered.map(keybind => (
               <KeybindRow
@@ -531,8 +531,6 @@ export default function KeybindsLanding({ isActive = false }) {
               />
             ))}
           </div>
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No keybinds yet. Click + to add one.</div>
         )}
       </div>
     </div>

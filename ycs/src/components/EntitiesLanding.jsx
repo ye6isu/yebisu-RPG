@@ -138,7 +138,7 @@ function FileDropZone({ hasFile, fileName, onImport, accept }) {
       onClick={() => onImport()}
       className="ycs-string-input"
       style={{
-        flex: 1, height: '24px', display: 'flex', alignItems: 'center',
+        width: '180px', flex: '0 0 180px', height: '24px', display: 'flex', alignItems: 'center',
         justifyContent: hasFile ? 'flex-start' : 'center', gap: '6px',
         cursor: 'pointer', fontSize: '12px', padding: '0 8px', boxSizing: 'border-box',
         borderColor: dragOver ? 'var(--ycs-highlight)' : undefined,
@@ -576,10 +576,10 @@ function EntityEditor({ entityId, onBack }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldGroup label="Identity">
           <FieldRow label="Id">
-            <StringField value={id} onChange={v => setId(v.toLowerCase().replace(/\s/g, '_'))} disabled={!!entityId} style={{ width: '100%' }} />
+          <StringField value={id} onChange={v => setId(v.toLowerCase().replace(/\s/g, '_'))} disabled={!!entityId} />
           </FieldRow>
           <FieldRow label="Display Name">
-            <StringField value={displayName} onChange={setDisplayName} style={{ width: '100%' }} />
+          <StringField value={displayName} onChange={setDisplayName} />
           </FieldRow>
         </FieldGroup>
 
@@ -632,13 +632,13 @@ function EntityEditor({ entityId, onBack }) {
 
         <FieldGroup label="Hitbox">
           <FieldRow label="Hitbox Width">
-            <StringField value={hitboxWidth} onChange={setHitboxWidth} style={{ width: '100%' }} />
+          <StringField value={hitboxWidth} onChange={setHitboxWidth} style={{ width: '90px' }} />
           </FieldRow>
           <FieldRow label="Hitbox Height">
-            <StringField value={hitboxHeight} onChange={setHitboxHeight} style={{ width: '100%' }} />
+          <StringField value={hitboxHeight} onChange={setHitboxHeight} style={{ width: '90px' }} />
           </FieldRow>
           <FieldRow label="Eye Height">
-            <StringField value={eyeHeight} onChange={setEyeHeight} placeholder="Default (75% of height)" style={{ width: '100%' }} />
+          <StringField value={eyeHeight} onChange={setEyeHeight} placeholder="Default" style={{ width: '90px' }} />
           </FieldRow>
           <FieldRow label="Extra Hitbox Parts">
             <FieldIconButton title="Manage Parts" hasData={parts.length > 0} onClick={() => setSubpage('parts')} />
@@ -716,7 +716,7 @@ export default function EntitiesLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {filtered.map(entity => (
               <EntityRow
@@ -727,8 +727,6 @@ export default function EntitiesLanding({ isActive = false }) {
               />
             ))}
           </div>
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No entities yet. Click + to add one.</div>
         )}
       </div>
     </div>

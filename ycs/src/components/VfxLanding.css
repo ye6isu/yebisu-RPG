@@ -2,13 +2,13 @@
 .vfx-editor {
   display: flex;
   flex-direction: column;
+  position: relative;
   height: 100%;
   min-height: 0;
   color: var(--ycs-text);
 }
 
-.vfx-landing-toolbar,
-.vfx-editor-toolbar {
+.vfx-landing-toolbar {
   min-height: 48px;
   padding: 8px 16px;
   display: flex;
@@ -18,8 +18,7 @@
   box-sizing: border-box;
 }
 
-.vfx-landing-toolbar h2,
-.vfx-editor-toolbar h2 {
+.vfx-landing-toolbar h2 {
   margin: 0;
   font-size: 16px;
   font-weight: 500;
@@ -27,6 +26,20 @@
 }
 
 .vfx-landing-toolbar .ycs-string-input { width: 180px; }
+
+.vfx-editor-status {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 20;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 5px 9px;
+  transform: translateX(-50%);
+  border-radius: var(--ycs-radius, 4px);
+  background-color: var(--ycs-foreground);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
 
 .vfx-list {
   flex: 1;
@@ -147,11 +160,10 @@
 }
 
 .vfx-vector-fields,
-.vfx-pair { display: flex; align-items: center; gap: 4px; width: 100%; }
-.vfx-vector-fields label { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; }
+.vfx-pair { display: flex; align-items: center; gap: 4px; width: max-content; }
+.vfx-vector-fields label { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
 .vfx-vector-fields label span { font-size: 9px; opacity: 0.5; }
-.vfx-vector-fields .ycs-string-input,
-.vfx-pair .ycs-string-input { width: 100% !important; min-width: 0; }
+.vfx-vector-fields .ycs-string-input { width: 90px !important; min-width: 90px; max-width: 90px; }
 
 .vfx-timeline {
   flex: 1 1 auto;

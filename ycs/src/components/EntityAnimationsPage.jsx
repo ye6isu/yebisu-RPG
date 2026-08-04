@@ -16,14 +16,14 @@ export default function EntityAnimationsPage({ entityId, headBone, idleAnim, wal
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldRow label="Head Bone Name">
-          <StringField value={headBone} onChange={onChangeHeadBone} placeholder="(none)" style={{ width: '100%' }} />
+          <StringField value={headBone} onChange={onChangeHeadBone} placeholder="(none)" />
         </FieldRow>
 
         <FieldRow label="Idle Animation Name">
-          <StringField value={idleAnim} onChange={onChangeIdleAnim} style={{ width: '100%' }} />
+          <StringField value={idleAnim} onChange={onChangeIdleAnim} />
         </FieldRow>
         <FieldRow label="Walk Animation Name">
-          <StringField value={walkAnim} onChange={onChangeWalkAnim} placeholder="(none)" style={{ width: '100%' }} />
+          <StringField value={walkAnim} onChange={onChangeWalkAnim} placeholder="(none)" />
         </FieldRow>
       </div>
     </div>

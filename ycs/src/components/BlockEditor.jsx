@@ -631,10 +631,10 @@ function BlockSettingsPopup({ bdef, node, onFieldChange, showSettings, setShowSe
             return (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: 'var(--ycs-text)', fontSize: 12 }}>{s.label}</span>
-                <select value={node.fields?.[key] ?? s.default ?? ''}
+                <select className="ycs-string-input" value={node.fields?.[key] ?? s.default ?? ''}
                   onChange={e => { e.stopPropagation(); onFieldChange?.(node.id, key, e.target.value); }}
                   onMouseDown={e => e.stopPropagation()}
-                  style={{ background: 'rgba(0,0,0,0.3)', border: 'none', color: '#fff', borderRadius: 4, padding: '2px 6px' }}>
+                  style={{ width: 180, flex: '0 0 180px', background: 'rgba(0,0,0,0.3)', border: 'none', color: '#fff', borderRadius: 4, padding: '2px 6px' }}>
                   {(s.options || []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>

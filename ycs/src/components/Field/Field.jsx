@@ -23,7 +23,7 @@ export function NumberInput({ value, onChange, style = {} }) {
         const v = e.target.value;
         if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) onChange(v);
       }}
-      style={{ width: '80px', ...style }}
+      style={{ width: '90px', ...style }}
     />
   );
 }
@@ -52,7 +52,7 @@ export function StringField({ value, onChange, placeholder, disabled, style = {}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
-      style={style}
+      style={{ width: '180px', ...style }}
     />
   );
 }
@@ -106,7 +106,7 @@ export function FontComboField({ value, onChange, options }) {
   }, []);
   
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '180px', flex: '0 0 180px' }}>
       <StringField 
         value={value} 
         onChange={onChange} 
@@ -187,7 +187,7 @@ export function DropdownField({ value, onChange, options }) {
     : options;
   
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '180px', flex: '0 0 180px' }}>
       <div
         className="ycs-string-input"
         onClick={() => { if (!isOpen) setIsOpen(true); }}
@@ -290,7 +290,7 @@ export function StandardDropdownField({ value, onChange, options, searchable, di
   }, [isOpen, searchable]);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '180px', flex: '0 0 180px' }}>
       <div
         className="ycs-string-input"
         onClick={() => { if (!disabled) setIsOpen(!isOpen); }}

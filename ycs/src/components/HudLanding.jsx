@@ -690,7 +690,7 @@ function LayoutPanel({
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 }}>
       <FieldRow label="Name">
-        <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} style={{ width: '100%' }} />
+        <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} />
       </FieldRow>
       <LinkableValueField
         label="Visibility" mode="bool"
@@ -790,14 +790,14 @@ function CanvasToolbar({
       </FieldRow>
       <FieldRow label="Grid W/H">
         <div style={{ display: 'flex', gap: 6 }}>
-          <input className="ycs-string-input" type="number" value={gridW} onChange={e => setGridW(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '100%' }} />
-          <input className="ycs-string-input" type="number" value={gridH} onChange={e => setGridH(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '100%' }} />
+          <input className="ycs-string-input" type="number" value={gridW} onChange={e => setGridW(Math.max(1, parseInt(e.target.value) || 1))} />
+          <input className="ycs-string-input" type="number" value={gridH} onChange={e => setGridH(Math.max(1, parseInt(e.target.value) || 1))} />
         </div>
       </FieldRow>
       <FieldRow label="Grid Offset">
         <div style={{ display: 'flex', gap: 6 }}>
-          <input className="ycs-string-input" type="number" value={gridOffsetX} onChange={e => setGridOffsetX(parseInt(e.target.value) || 0)} style={{ width: '100%' }} />
-          <input className="ycs-string-input" type="number" value={gridOffsetY} onChange={e => setGridOffsetY(parseInt(e.target.value) || 0)} style={{ width: '100%' }} />
+          <input className="ycs-string-input" type="number" value={gridOffsetX} onChange={e => setGridOffsetX(parseInt(e.target.value) || 0)} />
+          <input className="ycs-string-input" type="number" value={gridOffsetY} onChange={e => setGridOffsetY(parseInt(e.target.value) || 0)} />
         </div>
       </FieldRow>
     </div>
@@ -1112,7 +1112,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 }}>
       <FieldRow label="Name">
-        <StringField value={widget.name || ''} onChange={v => set('name', v)} style={{ width: '100%' }} />
+          <StringField value={widget.name || ''} onChange={v => set('name', v)} />
       </FieldRow>
       <FieldRow label="Anchor To">
         <StandardDropdownField
@@ -1134,16 +1134,16 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
         </div>
       </div>
       <FieldRow label="Offset X">
-        <StringField value={String(widget.x)} onChange={v => set('x', parseInt(v) || 0)} style={{ width: '100%' }} />
+          <StringField value={String(widget.x)} onChange={v => set('x', parseInt(v) || 0)} style={{ width: '90px' }} />
       </FieldRow>
       <FieldRow label="Offset Y">
-        <StringField value={String(widget.y)} onChange={v => set('y', parseInt(v) || 0)} style={{ width: '100%' }} />
+          <StringField value={String(widget.y)} onChange={v => set('y', parseInt(v) || 0)} style={{ width: '90px' }} />
       </FieldRow>
       <FieldRow label="Width">
-        <StringField value={String(widget.width)} onChange={v => set('width', Math.max(4, parseInt(v) || 4))} style={{ width: '100%' }} />
+          <StringField value={String(widget.width)} onChange={v => set('width', Math.max(4, parseInt(v) || 4))} style={{ width: '90px' }} />
       </FieldRow>
       <FieldRow label="Height">
-        <StringField value={String(widget.height)} onChange={v => set('height', Math.max(4, parseInt(v) || 4))} style={{ width: '100%' }} />
+          <StringField value={String(widget.height)} onChange={v => set('height', Math.max(4, parseInt(v) || 4))} style={{ width: '90px' }} />
       </FieldRow>
 
       <LinkableValueField
@@ -1188,7 +1188,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
           />
           {widget.type === 'bar' && (
             <FieldRow label="Fallback Color">
-              <StringField value={widget.color} onChange={v => set('color', v)} style={{ width: '100%' }} />
+              <StringField value={widget.color} onChange={v => set('color', v)} />
             </FieldRow>
           )}
         </>
@@ -1215,7 +1215,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
                 onRemoveFrameLink={() => onRemoveLink('frame_barEmpty')}
               />
               <FieldRow label="Fallback Color">
-                <StringField value={widget.color} onChange={v => set('color', v)} style={{ width: '100%' }} />
+              <StringField value={widget.color} onChange={v => set('color', v)} />
               </FieldRow>
             </>
           )}
@@ -1223,7 +1223,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
       )}
       {widget.type === 'text' && (
         <FieldRow label="Color">
-          <StringField value={widget.color} onChange={v => set('color', v)} style={{ width: '100%' }} />
+              <StringField value={widget.color} onChange={v => set('color', v)} />
         </FieldRow>
       )}
       {widget.type === 'text' && (
@@ -1231,7 +1231,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
           <StringField
             value={String(widget.textFontScale ?? 1)}
             onChange={v => set('textFontScale', Math.max(0.1, parseFloat(v) || 1))}
-            style={{ width: '100%' }}
+            style={{ width: '90px' }}
           />
         </FieldRow>
       )}
@@ -1942,7 +1942,7 @@ export default function HudLanding({ isActive = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {filtered.map(layout => (
               <div
@@ -1967,8 +1967,6 @@ export default function HudLanding({ isActive = false }) {
               </div>
             ))}
           </div>
-        ) : (
-          <div style={{ opacity: 0.3, fontSize: '13px', padding: '8px 0' }}>No HUD layouts yet. Click + to add one.</div>
         )}
       </div>
     </div>

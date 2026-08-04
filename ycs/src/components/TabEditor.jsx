@@ -343,10 +343,10 @@ export default function TabEditor({ tabId: existingId, onBack }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <FieldGroup label="Identity">
           <FieldRow label="Tab ID">
-            <StringField value={tabId} onChange={handleIdChange} style={{ width: '100%' }} />
+              <StringField value={tabId} onChange={handleIdChange} />
           </FieldRow>
           <FieldRow label="Display Name">
-            <StringField value={displayName} onChange={setDisplayName} style={{ width: '100%' }} />
+              <StringField value={displayName} onChange={setDisplayName} />
           </FieldRow>
         </FieldGroup>
 
@@ -356,7 +356,7 @@ export default function TabEditor({ tabId: existingId, onBack }) {
           </FieldRow>
           {cycleEnabled && (
             <FieldRow label="Cycle Speed (ms)">
-              <NumberInput value={cycleMs} onChange={setCycleMs} style={{ width: '80px' }} />
+              <NumberInput value={cycleMs} onChange={setCycleMs} />
             </FieldRow>
           )}
           {!cycleEnabled && (

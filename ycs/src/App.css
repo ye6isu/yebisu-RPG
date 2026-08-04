@@ -209,6 +209,57 @@ input[type="range"].ycs-slider::-webkit-slider-thumb:hover {
   background-color: var(--ycs-highlight);
 }
 
+.ycs-sidebar-divider {
+  position: relative;
+  width: 6px;
+  flex-shrink: 0;
+  background-color: var(--ycs-accent);
+  z-index: 100;
+}
+
+.ycs-sidebar-resize-hitbox {
+  position: absolute;
+  inset: 0 auto 0 -2px;
+  width: 10px;
+  cursor: col-resize;
+  background-color: transparent;
+}
+
+.ycs-sidebar-collapse-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 42px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ycs-text);
+  background-color: var(--ycs-accent);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+  z-index: 1;
+}
+
+.ycs-sidebar-collapse-button:hover,
+.ycs-sidebar-collapse-button:focus-visible {
+  background-color: var(--ycs-highlight);
+  outline: none;
+}
+
+.ycs-sidebar-divider.collapsed .ycs-sidebar-collapse-button {
+  left: 0;
+  width: 16px;
+  transform: translateY(-50%);
+  border-left: 0;
+  border-radius: 0 var(--ycs-radius, 4px) var(--ycs-radius, 4px) 0;
+}
+
 /* Workspace Tile */
 .workspace-leaf {
   flex: 1;

@@ -486,10 +486,10 @@ function TextureEditor({ texture, onBack }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <FieldGroup label="Identity">
           <FieldRow label="Label">
-            <input className="ycs-string-input" type="text" value={label} onChange={e => setLabel(e.target.value)} style={{ width: '100%' }} />
+            <input className="ycs-string-input" type="text" value={label} onChange={e => setLabel(e.target.value)} />
           </FieldRow>
           <FieldRow label="ID">
-            <input className="ycs-string-input" type="text" value={id} onChange={e => setId(e.target.value)} style={{ width: '100%' }} />
+            <input className="ycs-string-input" type="text" value={id} onChange={e => setId(e.target.value)} />
           </FieldRow>
         </FieldGroup>
 
@@ -531,10 +531,10 @@ function TextureEditor({ texture, onBack }) {
             {isSpritesheet && (
               <FieldGroup label="Spritesheet">
                 <FieldRow label="Rows">
-                  <NumberInput value={rows} onChange={setRows} style={{ width: '64px' }} />
+                  <NumberInput value={rows} onChange={setRows} />
                 </FieldRow>
                 <FieldRow label="Default Frame">
-                  <NumberInput value={defaultFrame} onChange={setDefaultFrame} style={{ width: '64px' }} />
+                  <NumberInput value={defaultFrame} onChange={setDefaultFrame} />
                 </FieldRow>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                   <input type="checkbox" checked={animatedOnUse} onChange={e => setAnimatedOnUse(e.target.checked)} />
@@ -542,7 +542,7 @@ function TextureEditor({ texture, onBack }) {
                 </div>
                 {animatedOnUse && (
                   <FieldRow label="Ticks/Frame">
-                    <NumberInput value={ticksPerFrame} onChange={setTicksPerFrame} style={{ width: '64px' }} />
+                    <NumberInput value={ticksPerFrame} onChange={setTicksPerFrame} />
                   </FieldRow>
                 )}
               </FieldGroup>
