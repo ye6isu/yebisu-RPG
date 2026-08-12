@@ -53,6 +53,29 @@
   border: 1px solid var(--ycs-highlight);
 }
 
+.dropdown.ycs-field-dropdown {
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  overflow-x: auto;
+}
+
+.ycs-field-dropdown .dropdown-item {
+  width: max-content;
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.dropdown.ycs-field-dropdown-column {
+  overflow: hidden;
+}
+
+.ycs-field-dropdown-options {
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
 .ycs-color-preview {
   position: relative;
   width: 24px;

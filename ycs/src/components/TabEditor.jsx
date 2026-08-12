@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { FieldRow, StringField, NumberInput, DropdownField } from './Field/Field';
+import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
 import { VANILLA_ITEMS } from '../data/vanillaItems';
 
 const MODID = 'yebisurpg';
@@ -158,7 +159,7 @@ function ItemArranger({ items, onReorder }) {
   );
 }
 
-export default function TabEditor({ tabId: existingId, onBack }) {
+export default function TabEditor({ tabId: existingId, onBack, isActive = false }) {
   const [tabId, setTabId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [iconItem, setIconItem] = useState('minecraft:stone');
@@ -326,21 +327,19 @@ export default function TabEditor({ tabId: existingId, onBack }) {
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving tab' : 'Save tab', disabled: saving || !tabId, onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete tab', danger: true, disabled: saving || !injected, onClick: handleRemove },
+    ],
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {existingId ? `Edit Tab: ${existingId}` : 'New Tab'}
-        </h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {injected && <button className="ycs-button" onClick={handleRemove} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving || !tabId}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldGroup label="Identity">
           <FieldRow label="Tab ID">
               <StringField value={tabId} onChange={handleIdChange} />

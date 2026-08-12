@@ -102,7 +102,7 @@ function FieldIconButton({ onClick, title, hasData, disabled }) {
   );
 }
 
-function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
+function AbilityEditor({ abilityId, onBack, onOpenBlockEditor, isActive = false }) {
   const [form, setForm] = useState(DEFAULT_ABILITY);
   const [textureOptions, setTextureOptions] = useState([{ value: '', label: '(none)' }]);
   const [resourceOptions, setResourceOptions] = useState([]);
@@ -303,21 +303,19 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving ability' : 'Save ability', disabled: saving || !form.name, onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete ability', danger: true, disabled: saving || !abilityId, onClick: handleRemove },
+    ],
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {abilityId ? `Edit Ability: ${abilityId}` : 'New Ability'}
-        </h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {abilityId && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldRow label="Name">
           <StringField value={form.name} onChange={v => setField('name', sanitizeId(v))} />
         </FieldRow>
@@ -331,15 +329,13 @@ function AbilityEditor({ abilityId, onBack, onOpenBlockEditor }) {
           <NumberInput value={form.cooldownSeconds} onChange={v => setField('cooldownSeconds', v)} />
         </FieldRow>
         <FieldRow label="Resource Cost">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <StandardDropdownField
-                value={selectedResourceId}
-                onChange={setSelectedResourceId}
-                options={costResourceOptions.length ? costResourceOptions : [{ value: '', label: '(no resources)', disabled: true }]}
-                searchable
-              />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StandardDropdownField
+              value={selectedResourceId}
+              onChange={setSelectedResourceId}
+              options={costResourceOptions.length ? costResourceOptions : [{ value: '', label: '(no resources)', disabled: true }]}
+              searchable
+            />
             <NumberInput
               value={selectedResourceId ? (form.resourceCosts?.[selectedResourceId] ?? '0') : '0'}
               onChange={value => selectedResourceId && setResourceCost(selectedResourceId, value)}
@@ -371,7 +367,7 @@ export default function AbilitiesLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
   const [blockEditing, setBlockEditing] = useState(null);
 
   const reload = useCallback(async () => {
@@ -408,6 +404,7 @@ export default function AbilitiesLanding({ isActive = false }) {
       <div style={{ position: 'relative', height: '100%' }}>
         <div style={{ height: '100%', visibility: blockEditing ? 'hidden' : 'visible', pointerEvents: blockEditing ? 'none' : 'auto' }}>
           <AbilityEditor
+            isActive={isActive}
             abilityId={editing || undefined}
             onBack={() => { setCreating(false); setEditing(null); reload(); }}
             onOpenBlockEditor={(abilityId, methodKey) => setBlockEditing({ abilityId, methodKey })}

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ColorField, FieldRow, NumberInput, StandardDropdownField, StringField } from './Field/Field';
 import { useTitlebarActions } from './Titlebar/TitlebarActionsContext';
+import VfxNewLanding from './VfxNewLanding';
 import './VfxLanding.css';
 
 const JAVA_BASE = 'java/net/ye6isu/yebisuRPG';
@@ -3237,8 +3238,8 @@ export default function VfxLanding({ isActive = false }) {
     reload();
   };
 
-  if (creating) return <VfxEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <VfxEditor isActive={isActive} effectId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <VfxNewLanding isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <VfxNewLanding isActive={isActive} effectId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const filtered = effects.filter(effect => `${effect.name || ''} ${effect.id || ''}`.toLowerCase().includes(search.toLowerCase()));
   return (

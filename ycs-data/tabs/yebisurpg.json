@@ -1,0 +1,27 @@
+{
+  "id": "yebisurpg",
+  "displayName": "yebisu RPG",
+  "iconItem": "minecraft:stone",
+  "cycleEnabled": true,
+  "cycleMs": 2000,
+  "type": "tab",
+  "_injections": [
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModCreativeModeTabs.java",
+      "marker": "YCS_Mod_Creative_Tabs",
+      "content": "    public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.item.CreativeModeTab, net.minecraft.world.item.CreativeModeTab> YEBISURPG = CREATIVE_MODE_TABS.register(\"yebisurpg\",\n            () -> net.minecraft.world.item.CreativeModeTab.builder()\n                    .title(net.minecraft.network.chat.Component.translatable(\"itemGroup.yebisurpg.yebisurpg\"))\n                    .icon(() -> new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(\"minecraft\", \"stone\"))))\n                    .build());"
+    },
+    {
+      "type": "java-marker",
+      "file": "java/net/ye6isu/yebisuRPG/item/TabIconCycler.java",
+      "marker": "YCS_Cycler_Register",
+      "content": "        ENTRIES.add(new CycleEntry(ModCreativeModeTabs.YEBISURPG, 2000L, new java.util.ArrayList<>()));"
+    },
+    {
+      "type": "json-key",
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "itemGroup.yebisurpg.yebisurpg"
+    }
+  ]
+}

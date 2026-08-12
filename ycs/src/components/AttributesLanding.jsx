@@ -85,7 +85,7 @@ function AttributeRow({ attribute, onClick, onDelete }) {
   );
 }
 
-function AttributeEditor({ attributeId, onBack }) {
+function AttributeEditor({ attributeId, onBack, isActive = false }) {
   const [name, setName] = useState('');
   const [titleText, setTitleText] = useState('');
   const [min, setMin] = useState('0');
@@ -181,21 +181,19 @@ function AttributeEditor({ attributeId, onBack }) {
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving attribute' : 'Save attribute', disabled: saving || !name, onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete attribute', danger: true, disabled: saving || !attributeId, onClick: handleRemove },
+    ],
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {attributeId ? `Edit Attribute: ${attributeId}` : 'New Attribute'}
-        </h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {attributeId && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldRow label="Name">
         <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} />
         </FieldRow>
@@ -225,7 +223,7 @@ export default function AttributesLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     try {
@@ -259,8 +257,8 @@ export default function AttributesLanding({ isActive = false }) {
     } catch {}
   };
 
-  if (creating) return <AttributeEditor onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <AttributeEditor attributeId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <AttributeEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <AttributeEditor isActive={isActive} attributeId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const filtered = attributes.filter(a => !a.resourceManaged && (!search || (a.titleText || a.name || a.id).toLowerCase().includes(search.toLowerCase())));
 

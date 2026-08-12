@@ -6,16 +6,25 @@
       "id": "plane_1",
       "name": "Plane 1",
       "type": "plane",
-      "texture": "yebisurpg:textures/vfx/yesss/plane_1.png",
       "position": {
         "x": 0,
         "y": 0,
-        "z": 3.9985664423993055
+        "z": 2
+      },
+      "pivot": {
+        "x": 0,
+        "y": 0,
+        "z": -2
+      },
+      "baseRotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
       },
       "rotation": {
         "x": 0,
         "y": 0,
-        "z": 720
+        "z": 0
       },
       "scale": {
         "x": 1,
@@ -24,10 +33,11 @@
       },
       "width": 1,
       "height": 1,
-      "billboard": false,
-      "fullBright": false,
+      "texture": "yebisurpg:textures/vfx/yesss/plane_1.png",
       "color": "#ffffff",
       "opacity": 1,
+      "billboard": false,
+      "fullBright": false,
       "rows": 1,
       "ticksPerFrame": 2,
       "textureLoop": false,
@@ -178,85 +188,31 @@
             "z": 0
           },
           "easing": {
-            "type": "cubic",
-            "mode": "inOut",
+            "type": "expo",
+            "mode": "out",
             "amount": 1,
-            "x1": 0,
-            "y1": 0.55,
-            "x2": 0.45,
-            "y2": 1
+            "x1": 0.3333333333333333,
+            "y1": 0.3333333333333333,
+            "x2": 0.6666666666666666,
+            "y2": 0.6666666666666666
           }
         },
         {
-          "id": "rotation_5",
-          "tick": 6,
-          "value": {
-            "x": 0,
-            "y": 0,
-            "z": -45
-          },
-          "easing": {
-            "type": "cubic",
-            "mode": "inOut",
-            "amount": 1,
-            "x1": 0,
-            "y1": 0.55,
-            "x2": 0.45,
-            "y2": 1
-          }
-        },
-        {
-          "id": "rotation_4",
-          "tick": 6.002,
-          "value": {
-            "x": 0,
-            "y": 0,
-            "z": -45
-          },
-          "easing": {
-            "type": "cubic",
-            "mode": "inOut",
-            "amount": 1,
-            "x1": 0,
-            "y1": 0.55,
-            "x2": 0.45,
-            "y2": 1
-          }
-        },
-        {
-          "id": "rotation_6",
-          "tick": 19.994,
-          "value": {
-            "x": 0,
-            "y": 0,
-            "z": 720
-          },
-          "easing": {
-            "type": "cubic",
-            "mode": "inOut",
-            "amount": 1,
-            "x1": 0,
-            "y1": 0.55,
-            "x2": 0.45,
-            "y2": 1
-          }
-        },
-        {
-          "id": "rotation_7",
+          "id": "rotation_2",
           "tick": 20,
           "value": {
             "x": 0,
-            "y": 0,
-            "z": 720
+            "y": -720,
+            "z": 0
           },
           "easing": {
             "type": "cubic",
             "mode": "inOut",
             "amount": 1,
-            "x1": 0,
-            "y1": 0.55,
-            "x2": 0.45,
-            "y2": 1
+            "x1": 0.3333333333333333,
+            "y1": 0.3333333333333333,
+            "x2": 0.6666666666666666,
+            "y2": 0.6666666666666666
           }
         }
       ],

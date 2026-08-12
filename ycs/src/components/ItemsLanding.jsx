@@ -10,6 +10,8 @@ export default function ItemsLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
   const [blockEditing, setBlockEditing] = useState(null); // { itemId, methodKey }
+  const [controlHeld, setControlHeld] = useState(false);
+  const [hoveredItemId, setHoveredItemId] = useState(null);
 
   useTitlebarActions({
     active: isActive,
@@ -41,6 +43,25 @@ export default function ItemsLanding({ isActive = false }) {
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
+
+  useEffect(() => {
+    const handleKeyDown = event => {
+      if (event.key === 'Control') setControlHeld(true);
+    };
+    const handleKeyUp = event => {
+      if (event.key === 'Control') setControlHeld(false);
+    };
+    const handleBlur = () => setControlHeld(false);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   const deleteItem = async (item, e) => {
     e.stopPropagation();
@@ -111,16 +132,14 @@ export default function ItemsLanding({ isActive = false }) {
                   minWidth: '160px', flex: '1 1 160px', maxWidth: '280px',
                 }}
                 onMouseEnter={e => {
+                  setHoveredItemId(item.id);
                   e.currentTarget.style.backgroundColor = 'var(--ycs-accent)';
                   e.currentTarget.style.borderColor = 'var(--ycs-highlight)';
-                  const del = e.currentTarget.querySelector('.row-delete');
-                  if (del) del.style.opacity = '1';
                 }}
                 onMouseLeave={e => {
+                  setHoveredItemId(current => current === item.id ? null : current);
                   e.currentTarget.style.backgroundColor = 'transparent';
                   e.currentTarget.style.borderColor = 'var(--ycs-foreground)';
-                  const del = e.currentTarget.querySelector('.row-delete');
-                  if (del) del.style.opacity = '0';
                 }}
               >
                 <div style={{
@@ -147,7 +166,10 @@ export default function ItemsLanding({ isActive = false }) {
                   title="Delete"
                   style={{
                     width: 18, height: 18,
-                    cursor: 'pointer', opacity: 0, transition: 'opacity 0.1s',
+                    cursor: 'pointer',
+                    opacity: controlHeld && hoveredItemId === item.id ? 1 : 0,
+                    pointerEvents: controlHeld && hoveredItemId === item.id ? 'auto' : 'none',
+                    transition: 'opacity 0.1s',
                     flexShrink: 0,
                   }}
                 >

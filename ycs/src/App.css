@@ -212,9 +212,14 @@ input[type="range"].ycs-slider::-webkit-slider-thumb:hover {
 .ycs-sidebar-divider {
   position: relative;
   width: 6px;
+  margin-left: -6px;
   flex-shrink: 0;
   background-color: var(--ycs-accent);
   z-index: 100;
+}
+
+.ycs-sidebar-divider.collapsed {
+  margin-left: 0;
 }
 
 .ycs-sidebar-resize-hitbox {
