@@ -207,7 +207,7 @@ function EntityRow({ entity, onClick, onDelete }) {
   );
 }
 
-function EntityEditor({ entityId, onBack }) {
+function EntityEditor({ entityId, onBack, isActive = false }) {
   const [id, setId] = useState(entityId || '');
   const [displayName, setDisplayName] = useState('');
   const [textureId, setTextureId] = useState('');
@@ -502,6 +502,15 @@ function EntityEditor({ entityId, onBack }) {
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving entity' : 'Save entity', disabled: saving || !id, onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete entity', danger: true, disabled: saving || !injected, onClick: handleRemove },
+    ],
+  });
+
   const textureOptions = textures.map(t => ({ value: t.id, label: t.label || t.id }));
 
   if (subpage === 'attributes') {
@@ -561,19 +570,8 @@ function EntityEditor({ entityId, onBack }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {entityId ? `Edit Entity: ${entityId}` : 'New Entity'}
-        </h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {injected && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldGroup label="Identity">
           <FieldRow label="Id">
           <StringField value={id} onChange={v => setId(v.toLowerCase().replace(/\s/g, '_'))} disabled={!!entityId} />
@@ -656,7 +654,7 @@ export default function EntitiesLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     try {
@@ -706,8 +704,8 @@ export default function EntitiesLanding({ isActive = false }) {
     }
   };
 
-  if (creating) return <EntityEditor onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <EntityEditor entityId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <EntityEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <EntityEditor isActive={isActive} entityId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const filtered = entities.filter(entity =>
     !search || (entity.displayName || entity.id).toLowerCase().includes(search.toLowerCase())

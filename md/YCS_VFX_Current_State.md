@@ -1,6 +1,6 @@
 # YCS VFX Current State
 
-This is the implementation handoff for the YCS VFX system as of 2026-07-27. Read this before continuing VFX work. The reference-mod analysis and longer-term design rationale remain in `VFX_Decompiled_Architecture_Study.md`.
+This is the implementation handoff for the YCS VFX system as of 2026-08-12. Read this before continuing VFX work. The reference-mod analysis and longer-term design rationale remain in `VFX_Decompiled_Architecture_Study.md`.
 
 ## Status Summary
 
@@ -8,20 +8,21 @@ The first vertical slice is implemented and compiles:
 
 - YCS can create, edit, rename, save, and delete VFX definitions.
 - A VFX definition is a flat composition of removable plane objects on a shared timeline.
-- YCS provides a Three.js preview with camera orbit, grid/axes, activation-aware visibility, texture animation, selection outline, play/pause, timeline scrubbing, and editable Position/Rotation/Scale/Opacity animation curves.
+- YCS provides a Three.js preview with camera orbit, grid/front guide, activation-aware visibility, texture animation, selection outline, play/pause, timeline scrubbing, and Position/Rotation/Scale/Opacity keyframe editing.
 - Saving generates client resource JSON, effect-owned texture copies, and a common-side duration registration.
 - Blocky has `Play VFX` and `Remove VFX` action blocks.
 - The server validates and starts finite instances, then sends compact clientbound start/remove payloads.
 - Clients render translucent textured quads directly, without GeckoLib, Specter, Satin, or another Minecraft runtime dependency.
 
-This is a plane-rendering foundation, not yet a complete VFX creator. Position, Rotation, Scale, and Opacity are keyframeable with cubic Bézier temporal easing; other material properties, models, beams, trails, emitters, particles, advanced materials, and post-processing are not implemented.
+This is a plane-rendering foundation, not yet a complete VFX creator. The version-4 runtime and promoted Three.js preview evaluate Position, Rotation, Scale, and Opacity keyframes with custom cubic Bézier curves plus the animation system's Step, Sine, Quad, Cubic, Quart, Quint, Expo, Circ, Back, Elastic, and Bounce easing formulas. The promoted editor can add or remove a linear key at the current playhead, edit its value through the inspector, and read/apply its outgoing easing through the graph editor. Other material properties, models, beams, trails, emitters, particles, advanced materials, and post-processing are not implemented.
 
 ## Implemented File Map
 
 ### YCS editor
 
-- `ycs/src/components/VfxLanding.jsx`: list/editor UI, plane inspector, Three.js preview, timeline, save/delete lifecycle, and runtime export.
-- `ycs/src/components/VfxLanding.css`: VFX workspace, hierarchy, viewport, inspector, timeline, and responsive styling.
+- `ycs/src/components/VfxLanding.jsx`: searchable effect landing/list plus the legacy editor implementation retained as reference; create/edit routes now open the promoted new editor.
+- `ycs/src/components/VfxNewLanding.jsx` and `VfxNewLanding.css`: primary plane editor, resizable hierarchy/inspector/timeline workspace, save/delete lifecycle, and runtime export.
+- `ycs/src/components/ThreeDViewport.jsx`, `VfxKeyframes.js`, and `ThreeDViewport.css`: primary editor preview, including textures, base size, animated transforms/opacity, selection outline, activation ranges, and spritesheet playback.
 - `ycs/src/App.jsx`: adds the VFX page and Assets > VFX navigation entry.
 - `ycs/package.json`: adds `three`; this is an editor dependency only, not a Minecraft runtime dependency.
 
@@ -68,7 +69,9 @@ The editor currently stores number inputs as strings so values round-trip throug
       "name": "Plane 1",
       "type": "plane",
       "texture": "shared_texture_id",
-      "position": { "x": "0", "y": "1", "z": "0" },
+      "position": { "x": "0", "y": "0", "z": "0" },
+      "pivot": { "x": "0", "y": "0", "z": "0" },
+      "baseRotation": { "x": "0", "y": "0", "z": "0" },
       "positionKeyframes": [
         {
           "id": "position_1",
@@ -88,8 +91,8 @@ The editor currently stores number inputs as strings so values round-trip throug
       "scale": { "x": "1", "y": "1", "z": "1" },
       "width": "1",
       "height": "1",
-      "billboard": true,
-      "fullBright": true,
+      "billboard": false,
+      "fullBright": false,
       "color": "#ffffff",
       "rows": "1",
       "ticksPerFrame": "2",
@@ -108,10 +111,11 @@ Important current semantics:
 - Duration is clamped to 1 through 12,000 ticks.
 - Every plane must select a shared YCS texture before save.
 - `rows` means vertically stacked spritesheet frames. Horizontal grids are not supported.
-- `startTick` is inclusive and `endTick` is exclusive.
-- Layer timing is not clamped to the effect composition. A clip may start before tick 0 or end after `durationTicks`; only its intersection with the visible composition is drawn, while `endTick - startTick` preserves the full source length. Authoring/export/loading apply only a broad `-12000..24000` safety bound.
-- Position, Rotation, Scale, and Opacity keyframes use stable per-plane IDs and continuous global effect-tick times stored to thousandth-tick precision. Each outgoing key stores an easing object. Cubic easing uses normalized Bézier controls (`x1`, `y1`, `x2`, `y2`) and defaults to linear; schema v4 also supports typed Elastic and Bounce `in`, `out`, and `inOut` equations, with Elastic carrying an `amount` from 0 through 4. The editor and runtime evaluate the same eased progress. With no keys for a property, the plane uses its static value and keyed tracks hold their first/last value outside the keyed range. Opacity values are clamped to 0 through 1 during runtime export/loading.
-- Position, Rotation, and Scale default to combined XYZ vector tracks. Their `separatePositionDimensions`, `separateRotationDimensions`, and `separateScaleDimensions` flags switch authoring/runtime to independent per-axis scalar keyframe arrays such as `positionXKeyframes`, `rotationYKeyframes`, or `scaleZKeyframes`; each XYZ toggle performs an explicit conversion in either direction.
+- `startTick` and `endTick` are both inclusive. A composition with `durationTicks: 20` therefore exposes and renders authored ticks 0 through 20; the runtime keeps that last sampled tick visible for its complete tick interval before expiring.
+- Layer timing is not clamped to the effect composition. A clip may start before tick 0 or end after `durationTicks`; only its intersection with the visible composition is drawn, while `endTick - startTick + 1` preserves the inclusive source length. Authoring/export/loading apply only a broad `-12000..24000` safety bound.
+- Position, Rotation, Scale, and Opacity keyframes use stable per-plane IDs and continuous global effect-tick times stored to thousandth-tick precision. Each outgoing key stores an easing object. Custom cubic easing uses normalized Bézier controls (`x1`, `y1`, `x2`, `y2`) and defaults to linear. Schema v4 also accepts typed Step, Sine, Quad, Cubic power, Quart, Quint, Expo, Circ, Back, Elastic, and Bounce easing with `in`, `out`, and `inOut` modes where applicable. Their formulas mirror `HandAnimationLoader`: Step uses an adjustable 2-through-64 step count, Back uses its 0-through-10 overshoot argument, and Elastic uses its 0-through-4 oscillation multiplier. Bounce strength blends from linear at 0 to the animation system's exact bounce at 1 and permits stronger values through 4. The promoted editor preview and Minecraft runtime evaluate these types with matching math. With no keys for a property, the plane uses its static value and keyed tracks hold their first/last value outside the keyed range. Opacity values are clamped to 0 through 1 during runtime export/loading.
+- Position, Rotation, and Scale default to combined XYZ vector tracks. Their `separatePositionDimensions`, `separateRotationDimensions`, and `separateScaleDimensions` flags switch runtime evaluation to independent per-axis scalar keyframe arrays such as `positionXKeyframes`, `rotationYKeyframes`, or `scaleZKeyframes`. The retained legacy editor's XYZ toggle performs explicit conversion in either direction; the promoted editor does not expose that toggle yet.
+- Pivot is a static, non-keyframed local transform origin matching Blockbench animation behavior. Evaluated Position translates the Pivot and attached plane together. Plane Rotation is a second static field that gives the plane its base orientation around that Pivot; animated Rotation is added relative to it, and animated Scale uses the same Pivot. For a plane centered at local zero, the transform is `Position + Pivot + (Plane Rotation + Rotation)(Scale(-Pivot + vertex))`. Missing Pivot or Plane Rotation data defaults to `0, 0, 0`, preserving legacy definitions. The selected plane's translated Pivot is shown in the YCS viewport with a non-occluded XYZ axis marker.
 - The object list is flat. It is not yet a parent/child transform hierarchy and cannot be reordered.
 - Empty effects are currently allowed.
 
@@ -164,15 +168,13 @@ The VFX page currently provides:
 - searchable effect list plus New, Edit, Save, Remove, and Delete flows;
 - a resizable left hierarchy, right inspector, and bottom timeline whose dimensions persist as editor preferences in `localStorage`;
 - effect ID, name, and total duration above the left-side object list, plus add-plane and remove-selected-object actions;
-- per-plane name, shared texture, position, Euler rotation, animatable transform scale, base width/height (`Base Size`), color, opacity, billboard, full bright, vertical frame count, ticks per frame, frame looping, and active tick range;
-- Three.js perspective preview with camera orbit, grid, axes, a grid-level origin-to-`+Z` front guide ending in a keyframe-style diamond at the grid boundary, activation-aware object/outline visibility, Position/Rotation/Scale/Opacity curve evaluation, double-sided planes, nearest texture magnification, spritesheet playback, selected-object outline, and camera/target preservation while inspector edits rebuild the scene;
-- icon-based previous-tick, play/pause, next-tick, and selected-key Graph controls grouped on the left side of the toolbar, a directly editable current-tick field, a full-width scrubber aligned to the activation-track start/end bounds, one directly editable Active clip on every main object row, and a disclosure expansion containing Position, Rotation, Scale, and Opacity keyframe tracks.
+- a combined per-plane `Name / Object ID` field that keeps the display name and sanitized runtime ID synchronized when edited, plus searchable shared texture and the transform controls ordered Pivot, Scale, Plane Rotation, Position, then Rotation. Pivot and Plane Rotation are static; Position, Rotation, and Scale retain their animation tracks. Plane Rotation establishes the plane's orientation around the Pivot before animated Rotation is applied relative to it. The inspector also exposes base width/height (`Base Size`), opacity, billboard, full bright, and active tick range. New planes start at Position `0, 0, 0`, Rotation `0, 0, 0`, Pivot `0, 0, 0`, and Plane Rotation `0, 0, 0`, with Billboard and Full Bright unchecked. Color and spritesheet frame/timing/loop values remain preserved in authoring JSON and runtime export but are not exposed in the promoted inspector;
+- Three.js perspective preview with camera orbit, grid, a grid-level origin-to-`+Z` front guide ending in a diamond, activation-aware object/outline visibility including the authored final boundary frame, eased Position/Rotation/Scale/Opacity evaluation, double-sided planes, nearest texture magnification, spritesheet playback, selected-object outline, and camera/target preservation while inspector edits rebuild the scene;
+- a directly editable current-tick field, frame-synchronized 20-ticks-per-second playback, centered play/pause control, full-width scrubber, draggable/resizable activation clips, Ctrl-wheel zoom, and Shift-wheel horizontal timeline panning. Each layer retains a disclosure arrow with Position, Rotation, Scale, and Opacity property rows plus a right-aligned keyframe diamond. The diamond uses the same transparent background as an unchecked inspector checkbox, adds a linear key at the playhead when clicked, turns solid white while that property is keyed at the current tick, and removes that key when clicked again. Added keys also render on the property track as solid white diamonds, including keys on the composition's final tick. Track diamonds and the playhead share the exact same buffered track width. Track diamonds support persistent click selection, Ctrl/Command/Shift additive selection, marquee selection, and group horizontal dragging snapped exclusively to whole tick values; clicking an already-selected marker never toggles it off. Clicking either the property label background or empty space on its timeline track preserves key selection because both remain part of the selected element's editing surface; dragging that track space still begins a replacement marquee, while modifier-dragging adds to the current selection. Inspector interactions also preserve key selection. Clicking an already-selected layer row or activation clip keeps it selected instead of toggling it off. The playhead is rendered only when its tick lies inside the visible zoom window, so an off-screen playhead no longer sticks to the first or last visible tick;
+- inspector number fields that remain directly typeable and also support horizontal drag adjustment, Item Editor-style highlighted checkboxes, and an overlay horizontal scrollbar when fixed-width controls exceed the resized inspector width;
+- an explicitly stacked right-side inspector above a vertically resizable graph editor, both using the same 36px section-title styling. The graph remains one responsive square easing graph with pointer- and keyboard-adjustable cubic handles, horizontal Apply/Read controls, and a three-column preset grid ordered Linear, Step, Sine, Quad, Cubic, Quart, Quint, Expo, Circ, Back, Elastic, and Bounce. The complete control block is bottom-anchored, while the square graph consumes the remaining space and sizes itself from the smaller available width or height, so resizing either pane axis changes the graph without stretching it. Choosing a preset or shared In/Out/In-Out mode applies it immediately. Named preset curves still expose editable handles; dragging one converts the displayed draft to a custom cubic, and Apply writes that adjustment. When the selected family has a numeric property, its standard 90px draggable number field appears below the mode row and Apply writes the adjustment. Read resolves the active selected segment's left key and loads its outgoing easing into the graph draft. With two or more selected keys on one track, Apply writes the normalized draft only to each left key whose immediate next key is also selected, so selections 1/2/3 affect segments 1-to-2 and 2-to-3 but not the unused outgoing curve on key 3. A single selected key still edits its own outgoing easing. All graph interactions preserve key selection. The graph editor height persists in `localStorage` and its content uses the shared overlay scrollbar.
 
-The timeline controls preview time, object activation, and Position/Rotation/Scale/Opacity keyframes. Space toggles playback outside free-text controls; when a numeric value field remains focused after editing, Space blurs it and toggles playback instead of becoming inert. Previous/next moves exactly one tick from fractional time, direct tick entry accepts fractions, and Shift scrubbing snaps to whole ticks. Timeline scrubbing updates live values without clearing the selected keys. Delete or Backspace removes every selected keyframe unless focus is in a text-entry control. The Graph toggle remains with the left-side transport controls so its time scale and the full-width scrubber align with every track. Active clips stay directly draggable/resizable, preserve off-composition source length, shift every property key with the clip body, and never create horizontal timeline overflow. Position, Rotation, and Scale each have an `XYZ` Separate Dimensions toggle in their timeline row, outside Graph mode. Off keeps one combined vector track; on converts it into independently keyframeable X, Y, and Z child tracks. Recombining samples the separated tracks at their union of key times and creates a combined vector track, so toggling is explicit and may simplify distinct per-axis curve information just as in After Effects. Opacity remains scalar. Every property/axis track permits only one keyframe at each thousandth-tick timestamp; loading older duplicate data keeps the most recently authored entry, while live state updates reject rather than merge a collision. During timeline or graph dragging, an occupied timestamp resolves to the nearest free timestamp on the pointer's current side, so the key sits immediately before the occupied time and skips immediately after it as the pointer crosses. Dragging a key that is already part of a multi-key selection translates every selected key by the same time delta across objects and tracks; the group shares bounds and collision resolution, so it cannot collapse onto unselected keys. Every track supports fractional creation, continuous dragging, Shift whole-tick snapping, additive selection, marquee selection, direct inspector editing, apply, and delete. Graph mode filters All, Position, Rotation, Scale, or Opacity and preserves selection while interacting. Dragging a graph key moves its time and selected component value; Shift snaps graph time to whole ticks, while Ctrl on Windows or Command on macOS temporarily snaps time/value to nearby selected keys, the playhead, zero, and composition bounds. Adjacent cubic keys expose two Bézier direction handles. Elastic and Bounce segments render as sampled multi-turn curves and are edited through their presets rather than fake cubic handles. Multi-key value scaling/transform boxes, per-key numeric time fields, speed-graph mode, and Blocky property events are not implemented yet.
-
-Graph presentation defaults to a square, non-stretched plotting canvas with a square 24-pixel grid. Square mode auto-fits selected key times and values, while its `Square` toggle switches to a full-width timeline-style graph with the exact tick-0-through-duration horizontal domain. Full-width mode reserves the same hierarchy column as timeline rows, fills the complete remaining track column, and uses the same left/right track inset as the Active row. Both modes retain an outer overscan gutter for captured key and Bézier-handle drags. Graph keys and handle knobs use non-scaling round markers, so the full-width graph cannot turn them into ellipses. Axis colors are red X, amber Y, and blue Z; no green graph styling remains. Space is reserved for Play/Pause outside text-entry controls—even while a graph button has focus—and neither Space nor the transport Play/Pause button clears selected timeline or graph keys, so the editable curve remains visible while previewing.
-
-Square and Full Graph modes both use the same full-height Easing Presets panel in the left hierarchy column. Linear has one button; Ease, Sine, Quad, Cubic, Quart, Quint, Expo, Circ, Back, Elastic, and Bounce each use one compact family row with `[In] [Out] [In/Out]` buttons. A preset applies to every selected keyframe's outgoing curve without clearing selection. Elastic Amount accepts editable values from 0 (linear) through 1 (standard) to 4 (strong overshoot). `Read Selected` copies an independent snapshot of the complete easing object. When a visible graph segment is selected, it resolves the segment's left keyframe because that key owns the outgoing curve; for a single selected key it reads that key directly. `Apply Copied` writes the snapshot to the current target selection so custom handles and typed easing settings can be transferred or restored after further curve edits.
+The promoted timeline supports add/remove, selection, time dragging, and outgoing-easing editing for the four transform/opacity property rows. Once a property has at least one key, changing its inspector value at an unkeyed playhead automatically creates a linear key there from the currently evaluated value plus the user's edit. A key added on an existing Separate Dimensions track creates the missing axis keys together, and inspector edits at that playhead update those keys. Graph key-value dragging and Separate Dimensions controls are not exposed yet. When an existing version-2/3/4 effect is loaded, all recognized keyframe, easing, and Separate Dimensions fields remain attached to the plane object and pass through the authoring and runtime exports unchanged.
 
 The preview approximates the runtime but is not renderer-identical. In particular, it uses an unlit `MeshBasicMaterial`, so the runtime meaning of `fullBright` is not visually compared against world lighting in YCS.
 
@@ -206,7 +208,7 @@ This system **needs explicit server authority + sync**, and that authority is im
 4. It allocates a random instance UUID and captures the server level game tick.
 5. It sends one start payload to players in the same dimension within 192 blocks of the sampled origin.
 6. It stores the full start payload, instance UUID, dimension, end tick, and recipient UUIDs. Follow Entity instances are resent idempotently when another player starts tracking the anchor, allowing that client to reconstruct elapsed time from the original start tick.
-7. The server drops its active record at the registered duration. No natural-expiry packet is needed because clients use the same duration and shared tick.
+7. The server drops its active record after the registered final tick's complete interval. No natural-expiry packet is needed because clients use the same inclusive duration and shared tick.
 8. An explicit Remove or same-slot replacement sends a UUID-only remove payload to every recorded recipient that is still connected.
 
 The start payload contains:
@@ -224,13 +226,13 @@ The client resource reload listener scans only the `yebisurpg` namespace under `
 On a start payload, `ClientVfxManager` stores effect ID, fallback transform, optional entity-anchor fields, and start tick under the instance UUID. During `RenderLevelStageEvent.Stage.AFTER_PARTICLES` it:
 
 1. Computes elapsed time from `ClientLevel.getGameTime()` plus partial tick and the server-provided start tick.
-2. Removes instances whose definition duration has elapsed.
-3. Skips planes outside their activation range.
+2. Removes instances after the inclusive definition duration's final tick interval has elapsed.
+3. Skips planes outside their inclusive activation range.
 4. Frustum-culls a bounds estimate around each plane.
 5. Resolves one instance transform: fixed uses the captured values; entity-following uses the interpolated vanilla client entity position/current eye height and enabled view rotations, except the anchored local first-person Eye Level case uses the exact active camera transform for screen stability and removes vanilla walking view bob in camera space when First-Person View Sway is disabled.
 6. Evaluates the plane's static values or schema-v4 combined/separated Position, Rotation, Scale, and Opacity tracks at the authoritative fractional elapsed effect tick, using the same cubic Bézier, Elastic, or Bounce evaluator as YCS.
 7. Rotates the evaluated local position by instance pitch then yaw so local `+Z` maps to the resolved forward direction, adds it to the resolved origin, and uses the evaluated opacity for quad alpha.
-8. Uses camera rotation plus evaluated Z rotation for billboard planes; non-billboards apply instance yaw/pitch followed by evaluated authored rotation order Y, X, then Z. Evaluated Scale is applied before drawing.
+8. Adds static Plane Rotation to evaluated animated Rotation, then applies the combined Y, X, Z orientation around the translated Pivot. Billboard planes apply that local orientation after camera rotation; non-billboards apply it after instance yaw/pitch. Evaluated Scale uses the same Pivot and is applied before drawing.
 9. Selects a vertical spritesheet frame through the existing `TextureFrameClock`.
 10. Draws one `RenderType.entityTranslucent` quad with color/opacity and either full-bright or boundary-safe sampled world light. Non-full-bright planes combine the brightest block/sky light at their center and six immediate neighbors, preventing the whole plane from darkening when its center overlaps a solid block while retaining normal world depth occlusion.
 11. Ends each render-type batch after all active instances are visited.
@@ -242,10 +244,10 @@ Changing or losing the client level clears all active client instances. If a sta
 The workspace currently contains `ycs-data/vfx/yesss.json` and its generated `assets/yebisurpg/vfx/yesss.json`, with this injected registration:
 
 ```java
-VfxRegistry.register("yesss", 40);
+VfxRegistry.register("yesss", 20);
 ```
 
-`yesss` currently contains three plane objects covering consecutive activation ranges. It predates property keyframes and remains a valid version-1 static-property definition until it is re-saved through YCS, which will export it as version 2.
+`yesss` currently contains one plane and is a version-4 definition with preserved transform keyframes.
 
 ## Known Limitations And Risks
 
@@ -257,20 +259,20 @@ VfxRegistry.register("yesss", 40);
 - Explicit remove targets every recorded recipient, including players added through Follow Entity start-tracking resends.
 - There are no global/per-owner active-instance caps beyond finite duration and same-name replacement.
 - No blend-mode choice, additive material, depth-test controls, soft particles, model renderer, beam, trail, emitter, collision, curves, gradients, or random seed exists.
-- Position, Rotation, Scale, and Opacity are keyframed and use editable value-graph keys plus cubic Bézier direction handles. Position alone supports Separate Dimensions. There is no speed graph, group movement/transform box, copy/paste, per-key numeric tick field, easing presets, or separated Rotation/Scale yet.
+- The promoted editor supports Position, Rotation, Scale, and Opacity key creation/removal, visible selectable and time-draggable timeline markers, inspector auto-key editing, custom cubic graph editing, and named easing presets, but still has no graph key-value dragging or Separate Dimensions toggle.
 - Runtime definitions reload through Minecraft's normal client resource reload. YCS Save does not push a live cache-refresh command into a running game.
-- Duplicate object IDs are not explicitly rejected. Sanitized duplicates would target the same generated texture path.
+- Save rejects duplicate sanitized object IDs before generated texture paths can collide.
 - Texture export always uses a `.png` destination and assumes the selected shared texture is valid for that extension.
 - The Three.js dependency substantially increases the main YCS bundle; the build currently reports a large-chunk warning.
-- There are no automated VFX tests. Both `./gradlew build` and `npm run build` passed on 2026-07-27.
+- There are no automated VFX tests. Both `npm run build` for YCS and `./gradlew build` for the mod passed on 2026-08-12.
 
 ## Recommended Continuation Order
 
 1. Create a non-empty test effect with one visible plane and validate editor preview, generated texture, runtime JSON, Blocky compilation, and in-game rendering.
 2. Run a real dedicated server with two independent clients. Verify start timing, radius selection, same-name replacement, explicit removal, natural expiry, disconnect, and dimension-change behavior.
 3. Validate the implemented Fixed/Follow Entity anchor modes, then decide whether block and bone anchors are required.
-4. Add schema validation for unique IDs, supported texture files, valid nonzero source ranges, broad timing safety bounds, and finite Bézier controls. Extend the version-1/version-2/version-3 loader boundary with explicit migrations when a future schema change cannot remain optional and backward-compatible.
-5. Generalize the Position/Rotation/Scale/Opacity tracks for other material properties, then extend existing multi-selection and editable value graph with copy/paste, group value scaling, per-key numeric tick editing, easing presets, and optional speed-graph controls. Keep Active directly editable on the main row, use stable object/keyframe IDs, and keep playback a pure function of authoritative start tick plus definition data.
+4. Add schema validation for supported texture files, valid nonzero source ranges, broad timing safety bounds, and finite Bézier controls. Extend the version-1-through-version-4 loader boundary with explicit migrations when a future schema change cannot remain optional and backward-compatible.
+5. Extend graph editing from outgoing easing into key values and optional speed-graph controls, then generalize those tracks for other material properties and add copy/paste, group value scaling, and per-key numeric tick editing. Keep Active directly editable on the main row, use stable object/keyframe IDs, and keep playback a pure function of authoritative start tick plus definition data.
 6. Add the next render object type through the existing typed `objects` array. A 3D model object is the most direct next proof that the composition is not plane-specific; beams and trails can follow.
 7. Define renderer and instance budgets before adding particle emitters or unrestricted looping effects.
 8. Add persistent server authority and login/start-tracking synchronization before exposing indefinite effects in YCS or Blocky.

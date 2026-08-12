@@ -75,6 +75,10 @@ public final class VfxDefinitionLoader {
         if (texture == null) return null;
 
         JsonObject position = object.has("position") ? object.getAsJsonObject("position") : new JsonObject();
+        JsonObject pivot = object.has("pivot") ? object.getAsJsonObject("pivot") : new JsonObject();
+        JsonObject baseRotation = object.has("baseRotation")
+                ? object.getAsJsonObject("baseRotation")
+                : new JsonObject();
         JsonObject rotation = object.has("rotation") ? object.getAsJsonObject("rotation") : new JsonObject();
         JsonObject scale = object.has("scale") ? object.getAsJsonObject("scale") : new JsonObject();
         float opacity = clamp(decimal(object, "opacity", 1.0f), 0.0f, 1.0f);
@@ -88,6 +92,12 @@ public final class VfxDefinitionLoader {
                 decimal(position, "x", 0.0f),
                 decimal(position, "y", 0.0f),
                 decimal(position, "z", 0.0f),
+                decimal(pivot, "x", 0.0f),
+                decimal(pivot, "y", 0.0f),
+                decimal(pivot, "z", 0.0f),
+                decimal(baseRotation, "x", 0.0f),
+                decimal(baseRotation, "y", 0.0f),
+                decimal(baseRotation, "z", 0.0f),
                 decimal(rotation, "x", 0.0f),
                 decimal(rotation, "y", 0.0f),
                 decimal(rotation, "z", 0.0f),
@@ -200,13 +210,19 @@ public final class VfxDefinitionLoader {
         }
         JsonObject easing = keyframe.getAsJsonObject("easing");
         String type = string(easing, "type", "cubic");
-        if (!type.equals("elastic") && !type.equals("bounce")) type = "cubic";
+        if (!List.of(
+                "cubic", "step", "sine", "quad", "cubicPower", "quart", "quint",
+                "expo", "circ", "back", "elastic", "bounce").contains(type)) {
+            type = "cubic";
+        }
         String mode = string(easing, "mode", "inOut");
         if (!mode.equals("in") && !mode.equals("out") && !mode.equals("inOut")) mode = "inOut";
+        double fallbackAmount = type.equals("step") ? 2.0 : type.equals("back") ? 1.70158 : 1.0;
+        double maximumAmount = type.equals("step") ? 64.0 : type.equals("back") ? 10.0 : 4.0;
         return new VfxDefinition.Easing(
                 type,
                 mode,
-                clamp(decimalDouble(easing, "amount", 1.0), 0.0, 4.0),
+                clamp(decimalDouble(easing, "amount", fallbackAmount), 0.0, maximumAmount),
                 clamp(decimalDouble(easing, "x1", 1.0 / 3.0), 0.0, 1.0),
                 decimalDouble(easing, "y1", 1.0 / 3.0),
                 clamp(decimalDouble(easing, "x2", 2.0 / 3.0), 0.0, 1.0),

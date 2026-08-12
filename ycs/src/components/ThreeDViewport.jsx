@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { propertyValueAtTick } from './VfxKeyframes';
 import './ThreeDViewport.css';
 
 const DEFAULT_CAMERA_POSITION = [3.6, 2.8, 4.8];
@@ -10,8 +11,11 @@ function clearObjectGroup(group) {
   for (const child of [...group.children]) {
     group.remove(child);
     child.geometry?.dispose();
-    if (Array.isArray(child.material)) child.material.forEach(material => material.dispose());
-    else child.material?.dispose();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach(material => {
+      material?.map?.dispose?.();
+      material?.dispose?.();
+    });
   }
 }
 
@@ -20,11 +24,20 @@ function numeric(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function ThreeDViewport({ className = '', ariaLabel = '3D viewport', objects = [] }) {
+function ThreeDViewport({
+  className = '',
+  ariaLabel = '3D viewport',
+  objects = [],
+  selectedId = null,
+  textureUrls = {},
+  previewTick = 0,
+}) {
   const hostRef = useRef(null);
   const resetViewRef = useRef(() => {});
   const objectGroupRef = useRef(null);
   const renderRef = useRef(() => {});
+  const previewTickRef = useRef(previewTick);
+  previewTickRef.current = previewTick;
   const viewRef = useRef({
     position: [...DEFAULT_CAMERA_POSITION],
     target: [...DEFAULT_CAMERA_TARGET],
@@ -35,14 +48,41 @@ function ThreeDViewport({ className = '', ariaLabel = '3D viewport', objects = [
       id: object.id,
       name: object.name,
       position: object.position,
+      pivot: object.pivot,
+      baseRotation: object.baseRotation,
+      positionKeyframes: object.positionKeyframes,
+      positionXKeyframes: object.positionXKeyframes,
+      positionYKeyframes: object.positionYKeyframes,
+      positionZKeyframes: object.positionZKeyframes,
+      separatePositionDimensions: object.separatePositionDimensions,
       rotation: object.rotation,
+      rotationKeyframes: object.rotationKeyframes,
+      rotationXKeyframes: object.rotationXKeyframes,
+      rotationYKeyframes: object.rotationYKeyframes,
+      rotationZKeyframes: object.rotationZKeyframes,
+      separateRotationDimensions: object.separateRotationDimensions,
       scale: object.scale,
+      scaleKeyframes: object.scaleKeyframes,
+      scaleXKeyframes: object.scaleXKeyframes,
+      scaleYKeyframes: object.scaleYKeyframes,
+      scaleZKeyframes: object.scaleZKeyframes,
+      separateScaleDimensions: object.separateScaleDimensions,
+      width: object.width,
+      height: object.height,
+      color: object.color,
       opacity: object.opacity,
+      opacityKeyframes: object.opacityKeyframes,
       billboard: object.billboard,
       fullBright: object.fullBright,
       texture: object.texture,
+      rows: object.rows,
+      ticksPerFrame: object.ticksPerFrame,
+      textureLoop: object.textureLoop,
+      start: object.start,
+      end: object.end,
     }));
   const previewPlaneSignature = JSON.stringify(previewPlanes);
+  const textureUrlSignature = JSON.stringify(textureUrls);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -68,14 +108,72 @@ function ThreeDViewport({ className = '', ariaLabel = '3D viewport', objects = [
     controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
     controls.target.fromArray(viewRef.current.target);
     controls.update();
+    const previewPositionOffset = new THREE.Vector3();
+    const previewRotationEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const previewRotationQuaternion = new THREE.Quaternion();
 
     const render = () => {
       camera.position.toArray(viewRef.current.position);
       controls.target.toArray(viewRef.current.target);
       objectGroupRef.current?.children.forEach(child => {
-        if (!child.userData.billboard) return;
-        child.quaternion.copy(camera.quaternion);
-        child.rotateZ(THREE.MathUtils.degToRad(child.userData.rotationZ));
+        const { previewObject, texture, outline, pivotMarker } = child.userData;
+        if (!previewObject) return;
+        const active = previewTickRef.current >= numeric(previewObject.start, 0)
+          && previewTickRef.current <= numeric(previewObject.end, Number.POSITIVE_INFINITY);
+        child.visible = active;
+        if (outline) outline.visible = active;
+        if (pivotMarker) pivotMarker.visible = active;
+        if (!active) return;
+        const position = propertyValueAtTick(previewObject, 'position', previewTickRef.current);
+        const rotation = propertyValueAtTick(previewObject, 'rotation', previewTickRef.current);
+        const scale = propertyValueAtTick(previewObject, 'scale', previewTickRef.current);
+        const opacity = propertyValueAtTick(previewObject, 'opacity', previewTickRef.current);
+        const pivotX = numeric(previewObject.pivot?.x);
+        const pivotY = numeric(previewObject.pivot?.y);
+        const pivotZ = numeric(previewObject.pivot?.z);
+        previewRotationEuler.set(
+          THREE.MathUtils.degToRad(numeric(previewObject.baseRotation?.x) + rotation.x),
+          THREE.MathUtils.degToRad(numeric(previewObject.baseRotation?.y) + rotation.y),
+          THREE.MathUtils.degToRad(numeric(previewObject.baseRotation?.z) + rotation.z),
+          'YXZ',
+        );
+        previewRotationQuaternion.setFromEuler(previewRotationEuler);
+        previewPositionOffset.set(
+          -pivotX * scale.x,
+          -pivotY * scale.y,
+          -pivotZ * scale.z,
+        );
+        child.scale.set(scale.x, scale.y, scale.z);
+        child.material.opacity = opacity;
+        if (previewObject.billboard) {
+          child.quaternion.copy(camera.quaternion).multiply(previewRotationQuaternion);
+        } else {
+          child.quaternion.copy(previewRotationQuaternion);
+        }
+        previewPositionOffset.applyQuaternion(child.quaternion);
+        child.position.set(
+          position.x + pivotX + previewPositionOffset.x,
+          position.y + pivotY + previewPositionOffset.y,
+          position.z + pivotZ + previewPositionOffset.z,
+        );
+        pivotMarker?.position.set(
+          position.x + pivotX,
+          position.y + pivotY,
+          position.z + pivotZ,
+        );
+        if (texture) {
+          const rows = Math.max(1, Math.floor(numeric(previewObject.rows, 1)));
+          const ticksPerFrame = Math.max(1, Math.floor(numeric(previewObject.ticksPerFrame, 2)));
+          const rawFrame = Math.max(0, Math.floor(
+            (previewTickRef.current - numeric(previewObject.start, 0)) / ticksPerFrame,
+          ));
+          const frame = previewObject.textureLoop
+            ? rawFrame % rows
+            : Math.min(rawFrame, rows - 1);
+          texture.repeat.set(1, 1 / rows);
+          texture.offset.set(0, 1 - ((frame + 1) / rows));
+        }
+        outline?.update();
       });
       renderer.render(scene, camera);
     };
@@ -151,7 +249,15 @@ function ThreeDViewport({ className = '', ariaLabel = '3D viewport', objects = [
     observer.observe(host);
     resize();
 
+    let animationFrame = 0;
+    const animate = () => {
+      render();
+      animationFrame = requestAnimationFrame(animate);
+    };
+    animate();
+
     return () => {
+      cancelAnimationFrame(animationFrame);
       observer.disconnect();
       controls.removeEventListener('change', render);
       controls.dispose();
@@ -175,37 +281,76 @@ function ThreeDViewport({ className = '', ariaLabel = '3D viewport', objects = [
     const group = objectGroupRef.current;
     if (!group) return;
     clearObjectGroup(group);
-    previewPlanes.forEach((object, index) => {
-      const geometry = new THREE.PlaneGeometry(1, 1);
+    const loader = new THREE.TextureLoader();
+    previewPlanes.forEach(object => {
+      const geometry = new THREE.PlaneGeometry(
+        Math.max(0.001, numeric(object.width, 1)),
+        Math.max(0.001, numeric(object.height, 1)),
+      );
+      const textureUrl = textureUrls[object.texture];
+      const texture = textureUrl ? loader.load(textureUrl) : null;
+      if (texture) {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.LinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+      }
       const material = new THREE.MeshBasicMaterial({
-        color: 0x7f8794,
+        map: texture,
+        color: new THREE.Color(object.color || '#ffffff'),
         transparent: true,
         opacity: THREE.MathUtils.clamp(numeric(object.opacity, 1), 0, 1),
         side: THREE.DoubleSide,
+        depthWrite: false,
+        wireframe: !texture,
       });
       const plane = new THREE.Mesh(geometry, material);
       plane.name = object.name;
+      plane.rotation.order = 'YXZ';
       plane.position.set(
-        numeric(object.position?.x),
-        numeric(object.position?.y, 1),
-        numeric(object.position?.z) + (index * 0.01),
+        numeric(object.position?.x) + numeric(object.pivot?.x),
+        numeric(object.position?.y) + numeric(object.pivot?.y),
+        numeric(object.position?.z) + numeric(object.pivot?.z),
       );
       plane.rotation.set(
-        THREE.MathUtils.degToRad(numeric(object.rotation?.x)),
-        THREE.MathUtils.degToRad(numeric(object.rotation?.y)),
-        THREE.MathUtils.degToRad(numeric(object.rotation?.z)),
+        THREE.MathUtils.degToRad(numeric(object.baseRotation?.x) + numeric(object.rotation?.x)),
+        THREE.MathUtils.degToRad(numeric(object.baseRotation?.y) + numeric(object.rotation?.y)),
+        THREE.MathUtils.degToRad(numeric(object.baseRotation?.z) + numeric(object.rotation?.z)),
       );
       plane.scale.set(
         numeric(object.scale?.x, 1),
         numeric(object.scale?.y, 1),
         numeric(object.scale?.z, 1),
       );
-      plane.userData.billboard = Boolean(object.billboard);
-      plane.userData.rotationZ = numeric(object.rotation?.z);
+      plane.userData.previewObject = object;
+      plane.userData.texture = texture;
+      plane.userData.outline = null;
+      plane.userData.pivotMarker = null;
       group.add(plane);
+
+      if (object.id === selectedId) {
+        const outline = new THREE.BoxHelper(plane, 0x4fa3ff);
+        plane.userData.outline = outline;
+        group.add(outline);
+        const pivotMarker = new THREE.AxesHelper(0.35);
+        const pivotMaterials = Array.isArray(pivotMarker.material)
+          ? pivotMarker.material
+          : [pivotMarker.material];
+        pivotMaterials.forEach(pivotMaterial => {
+          pivotMaterial.depthTest = false;
+          pivotMaterial.depthWrite = false;
+          pivotMaterial.transparent = true;
+          pivotMaterial.opacity = 0.95;
+        });
+        pivotMarker.renderOrder = 4;
+        pivotMarker.userData.isPivotMarker = true;
+        plane.userData.pivotMarker = pivotMarker;
+        group.add(pivotMarker);
+      }
     });
     renderRef.current();
-  }, [previewPlaneSignature]);
+  }, [previewPlaneSignature, selectedId, textureUrlSignature]);
 
   return (
     <div

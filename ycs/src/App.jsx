@@ -16,7 +16,6 @@ import AbilitiesLanding from "./components/AbilitiesLanding";
 import HudLanding from "./components/HudLanding";
 import ResourcesLanding from "./components/ResourcesLanding";
 import VfxLanding from "./components/VfxLanding";
-import VfxNewLanding from "./components/VfxNewLanding";
 import OverlayScrollArea from "./components/OverlayScrollArea";
 import "./App.css";
 
@@ -84,7 +83,12 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('ycs-sidebar-collapsed') === 'true';
   });
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ycs-active-tab') || 'items');
+  const [activeTab, setActiveTab] = useState(() => {
+    const storedTab = localStorage.getItem('ycs-active-tab') || 'items';
+    if (storedTab !== 'vfx-new') return storedTab;
+    localStorage.setItem('ycs-active-tab', 'vfx');
+    return 'vfx';
+  });
   const [isRegistryOpen, setIsRegistryOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-registry-open'));
   const [isDataOpen, setIsDataOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-data-open'));
   const [isAssetsOpen, setIsAssetsOpen] = useState(() => storedSidebarGroupState('ycs-sidebar-assets-open'));
@@ -252,7 +256,6 @@ function App() {
     { key: 'abilities', component: <AbilitiesLanding isActive={activeTab === 'abilities'} /> },
     { key: 'textures', component: <TextureManager isActive={activeTab === 'textures'} /> },
     { key: 'vfx', component: <VfxLanding isActive={activeTab === 'vfx'} /> },
-    { key: 'vfx-new', component: <VfxNewLanding isActive={activeTab === 'vfx-new'} /> },
     { key: 'resources', component: <ResourcesLanding isActive={activeTab === 'resources'} /> },
     { key: 'hud', component: <HudLanding isActive={activeTab === 'hud'} /> },
   ];
@@ -314,11 +317,10 @@ function App() {
               label="Assets"
               isOpen={isAssetsOpen}
               onToggle={() => toggleSidebarGroup('ycs-sidebar-assets-open', setIsAssetsOpen)}
-              tabKeys={['textures', 'vfx', 'vfx-new']}
+              tabKeys={['textures', 'vfx']}
             >
               <SidebarTab label="Textures" tabKey="textures" />
               <SidebarTab label="VFX" tabKey="vfx" />
-              <SidebarTab label="VFX (New)" tabKey="vfx-new" />
             </SidebarGroup>
 
             <SidebarGroup

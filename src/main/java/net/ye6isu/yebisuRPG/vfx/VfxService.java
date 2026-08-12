@@ -200,7 +200,7 @@ public final class VfxService {
         ACTIVE.put(key, new ActiveVfx(
                 instanceId,
                 level.dimension(),
-                startTick + durationTicks,
+                startTick + durationTicks + 1L,
                 recipients,
                 payload));
         return instanceId;

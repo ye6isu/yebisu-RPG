@@ -343,15 +343,15 @@ function DataComponentRow({ dc, onChange, onRemove, globalOptions, globalCompone
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
       {isRef ? (
-        <div style={{ flex: 1 }}>
+        <div style={{ width: '180px', flex: '0 0 180px' }}>
           <DropdownField value={dc.ref} onChange={v => onChange({ ref: v })} options={globalOptions.length ? globalOptions : [{ label: '(none defined)', value: '', disabled: true }]} />
         </div>
       ) : (
-        <StringField value={dc.name} onChange={v => onChange({ name: v.toLowerCase().replace(/\s/g, '_') })} placeholder="name" style={{ flex: 1 }} />
+        <StringField value={dc.name} onChange={v => onChange({ name: v.toLowerCase().replace(/\s/g, '_') })} placeholder="name" />
       )}
 
       {!isRef && (
-        <div style={{ flex: 1 }}>
+        <div style={{ width: '180px', flex: '0 0 180px' }}>
           <StandardDropdownField value={dc.type} onChange={v => onChange({ type: v })} options={DATA_COMPONENT_TYPES} />
         </div>
       )}
@@ -834,8 +834,8 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
       setAvailableTabs(loaded);
       setAllTabOptions([
         { label: '(None)', value: '' },
-        ...loaded.map(t => ({ label: `${t.displayName || t.id} — ${MODID}:${t.id}`, value: t.id })),
-        ...VANILLA_TABS.map(t => ({ label: `${t.displayName} — ${t.id}`, value: t.id })),
+        ...loaded.map(t => ({ label: t.displayName || t.id, value: t.id })),
+        ...VANILLA_TABS.map(t => ({ label: t.displayName, value: t.id })),
       ]);
     } catch {}
   }, []);
@@ -1699,9 +1699,9 @@ export default function ItemEditor({ isActive = false, itemId: existingId, onBac
   useTitlebarActions({
     active: isActive,
     buttons: [
-      ...(injected ? [{ id: 'delete', icon: 'delete', title: 'Delete item', danger: true, disabled: saving, onClick: handleRemove }] : []),
-      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
       { id: 'save', icon: 'save', title: saving ? 'Saving item' : 'Save item', disabled: saving || !itemId, onClick: handleSaveAndInject },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete item', danger: true, disabled: saving || !injected, onClick: handleRemove },
     ],
   });
 

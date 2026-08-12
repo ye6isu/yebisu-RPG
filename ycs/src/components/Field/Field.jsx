@@ -131,7 +131,7 @@ export function FontComboField({ value, onChange, options }) {
       </div>
       
       {isOpen && (
-        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100 }}>
+        <div className="dropdown ycs-field-dropdown" style={{ marginTop: '4px', top: '100%', zIndex: 100 }}>
           {options.map((opt) => (
             <div 
               key={opt.label}
@@ -233,7 +233,7 @@ export function DropdownField({ value, onChange, options }) {
       </div>
 
       {isOpen && (
-        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100, maxHeight: '240px', overflowY: 'auto' }}>
+        <div className="dropdown ycs-field-dropdown" style={{ marginTop: '4px', top: '100%', zIndex: 100, maxHeight: '240px' }}>
           {filteredOptions.length > 0 ? filteredOptions.map((opt, i) =>
             opt.disabled ? (
               <div key={opt.value + i} className="dropdown-item" style={{ opacity: 0.35, fontSize: '11px', cursor: 'default', pointerEvents: 'none' }}>
@@ -248,7 +248,7 @@ export function DropdownField({ value, onChange, options }) {
               >
                 {opt.thumb || (opt.img
                   ? <img src={opt.img} alt="" style={{ width: '16px', height: '16px', imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} />
-                  : <div style={{ width: '16px', flexShrink: 0 }} />
+                  : null
                 )}
                 {opt.label}
               </div>
@@ -312,7 +312,7 @@ export function StandardDropdownField({ value, onChange, options, searchable, di
       </div>
 
       {isOpen && (
-        <div className="dropdown" style={{ width: '100%', marginTop: '4px', top: '100%', zIndex: 100, display: 'flex', flexDirection: 'column', maxHeight: searchable ? 250 : undefined }}>
+        <div className="dropdown ycs-field-dropdown ycs-field-dropdown-column" style={{ marginTop: '4px', top: '100%', zIndex: 100, display: 'flex', flexDirection: 'column', maxHeight: searchable ? 250 : undefined }}>
           {searchable && (
             <div style={{ padding: '4px 6px', flexShrink: 0, borderBottom: '1px solid var(--ycs-foreground)' }}>
               <input
@@ -322,7 +322,7 @@ export function StandardDropdownField({ value, onChange, options, searchable, di
               />
             </div>
           )}
-          <div style={{ overflowY: 'auto' }}>
+          <div className="ycs-field-dropdown-options">
             {filtered.map((opt) => (
               <div
                 key={opt.value}

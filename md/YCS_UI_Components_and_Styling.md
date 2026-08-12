@@ -45,8 +45,11 @@ YCS uses the following CSS variables for theming, which map directly to user pre
 Custom comboboxes and dropdowns avoid the native OS `<select>` styling to fully integrate with the YCS color scheme, supporting both readonly selection and typed entry.
 - **Components**: `DropdownField`, `StandardDropdownField`, `FontComboField` (found in `Field.jsx`).
 - **Default width**: Custom dropdowns, font selectors, and native `<select>` controls use a fixed `180px` width and do not grow or shrink with their parent row.
+- **Options popup**: The opened options panel is fixed at `360px`, twice the closed control width. Option labels remain on one line; labels wider than the panel produce a horizontal scrollbar instead of wrapping.
+- **Optional thumbnails**: Render thumbnail spacing only for options that actually provide an image or thumbnail. Text-only options start at the popup's normal left padding without an empty image placeholder.
 - **Inner Classes**:
   - `.dropdown`: The floating popup container for options.
+  - `.ycs-field-dropdown`: The shared 360px, horizontally scrollable field-options popup variant.
   - `.dropdown-item`: Individual clickable options inside the dropdown.
   - `.dropdown-separator`: 1px divider line between grouped items.
 
@@ -70,7 +73,7 @@ Custom comboboxes and dropdowns avoid the native OS `<select>` styling to fully 
 ### Sidebar Navigation State
 The main sidebar persists both the selected page (`ycs-active-tab`) and each parent group's expanded/collapsed state in local storage. When the parent containing the selected page is collapsed, apply `.active` to that parent so the user's current location remains visible even though its child row is hidden.
 - Parent and child tabs use matching left/right padding at their respective hierarchy depth. VFX object-tab lists likewise keep equal outer gutters on both sides.
-- The sidebar's `6px` divider is also its resize rail. Center the borderless collapse control inside that rail at the rail's full width while expanded; do not give it a separate button outline or footprint.
+- The sidebar's `6px` divider is also its resize rail. While expanded, overlap the divider into the sidebar's existing right gutter so the divider does not make the right-side spacing appear wider than the left; the collapsed divider remains in normal flow. Center the borderless collapse control inside that rail at the rail's full width and do not give it a separate button outline or footprint.
 - Persist the collapsed state under `ycs-sidebar-collapsed`. While collapsed, hide the sidebar and expose the same control as a narrow `16px` reopening notch. Keep the workspace's `6px` right and bottom accent borders so its outer padding remains visually balanced with the collapsed left rail.
 
 ### Sidebar Run Actions

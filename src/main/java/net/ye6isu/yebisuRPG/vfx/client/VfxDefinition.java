@@ -12,6 +12,12 @@ public record VfxDefinition(String id, int durationTicks, List<Plane> planes) {
             double x,
             double y,
             double z,
+            double pivotX,
+            double pivotY,
+            double pivotZ,
+            float baseRotationX,
+            float baseRotationY,
+            float baseRotationZ,
             float rotationX,
             float rotationY,
             float rotationZ,
@@ -135,12 +141,47 @@ public record VfxDefinition(String id, int durationTicks, List<Plane> planes) {
         }
 
         private static double easedProgress(double progress, Easing easing) {
+            if ("step".equals(easing.type())) {
+                double steps = Math.max(2.0, Math.rint(easing.amount()));
+                return progress < 1.0 ? Math.floor(progress * steps) / steps : 1.0;
+            }
+            if ("sine".equals(easing.type())) {
+                if ("in".equals(easing.mode())) return 1.0 - Math.cos(progress * Math.PI / 2.0);
+                if ("out".equals(easing.mode())) return Math.sin(progress * Math.PI / 2.0);
+                return -(Math.cos(Math.PI * progress) - 1.0) / 2.0;
+            }
+            if ("quad".equals(easing.type())) return powerProgress(progress, easing.mode(), 2);
+            if ("cubicPower".equals(easing.type())) return powerProgress(progress, easing.mode(), 3);
+            if ("quart".equals(easing.type())) return powerProgress(progress, easing.mode(), 4);
+            if ("quint".equals(easing.type())) return powerProgress(progress, easing.mode(), 5);
+            if ("expo".equals(easing.type())) {
+                if (progress == 0.0 || progress == 1.0) return progress;
+                if ("in".equals(easing.mode())) return Math.pow(2.0, 10.0 * progress - 10.0);
+                if ("out".equals(easing.mode())) return 1.0 - Math.pow(2.0, -10.0 * progress);
+                return progress < 0.5
+                        ? Math.pow(2.0, 20.0 * progress - 10.0) / 2.0
+                        : (2.0 - Math.pow(2.0, -20.0 * progress + 10.0)) / 2.0;
+            }
+            if ("circ".equals(easing.type())) {
+                if ("in".equals(easing.mode())) {
+                    return 1.0 - Math.sqrt(Math.max(0.0, 1.0 - progress * progress));
+                }
+                if ("out".equals(easing.mode())) {
+                    return Math.sqrt(Math.max(0.0, 1.0 - Math.pow(progress - 1.0, 2.0)));
+                }
+                return progress < 0.5
+                        ? (1.0 - Math.sqrt(Math.max(0.0, 1.0 - Math.pow(2.0 * progress, 2.0)))) / 2.0
+                        : (Math.sqrt(Math.max(0.0, 1.0 - Math.pow(-2.0 * progress + 2.0, 2.0))) + 1.0) / 2.0;
+            }
+            if ("back".equals(easing.type())) {
+                return backProgress(progress, easing.mode(), easing.amount());
+            }
             if ("bounce".equals(easing.type())) {
-                return bounceProgress(progress, easing.mode());
+                double bounce = bounceProgress(progress, easing.mode());
+                return progress + (bounce - progress) * easing.amount();
             }
             if ("elastic".equals(easing.type())) {
-                double elastic = elasticProgress(progress, easing.mode());
-                return progress + (elastic - progress) * easing.amount();
+                return elasticProgress(progress, easing.mode(), easing.amount());
             }
             double low = 0.0;
             double high = 1.0;
@@ -150,6 +191,31 @@ public record VfxDefinition(String id, int durationTicks, List<Plane> planes) {
                 else high = amount;
             }
             return cubic(0.0, easing.y1(), easing.y2(), 1.0, (low + high) * 0.5);
+        }
+
+        private static double powerProgress(double progress, String mode, int power) {
+            if ("in".equals(mode)) return Math.pow(progress, power);
+            if ("out".equals(mode)) return 1.0 - Math.pow(1.0 - progress, power);
+            return progress < 0.5
+                    ? Math.pow(2.0, power - 1.0) * Math.pow(progress, power)
+                    : 1.0 - Math.pow(-2.0 * progress + 2.0, power) / 2.0;
+        }
+
+        private static double backProgress(double progress, String mode, double amount) {
+            double overshoot = amount == 0.0 ? 1.70158 : amount;
+            if ("in".equals(mode)) {
+                return (overshoot + 1.0) * Math.pow(progress, 3.0) - overshoot * progress * progress;
+            }
+            if ("out".equals(mode)) {
+                return 1.0 + (overshoot + 1.0) * Math.pow(progress - 1.0, 3.0)
+                        + overshoot * Math.pow(progress - 1.0, 2.0);
+            }
+            double scaled = overshoot * 1.525;
+            return progress < 0.5
+                    ? Math.pow(2.0 * progress, 2.0)
+                    * ((scaled + 1.0) * 2.0 * progress - scaled) / 2.0
+                    : (Math.pow(2.0 * progress - 2.0, 2.0)
+                    * ((scaled + 1.0) * (2.0 * progress - 2.0) + scaled) + 2.0) / 2.0;
         }
 
         private static double bounceOut(double progress) {
@@ -178,24 +244,25 @@ public record VfxDefinition(String id, int durationTicks, List<Plane> planes) {
             return bounceOut(progress);
         }
 
-        private static double elasticProgress(double progress, String mode) {
+        private static double elasticProgress(double progress, String mode, double amount) {
             if (progress == 0.0 || progress == 1.0) return progress;
+            double multiplier = amount == 0.0 ? 1.0 : amount;
             if ("in".equals(mode)) {
                 double period = 2.0 * Math.PI / 3.0;
                 return -Math.pow(2.0, 10.0 * progress - 10.0)
-                        * Math.sin((10.0 * progress - 10.75) * period);
+                        * Math.sin((10.0 * progress - 10.75) * period * multiplier);
             }
             if ("inOut".equals(mode)) {
                 double period = 2.0 * Math.PI / 4.5;
                 return progress < 0.5
                         ? -(Math.pow(2.0, 20.0 * progress - 10.0)
-                        * Math.sin((20.0 * progress - 11.125) * period)) / 2.0
+                        * Math.sin((20.0 * progress - 11.125) * period * multiplier)) / 2.0
                         : (Math.pow(2.0, -20.0 * progress + 10.0)
-                        * Math.sin((20.0 * progress - 11.125) * period)) / 2.0 + 1.0;
+                        * Math.sin((20.0 * progress - 11.125) * period * multiplier)) / 2.0 + 1.0;
             }
             double period = 2.0 * Math.PI / 3.0;
             return Math.pow(2.0, -10.0 * progress)
-                    * Math.sin((10.0 * progress - 0.75) * period) + 1.0;
+                    * Math.sin((10.0 * progress - 0.75) * period * multiplier) + 1.0;
         }
 
         private static double cubic(double start, double control1, double control2, double end, double amount) {

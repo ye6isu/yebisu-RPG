@@ -110,7 +110,7 @@ function CategoryPicker({ value, onChange }) {
           className="ycs-string-input"
           value={value}
           onChange={e => onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
-          style={{ flex: 1 }}
+          style={{ width: 180, flex: '0 0 180px' }}
         />
         <button className="ycs-button" onClick={() => { setCustomMode(false); onChange(OWN_CATEGORY); }}>Cancel</button>
       </div>
@@ -228,7 +228,7 @@ function FieldIconButton({ onClick, title, hasData, disabled }) {
   );
 }
 
-function KeybindEditor({ keybindId, onBack, onOpenBlockEditor }) {
+function KeybindEditor({ keybindId, onBack, onOpenBlockEditor, isActive = false }) {
   const [name, setName] = useState('');
   const [titleText, setTitleText] = useState('');
   const [bindCode, setBindCode] = useState('NONE');
@@ -395,21 +395,19 @@ function KeybindEditor({ keybindId, onBack, onOpenBlockEditor }) {
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving keybind' : 'Save keybind', disabled: saving || !name, onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete keybind', danger: true, disabled: saving || !keybindId, onClick: handleRemove },
+    ],
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {keybindId ? `Edit Keybind: ${keybindId}` : 'New Keybind'}
-        </h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {keybindId && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldRow label="Name">
         <StringField value={name} onChange={v => setName(v.toLowerCase().replace(/\s/g, '_'))} />
         </FieldRow>
@@ -458,7 +456,7 @@ export default function KeybindsLanding({ isActive = false }) {
   const [search, setSearch] = useState('');
   const [blockEditing, setBlockEditing] = useState(null); // { keybindId, methodKey }
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     try {
@@ -501,6 +499,7 @@ export default function KeybindsLanding({ isActive = false }) {
       <div style={{ position: 'relative', height: '100%' }}>
         <div style={{ height: '100%', visibility: blockEditing ? 'hidden' : 'visible', pointerEvents: blockEditing ? 'none' : 'auto' }}>
           <KeybindEditor
+            isActive={isActive}
             keybindId={editing || undefined}
             onBack={() => { setCreating(false); setEditing(null); reload(); }}
             onOpenBlockEditor={(keybindId, methodKey) => setBlockEditing({ keybindId, methodKey })}

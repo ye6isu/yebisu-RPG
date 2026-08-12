@@ -11,6 +11,7 @@ export default function TabsLanding({ isActive = false }) {
 
   useTitlebarActions({
     active: isActive,
+    enabled: !creating && !editing,
     search,
     onSearchChange: setSearch,
     onAdd: () => { setEditing(null); setCreating(true); },
@@ -56,8 +57,8 @@ export default function TabsLanding({ isActive = false }) {
     }
   };
 
-  if (creating) return <TabEditor onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <TabEditor tabId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <TabEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <TabEditor isActive={isActive} tabId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const filtered = tabs.filter(tab =>
     !search || (tab.displayName || tab.id).toLowerCase().includes(search.toLowerCase())

@@ -30,6 +30,10 @@ export default function Titlebar({ openPreferences, isSubwindow, title }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const actions = useCurrentTitlebarActions();
+  const startWindowDrag = event => {
+    if (event.button !== 0) return;
+    getCurrentWindow().startDragging().catch(console.error);
+  };
 
   // Close menu if clicked outside
   useEffect(() => {
@@ -49,8 +53,13 @@ export default function Titlebar({ openPreferences, isSubwindow, title }) {
   }, [isSubwindow]);
 
   return (
-    <div className="titlebar">
-      <div className="titlebar-left">
+    <div className="titlebar" data-tauri-drag-region onPointerDown={startWindowDrag}>
+      <div
+        className="titlebar-left"
+        onPointerDown={event => {
+          if (!isSubwindow) event.stopPropagation();
+        }}
+      >
         {!isSubwindow ? (
           <>
             <img src="/yebisu.png" alt="YCS Logo" className="logo-icon" />
@@ -143,11 +152,6 @@ export default function Titlebar({ openPreferences, isSubwindow, title }) {
       <div 
         data-tauri-drag-region 
         style={{ flexGrow: 1, height: '100%' }}
-        onPointerDown={() => {
-          import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-            getCurrentWindow().startDragging();
-          });
-        }}
       ></div>
 
       {/* Window Controls (Right side) */}
@@ -155,7 +159,7 @@ export default function Titlebar({ openPreferences, isSubwindow, title }) {
         display: 'flex',
         height: '100%',
         alignItems: 'center'
-      }}>
+      }} onPointerDown={(event) => event.stopPropagation()}>
         {!isSubwindow && (
           <>
             <div 

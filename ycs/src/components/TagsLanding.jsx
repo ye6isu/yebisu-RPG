@@ -5,7 +5,7 @@ import { VANILLA_ITEMS } from '../data/vanillaItems';
 
 const MODID = 'yebisurpg';
 
-function TagEditor({ tagId, onBack, onSaved }) {
+function TagEditor({ tagId, onBack, onSaved, isActive = false }) {
   const [tagName, setTagName] = useState('');
   const [values, setValues] = useState([]);
   const [filter, setFilter] = useState('');
@@ -80,6 +80,30 @@ function TagEditor({ tagId, onBack, onSaved }) {
     setSaving(false);
   };
 
+  const handleRemove = async () => {
+    if (!tagId || !window.confirm(`Delete tag "${tagName || tagId}"?`)) return;
+    setSaving(true);
+    try {
+      const raw = await invoke('load_ycs_data', { category: 'tags', id: tagId }).catch(() => null);
+      const data = raw ? JSON.parse(raw) : {};
+      if (data._file) await invoke('delete_mod_file', { file: data._file }).catch(() => {});
+      await invoke('delete_ycs_data', { category: 'tags', id: tagId });
+      if (onBack) onBack();
+    } catch (err) {
+      setStatus({ ok: false, msg: String(err) });
+    }
+    setSaving(false);
+  };
+
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving tag' : 'Save tag', disabled: saving || !tagName.trim(), onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete tag', danger: true, disabled: saving || !tagId, onClick: handleRemove },
+    ],
+  });
+
   const q = filter.toLowerCase();
 
   const vanillaFiltered = VANILLA_ITEMS.filter(i => !q || i.id.includes(q) || i.displayName.toLowerCase().includes(q));
@@ -87,20 +111,7 @@ function TagEditor({ tagId, onBack, onSaved }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ padding: '12px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button className="ycs-tiny-button" onClick={onBack} title="Back">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 12L6 8l4-4"/></svg>
-        </button>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>
-          {tagId ? (tagName || tagId) : 'New Tag'}
-        </h2>
-        {status && <span style={{ fontSize: '12px', color: status.ok ? 'inherit' : '#f88', opacity: 0.8 }}>{status.msg}</span>}
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save & Inject'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', flexShrink: 0 }} />
-
+      {status && <div role="status" style={{ padding: '8px 16px 0', fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
       {/* Tag ID field */}
       <div style={{ padding: '10px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontSize: '13px', minWidth: '80px', opacity: 0.5, userSelect: 'none' }}>Tag ID</span>
@@ -111,7 +122,7 @@ function TagEditor({ tagId, onBack, onSaved }) {
           onChange={e => setTagName(e.target.value)}
           placeholder="yebisurpg:magic_weapons"
           disabled={!!tagId}
-          style={{ flex: 1, opacity: tagId ? 0.5 : 1 }}
+          style={{ width: '180px', flex: '0 0 180px', opacity: tagId ? 0.5 : 1 }}
         />
       </div>
 
@@ -148,7 +159,7 @@ function TagEditor({ tagId, onBack, onSaved }) {
           value={filter}
           onChange={e => setFilter(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addCustom()}
-          style={{ flex: 1 }}
+          style={{ width: '180px', flex: '0 0 180px' }}
           autoFocus
         />
         <button className="ycs-button icon" onClick={addCustom} title="Add custom entry">
@@ -209,7 +220,7 @@ export default function TagsLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     try {
@@ -257,8 +268,8 @@ export default function TagsLanding({ isActive = false }) {
     } catch {}
   };
 
-  if (creating) return <TagEditor onBack={() => { setCreating(false); reload(); }} onSaved={() => { setCreating(false); reload(); }} />;
-  if (editing)  return <TagEditor tagId={editing} onBack={() => { setEditing(null); reload(); }} onSaved={() => reload()} />;
+  if (creating) return <TagEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} onSaved={() => { setCreating(false); reload(); }} />;
+  if (editing)  return <TagEditor isActive={isActive} tagId={editing} onBack={() => { setEditing(null); reload(); }} onSaved={() => reload()} />;
 
   const filtered = tags.filter(t => !search || (t.tagName || t.id).toLowerCase().includes(search.toLowerCase()));
 

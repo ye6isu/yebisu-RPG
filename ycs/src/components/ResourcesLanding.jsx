@@ -132,7 +132,7 @@ function ResourcePreview({ bar, currentDefault, maximumDefault }) {
   );
 }
 
-function ResourceEditor({ resourceId, onBack }) {
+function ResourceEditor({ resourceId, onBack, isActive = false }) {
   const [id, setId] = useState(resourceId || '');
   const [name, setName] = useState('');
   const [currentDefault, setCurrentDefault] = useState('0');
@@ -314,17 +314,19 @@ function ResourceEditor({ resourceId, onBack }) {
     }
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving resource' : 'Save resource', disabled: saving || !id, onClick: save },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: resourceId === 'stamina' ? 'Stamina cannot be deleted' : 'Delete resource', danger: true, disabled: saving || !resourceId || resourceId === 'stamina', onClick: remove },
+    ],
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, flex: 1 }}>{resourceId ? `Edit Resource: ${resourceId}` : 'New Resource'}</h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {resourceId && resourceId !== 'stamina' && <button className="ycs-button" onClick={remove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-      <div style={{ height: 1, backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
       <FieldRow label="Name"><StringField value={name} onChange={setName} /></FieldRow>
       <FieldRow label="ID"><StringField value={id} onChange={value => setId(normalizeId(value))} disabled={resourceId === 'stamina'} /></FieldRow>
         <FieldRow label="Current Default"><NumberInput value={currentDefault} onChange={setCurrentDefault} /></FieldRow>
@@ -386,7 +388,7 @@ export default function ResourcesLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(() => loadCategory('resources').then(setResources), []);
   useEffect(() => { reload(); }, [reload]);
@@ -404,8 +406,8 @@ export default function ResourcesLanding({ isActive = false }) {
     reload();
   };
 
-  if (creating) return <ResourceEditor onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <ResourceEditor resourceId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <ResourceEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <ResourceEditor isActive={isActive} resourceId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

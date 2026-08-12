@@ -731,13 +731,17 @@ function LayoutPanel({
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
+                  className="ycs-slider"
                   type="range"
                   min="0"
                   max="1"
                   step="0.05"
                   value={previewImageOpacity}
                   onChange={e => setPreviewImageOpacity(Number(e.target.value))}
-                  style={{ flex: 1 }}
+                  style={{
+                    flex: 1,
+                    background: `linear-gradient(to right, var(--ycs-highlight) ${previewImageOpacity * 100}%, var(--ycs-foreground) ${previewImageOpacity * 100}%)`,
+                  }}
                 />
                 <span style={{ width: 34, textAlign: 'right', fontSize: 11, opacity: 0.7 }}>
                   {Math.round(previewImageOpacity * 100)}%
@@ -1291,10 +1295,14 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
             />
             {widget.fillLerpEnabled && (
               <input
+                className="ycs-slider"
                 type="range" min="0.01" max="1" step="0.01"
                 value={widget.fillLerpStrength ?? 0.2}
                 onChange={e => set('fillLerpStrength', parseFloat(e.target.value))}
-                style={{ flex: 1 }}
+                style={{
+                  flex: 1,
+                  background: `linear-gradient(to right, var(--ycs-highlight) ${(((widget.fillLerpStrength ?? 0.2) - 0.01) / 0.99) * 100}%, var(--ycs-foreground) ${(((widget.fillLerpStrength ?? 0.2) - 0.01) / 0.99) * 100}%)`,
+                }}
               />
             )}
           </div>
@@ -1304,7 +1312,7 @@ function WidgetInspector({ widget, allWidgets, layoutId, widgetIndex, previewW, 
   );
 }
 
-function HudEditor({ layoutId, onBack }) {
+function HudEditor({ layoutId, onBack, isActive = false }) {
   const [name, setName] = useState('');
   const [widgets, setWidgets] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -1782,6 +1790,15 @@ function HudEditor({ layoutId, onBack }) {
     setSaving(false);
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: saving ? 'Saving HUD layout' : 'Save HUD layout', disabled: saving || !name.trim(), onClick: handleSave },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', disabled: saving, onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete HUD layout', danger: true, disabled: saving || !layoutId, onClick: handleRemove },
+    ],
+  });
+
   if (editingBinding !== null) {
     return (
       <BlockEditor
@@ -1799,19 +1816,7 @@ function HudEditor({ layoutId, onBack }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>
-          {layoutId ? 'Edit HUD Layout' : 'New HUD Layout'}
-        </h2>
-        <div style={{ flex: 1 }} />
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {layoutId && <button className="ycs-button" onClick={handleRemove} disabled={saving} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
+      {status && <div role="status" style={{ padding: '8px 16px', fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <PannableCanvas
           previewW={previewW} previewH={previewH}
@@ -1895,7 +1900,7 @@ export default function HudLanding({ isActive = false }) {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
-  useTitlebarActions({ active: isActive, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
+  useTitlebarActions({ active: isActive, enabled: !creating && !editing, search, onSearchChange: setSearch, onAdd: () => { setEditing(null); setCreating(true); } });
 
   const reload = useCallback(async () => {
     try {
@@ -1931,8 +1936,8 @@ export default function HudLanding({ isActive = false }) {
     } catch {}
   };
 
-  if (creating) return <HudEditor onBack={() => { setCreating(false); reload(); }} />;
-  if (editing) return <HudEditor layoutId={editing} onBack={() => { setEditing(null); reload(); }} />;
+  if (creating) return <HudEditor isActive={isActive} onBack={() => { setCreating(false); reload(); }} />;
+  if (editing) return <HudEditor isActive={isActive} layoutId={editing} onBack={() => { setEditing(null); reload(); }} />;
 
   const protectedLayoutIds = new Set(['ability', 'alt_ability', 'resource']);
   const filtered = layouts

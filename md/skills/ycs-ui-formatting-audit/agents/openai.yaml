@@ -1,0 +1,4 @@
+interface:
+  display_name: "YCS UI Formatting Audit"
+  short_description: "Audit YCS fields and titlebar page states"
+  default_prompt: "Use $ycs-ui-formatting-audit to audit this YCS page for shared components, fixed-width controls, and correct landing/editor titlebar actions."

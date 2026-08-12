@@ -106,7 +106,7 @@ public final class ClientVfxManager {
             }
 
             double elapsed = currentTick - instance.startTick();
-            if (elapsed >= definition.durationTicks()) {
+            if (elapsed >= definition.durationTicks() + 1.0) {
                 iterator.remove();
                 continue;
             }
@@ -115,7 +115,7 @@ public final class ClientVfxManager {
             InstanceTransform transform = resolveTransform(minecraft, event, level, instance, partialTick);
             if (transform == null) continue;
             for (VfxDefinition.Plane plane : definition.planes()) {
-                if (elapsed < plane.startTick() || elapsed >= plane.endTick()) continue;
+                if (elapsed < plane.startTick() || elapsed >= plane.endTick() + 1.0) continue;
                 renderPlane(event, buffers, usedTypes, level, instance, transform, plane, elapsed);
             }
         }
@@ -136,19 +136,34 @@ public final class ClientVfxManager {
         VfxDefinition.Position position = plane.positionAt(elapsed);
         VfxDefinition.Position rotation = plane.rotationAt(elapsed);
         VfxDefinition.Position scale = plane.scaleAt(elapsed);
-        Vec3 worldPosition = transform.origin().add(rotateLocalOffset(
+        float rotationX = plane.baseRotationX() + (float)rotation.x();
+        float rotationY = plane.baseRotationY() + (float)rotation.y();
+        float rotationZ = plane.baseRotationZ() + (float)rotation.z();
+        Vec3 worldPivot = transform.origin().add(rotateLocalOffset(
                 transform,
-                position.x(),
-                position.y(),
-                position.z()));
-        double radius = Math.max(plane.width() * Math.abs(scale.x()), plane.height() * Math.abs(scale.y()));
+                position.x() + plane.pivotX(),
+                position.y() + plane.pivotY(),
+                position.z() + plane.pivotZ()));
+        double relativeX = -plane.pivotX();
+        double relativeY = -plane.pivotY();
+        double relativeZ = -plane.pivotZ();
+        double scaledRelativeX = relativeX * scale.x();
+        double scaledRelativeY = relativeY * scale.y();
+        double scaledRelativeZ = relativeZ * scale.z();
+        double scaledHalfWidth = plane.width() * Math.abs(scale.x()) * 0.5;
+        double scaledHalfHeight = plane.height() * Math.abs(scale.y()) * 0.5;
+        double radius = Math.sqrt(
+                scaledRelativeX * scaledRelativeX
+                        + scaledRelativeY * scaledRelativeY
+                        + scaledRelativeZ * scaledRelativeZ)
+                + Math.sqrt(scaledHalfWidth * scaledHalfWidth + scaledHalfHeight * scaledHalfHeight);
         if (!event.getFrustum().isVisible(new AABB(
-                worldPosition.x - radius,
-                worldPosition.y - radius,
-                worldPosition.z - radius,
-                worldPosition.x + radius,
-                worldPosition.y + radius,
-                worldPosition.z + radius))) return;
+                worldPivot.x - radius,
+                worldPivot.y - radius,
+                worldPivot.z - radius,
+                worldPivot.x + radius,
+                worldPivot.y + radius,
+                worldPivot.z + radius))) return;
 
         RenderType renderType = RenderType.entityTranslucent(plane.texture());
         usedTypes.add(renderType);
@@ -161,21 +176,32 @@ public final class ClientVfxManager {
         if (transform.cancelViewSway() && minecraft.options.bobView().get()) {
             cancelViewSway(poseStack, event, minecraft.player, event.getCamera().getPartialTickTime());
         }
-        poseStack.translate(
-                worldPosition.x - camera.x,
-                worldPosition.y - camera.y,
-                worldPosition.z - camera.z);
         if (plane.billboard()) {
+            poseStack.translate(
+                    worldPivot.x - camera.x,
+                    worldPivot.y - camera.y,
+                    worldPivot.z - camera.z);
             poseStack.mulPose(event.getCamera().rotation());
-            poseStack.mulPose(Axis.ZP.rotationDegrees((float)rotation.z()));
+            poseStack.mulPose(Axis.YP.rotationDegrees(rotationY));
+            poseStack.mulPose(Axis.XP.rotationDegrees(rotationX));
+            poseStack.mulPose(Axis.ZP.rotationDegrees(rotationZ));
         } else {
+            poseStack.translate(
+                    transform.origin().x - camera.x,
+                    transform.origin().y - camera.y,
+                    transform.origin().z - camera.z);
             poseStack.mulPose(Axis.YP.rotationDegrees(-transform.yawDegrees()));
             poseStack.mulPose(Axis.XP.rotationDegrees(transform.pitchDegrees()));
-            poseStack.mulPose(Axis.YP.rotationDegrees((float)rotation.y()));
-            poseStack.mulPose(Axis.XP.rotationDegrees((float)rotation.x()));
-            poseStack.mulPose(Axis.ZP.rotationDegrees((float)rotation.z()));
+            poseStack.translate(
+                    position.x() + plane.pivotX(),
+                    position.y() + plane.pivotY(),
+                    position.z() + plane.pivotZ());
+            poseStack.mulPose(Axis.YP.rotationDegrees(rotationY));
+            poseStack.mulPose(Axis.XP.rotationDegrees(rotationX));
+            poseStack.mulPose(Axis.ZP.rotationDegrees(rotationZ));
         }
         poseStack.scale((float)scale.x(), (float)scale.y(), (float)scale.z());
+        poseStack.translate(relativeX, relativeY, relativeZ);
 
         int frame = TextureFrameClock.frameAt(
                 (long) Math.floor(instance.startTick() + elapsed),
@@ -194,7 +220,7 @@ public final class ClientVfxManager {
         int alpha = Math.round(Mth.clamp(plane.opacityAt(elapsed), 0.0f, 1.0f) * 255.0f);
         int light = plane.fullBright()
                 ? 0x00F000F0
-                : samplePlaneLight(level, worldPosition);
+                : samplePlaneLight(level, worldPivot);
         Matrix4f matrix = poseStack.last().pose();
 
         vertex(vertices, matrix, -halfWidth, -halfHeight, 0.0f, red, green, blue, alpha, 0.0f, v1, light);

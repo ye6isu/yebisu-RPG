@@ -78,7 +78,8 @@ function ImageBarDropZone({ hasFile, fileName, onImport, onClear, accept = IMAGE
       onClick={browse}
       className="ycs-string-input"
       style={{
-        flex: 1,
+        width: '180px',
+        flex: '0 0 180px',
         height: '24px',
         display: 'flex',
         alignItems: 'center',
@@ -268,7 +269,7 @@ export default function TextureManager({ isActive = false }) {
     }
   };
 
-  useTitlebarActions({ active: isActive, search: filter, onSearchChange: setFilter, onAdd: importTexture });
+  useTitlebarActions({ active: isActive, enabled: !editing, search: filter, onSearchChange: setFilter, onAdd: importTexture });
 
   const filtered = textures.filter(tex => {
     if (!filter) return true;
@@ -277,17 +278,13 @@ export default function TextureManager({ isActive = false }) {
   });
 
   if (editing) {
-    return <TextureEditor texture={editing} onBack={() => { setEditing(null); reload(); }} />;
+    return <TextureEditor isActive={isActive} texture={editing} onBack={() => { setEditing(null); reload(); }} />;
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', opacity: 0.5, fontSize: '13px' }}>
-            {filter ? 'No textures match your filter.' : ''}
-          </div>
-        ) : (
+        {filtered.length === 0 ? null : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {filtered.map(tex => (
               <div
@@ -375,7 +372,7 @@ export default function TextureManager({ isActive = false }) {
   );
 }
 
-function TextureEditor({ texture, onBack }) {
+function TextureEditor({ texture, onBack, isActive = false }) {
   const [label, setLabel] = useState(texture.label || '');
   const [id, setId] = useState(texture.id || '');
   const [dataUrl, setDataUrl] = useState(texture.dataUrl || '');
@@ -471,19 +468,19 @@ function TextureEditor({ texture, onBack }) {
     }
   };
 
+  useTitlebarActions({
+    active: isActive,
+    buttons: [
+      { id: 'save', icon: 'save', title: 'Save texture', disabled: !id, onClick: save },
+      { id: 'cancel', icon: 'cancel', title: 'Cancel', onClick: onBack },
+      { id: 'delete', icon: 'delete', title: 'Delete texture', danger: true, disabled: isNew, onClick: handleRemove },
+    ],
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '8px 16px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '500', flex: 1 }}>{isNew ? 'New Texture' : 'Edit Texture'}</h2>
-        {status && <span style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</span>}
-        {!isNew && <button className="ycs-button" onClick={handleRemove} style={{ color: '#e05252' }}>Remove</button>}
-        <button className="ycs-button" onClick={onBack}>Cancel</button>
-        <button className="ycs-button" onClick={save}>Save</button>
-      </div>
-
-      <div style={{ height: '1px', backgroundColor: 'var(--ycs-foreground)', width: '100%', flexShrink: 0 }} />
-
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {status && <div role="status" style={{ fontSize: 11, color: status.ok ? '#5ba558' : '#e05252' }}>{status.msg}</div>}
         <FieldGroup label="Identity">
           <FieldRow label="Label">
             <input className="ycs-string-input" type="text" value={label} onChange={e => setLabel(e.target.value)} />
