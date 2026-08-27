@@ -1,0 +1,22 @@
+{
+  "name": "ycs4",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "prepare:sprites": "node slice-button.mjs",
+    "predev": "npm run prepare:sprites",
+    "dev": "vite",
+    "prebuild": "npm run prepare:sprites",
+    "build": "vite build",
+    "pretauri": "npm run prepare:sprites",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "vite": "^7.0.4"
+  }
+}

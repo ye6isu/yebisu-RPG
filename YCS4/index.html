@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yebisu Creator Studio</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="titlebar" class="titlebar" data-tauri-drag-region>
+        <img class="titlebar-logo" src="./assets/icon.png" alt="" draggable="false" />
+        <span class="titlebar-title">Yebisu Creator Studio</span>
+        <div class="titlebar-drag-region" data-tauri-drag-region></div>
+        <div class="window-controls">
+          <button id="minimize" class="window-control" type="button" title="Minimize" aria-label="Minimize">
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M1 5.5h8" />
+            </svg>
+          </button>
+          <button id="maximize" class="window-control" type="button" title="Maximize" aria-label="Maximize">
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <rect x="1.5" y="1.5" width="7" height="7" />
+            </svg>
+          </button>
+          <button id="close" class="window-control window-control-close" type="button" title="Close" aria-label="Close">
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M1 1l8 8M9 1 1 9" />
+            </svg>
+          </button>
+        </div>
+      </header>
+      <div class="ui-viewport">
+        <div id="ui-shell" class="ui-shell">
+          <nav class="menu-bar" aria-label="Application menu">
+        <div class="menu-entry">
+          <button
+            id="file-menu-button"
+            class="menu-bar-button"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="file-menu"
+          >File</button>
+          <div id="file-menu" class="application-menu pixel-option-stack" role="menu" hidden>
+            <button id="exit-option" class="pixel-option application-menu-option" type="button" role="menuitem">
+              Exit
+            </button>
+          </div>
+        </div>
+        <div class="menu-entry">
+          <button
+            id="edit-menu-button"
+            class="menu-bar-button"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="edit-menu"
+          >Edit</button>
+          <div id="edit-menu" class="application-menu pixel-option-stack" role="menu" hidden>
+            <button id="preferences-option" class="pixel-option application-menu-option" type="button" role="menuitem">
+              Preferences
+            </button>
+            <button id="test-option" class="pixel-option application-menu-option" type="button" role="menuitem">
+              Test
+            </button>
+          </div>
+        </div>
+          </nav>
+          <div class="workspace-tabs-shell">
+            <div id="workspace-tabs" class="workspace-tabs" role="tablist" aria-label="Workspace tabs">
+        <button
+          id="home-tab"
+          class="workspace-tab workspace-tab-active"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="home-workspace"
+          data-workspace-mode="home"
+        ><span id="primary-workspace-tab-label">Home</span></button>
+            </div>
+            <div id="workspace-tab-directions-left" class="workspace-tab-directions workspace-tab-directions-left" hidden>
+              <button id="workspace-tabs-previous" class="workspace-tab-direction" type="button" aria-label="Previous workspace tab">
+                <span class="pixel-direction-icon pixel-direction-left" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div id="workspace-tab-directions-right" class="workspace-tab-directions workspace-tab-directions-right" hidden>
+              <button id="workspace-tabs-next" class="workspace-tab-direction" type="button" aria-label="Next workspace tab">
+                <span class="pixel-direction-icon pixel-direction-right" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+          <aside class="workspace-action-rail" aria-label="Home workspace actions">
+            <div class="workspace-actions workspace-actions-top">
+              <button class="pixel-button workspace-action-button" type="button" aria-label="Home" aria-pressed="true" data-workspace-toggle data-workspace-mode="home"><span class="workspace-mode-icon workspace-mode-icon-first" aria-hidden="true"></span></button>
+              <button class="pixel-button workspace-action-button" type="button" aria-label="Assets" aria-pressed="false" data-workspace-toggle data-workspace-mode="assets"><span class="workspace-mode-icon workspace-mode-icon-second" aria-hidden="true"></span></button>
+            </div>
+            <div class="workspace-actions workspace-actions-bottom">
+              <button id="run-client-task-button" class="pixel-button workspace-action-button" type="button" aria-label="Run Client" aria-pressed="false"><span class="workspace-task-icon workspace-task-icon-run-client" aria-hidden="true"></span></button>
+              <button id="run-data-task-button" class="pixel-button workspace-action-button" type="button" aria-label="Run Data" aria-pressed="false"><span class="workspace-task-icon workspace-task-icon-run-data" aria-hidden="true"></span></button>
+              <button id="task-output-button" class="pixel-button workspace-action-button" type="button" aria-label="Run console" aria-pressed="false"><span class="workspace-task-icon workspace-task-icon-output" aria-hidden="true"></span></button>
+            </div>
+          </aside>
+          <main id="home-workspace" class="workspace-container" role="tabpanel" aria-labelledby="home-tab">
+        <div class="workspace-top-controls" aria-label="Workspace top controls">
+          <div class="workspace-top-controls-left">
+            <input id="workspace-search-input" class="pixel-text-box workspace-top-text-box" type="text" aria-label="Search workspace" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+            <button id="workspace-search-button" class="pixel-button workspace-top-control-button" type="button" aria-label="Search">
+              <img class="workspace-search-icon" src="./assets/sprite/home/home_icon.png" alt="" draggable="false" />
+            </button>
+          </div>
+          <div id="workspace-create-dropdown" class="workspace-create-dropdown">
+            <button
+              id="workspace-create-button"
+              class="pixel-button workspace-top-control-button"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="workspace-create-options"
+              aria-label="Create"
+            >+</button>
+            <div id="workspace-create-options" class="preferences-scale-options pixel-option-stack workspace-create-options" role="menu" hidden>
+              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Item" data-workspace-create-mode="home">Item</button>
+              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Texture" data-workspace-create-mode="assets" hidden>Texture</button>
+              <div class="workspace-create-divider-row" role="separator" data-workspace-create-mode="home assets">
+                <div class="pixel-divider pixel-divider-horizontal workspace-create-divider" aria-hidden="true"></div>
+              </div>
+              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Folder" data-workspace-create-mode="home assets">Folder</button>
+              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Test" data-workspace-create-mode="home">Test</button>
+            </div>
+          </div>
+        </div>
+        <div id="workspace-item-editors" class="workspace-item-editors"></div>
+        <section class="workspace-inner-container" aria-label="Home workspace content">
+          <div id="workspace-object-grid" class="workspace-object-grid"></div>
+          <div id="workspace-object-scrollbar" class="workspace-object-scrollbar" aria-hidden="true" hidden>
+            <div id="workspace-object-scrollbar-thumb" class="workspace-object-scrollbar-thumb"></div>
+          </div>
+        </section>
+        <section id="workspace-task-terminal" class="workspace-task-terminal" aria-label="Task command output" hidden>
+          <span id="workspace-task-terminal-resize-handle" class="workspace-task-terminal-resize-handle" aria-hidden="true"></span>
+          <div id="workspace-task-terminal-title" class="workspace-task-terminal-title">Run Client</div>
+          <pre id="workspace-task-terminal-output" class="workspace-task-terminal-output" tabindex="0"></pre>
+        </section>
+        <div id="workspace-object-context-menu" class="pixel-option-stack workspace-object-context-menu" role="menu" hidden>
+          <button id="workspace-object-cut-option" class="pixel-option workspace-object-context-option" type="button" role="menuitem">Cut</button>
+          <button id="workspace-object-paste-option" class="pixel-option workspace-object-context-option" type="button" role="menuitem">Paste</button>
+          <div id="workspace-object-context-divider" class="workspace-object-divider-row" role="separator">
+            <div class="pixel-divider pixel-divider-horizontal" aria-hidden="true"></div>
+          </div>
+          <button id="workspace-object-new-option" class="pixel-option workspace-object-context-option workspace-context-new-trigger" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" hidden>
+            <span>New</span>
+            <span class="pixel-direction-icon pixel-direction-right" aria-hidden="true"></span>
+          </button>
+          <div id="workspace-object-new-options" class="pixel-option-stack workspace-context-submenu" role="menu" hidden>
+            <button class="pixel-option workspace-object-context-option workspace-context-new-option" type="button" role="menuitem" data-workspace-new-option="Item" data-workspace-new-mode="home">Item</button>
+            <button class="pixel-option workspace-object-context-option workspace-context-new-option" type="button" role="menuitem" data-workspace-new-option="Texture" data-workspace-new-mode="assets" hidden>Texture</button>
+            <div class="workspace-create-divider-row workspace-context-new-divider" role="separator" data-workspace-new-mode="home assets">
+              <div class="pixel-divider pixel-divider-horizontal workspace-create-divider" aria-hidden="true"></div>
+            </div>
+            <button class="pixel-option workspace-object-context-option workspace-context-new-option" type="button" role="menuitem" data-workspace-new-option="Folder" data-workspace-new-mode="home assets">Folder</button>
+            <button class="pixel-option workspace-object-context-option workspace-context-new-option" type="button" role="menuitem" data-workspace-new-option="Test" data-workspace-new-mode="home">Test</button>
+          </div>
+          <button id="workspace-object-delete-option" class="pixel-option workspace-object-context-option" type="button" role="menuitem">Delete</button>
+          <button id="workspace-object-rename-option" class="pixel-option workspace-object-context-option" type="button" role="menuitem" hidden>Rename</button>
+        </div>
+        <div id="dialog-layer" class="dialog-layer" hidden>
+          <section
+            id="preferences-dialog"
+            class="floating-dialog"
+            role="dialog"
+            aria-labelledby="preferences-dialog-title"
+            hidden
+          >
+            <header id="preferences-titlebar" class="floating-dialog-titlebar">
+              <span id="preferences-dialog-title" class="floating-dialog-title">Preferences</span>
+              <button
+                id="preferences-close"
+                class="dialogue-title-button floating-dialog-close"
+                type="button"
+                aria-label="Close Preferences"
+              >
+                <img src="./assets/sprite/generated/dialogue_icon_2x.png" alt="" draggable="false" />
+              </button>
+            </header>
+            <div id="preferences-body" class="floating-dialog-body preferences-body">
+              <div class="preferences-field-row dialog-labeled-row">
+                <label for="ui-scale-button">Scale</label>
+                <div id="ui-scale" class="preferences-scale-dropdown">
+                  <button
+                    id="ui-scale-button"
+                    class="pixel-option preferences-scale-select"
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="ui-scale-options"
+                  >
+                    <span id="ui-scale-value">200%</span>
+                    <span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+                  </button>
+                  <div id="ui-scale-options" class="preferences-scale-options pixel-option-stack" role="listbox" hidden>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-scale="100" aria-selected="false">100%</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-scale="200" aria-selected="true">200%</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-scale="300" aria-selected="false">300%</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-scale="400" aria-selected="false">400%</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-scale="500" aria-selected="false">500%</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="test-body" class="floating-dialog-body test-body dialog-line-stack" hidden>
+              <div class="test-button-row dialog-line">
+                <button class="pixel-button test-dialog-button" type="button">Normal Button</button>
+              </div>
+              <div class="test-button-row dialog-line">
+                <button
+                  id="test-toggle-button"
+                  class="pixel-button test-dialog-button"
+                  type="button"
+                  aria-pressed="true"
+                >Toggled Button</button>
+              </div>
+              <div class="test-button-row dialog-line">
+                <button id="test-add-tab-button" class="pixel-button test-dialog-button" type="button">Add Tab</button>
+              </div>
+              <div class="test-dropdown-row dialog-line dialog-labeled-row">
+                <span>Dropdown</span>
+                <div id="test-dropdown" class="preferences-scale-dropdown">
+                  <button
+                    id="test-dropdown-button"
+                    class="pixel-option preferences-scale-select"
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="test-dropdown-options"
+                  >
+                    <span id="test-dropdown-value">Option 1</span>
+                    <span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+                  </button>
+                  <div id="test-dropdown-options" class="preferences-scale-options pixel-option-stack" role="listbox" hidden>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-test-option="Option 1" aria-selected="true">Option 1</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-test-option="Option 2" aria-selected="false">Option 2</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-test-option="Option 3" aria-selected="false">Option 3</button>
+                  </div>
+                </div>
+              </div>
+              <div class="test-text-box-row dialog-line dialog-labeled-row">
+                <label for="test-text-box">Text Box</label>
+                <input id="test-text-box" class="pixel-text-box" type="text" value="Text" />
+              </div>
+              <div class="test-combobox-row dialog-line dialog-labeled-row">
+                <label for="test-combobox-input">Combo Box</label>
+                <div id="test-combobox" class="pixel-combobox">
+                  <div class="pixel-combobox-control">
+                    <input id="test-combobox-input" class="pixel-text-box pixel-combobox-input" type="text" value="Option 1" />
+                    <button
+                      id="test-combobox-button"
+                      class="pixel-button pixel-combobox-button"
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded="false"
+                      aria-controls="test-combobox-options"
+                      aria-label="Open combo box options"
+                    >
+                      <span class="pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <div id="test-combobox-options" class="preferences-scale-options pixel-option-stack pixel-combobox-options" role="listbox" hidden>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-combobox-option="Option 1" aria-selected="true">Option 1</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-combobox-option="Option 2" aria-selected="false">Option 2</button>
+                    <button class="pixel-option preferences-scale-option" type="button" role="option" data-combobox-option="Option 3" aria-selected="false">Option 3</button>
+                  </div>
+                </div>
+              </div>
+              <div class="test-value-slider-row dialog-line dialog-labeled-row">
+                <label for="test-value-slider">Value Slider</label>
+                <div class="pixel-value-slider">
+                  <span class="pixel-value-slider-surface pixel-value-slider-empty" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-surface pixel-value-slider-filled" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-normal" aria-hidden="true">50</span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-highlighted" aria-hidden="true">50</span>
+                  <input
+                    id="test-value-slider"
+                    class="pixel-value-slider-input"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value="50"
+                  />
+                </div>
+              </div>
+              <div class="test-hex-row dialog-line dialog-labeled-row">
+                <label for="test-hex-input">Hex</label>
+                <div id="test-hex" class="pixel-hex-field">
+                  <span class="pixel-hex-background" aria-hidden="true"></span>
+                  <span class="pixel-hex-color" aria-hidden="true"></span>
+                  <span class="pixel-hex-frame" aria-hidden="true"></span>
+                  <input
+                    id="test-hex-input"
+                    class="pixel-hex-input"
+                    type="text"
+                    value="#7C5CFC"
+                    maxlength="7"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-label="Hex color"
+                  />
+                </div>
+              </div>
+              <div class="test-checkbox-row dialog-line dialog-labeled-row">
+                <span>Checkbox</span>
+                <button
+                  id="test-checkbox"
+                  class="pixel-checkbox"
+                  type="button"
+                  role="checkbox"
+                  aria-checked="false"
+                  aria-label="Test checkbox"
+                ></button>
+              </div>
+              <div class="test-divider-row dialog-line dialog-labeled-row">
+                <span>Horizontal Divider</span>
+                <div class="pixel-divider pixel-divider-horizontal" role="separator" aria-orientation="horizontal"></div>
+              </div>
+              <div class="test-divider-row dialog-line dialog-labeled-row">
+                <span>Vertical Divider</span>
+                <div class="pixel-divider pixel-divider-vertical" role="separator" aria-orientation="vertical"></div>
+              </div>
+            </div>
+            <span class="dialog-resize-handle dialog-resize-n" data-resize="n" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-ne" data-resize="ne" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-e" data-resize="e" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-se" data-resize="se" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-s" data-resize="s" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-sw" data-resize="sw" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-w" data-resize="w" aria-hidden="true"></span>
+            <span class="dialog-resize-handle dialog-resize-nw" data-resize="nw" aria-hidden="true"></span>
+          </section>
+          <section
+            id="hex-color-dialog"
+            class="floating-dialog hex-color-dialog"
+            role="dialog"
+            aria-labelledby="hex-color-dialog-title"
+            hidden
+          >
+            <header class="floating-dialog-titlebar hex-color-dialog-titlebar">
+              <span id="hex-color-dialog-title" class="floating-dialog-title">Hex Color</span>
+            </header>
+            <div class="floating-dialog-body hex-color-dialog-body">
+              <button
+                id="hex-color-picker"
+                class="hex-color-picker"
+                type="button"
+                aria-label="Saturation and value color picker"
+              >
+                <span id="hex-color-picker-marker" class="hex-color-picker-marker" aria-hidden="true"></span>
+              </button>
+              <div class="hex-hue-slider">
+                <span id="hex-hue-slider-marker" class="hex-hue-slider-marker" aria-hidden="true"></span>
+                <input
+                  id="hex-hue-slider-input"
+                  class="hex-hue-slider-input"
+                  type="range"
+                  min="0"
+                  max="360"
+                  value="255"
+                  aria-label="Hue"
+                />
+              </div>
+              <div class="hex-channel-row">
+                <span>R</span>
+                <div class="pixel-value-slider">
+                  <span class="pixel-value-slider-surface pixel-value-slider-empty" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-surface pixel-value-slider-filled" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-normal" aria-hidden="true">124</span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-highlighted" aria-hidden="true">124</span>
+                  <input class="pixel-value-slider-input" type="range" min="0" max="255" value="124" data-hex-channel="r" aria-label="Red" />
+                </div>
+              </div>
+              <div class="hex-channel-row">
+                <span>G</span>
+                <div class="pixel-value-slider">
+                  <span class="pixel-value-slider-surface pixel-value-slider-empty" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-surface pixel-value-slider-filled" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-normal" aria-hidden="true">92</span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-highlighted" aria-hidden="true">92</span>
+                  <input class="pixel-value-slider-input" type="range" min="0" max="255" value="92" data-hex-channel="g" aria-label="Green" />
+                </div>
+              </div>
+              <div class="hex-channel-row">
+                <span>B</span>
+                <div class="pixel-value-slider">
+                  <span class="pixel-value-slider-surface pixel-value-slider-empty" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-surface pixel-value-slider-filled" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-normal" aria-hidden="true">252</span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-highlighted" aria-hidden="true">252</span>
+                  <input class="pixel-value-slider-input" type="range" min="0" max="255" value="252" data-hex-channel="b" aria-label="Blue" />
+                </div>
+              </div>
+              <div class="hex-channel-row">
+                <span>A</span>
+                <div class="pixel-value-slider">
+                  <span class="pixel-value-slider-surface pixel-value-slider-empty" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-surface pixel-value-slider-filled" aria-hidden="true"></span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-normal" aria-hidden="true">128</span>
+                  <span class="pixel-value-slider-value pixel-value-slider-value-highlighted" aria-hidden="true">128</span>
+                  <input class="pixel-value-slider-input" type="range" min="0" max="255" value="128" data-hex-channel="a" aria-label="Alpha" />
+                </div>
+              </div>
+              <div class="pixel-hex-field hex-color-dialog-preview">
+                <span class="pixel-hex-background"></span>
+                <span class="pixel-hex-color"></span>
+                <span class="pixel-hex-frame"></span>
+                <input
+                  id="hex-color-dialog-value"
+                  class="pixel-hex-input hex-color-dialog-value"
+                  type="text"
+                  value="#7C5CFC"
+                  readonly
+                  aria-label="Selected hex color"
+                />
+              </div>
+            </div>
+          </section>
+          <section
+            id="texture-import-dialog"
+            class="floating-dialog texture-import-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="texture-import-dialog-title"
+            hidden
+          >
+            <header id="texture-import-titlebar" class="floating-dialog-titlebar">
+              <span id="texture-import-dialog-title" class="floating-dialog-title">Texture</span>
+              <button id="texture-import-close" class="dialogue-title-button floating-dialog-close" type="button" aria-label="Close Texture">
+                <img src="./assets/sprite/generated/dialogue_icon_2x.png" alt="" draggable="false" />
+              </button>
+            </header>
+            <div class="floating-dialog-body texture-import-dialog-body">
+              <div class="texture-import-main">
+                <div class="dialog-line-stack texture-import-fields">
+                <div class="dialog-line dialog-labeled-row">
+                  <label for="texture-import-name">Name</label>
+                  <input id="texture-import-name" class="pixel-text-box" type="text" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="dialog-line dialog-labeled-row">
+                  <label for="texture-import-id">ID</label>
+                  <input id="texture-import-id" class="pixel-text-box" type="text" pattern="[a-z0-9_]*" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="dialog-line dialog-labeled-row">
+                  <span>Texture</span>
+                  <button class="pixel-button pixel-file-button" type="button" data-texture-file="texture"><span>Add</span></button>
+                  <input class="texture-import-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-texture-file-input="texture" hidden />
+                </div>
+                <div class="dialog-line dialog-labeled-row">
+                  <span>Mask</span>
+                  <button class="pixel-button pixel-file-button" type="button" data-texture-file="mask"><span>Add</span></button>
+                  <input class="texture-import-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-texture-file-input="mask" hidden />
+                </div>
+                <div class="dialog-line dialog-labeled-row">
+                  <span>Emissive</span>
+                  <button class="pixel-button pixel-file-button" type="button" data-texture-file="emissive"><span>Add</span></button>
+                  <input class="texture-import-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-texture-file-input="emissive" hidden />
+                </div>
+                <div class="dialog-line dialog-labeled-row">
+                  <span>Spritesheet</span>
+                  <button id="texture-import-spritesheet" class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" aria-label="Spritesheet"></button>
+                </div>
+                <div id="texture-import-spritesheet-fields" class="texture-import-conditional-fields" hidden>
+                  <div class="dialog-line dialog-labeled-row">
+                    <label for="texture-import-rows">Rows</label>
+                    <input id="texture-import-rows" class="pixel-text-box" type="number" min="1" value="1" />
+                  </div>
+                  <div class="dialog-line dialog-labeled-row">
+                    <label for="texture-import-default-frame">Default Frame</label>
+                    <input id="texture-import-default-frame" class="pixel-text-box" type="number" min="0" value="0" />
+                  </div>
+                  <div class="dialog-line dialog-labeled-row">
+                    <span>Animated</span>
+                    <button id="texture-import-animated" class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" aria-label="Animated"></button>
+                  </div>
+                  <div id="texture-import-animation-fields" class="dialog-line dialog-labeled-row" hidden>
+                    <label for="texture-import-ticks-per-frame">Ticks/Frame</label>
+                    <input id="texture-import-ticks-per-frame" class="pixel-text-box" type="number" min="1" value="4" />
+                  </div>
+                </div>
+                </div>
+                <div class="texture-import-preview" aria-label="Texture preview">
+                  <canvas id="texture-import-preview-canvas" width="256" height="256"></canvas>
+                </div>
+              </div>
+              <div id="texture-import-status" class="texture-import-status" role="status"></div>
+              <div class="texture-import-actions">
+                <button id="texture-import-save" class="pixel-button" type="button">Save</button>
+                <button id="texture-import-cancel" class="pixel-button" type="button">Cancel</button>
+              </div>
+            </div>
+          </section>
+        </div>
+          </main>
+        </div>
+      </div>
+    </div>
+    <template id="item-editor-template">
+      <section class="workspace-item-editor" role="tabpanel" hidden>
+        <div class="workspace-item-editor-form">
+          <div class="workspace-item-field-row workspace-item-primary-row">
+            <span>Item ID</span>
+            <input class="pixel-text-box" type="text" inputmode="text" pattern="[a-z0-9_]*" spellcheck="false" autocomplete="off" data-item-field="itemId" aria-label="Item ID" />
+            <div class="workspace-item-actions">
+              <button class="pixel-button workspace-item-action-button" type="button" data-item-action="delete" aria-label="Delete item" hidden><span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span></button>
+              <button class="pixel-button workspace-item-action-button" type="button" data-item-action="cancel" aria-label="Cancel item"><span class="workspace-file-icon workspace-file-icon-cancel" aria-hidden="true"></span></button>
+              <button class="pixel-button workspace-item-action-button" type="button" data-item-action="save" aria-label="Save item"><span class="workspace-file-icon workspace-file-icon-save" aria-hidden="true"></span></button>
+            </div>
+          </div>
+          <label class="workspace-item-field-row">
+            <span>Display Name</span>
+            <input class="pixel-text-box" type="text" data-item-field="displayName" />
+          </label>
+          <div class="workspace-item-field-row">
+            <span>Texture</span>
+            <div class="pixel-combobox workspace-item-dropdown workspace-item-texture-combobox" data-item-texture-combobox>
+              <div class="pixel-combobox-control">
+                <input class="pixel-text-box pixel-combobox-input" type="text" autocomplete="off" spellcheck="false" placeholder="(None)" aria-label="Texture" data-item-texture-input />
+                <button class="pixel-button pixel-combobox-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Open texture options" data-item-texture-button>
+                  <span class="pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="preferences-scale-options pixel-option-stack pixel-combobox-options workspace-item-texture-options" role="listbox" hidden data-item-texture-options></div>
+            </div>
+          </div>
+          <div class="workspace-item-field-row">
+            <span>Holding Mode</span>
+            <div class="workspace-item-dropdown" data-item-dropdown="holdingMode">
+              <button class="pixel-option preferences-scale-select workspace-item-dropdown-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-item-dropdown-button data-value="generated">
+                <span data-item-dropdown-label>Generated</span>
+                <span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+              </button>
+              <div class="pixel-option-stack workspace-item-dropdown-options" role="listbox" hidden>
+                <button class="pixel-option" type="button" role="option" aria-selected="true" data-item-dropdown-value="generated">Generated</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="handheld">Handheld</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="3d">3D Model</button>
+              </div>
+            </div>
+          </div>
+          <div class="workspace-item-field-row">
+            <span>Creative Tab</span>
+            <div class="workspace-item-dropdown" data-item-dropdown="creativeTab">
+              <button class="pixel-option preferences-scale-select workspace-item-dropdown-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-item-dropdown-button>
+                <span data-item-dropdown-label>(None)</span>
+                <span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+              </button>
+              <div class="pixel-option-stack workspace-item-dropdown-options" role="listbox" hidden>
+                <button class="pixel-option" type="button" role="option" data-item-dropdown-value="">(None)</button>
+              </div>
+            </div>
+          </div>
+          <label class="workspace-item-field-row">
+            <span>Stack Size</span>
+            <input class="pixel-text-box" type="number" min="1" max="99" value="64" data-item-field="stackSize" />
+          </label>
+          <div class="workspace-item-status" role="status" data-item-status></div>
+        </div>
+      </section>
+    </template>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
