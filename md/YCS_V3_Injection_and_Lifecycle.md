@@ -131,6 +131,10 @@ When the item ID changes between saves:
 4. Everything is re-injected under the new ID
 5. New JSON is saved as `ycs-data/<category>/<newId>.json`
 
+### YCS4 Reduced Item Save
+
+YCS4's reduced Item page uses the same authoritative manifest contract through its scoped `save_basic_item` and `delete_basic_item` commands. Save receives `lastSavedId`, loads that prior `ycs-data/items/<id>.json`, removes only the basic-field injections YCS4 currently owns in reverse, preserves unsupported top-level fields and their still-active manifest entries, rejects collisions on an ID rename, deletes the old JSON after cleanup, updates the exposed fields, and writes a fresh combined manifest under the new ID. An ID rename is blocked while unsupported injections remain because YCS4 cannot safely rewrite their embedded IDs until their fields are ported. Delete loads the saved JSON, removes the complete manifest in reverse, and only then deletes the source JSON. The Item editor and direct Delete/Backspace/right-click Delete of a saved Item reference both route through this command; the visual reference remains when backend cleanup fails. Generated and Handheld modes inject the `ModItems` registration, language key, optional creative-tab assignment, copied base texture, and a directly written item model so Save is testable immediately without requiring `runData`. The 3D Model holding mode remains selectable for parity but Save rejects it until YCS4 exposes the required geo model, geo texture, and display-model inputs. YCS4 reconciles saved Items against the complete recursive visual hierarchy and collapses duplicate references, but their folder/tab placement remains outside the Item JSON. Deleting a visual Folder unwraps its direct children into the parent in order, retaining nested Folder subtrees, and remains non-destructive to the saved Items it contained.
+
 ---
 
 ## Injection Targets by Holding Mode
