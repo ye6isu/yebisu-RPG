@@ -313,6 +313,34 @@ fn validate_image_extension(extension: &str) -> Result<&str, String> {
     }
 }
 
+fn detected_image_extension(data: &[u8]) -> Option<&'static str> {
+    if data.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("png")
+    } else if data.starts_with(b"\xff\xd8\xff") {
+        Some("jpeg")
+    } else if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        Some("gif")
+    } else if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        Some("webp")
+    } else {
+        None
+    }
+}
+
+fn validate_image_data(extension: &str, data: &[u8]) -> Result<(), String> {
+    let declared = if extension == "jpg" { "jpeg" } else { extension };
+    let detected = detected_image_extension(data)
+        .ok_or_else(|| "Image data is not a supported PNG, JPEG, GIF, or WebP file".to_string())?;
+    if declared != detected {
+        return Err(format!(
+            "Image extension '{}' does not match its {} file data",
+            extension,
+            detected.to_ascii_uppercase(),
+        ));
+    }
+    Ok(())
+}
+
 fn clear_texture_sidecar(directory: &Path, id: &str) -> Result<(), String> {
     for extension in ["png", "jpg", "jpeg", "gif", "webp"] {
         let path = directory.join(format!("{}.{}", id, extension));
@@ -333,6 +361,119 @@ fn read_texture_sidecar(directory: &Path, id: &str) -> Result<Option<(String, Ve
         }
     }
     Ok(None)
+}
+
+fn json_references_texture(value: &Value, texture_id: &str) -> bool {
+    match value {
+        Value::Object(object) => object.iter().any(|(key, child)| {
+            let is_texture_field = key.to_ascii_lowercase().contains("texture");
+            (is_texture_field && child.as_str() == Some(texture_id))
+                || json_references_texture(child, texture_id)
+        }),
+        Value::Array(values) => values.iter().any(|child| json_references_texture(child, texture_id)),
+        _ => false,
+    }
+}
+
+#[tauri::command]
+fn find_texture_usage(texture_id: &str) -> Result<Vec<String>, String> {
+    let root = ycs_data_dir();
+    if !root.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut usages = Vec::new();
+    for category_entry in fs::read_dir(&root).map_err(|error| error.to_string())? {
+        let category_entry = category_entry.map_err(|error| error.to_string())?;
+        let category_path = category_entry.path();
+        let category = category_entry.file_name().to_string_lossy().to_string();
+        if category == "textures" || !category_path.is_dir() {
+            continue;
+        }
+        for object_entry in fs::read_dir(&category_path).map_err(|error| error.to_string())? {
+            let object_entry = object_entry.map_err(|error| error.to_string())?;
+            let object_path = object_entry.path();
+            if object_path.extension().and_then(|value| value.to_str()) != Some("json") {
+                continue;
+            }
+            let Ok(source) = fs::read_to_string(&object_path) else { continue; };
+            let Ok(object) = serde_json::from_str::<Value>(&source) else { continue; };
+            if !json_references_texture(&object, texture_id) {
+                continue;
+            }
+            let id = object_path.file_stem().and_then(|value| value.to_str()).unwrap_or("unknown");
+            let label = object.get("displayName")
+                .or_else(|| object.get("name"))
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or(id);
+            usages.push(format!("{}/{} ({})", category, id, label));
+        }
+    }
+    usages.sort();
+    usages.dedup();
+    Ok(usages)
+}
+
+fn refresh_item_outputs_for_texture(
+    texture_id: &str,
+    texture_extension: &str,
+    texture_data: &[u8],
+    write_outputs: bool,
+) -> Result<Vec<String>, String> {
+    let items_directory = ycs_data_dir().join("items");
+    if !items_directory.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut affected_items = Vec::new();
+    for entry in fs::read_dir(&items_directory).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let source = fs::read_to_string(&path)
+            .map_err(|error| format!("Failed to read Item dependency: {}", error))?;
+        let item: Value = serde_json::from_str(&source)
+            .map_err(|error| format!("Invalid Item dependency JSON: {}", error))?;
+        if item.get("texture").and_then(Value::as_str) != Some(texture_id) {
+            continue;
+        }
+
+        let id = item.get("id")
+            .and_then(Value::as_str)
+            .or_else(|| path.file_stem().and_then(|value| value.to_str()))
+            .ok_or_else(|| "Dependent Item is missing its ID".to_string())?;
+        if texture_extension != "png" {
+            return Err(format!(
+                "Texture '{}' is used by Item '{}' and must remain a PNG",
+                texture_id,
+                id,
+            ));
+        }
+
+        let generated_texture = format!("resources/assets/yebisurpg/textures/item/{}.png", id);
+        let owns_generated_texture = item.get("_injections")
+            .and_then(Value::as_array)
+            .map(|injections| injections.iter().any(|injection| {
+                injection.get("type").and_then(Value::as_str) == Some("created-file")
+                    && injection.get("file").and_then(Value::as_str) == Some(generated_texture.as_str())
+            }))
+            .unwrap_or(false);
+        if owns_generated_texture && write_outputs {
+            let destination = safe_source_path(&generated_texture)?;
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            }
+            fs::write(destination, texture_data)
+                .map_err(|error| format!("Failed to refresh Item '{}' texture: {}", id, error))?;
+        }
+        affected_items.push(id.to_string());
+    }
+    affected_items.sort();
+    affected_items.dedup();
+    Ok(affected_items)
 }
 
 #[tauri::command]
@@ -508,6 +649,8 @@ fn save_basic_item(
     if texture_extension != "png" {
         return Err("Minecraft Item textures must use PNG files".to_string());
     }
+    validate_image_data("png", &texture_data)
+        .map_err(|error| format!("Selected Item Texture is invalid: {}", error))?;
     let items_directory = ycs_data_dir().join("items");
     let previous_id = last_saved_id.as_deref().filter(|value| !value.is_empty()).unwrap_or(id);
     let previous_item_path = items_directory.join(format!("{}.json", previous_id));
@@ -618,12 +761,26 @@ fn save_texture_bundle(
     mask_data: Option<Vec<u8>>,
     emissive_ext: Option<String>,
     emissive_data: Option<Vec<u8>>,
-) -> Result<String, String> {
+) -> Result<Vec<String>, String> {
     validate_texture_id(id)?;
     let texture_ext = validate_image_extension(texture_ext)?;
     if texture_data.is_empty() {
         return Err("Texture image is empty".to_string());
     }
+    validate_image_data(texture_ext, &texture_data)?;
+    if let (Some(extension), Some(data)) = (mask_ext.as_deref(), mask_data.as_deref()) {
+        let extension = validate_image_extension(extension)?;
+        if !data.is_empty() {
+            validate_image_data(extension, data)?;
+        }
+    }
+    if let (Some(extension), Some(data)) = (emissive_ext.as_deref(), emissive_data.as_deref()) {
+        let extension = validate_image_extension(extension)?;
+        if !data.is_empty() {
+            validate_image_data(extension, data)?;
+        }
+    }
+    let affected_items = refresh_item_outputs_for_texture(id, texture_ext, &texture_data, false)?;
 
     let directory = ycs_data_dir().join("textures");
     fs::create_dir_all(&directory).map_err(|error| format!("Failed to create texture directory: {}", error))?;
@@ -632,7 +789,7 @@ fn save_texture_bundle(
     clear_texture_sidecar(&directory, &format!("{}_mask", id))?;
     clear_texture_sidecar(&directory, &format!("{}_emissive", id))?;
 
-    fs::write(directory.join(format!("{}.{}", id, texture_ext)), texture_data)
+    fs::write(directory.join(format!("{}.{}", id, texture_ext)), &texture_data)
         .map_err(|error| format!("Failed to save texture image: {}", error))?;
 
     if let (Some(extension), Some(data)) = (mask_ext.as_deref(), mask_data) {
@@ -653,7 +810,32 @@ fn save_texture_bundle(
 
     fs::write(directory.join(format!("{}.json", id)), metadata)
         .map_err(|error| format!("Failed to save texture metadata: {}", error))?;
-    Ok(format!("Saved texture {}", id))
+    refresh_item_outputs_for_texture(id, texture_ext, &texture_data, true)?;
+    Ok(affected_items)
+}
+
+#[tauri::command]
+fn delete_texture_bundle(id: &str) -> Result<String, String> {
+    validate_texture_id(id)?;
+    let usages = find_texture_usage(id)?;
+    if !usages.is_empty() {
+        return Err(format!(
+            "Texture '{}' is still used by: {}",
+            id,
+            usages.join(", "),
+        ));
+    }
+
+    let directory = ycs_data_dir().join("textures");
+    let metadata_path = directory.join(format!("{}.json", id));
+    if metadata_path.is_file() {
+        fs::remove_file(&metadata_path)
+            .map_err(|error| format!("Failed to delete texture metadata: {}", error))?;
+    }
+    clear_texture_sidecar(&directory, id)?;
+    clear_texture_sidecar(&directory, &format!("{}_mask", id))?;
+    clear_texture_sidecar(&directory, &format!("{}_emissive", id))?;
+    Ok(format!("Deleted texture {}", id))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -667,7 +849,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_ycs_data,
               load_ycs_data,
-              load_texture_bundle,
+                load_texture_bundle,
+                find_texture_usage,
+                delete_texture_bundle,
               delete_basic_item,
               save_basic_item,
               save_texture_bundle,

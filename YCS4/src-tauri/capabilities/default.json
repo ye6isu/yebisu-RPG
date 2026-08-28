@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "YCS4 main and independent floating-window permissions",
-  "windows": ["main", "test", "preferences", "texture"],
+  "windows": ["main", "test", "preferences", "texture", "warning"],
   "permissions": [
     "core:default",
     "core:webview:allow-create-webview-window",
@@ -16,6 +16,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-start-dragging",
     "core:window:allow-set-focus",
+    "core:window:allow-set-size",
     "core:window:allow-show",
     "core:window:allow-unminimize",
     "core:window:allow-set-enabled",

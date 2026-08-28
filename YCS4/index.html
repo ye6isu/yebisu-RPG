@@ -447,6 +447,19 @@
                   <input id="texture-import-id" class="pixel-text-box" type="text" pattern="[a-z0-9_]*" autocomplete="off" spellcheck="false" />
                 </div>
                 <div class="dialog-line dialog-labeled-row">
+                  <span>Filter To</span>
+                  <div id="texture-import-filter" class="preferences-scale-dropdown">
+                    <button id="texture-import-filter-button" class="pixel-option preferences-scale-select" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="texture-import-filter-options" data-value="">
+                      <span id="texture-import-filter-value">(All)</span>
+                      <span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+                    </button>
+                    <div id="texture-import-filter-options" class="preferences-scale-options pixel-option-stack" role="listbox" hidden>
+                      <button class="pixel-option preferences-scale-option" type="button" role="option" aria-selected="true" data-texture-filter-value="">(All)</button>
+                      <button class="pixel-option preferences-scale-option" type="button" role="option" aria-selected="false" data-texture-filter-value="item">Item</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="dialog-line dialog-labeled-row">
                   <span>Texture</span>
                   <button class="pixel-button pixel-file-button" type="button" data-texture-file="texture"><span>Add</span></button>
                   <input class="texture-import-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-texture-file-input="texture" hidden />
@@ -492,6 +505,31 @@
               <div class="texture-import-actions">
                 <button id="texture-import-save" class="pixel-button" type="button">Save</button>
                 <button id="texture-import-cancel" class="pixel-button" type="button">Cancel</button>
+              </div>
+            </div>
+          </section>
+          <section
+            id="warning-dialog"
+            class="floating-dialog warning-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="warning-dialog-title"
+            aria-describedby="warning-dialog-summary"
+            hidden
+          >
+            <header id="warning-titlebar" class="floating-dialog-titlebar">
+              <span id="warning-dialog-title" class="floating-dialog-title">Warning</span>
+              <button id="warning-close" class="dialogue-title-button floating-dialog-close" type="button" aria-label="Close warning">
+                <img src="./assets/sprite/generated/dialogue_icon_2x.png" alt="" draggable="false" />
+              </button>
+            </header>
+            <div class="floating-dialog-body warning-dialog-body">
+              <p id="warning-dialog-summary" class="warning-dialog-summary">This Texture is still used by:</p>
+              <ul id="warning-dialog-usage-list" class="warning-dialog-usage-list"></ul>
+              <div class="warning-dialog-actions">
+                <button id="warning-dialog-okay" class="pixel-button warning-dialog-button" type="button">Okay</button>
+                <button id="warning-dialog-save" class="pixel-button warning-dialog-button" type="button" hidden>Save</button>
+                <button id="warning-dialog-cancel" class="pixel-button warning-dialog-button" type="button" hidden>Cancel</button>
               </div>
             </div>
           </section>

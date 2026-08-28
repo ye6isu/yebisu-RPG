@@ -70,14 +70,18 @@ Folders must remain non-owning. Deleting, renaming, or moving a folder must neve
 
 ### Reconciliation with saved data
 
-On startup YCS4 restores the visual hierarchy, then reconciles Item references against `list_ycs_data("items")`:
+On startup YCS4 restores the visual hierarchy, then reconciles Item and Texture references against their `ycs-data` categories:
 
-- duplicate visual references for one saved Item ID are collapsed;
+- duplicate visual references for one saved object ID are collapsed;
+- a visual reference whose saved object no longer exists is removed;
 - a saved Item with no visual reference is restored at the Home root;
+- a saved Texture with no visual reference is restored at the Assets root;
 - restored references load their display label and preview when possible;
 - malformed optional display metadata does not make the reference unusable.
 
 This repair pass reinforces that `ycs-data` is authoritative and `localStorage` is only navigation layout.
+
+Every persisted workspace type must be registered in `savedWorkspaceLifecycles` with its `ycs-data` category, root mode, backend delete command, label/preview loaders, and optional editor cleanup. A shell with `data-workspace-reference-id` but no registered lifecycle is refused visual-only deletion. This makes persistence cleanup an explicit requirement when future V4 object types are added.
 
 ## Object JSON contract
 
@@ -123,6 +127,9 @@ Cleanup walks the manifest in reverse. This preserves dependency order when late
 3. Record each successful output in the new `_injections` manifest.
 4. Save the complete authoring JSON.
 5. Bind or create the visual container only after backend success.
+6. Close the object editor tab after the successful save; failed saves keep it open with the error state intact.
+
+Closing an Item tab with editor changes opens the canonical Warning dialog. Save delegates to the Item editor's normal save action and closes only after backend success. Cancel discards the editor state and closes the tab; X and Escape dismiss the warning without closing the tab.
 
 ### Existing object
 
@@ -149,6 +156,8 @@ The current Item editor uses scoped ownership because V4 exposes fewer fields th
 - A saved-object delete loads its JSON, removes the complete manifest in reverse, then deletes the JSON.
 - The visual reference remains when backend cleanup fails.
 - After successful Item deletion, YCS4 removes every visual reference with the same saved ID and closes the applicable editor tab.
+- Texture deletion refuses while any non-Texture authoring JSON still references that Texture. The workspace opens the canonical Warning dialog with the Texture ID and a list of the objects using it. After successful cleanup, YCS4 removes every matching Texture reference.
+- Right-click, Delete, Backspace, and editor Delete must converge on the same backend lifecycle for saved objects. No interaction may remove only the visual reference of a persisted object.
 - Deleting an unsaved container removes only that visual container.
 - Deleting a folder unwraps children and does not invoke object deletion.
 
@@ -174,6 +183,18 @@ The 3D Model option remains visible for compatibility but save rejects it until 
 
 `delete_basic_item` removes the complete manifest and then the Item JSON. It is idempotent when the Item is already absent.
 
+## Current Texture lifecycle
+
+`save_texture_bundle` writes the complete Texture metadata JSON, base image, and optional `_mask` and `_emissive` image sidecars under `ycs-data/textures/`.
+
+Texture metadata may include the optional `filterTo` selector scope. An absent value means the Texture appears in every compatible Texture combobox. The current `item` value restricts it to Item Texture selectors; future editor types must apply their own scope at the option-loading boundary.
+
+Texture import validates the actual PNG, JPEG, GIF, or WebP file signature against the declared extension for the base image and both optional sidecars. Item generation additionally requires genuine PNG data, not merely a `.png` filename, so Minecraft cannot receive a renamed JPEG or other invalid PNG.
+
+Texture Save resolves every Item whose `texture` field matches the saved Texture ID. If that Item's manifest owns `textures/item/<item-id>.png`, YCS4 refreshes the generated copy from the new source bytes without requiring the Item editor to be reopened or saved. The backend returns the affected Item IDs, and the main window reloads every matching Item container preview immediately. A Texture used by an Item must remain a genuine PNG.
+
+`find_texture_usage` and `delete_texture_bundle` scan non-Texture authoring categories recursively for fields whose names contain `texture` and whose value equals the Texture ID. The UI preflights deletion so it can display every usage in the Warning dialog, while the delete command repeats the check to keep the backend authoritative. If no usages remain, deletion removes the metadata, base image, mask, and emissive sidecars before YCS4 removes the visual references.
+
 ## Adding another object type
 
 1. Define the complete authoring schema and category under `ycs-data/`.
@@ -190,7 +211,6 @@ The 3D Model option remains visible for compatibility but save rejects it until 
 ## Current limitations
 
 - Only the reduced Item lifecycle uses the full V4 injection path today.
-- Texture bundle deletion is not yet a domain cleanup lifecycle equivalent to Item deletion; removing a Texture container is visual organization only.
 - Workspace hierarchy is local browser state and is not portable project metadata.
 - Folder deletion contains an unused confirmation-dialog path; actual removal currently unwraps children directly.
 - General transactional rollback is not implemented if generation fails after some old outputs were removed.
