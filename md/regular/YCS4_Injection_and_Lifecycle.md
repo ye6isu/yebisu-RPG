@@ -171,6 +171,8 @@ The current Item editor uses scoped ownership because V4 exposes fewer fields th
 - stack size clamped to 1–99;
 - optional project or vanilla creative tab.
 
+The V4 Item editor also exposes and round-trips the durable V3 authoring fields for tags, multiple-state metadata, tool settings, combat, food, fuel, tooltip, recipes, and custom-class method selection. Tool Type and Tier use the bounded V3 option sets, while the tag selector includes the complete V3 Vanilla and NeoForge catalog plus dynamically authored project tags. Item Abilities are currently hidden but their previously saved values remain preserved. Tooltip, Recipe, and Custom Class use checkbox-and-Edit rows whose anchored dialogs own their detailed controls. These fields remain authoring data until their individual generators are ported. Data Components are deliberately excluded from the V4 save payload for now. State 1 uses the main Item appearance fields; the Multiple States dialog owns State 2 onward, with per-state Holding Mode and Texture selection.
+
 It generates and owns:
 
 - the `ModItems.java` registration above `YCS_Mod_Items`;
@@ -210,7 +212,7 @@ Texture Save resolves every Item whose `texture` field matches the saved Texture
 
 ## Current limitations
 
-- Only the reduced Item lifecycle uses the full V4 injection path today.
+- Only the basic Item fields use the full V4 injection path today; the additional ported Item fields round-trip without generating their runtime artifacts yet.
 - Workspace hierarchy is local browser state and is not portable project metadata.
 - Folder deletion contains an unused confirmation-dialog path; actual removal currently unwraps children directly.
 - General transactional rollback is not implemented if generation fails after some old outputs were removed.

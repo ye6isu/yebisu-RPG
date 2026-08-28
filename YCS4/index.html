@@ -415,7 +415,9 @@
                   class="pixel-hex-input hex-color-dialog-value"
                   type="text"
                   value="#7C5CFC"
-                  readonly
+                  maxlength="7"
+                  autocomplete="off"
+                  spellcheck="false"
                   aria-label="Selected hex color"
                 />
               </div>
@@ -448,16 +450,7 @@
                 </div>
                 <div class="dialog-line dialog-labeled-row">
                   <span>Filter To</span>
-                  <div id="texture-import-filter" class="preferences-scale-dropdown">
-                    <button id="texture-import-filter-button" class="pixel-option preferences-scale-select" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="texture-import-filter-options" data-value="">
-                      <span id="texture-import-filter-value">(All)</span>
-                      <span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
-                    </button>
-                    <div id="texture-import-filter-options" class="preferences-scale-options pixel-option-stack" role="listbox" hidden>
-                      <button class="pixel-option preferences-scale-option" type="button" role="option" aria-selected="true" data-texture-filter-value="">(All)</button>
-                      <button class="pixel-option preferences-scale-option" type="button" role="option" aria-selected="false" data-texture-filter-value="item">Item</button>
-                    </div>
-                  </div>
+                  <button id="texture-import-filter-button" class="pixel-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="texture-filter-dialog" data-value="">Edit</button>
                 </div>
                 <div class="dialog-line dialog-labeled-row">
                   <span>Texture</span>
@@ -509,6 +502,34 @@
             </div>
           </section>
           <section
+            id="texture-filter-dialog"
+            class="floating-dialog texture-filter-dialog"
+            role="dialog"
+            aria-labelledby="texture-filter-dialog-title"
+            hidden
+          >
+            <header class="floating-dialog-titlebar texture-filter-dialog-titlebar">
+              <span id="texture-filter-dialog-title" class="floating-dialog-title">Filter To</span>
+            </header>
+            <div class="floating-dialog-body texture-filter-dialog-body">
+              <div id="texture-filter-preview" class="texture-filter-preview" aria-label="Selected filters"></div>
+              <div class="texture-filter-search">
+                <input id="texture-filter-search-input" class="pixel-text-box" type="text" aria-label="Search filters" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+                <button id="texture-filter-search-button" class="pixel-button workspace-top-control-button" type="button" aria-label="Search filters">
+                  <img class="workspace-search-icon" src="./assets/sprite/home/home_icon.png" alt="" draggable="false" />
+                </button>
+              </div>
+              <div id="texture-filter-options" class="texture-filter-options" role="listbox" aria-label="Available filters" data-dialog-overlay-scroller>
+                <button id="texture-filter-item" class="pixel-button" type="button" role="option" aria-selected="false" aria-pressed="false" data-texture-filter-value="item" data-texture-filter-label="Items">Items</button>
+                <button class="pixel-button" type="button" role="option" aria-selected="false" aria-pressed="false" data-texture-filter-value="dummy-a" data-texture-filter-label="A">A</button>
+                <button class="pixel-button" type="button" role="option" aria-selected="false" aria-pressed="false" data-texture-filter-value="dummy-be" data-texture-filter-label="Be">Be</button>
+                <button class="pixel-button" type="button" role="option" aria-selected="false" aria-pressed="false" data-texture-filter-value="dummy-deer" data-texture-filter-label="Deer">Deer</button>
+                <button class="pixel-button" type="button" role="option" aria-selected="false" aria-pressed="false" data-texture-filter-value="dummy-forest" data-texture-filter-label="Forest">Forest</button>
+                <button class="pixel-button" type="button" role="option" aria-selected="false" aria-pressed="false" data-texture-filter-value="dummy-granite" data-texture-filter-label="Granite">Granite</button>
+              </div>
+            </div>
+          </section>
+          <section
             id="warning-dialog"
             class="floating-dialog warning-dialog"
             role="alertdialog"
@@ -533,6 +554,38 @@
               </div>
             </div>
           </section>
+          <section id="item-tags-dialog" class="floating-dialog texture-filter-dialog item-tags-dialog" role="dialog" aria-labelledby="item-tags-dialog-title" hidden>
+            <header class="floating-dialog-titlebar texture-filter-dialog-titlebar">
+              <span id="item-tags-dialog-title" class="floating-dialog-title">Tags</span>
+            </header>
+            <div class="floating-dialog-body texture-filter-dialog-body">
+              <div id="item-tags-preview" class="texture-filter-preview" aria-label="Selected Item tags"></div>
+              <div class="texture-filter-search">
+                <input id="item-tags-search-input" class="pixel-text-box" type="text" aria-label="Search Item tags" autocomplete="off" spellcheck="false" />
+                <button id="item-tags-search-button" class="pixel-button workspace-top-control-button" type="button" aria-label="Search Item tags">
+                  <img class="workspace-search-icon" src="./assets/sprite/home/home_icon.png" alt="" draggable="false" />
+                </button>
+              </div>
+              <div id="item-tags-options" class="texture-filter-options" role="listbox" aria-label="Available Item tags" data-dialog-overlay-scroller></div>
+            </div>
+          </section>
+          <section id="item-states-dialog" class="floating-dialog item-states-dialog" role="dialog" aria-labelledby="item-states-dialog-title" hidden>
+            <header class="floating-dialog-titlebar hex-color-dialog-titlebar">
+              <span id="item-states-dialog-title" class="floating-dialog-title">Multiple States</span>
+            </header>
+            <div class="floating-dialog-body item-states-dialog-body">
+              <div id="item-states-list" class="item-states-list"></div>
+              <button id="item-states-add" class="pixel-button item-states-add" type="button">Add</button>
+            </div>
+          </section>
+          <section id="item-authoring-dialog" class="floating-dialog item-authoring-dialog" role="dialog" aria-labelledby="item-authoring-dialog-title" hidden>
+            <header class="floating-dialog-titlebar hex-color-dialog-titlebar">
+              <span id="item-authoring-dialog-title" class="floating-dialog-title">Item Fields</span>
+            </header>
+            <div class="floating-dialog-body item-authoring-dialog-body">
+              <div id="item-authoring-dialog-content"></div>
+            </div>
+          </section>
         </div>
           </main>
         </div>
@@ -555,18 +608,6 @@
             <input class="pixel-text-box" type="text" data-item-field="displayName" />
           </label>
           <div class="workspace-item-field-row">
-            <span>Texture</span>
-            <div class="pixel-combobox workspace-item-dropdown workspace-item-texture-combobox" data-item-texture-combobox>
-              <div class="pixel-combobox-control">
-                <input class="pixel-text-box pixel-combobox-input" type="text" autocomplete="off" spellcheck="false" placeholder="(None)" aria-label="Texture" data-item-texture-input />
-                <button class="pixel-button pixel-combobox-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Open texture options" data-item-texture-button>
-                  <span class="pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
-                </button>
-              </div>
-              <div class="preferences-scale-options pixel-option-stack pixel-combobox-options workspace-item-texture-options" role="listbox" hidden data-item-texture-options></div>
-            </div>
-          </div>
-          <div class="workspace-item-field-row">
             <span>Holding Mode</span>
             <div class="workspace-item-dropdown" data-item-dropdown="holdingMode">
               <button class="pixel-option preferences-scale-select workspace-item-dropdown-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-item-dropdown-button data-value="generated">
@@ -578,6 +619,37 @@
                 <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="handheld">Handheld</button>
                 <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="3d">3D Model</button>
               </div>
+            </div>
+          </div>
+          <div class="workspace-item-field-row">
+            <span>Texture</span>
+            <div class="pixel-combobox workspace-item-dropdown workspace-item-texture-combobox" data-item-texture-combobox>
+              <div class="pixel-combobox-control">
+                <input class="pixel-text-box pixel-combobox-input" type="text" autocomplete="off" spellcheck="false" placeholder="(None)" aria-label="Texture" data-item-texture-input />
+                <button class="pixel-button pixel-combobox-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Open texture options" data-item-texture-button>
+                  <span class="pixel-direction-icon pixel-direction-down" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="preferences-scale-options pixel-option-stack pixel-combobox-options workspace-item-texture-options" role="listbox" hidden data-item-texture-options></div>
+            </div>
+          </div>
+          <div class="workspace-item-field-row" data-item-condition="holdingMode=3d" hidden>
+            <span>Model</span>
+            <button class="pixel-button pixel-file-button" type="button" data-item-file-button="geoModel"><span>Add</span></button>
+            <input type="file" accept=".json,application/json" data-item-file-input="geoModel" hidden />
+            <input type="hidden" data-item-field="geoModel" />
+          </div>
+          <div class="workspace-item-field-row" data-item-condition="holdingMode=3d" hidden>
+            <span>Display Model</span>
+            <button class="pixel-button pixel-file-button" type="button" data-item-file-button="displayModel"><span>Add</span></button>
+            <input type="file" accept=".json,application/json" data-item-file-input="displayModel" hidden />
+            <input type="hidden" data-item-field="displayModel" />
+          </div>
+          <div class="workspace-item-field-row">
+            <span>Multiple States</span>
+            <div class="workspace-item-inline-controls">
+              <button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="multiState"></button>
+              <button class="pixel-button" type="button" data-item-dialog-action="states" data-item-condition="multiState" hidden>Edit</button>
             </div>
           </div>
           <div class="workspace-item-field-row">
@@ -596,6 +668,80 @@
             <span>Stack Size</span>
             <input class="pixel-text-box" type="number" min="1" max="99" value="64" data-item-field="stackSize" />
           </label>
+          <div class="workspace-item-field-row"><span>Tool</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="toolEnabled"></button></div>
+          <div class="workspace-item-field-row" data-item-condition="toolEnabled" hidden>
+            <span>Tool Type</span>
+            <div class="workspace-item-dropdown" data-item-dropdown="toolType">
+              <button class="pixel-option preferences-scale-select workspace-item-dropdown-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-item-dropdown-button data-value="sword"><span data-item-dropdown-label>Sword</span><span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span></button>
+              <div class="pixel-option-stack workspace-item-dropdown-options" role="listbox" hidden>
+                <button class="pixel-option" type="button" role="option" aria-selected="true" data-item-dropdown-value="sword">Sword</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="pickaxe">Pickaxe</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="axe">Axe</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="shovel">Shovel</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="hoe">Hoe</button>
+              </div>
+            </div>
+          </div>
+          <div class="workspace-item-field-row" data-item-condition="toolEnabled" hidden>
+            <span>Tier</span>
+            <div class="workspace-item-dropdown" data-item-dropdown="toolTier">
+              <button class="pixel-option preferences-scale-select workspace-item-dropdown-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-item-dropdown-button data-value="iron"><span data-item-dropdown-label>Iron</span><span class="preferences-scale-arrow pixel-direction-icon pixel-direction-down" aria-hidden="true"></span></button>
+              <div class="pixel-option-stack workspace-item-dropdown-options" role="listbox" hidden>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="wood">Wood</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="stone">Stone</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="true" data-item-dropdown-value="iron">Iron</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="gold">Gold</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="diamond">Diamond</button>
+                <button class="pixel-option" type="button" role="option" aria-selected="false" data-item-dropdown-value="netherite">Netherite</button>
+              </div>
+            </div>
+          </div>
+          <div class="workspace-item-field-row"><span>Tags</span><button class="pixel-button" type="button" data-item-dialog-action="tags">Edit</button></div>
+          <div class="workspace-item-field-row"><span>Data Components</span><button class="pixel-button" type="button" disabled aria-label="Data Components are not wired yet">Edit</button></div>
+          <label class="workspace-item-field-row"><span>Attack Damage</span><input class="pixel-text-box" type="number" data-item-field="attackDamage" /></label>
+          <label class="workspace-item-field-row"><span>Attack Speed</span><input class="pixel-text-box" type="number" data-item-field="attackSpeed" /></label>
+          <div class="workspace-item-field-row"><span>Food</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="foodEnabled"></button></div>
+          <label class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Nutrition</span><input class="pixel-text-box" type="number" value="4" data-item-field="nutrition" /></label>
+          <label class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Saturation</span><input class="pixel-text-box" type="number" step="0.1" value="0.3" data-item-field="saturation" /></label>
+          <div class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Can Always Eat</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="canAlwaysEat"></button></div>
+          <div class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Fast Food</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="fastFood"></button></div>
+          <div class="workspace-item-field-row"><span>Fuel</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="fuelEnabled"></button></div>
+          <label class="workspace-item-field-row" data-item-condition="fuelEnabled" hidden><span>Burn Time</span><input class="pixel-text-box" type="number" data-item-field="fuel" /></label>
+          <div class="workspace-item-field-row"><span>Tooltip</span><div class="workspace-item-inline-controls"><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="tooltipEnabled"></button><button class="pixel-button" type="button" data-item-dialog-action="tooltip" data-item-condition="tooltipEnabled" hidden>Edit</button></div></div>
+          <div data-item-dialog-fields="tooltip" hidden>
+            <label class="workspace-item-field-row"><span>Normal Text</span><input class="pixel-text-box" type="text" data-item-field="tooltipNormal" /></label>
+            <div class="workspace-item-field-row"><span>Shift to Reveal</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="tooltipShift"></button></div>
+            <div class="workspace-item-field-row" data-item-condition="tooltipShift" hidden><span>Default Hint</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="true" data-item-checkbox="tooltipUseDefaultHint"></button></div>
+            <label class="workspace-item-field-row" data-item-condition="tooltipShift,!tooltipUseDefaultHint" hidden><span>Custom Hint</span><input class="pixel-text-box" type="text" data-item-field="tooltipShiftHint" /></label>
+            <label class="workspace-item-field-row" data-item-condition="tooltipShift" hidden><span>Hidden Text</span><input class="pixel-text-box" type="text" data-item-field="tooltipHidden" /></label>
+          </div>
+          <div class="workspace-item-field-row">
+            <span>Recipe</span>
+            <div class="workspace-item-inline-controls">
+              <button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="recipeEnabled"></button>
+              <button class="pixel-button" type="button" data-item-dialog-action="recipes" data-item-condition="recipeEnabled" hidden>Edit</button>
+            </div>
+          </div>
+          <div data-item-dialog-fields="recipes" hidden>
+            <div class="workspace-item-field-row"><span>Crafting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="craftingEnabled"></button></div>
+            <label class="workspace-item-field-row" data-item-condition="craftingEnabled" hidden><span>Type</span><input class="pixel-text-box" type="text" value="shaped" data-item-field="craftingType" /></label>
+            <label class="workspace-item-field-row" data-item-condition="craftingEnabled" hidden><span>Count</span><input class="pixel-text-box" type="number" min="1" value="1" data-item-field="craftingCount" /></label>
+            <div class="workspace-item-field-row"><span>Smelting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="smeltingEnabled"></button></div>
+            <div class="workspace-item-field-row"><span>Blasting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="blastingEnabled"></button></div>
+            <div class="workspace-item-field-row"><span>Smoking</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="smokingEnabled"></button></div>
+            <div class="workspace-item-field-row"><span>Campfire</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="campfireEnabled"></button></div>
+            <div class="workspace-item-field-row"><span>Stonecutting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="stonecutEnabled"></button></div>
+          </div>
+          <div class="workspace-item-field-row"><span>Custom Class</span><div class="workspace-item-inline-controls"><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="customClass"></button><button class="pixel-button" type="button" data-item-dialog-action="customClass" data-item-condition="customClass" hidden>Edit</button></div></div>
+          <div data-item-dialog-fields="customClass" hidden>
+            <div class="workspace-item-field-row"><span>Block Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="useOn"></button></div>
+            <div class="workspace-item-field-row"><span>Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="use"></button></div>
+            <div class="workspace-item-field-row"><span>Continuous Use</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="continuousUse"></button></div>
+            <div class="workspace-item-field-row"><span>Finished Using</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="finishUsingItem"></button></div>
+            <div class="workspace-item-field-row"><span>Inventory Tick</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="inventoryTick"></button></div>
+            <div class="workspace-item-field-row"><span>Hurt Entity</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="hurtEnemy"></button></div>
+            <div class="workspace-item-field-row"><span>Entity Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="interactLivingEntity"></button></div>
+          </div>
           <div class="workspace-item-status" role="status" data-item-status></div>
         </div>
       </section>
