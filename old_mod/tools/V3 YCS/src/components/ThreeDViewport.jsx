@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { propertyValueAtTick } from './VfxKeyframes';
 import './ThreeDViewport.css';
 
@@ -24,6 +25,11 @@ function numeric(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function cleanTransformNumber(value) {
+  const rounded = Math.round(value * 1000000) / 1000000;
+  return Math.abs(rounded) < 0.000001 ? 0 : rounded;
+}
+
 function ThreeDViewport({
   className = '',
   ariaLabel = '3D viewport',
@@ -31,11 +37,20 @@ function ThreeDViewport({
   selectedId = null,
   textureUrls = {},
   previewTick = 0,
+  onTransformStart = () => {},
+  onTransformChange = () => {},
 }) {
+  const [transformMode, setTransformMode] = useState('translate');
   const hostRef = useRef(null);
   const resetViewRef = useRef(() => {});
   const objectGroupRef = useRef(null);
+  const transformControlsRef = useRef(null);
+  const transformDragRef = useRef(null);
   const renderRef = useRef(() => {});
+  const onTransformStartRef = useRef(onTransformStart);
+  const onTransformChangeRef = useRef(onTransformChange);
+  onTransformStartRef.current = onTransformStart;
+  onTransformChangeRef.current = onTransformChange;
   const previewTickRef = useRef(previewTick);
   previewTickRef.current = previewTick;
   const viewRef = useRef({
@@ -49,7 +64,6 @@ function ThreeDViewport({
       name: object.name,
       position: object.position,
       pivot: object.pivot,
-      baseRotation: object.baseRotation,
       positionKeyframes: object.positionKeyframes,
       positionXKeyframes: object.positionXKeyframes,
       positionYKeyframes: object.positionYKeyframes,
@@ -108,6 +122,66 @@ function ThreeDViewport({
     controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
     controls.target.fromArray(viewRef.current.target);
     controls.update();
+    const transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.setMode('translate');
+    transformControls.setSpace('world');
+    transformControls.size = 0.85;
+    scene.add(transformControls.getHelper());
+    transformControlsRef.current = transformControls;
+
+    const handleTransformDragging = event => {
+      controls.enabled = !event.value;
+    };
+    const handleTransformStart = event => {
+      const object = transformControls.object;
+      const previewObject = object?.userData?.previewObject;
+      if (!object || !previewObject) return;
+      onTransformStartRef.current();
+      transformDragRef.current = {
+        mode: event.mode,
+        object,
+        startPosition: object.position.clone(),
+        authoredPosition: propertyValueAtTick(previewObject, 'position', previewTickRef.current),
+      };
+    };
+    const handleTransformEnd = event => {
+      const drag = transformDragRef.current;
+      transformDragRef.current = null;
+      if (!drag || drag.object !== transformControls.object) return;
+      const object = drag.object;
+      const previewObject = object.userData.previewObject;
+      if (!previewObject) return;
+
+      if (event.mode === 'translate') {
+        const delta = object.position.clone().sub(drag.startPosition);
+        onTransformChangeRef.current(previewObject.id, 'position', {
+          x: cleanTransformNumber(drag.authoredPosition.x + delta.x),
+          y: cleanTransformNumber(drag.authoredPosition.y + delta.y),
+          z: cleanTransformNumber(drag.authoredPosition.z + delta.z),
+        });
+      } else if (event.mode === 'rotate') {
+        const authoredQuaternion = object.quaternion.clone();
+        if (previewObject.billboard) {
+          authoredQuaternion.premultiply(camera.quaternion.clone().invert());
+        }
+        const authoredRotation = new THREE.Euler().setFromQuaternion(authoredQuaternion, 'YXZ');
+        onTransformChangeRef.current(previewObject.id, 'rotation', {
+          x: cleanTransformNumber(THREE.MathUtils.radToDeg(authoredRotation.x)),
+          y: cleanTransformNumber(THREE.MathUtils.radToDeg(authoredRotation.y)),
+          z: cleanTransformNumber(THREE.MathUtils.radToDeg(authoredRotation.z)),
+        });
+      } else if (event.mode === 'scale') {
+        onTransformChangeRef.current(previewObject.id, 'scale', {
+          x: cleanTransformNumber(object.scale.x),
+          y: cleanTransformNumber(object.scale.y),
+          z: cleanTransformNumber(object.scale.z),
+        });
+      }
+    };
+    transformControls.addEventListener('dragging-changed', handleTransformDragging);
+    transformControls.addEventListener('mouseDown', handleTransformStart);
+    transformControls.addEventListener('mouseUp', handleTransformEnd);
+    const previewPivotOffset = new THREE.Vector3();
     const previewPositionOffset = new THREE.Vector3();
     const previewRotationEuler = new THREE.Euler(0, 0, 0, 'YXZ');
     const previewRotationQuaternion = new THREE.Quaternion();
@@ -115,6 +189,7 @@ function ThreeDViewport({
     const render = () => {
       camera.position.toArray(viewRef.current.position);
       controls.target.toArray(viewRef.current.target);
+      let selectedObjectActive = false;
       objectGroupRef.current?.children.forEach(child => {
         const { previewObject, texture, outline, pivotMarker } = child.userData;
         if (!previewObject) return;
@@ -123,6 +198,7 @@ function ThreeDViewport({
         child.visible = active;
         if (outline) outline.visible = active;
         if (pivotMarker) pivotMarker.visible = active;
+        if (transformControls.object === child) selectedObjectActive = active;
         if (!active) return;
         const position = propertyValueAtTick(previewObject, 'position', previewTickRef.current);
         const rotation = propertyValueAtTick(previewObject, 'rotation', previewTickRef.current);
@@ -132,34 +208,38 @@ function ThreeDViewport({
         const pivotY = numeric(previewObject.pivot?.y);
         const pivotZ = numeric(previewObject.pivot?.z);
         previewRotationEuler.set(
-          THREE.MathUtils.degToRad(numeric(previewObject.baseRotation?.x) + rotation.x),
-          THREE.MathUtils.degToRad(numeric(previewObject.baseRotation?.y) + rotation.y),
-          THREE.MathUtils.degToRad(numeric(previewObject.baseRotation?.z) + rotation.z),
+          THREE.MathUtils.degToRad(rotation.x),
+          THREE.MathUtils.degToRad(rotation.y),
+          THREE.MathUtils.degToRad(rotation.z),
           'YXZ',
         );
         previewRotationQuaternion.setFromEuler(previewRotationEuler);
-        previewPositionOffset.set(
-          -pivotX * scale.x,
-          -pivotY * scale.y,
-          -pivotZ * scale.z,
-        );
-        child.scale.set(scale.x, scale.y, scale.z);
+        const transforming = transformControls.dragging && transformControls.object === child;
         child.material.opacity = opacity;
-        if (previewObject.billboard) {
-          child.quaternion.copy(camera.quaternion).multiply(previewRotationQuaternion);
+        if (!transforming) {
+          child.scale.set(scale.x, scale.y, scale.z);
+          if (previewObject.billboard) {
+            child.quaternion.copy(camera.quaternion).multiply(previewRotationQuaternion);
+            previewPivotOffset.set(pivotX, pivotY, pivotZ).applyQuaternion(camera.quaternion);
+          } else {
+            child.quaternion.copy(previewRotationQuaternion);
+            previewPivotOffset.set(pivotX, pivotY, pivotZ);
+          }
+          previewPositionOffset.set(-pivotX, -pivotY, -pivotZ).applyQuaternion(child.quaternion);
+          child.position.set(
+            position.x + previewPivotOffset.x + previewPositionOffset.x,
+            position.y + previewPivotOffset.y + previewPositionOffset.y,
+            position.z + previewPivotOffset.z + previewPositionOffset.z,
+          );
+        } else if (previewObject.billboard) {
+          previewPivotOffset.set(pivotX, pivotY, pivotZ).applyQuaternion(camera.quaternion);
         } else {
-          child.quaternion.copy(previewRotationQuaternion);
+          previewPivotOffset.set(pivotX, pivotY, pivotZ);
         }
-        previewPositionOffset.applyQuaternion(child.quaternion);
-        child.position.set(
-          position.x + pivotX + previewPositionOffset.x,
-          position.y + pivotY + previewPositionOffset.y,
-          position.z + pivotZ + previewPositionOffset.z,
-        );
         pivotMarker?.position.set(
-          position.x + pivotX,
-          position.y + pivotY,
-          position.z + pivotZ,
+          position.x + previewPivotOffset.x,
+          position.y + previewPivotOffset.y,
+          position.z + previewPivotOffset.z,
         );
         if (texture) {
           const rows = Math.max(1, Math.floor(numeric(previewObject.rows, 1)));
@@ -175,6 +255,7 @@ function ThreeDViewport({
         }
         outline?.update();
       });
+      transformControls.getHelper().visible = Boolean(transformControls.object && selectedObjectActive);
       renderer.render(scene, camera);
     };
     renderRef.current = render;
@@ -261,6 +342,14 @@ function ThreeDViewport({
       observer.disconnect();
       controls.removeEventListener('change', render);
       controls.dispose();
+      transformControls.removeEventListener('dragging-changed', handleTransformDragging);
+      transformControls.removeEventListener('mouseDown', handleTransformStart);
+      transformControls.removeEventListener('mouseUp', handleTransformEnd);
+      transformControls.detach();
+      scene.remove(transformControls.getHelper());
+      transformControls.dispose();
+      transformControlsRef.current = null;
+      transformDragRef.current = null;
       resetViewRef.current = () => {};
       renderRef.current = () => {};
       clearObjectGroup(objectGroup);
@@ -278,8 +367,17 @@ function ThreeDViewport({
   }, []);
 
   useEffect(() => {
+    const controls = transformControlsRef.current;
+    if (!controls) return;
+    controls.setMode(transformMode);
+    controls.setSpace(transformMode === 'translate' ? 'world' : 'local');
+    renderRef.current();
+  }, [transformMode]);
+
+  useEffect(() => {
     const group = objectGroupRef.current;
     if (!group) return;
+    transformControlsRef.current?.detach();
     clearObjectGroup(group);
     const loader = new THREE.TextureLoader();
     previewPlanes.forEach(object => {
@@ -309,14 +407,14 @@ function ThreeDViewport({
       plane.name = object.name;
       plane.rotation.order = 'YXZ';
       plane.position.set(
-        numeric(object.position?.x) + numeric(object.pivot?.x),
-        numeric(object.position?.y) + numeric(object.pivot?.y),
-        numeric(object.position?.z) + numeric(object.pivot?.z),
+        numeric(object.position?.x),
+        numeric(object.position?.y),
+        numeric(object.position?.z),
       );
       plane.rotation.set(
-        THREE.MathUtils.degToRad(numeric(object.baseRotation?.x) + numeric(object.rotation?.x)),
-        THREE.MathUtils.degToRad(numeric(object.baseRotation?.y) + numeric(object.rotation?.y)),
-        THREE.MathUtils.degToRad(numeric(object.baseRotation?.z) + numeric(object.rotation?.z)),
+        THREE.MathUtils.degToRad(numeric(object.rotation?.x)),
+        THREE.MathUtils.degToRad(numeric(object.rotation?.y)),
+        THREE.MathUtils.degToRad(numeric(object.rotation?.z)),
       );
       plane.scale.set(
         numeric(object.scale?.x, 1),
@@ -347,6 +445,7 @@ function ThreeDViewport({
         pivotMarker.userData.isPivotMarker = true;
         plane.userData.pivotMarker = pivotMarker;
         group.add(pivotMarker);
+        transformControlsRef.current?.attach(plane);
       }
     });
     renderRef.current();
@@ -359,6 +458,47 @@ function ThreeDViewport({
       role="region"
       aria-label={ariaLabel}
     >
+      <div className="three-d-viewport-transform-tools" role="toolbar" aria-label="Object transform mode">
+        <button
+          type="button"
+          className={`ycs-button icon three-d-viewport-transform-button ${transformMode === 'translate' ? 'active' : ''}`}
+          onClick={() => setTransformMode('translate')}
+          title="Move"
+          aria-label="Move"
+          aria-pressed={transformMode === 'translate'}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3v18M3 12h18" />
+            <path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`ycs-button icon three-d-viewport-transform-button ${transformMode === 'rotate' ? 'active' : ''}`}
+          onClick={() => setTransformMode('rotate')}
+          title="Rotate"
+          aria-label="Rotate"
+          aria-pressed={transformMode === 'rotate'}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.5 8.5A8 8 0 1 0 20 15" />
+            <path d="M19.5 8.5V4.5M19.5 8.5h-4" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`ycs-button icon three-d-viewport-transform-button ${transformMode === 'scale' ? 'active' : ''}`}
+          onClick={() => setTransformMode('scale')}
+          title="Scale"
+          aria-label="Scale"
+          aria-pressed={transformMode === 'scale'}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" />
+            <path d="M4 8l5 5M20 8l-5 5M4 16l5-5M20 16l-5-5" />
+          </svg>
+        </button>
+      </div>
       <button
         type="button"
         className="ycs-button icon three-d-viewport-reset"
