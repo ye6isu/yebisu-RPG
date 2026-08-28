@@ -28,6 +28,8 @@ const populateTextureOptions = async panel => {
       try {
         const [metadataText, extension, data] = await invoke('load_texture_bundle', { id });
         const metadata = JSON.parse(metadataText);
+        const filterTo = String(metadata.filterTo || '').toLocaleLowerCase();
+        if (filterTo && filterTo !== 'item') continue;
         const url = URL.createObjectURL(new Blob([new Uint8Array(data)], {
           type: textureMimeType(extension),
         }));
@@ -273,6 +275,7 @@ export const initializeItemEditorPage = ({
     const fragment = template.content.cloneNode(true);
     const panel = fragment.querySelector('.workspace-item-editor');
     panel.id = panelId;
+    panel.dataset.dirty = 'false';
     populateCreativeTabOptions(panel);
     host.append(fragment);
     const texturesReady = populateTextureOptions(panel);
@@ -345,6 +348,7 @@ export const initializeItemEditorPage = ({
             textureInput.dataset.selectedLabel = textureOption.dataset.itemTextureLabel;
             textureOption.setAttribute('aria-selected', 'true');
           }
+          panel.dataset.dirty = 'false';
         })
         .catch(error => {
           panel.querySelector('[data-item-status]').textContent = `Load failed: ${error}`;
@@ -352,6 +356,15 @@ export const initializeItemEditorPage = ({
     }
     itemIdInput.focus();
     return tab;
+  };
+
+  const closeSavedItemWorkspaces = id => {
+    if (!id) return;
+    for (const panel of host.querySelectorAll('.workspace-item-editor')) {
+      if (panel.dataset.lastSavedId !== id) continue;
+      const tab = workspaceTabs.querySelector(`[data-workspace-panel-id="${panel.id}"]`);
+      if (tab) removeTab(tab);
+    }
   };
 
   host.addEventListener('click', async event => {
@@ -362,6 +375,7 @@ export const initializeItemEditorPage = ({
         String(checkbox.getAttribute('aria-checked') !== 'true'),
       );
       syncConditionalFields(checkbox.closest('.workspace-item-editor'));
+      checkbox.closest('.workspace-item-editor').dataset.dirty = 'true';
       return;
     }
 
@@ -415,8 +429,7 @@ export const initializeItemEditorPage = ({
             textureId,
           });
           panel.querySelector('[data-item-action="delete"]').hidden = false;
-          status.textContent = 'Saved and injected.';
-          requestAnimationFrame(() => panel.syncItemEditorScrollbars?.());
+          removeTab(tab);
         } catch (error) {
           status.textContent = `Save failed: ${error}`;
         } finally {
@@ -457,6 +470,7 @@ export const initializeItemEditorPage = ({
       options.hidden = true;
       button.setAttribute('aria-expanded', 'false');
       input.focus();
+      textureOption.closest('.workspace-item-editor').dataset.dirty = 'true';
       return;
     }
 
@@ -487,6 +501,7 @@ export const initializeItemEditorPage = ({
         sibling.setAttribute('aria-selected', String(sibling === option));
       }
       trigger.focus();
+      option.closest('.workspace-item-editor').dataset.dirty = 'true';
       return;
     }
 
@@ -501,6 +516,8 @@ export const initializeItemEditorPage = ({
   });
 
   host.addEventListener('input', event => {
+    const panel = event.target.closest('.workspace-item-editor');
+    if (panel) panel.dataset.dirty = 'true';
     const input = event.target.closest('[data-item-texture-input]');
     if (!input) return;
     if (input.value !== (input.dataset.selectedLabel || '')) {
@@ -524,5 +541,5 @@ export const initializeItemEditorPage = ({
     trigger.focus();
   });
 
-  return { addItemWorkspace, closeDropdowns };
+  return { addItemWorkspace, closeSavedItemWorkspaces, closeDropdowns };
 };

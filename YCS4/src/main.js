@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { LogicalSize } from '@tauri-apps/api/dpi';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { initializeItemEditorPage } from './item-editor.js';
 import { initializeFolderPage } from './folder-page.js';
@@ -9,10 +10,23 @@ import './styles.css';
 const detachedWindowType = new URLSearchParams(window.location.search).get('window');
 const detachedTextureId = new URLSearchParams(window.location.search).get('textureId') || '';
 const detachedTextureVisualId = new URLSearchParams(window.location.search).get('visualId') || '';
+const detachedWarningSummary = new URLSearchParams(window.location.search).get('summary') || '';
+const detachedWarningPanelId = new URLSearchParams(window.location.search).get('panelId') || '';
+const detachedWarningUsages = (() => {
+  try {
+    return JSON.parse(new URLSearchParams(window.location.search).get('usages') || '[]');
+  } catch {
+    return [];
+  }
+})();
 const isDetachedTestWindow = detachedWindowType === 'test';
 const isDetachedPreferencesWindow = detachedWindowType === 'preferences';
 const isDetachedTextureWindow = detachedWindowType === 'texture';
-const isDetachedFloatingWindow = isDetachedTestWindow || isDetachedPreferencesWindow || isDetachedTextureWindow;
+const isDetachedWarningWindow = detachedWindowType === 'warning';
+const isDetachedFloatingWindow = isDetachedTestWindow
+  || isDetachedPreferencesWindow
+  || isDetachedTextureWindow
+  || isDetachedWarningWindow;
 document.body.classList.toggle('detached-floating-window', isDetachedFloatingWindow);
 const appWindow = getCurrentWindow();
 const uiShell = document.getElementById('ui-shell');
@@ -109,6 +123,11 @@ const textureImportTitlebar = document.getElementById('texture-import-titlebar')
 const textureImportClose = document.getElementById('texture-import-close');
 const textureImportName = document.getElementById('texture-import-name');
 const textureImportId = document.getElementById('texture-import-id');
+const textureImportFilter = document.getElementById('texture-import-filter');
+const textureImportFilterButton = document.getElementById('texture-import-filter-button');
+const textureImportFilterValue = document.getElementById('texture-import-filter-value');
+const textureImportFilterOptions = document.getElementById('texture-import-filter-options');
+const textureImportFilterOptionButtons = [...textureImportFilterOptions.querySelectorAll('[data-texture-filter-value]')];
 const textureImportSpritesheet = document.getElementById('texture-import-spritesheet');
 const textureImportSpritesheetFields = document.getElementById('texture-import-spritesheet-fields');
 const textureImportRows = document.getElementById('texture-import-rows');
@@ -122,6 +141,15 @@ const textureImportSave = document.getElementById('texture-import-save');
 const textureImportCancel = document.getElementById('texture-import-cancel');
 const textureImportFileButtons = [...document.querySelectorAll('[data-texture-file]')];
 const textureImportFileInputs = [...document.querySelectorAll('[data-texture-file-input]')];
+const warningDialog = document.getElementById('warning-dialog');
+const warningTitlebar = document.getElementById('warning-titlebar');
+const warningDialogBody = warningDialog.querySelector('.warning-dialog-body');
+const warningDialogSummary = document.getElementById('warning-dialog-summary');
+const warningDialogUsageList = document.getElementById('warning-dialog-usage-list');
+const warningDialogOkay = document.getElementById('warning-dialog-okay');
+const warningDialogSave = document.getElementById('warning-dialog-save');
+const warningDialogCancel = document.getElementById('warning-dialog-cancel');
+const warningClose = document.getElementById('warning-close');
 const confirmDialog = document.getElementById('confirm-dialog');
 const confirmTitlebar = document.getElementById('confirm-titlebar');
 const confirmDialogTitle = document.getElementById('confirm-dialog-title');
@@ -141,6 +169,9 @@ const minimumDialogWidth = 180;
 const minimumDialogHeight = 120;
 let dialogDragState = null;
 let confirmDialogDragState = null;
+let warningDialogDragState = null;
+let warningSaveAction = null;
+let warningCancelAction = null;
 let textureImportTargetGrid = null;
 let textureImportEditingShell = null;
 let dialogResizeState = null;
@@ -152,8 +183,10 @@ let testColorHue = 255;
 let detachedTestWindowOpening = false;
 let detachedPreferencesWindowOpening = false;
 let detachedTextureWindowOpening = false;
+let detachedWarningWindowOpening = false;
 let preferencesModalOwnerLabels = [];
 let textureModalOwnerLabels = [];
+let warningModalOwnerLabels = [];
 let nextWorkspaceTabNumber = 1;
 let nextObjectContainerNumber = 1;
 let draggedWorkspaceTab = null;
@@ -757,8 +790,23 @@ syncPrimaryWorkspaceObjects();
 const configureDetachedDialog = mode => {
   const showingPreferences = mode === 'preferences';
   const showingTexture = mode === 'texture';
-  preferencesDialog.hidden = showingTexture;
+  const showingWarning = mode === 'warning';
+  preferencesDialog.hidden = showingTexture || showingWarning;
   textureImportDialog.hidden = !showingTexture;
+  warningDialog.hidden = !showingWarning;
+  if (showingWarning) {
+    showInlineWarningDialog({
+      summary: detachedWarningSummary,
+      usages: Array.isArray(detachedWarningUsages) ? detachedWarningUsages : [],
+      saveAction: detachedWarningPanelId
+        ? () => emitTo('main', 'ycs4:warning-save', { panelId: detachedWarningPanelId })
+        : null,
+      cancelAction: detachedWarningPanelId
+        ? () => emitTo('main', 'ycs4:warning-discard', { panelId: detachedWarningPanelId })
+        : null,
+    });
+    return;
+  }
   if (showingTexture) {
     openTextureImportDialog();
     requestAnimationFrame(syncDialogOverlayScrollbars);
@@ -1198,8 +1246,8 @@ const openDetachedTextureWindow = async () => {
     }
 
     const uiScaleFactor = getUiScaleFactor();
-    const width = Math.round(600 * uiScaleFactor);
-    const height = Math.round(390 * uiScaleFactor);
+    const width = Math.round(612 * uiScaleFactor);
+    const height = Math.round(440 * uiScaleFactor);
     const textureId = textureImportEditingShell?.dataset.workspaceReferenceId || '';
     const visualId = textureImportEditingShell?.dataset.workspaceVisualId || '';
     const parameters = new URLSearchParams({ window: 'texture' });
@@ -1237,6 +1285,102 @@ const openDetachedTextureWindow = async () => {
   } finally {
     detachedTextureWindowOpening = false;
   }
+};
+
+const openDetachedWarningWindow = async ({ summary, usages = [], panelId = '' }) => {
+  if (detachedWarningWindowOpening) return;
+  detachedWarningWindowOpening = true;
+  try {
+    const existingWindow = await WebviewWindow.getByLabel('warning');
+    if (existingWindow) await existingWindow.close();
+    await setWarningModalOwnersEnabled(false);
+    const uiScaleFactor = getUiScaleFactor();
+    const baseHeight = 120 + (Math.min(usages.length, 10) * 15);
+    const parameters = new URLSearchParams({
+      window: 'warning',
+      summary,
+      usages: JSON.stringify(usages),
+    });
+    if (panelId) parameters.set('panelId', panelId);
+    const width = Math.round(320 * uiScaleFactor);
+    const height = Math.round(baseHeight * uiScaleFactor);
+    const detachedWindow = new WebviewWindow('warning', {
+      url: `/?${parameters}`,
+      title: 'Warning',
+      width,
+      height,
+      minWidth: width,
+      minHeight: height,
+      maxWidth: width,
+      maxHeight: height,
+      parent: 'main',
+      alwaysOnTop: true,
+      decorations: false,
+      shadow: false,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      center: true,
+      focus: true,
+    });
+    detachedWindow.once('tauri://destroyed', () => {
+      setWarningModalOwnersEnabled(true).catch(console.error);
+    });
+    detachedWindow.once('tauri://error', event => {
+      console.error('Unable to create detached Warning window:', event.payload);
+      setWarningModalOwnersEnabled(true).catch(console.error);
+      showInlineWarningDialog({
+        summary,
+        usages,
+        saveAction: panelId
+          ? () => document.getElementById(panelId)?.querySelector('[data-item-action="save"]')?.click()
+          : null,
+        cancelAction: panelId
+          ? () => {
+            const tab = workspaceTabs.querySelector(`[data-workspace-panel-id="${CSS.escape(panelId)}"]`);
+            if (tab) removeWorkspaceTab(tab);
+          }
+          : null,
+      });
+    });
+  } catch (error) {
+    console.error('Unable to open detached Warning window:', error);
+    await setWarningModalOwnersEnabled(true);
+    showInlineWarningDialog({
+      summary,
+      usages,
+      saveAction: panelId
+        ? () => document.getElementById(panelId)?.querySelector('[data-item-action="save"]')?.click()
+        : null,
+      cancelAction: panelId
+        ? () => {
+          const tab = workspaceTabs.querySelector(`[data-workspace-panel-id="${CSS.escape(panelId)}"]`);
+          if (tab) removeWorkspaceTab(tab);
+        }
+        : null,
+    });
+  } finally {
+    detachedWarningWindowOpening = false;
+  }
+};
+
+const setWarningModalOwnersEnabled = async enabled => {
+  if (!enabled) {
+    const windows = await WebviewWindow.getAll();
+    const ownerWindows = windows.filter(windowHandle => windowHandle.label !== 'warning');
+    warningModalOwnerLabels = ownerWindows.map(windowHandle => windowHandle.label);
+    await Promise.allSettled(ownerWindows.map(windowHandle => windowHandle.setEnabled(false)));
+    return;
+  }
+
+  const ownerLabels = warningModalOwnerLabels;
+  warningModalOwnerLabels = [];
+  await Promise.allSettled(ownerLabels.map(async label => {
+    const windowHandle = await WebviewWindow.getByLabel(label);
+    if (windowHandle) await windowHandle.setEnabled(true);
+  }));
+  const mainWindow = await WebviewWindow.getByLabel('main');
+  if (mainWindow) await mainWindow.setFocus();
 };
 
 document.getElementById('minimize').addEventListener('click', () => {
@@ -1749,18 +1893,25 @@ function restoreWorkspaceLayout() {
 
 restoreWorkspaceLayout();
 
-const restoreMissingSavedItemReferences = async () => {
+const reconcileSavedWorkspaceReferences = async ({
+  category,
+  objectType,
+  mode,
+  loadLabel,
+  loadPreview,
+}) => {
   if (isDetachedFloatingWindow) return;
   try {
-    const ids = await invoke('list_ycs_data', { category: 'items' });
-    const seenItemReferences = new Set();
+    const ids = await invoke('list_ycs_data', { category });
+    const savedIds = new Set(ids);
+    const seenReferences = new Set();
     for (const shell of collectWorkspaceHierarchyShells()) {
-      const referenceId = shell.dataset.objectType === 'Item'
+      const referenceId = shell.dataset.objectType === objectType
         ? shell.dataset.workspaceReferenceId
         : '';
       if (!referenceId) continue;
-      if (!seenItemReferences.has(referenceId)) {
-        seenItemReferences.add(referenceId);
+      if (savedIds.has(referenceId) && !seenReferences.has(referenceId)) {
+        seenReferences.add(referenceId);
         continue;
       }
       const parentFolder = workspaceObjectFolderParents.get(shell) || null;
@@ -1770,33 +1921,67 @@ const restoreMissingSavedItemReferences = async () => {
     }
     for (const id of ids) {
       const existing = collectWorkspaceHierarchyShells().find(shell => (
-        shell.dataset.objectType === 'Item'
+        shell.dataset.objectType === objectType
         && shell.dataset.workspaceReferenceId === id
       ));
       if (existing) continue;
-      let label = id;
-      try {
-        const raw = await invoke('load_ycs_data', { category: 'items', id });
-        const data = JSON.parse(raw);
-        label = String(data.displayName || data.id || id);
-      } catch {
-        // A saved reference remains useful even when optional display metadata is malformed.
-      }
-      const button = addObjectContainer('Item', 'home', workspaceObjectGrid, label);
+      const label = await loadLabel(id);
+      const button = addObjectContainer(objectType, mode, workspaceObjectGrid, label);
       const shell = button.closest('.workspace-object-shell');
       if (shell) {
         shell.dataset.workspaceReferenceId = id;
-        loadItemPreviewForShell(shell);
+        loadPreview(shell);
       }
     }
     persistWorkspaceLayout();
     syncPrimaryWorkspaceObjects();
   } catch (error) {
-    console.error('Failed to restore saved Item references.', error);
+    console.error(`Failed to reconcile saved ${objectType} references.`, error);
   }
 };
 
-restoreMissingSavedItemReferences();
+const loadSavedItemLabel = async id => {
+  try {
+    const raw = await invoke('load_ycs_data', { category: 'items', id });
+    const data = JSON.parse(raw);
+    return String(data.displayName || data.id || id);
+  } catch {
+    return id;
+  }
+};
+
+const loadSavedTextureLabel = async id => {
+  try {
+    const [metadata] = await invoke('load_texture_bundle', { id });
+    const data = JSON.parse(metadata);
+    return String(data.label || data.id || id);
+  } catch {
+    return id;
+  }
+};
+
+const savedWorkspaceLifecycles = new Map([
+  ['Item', {
+    category: 'items',
+    mode: 'home',
+    deleteCommand: 'delete_basic_item',
+    loadLabel: loadSavedItemLabel,
+    loadPreview: loadItemPreviewForShell,
+    onDeleted: id => itemEditorPage.closeSavedItemWorkspaces(id),
+  }],
+  ['Texture', {
+    category: 'textures',
+    mode: 'assets',
+    deleteCommand: 'delete_texture_bundle',
+    usageCommand: 'find_texture_usage',
+    loadLabel: loadSavedTextureLabel,
+    loadPreview: loadTexturePreviewForShell,
+  }],
+]);
+
+for (const [objectType, lifecycle] of savedWorkspaceLifecycles) {
+  reconcileSavedWorkspaceReferences({ objectType, ...lifecycle });
+}
 
 testAddTabButton.addEventListener('click', () => {
   if (isDetachedTestWindow) {
@@ -1808,10 +1993,22 @@ testAddTabButton.addEventListener('click', () => {
 
 if (!isDetachedFloatingWindow) {
   listen('ycs4:add-test-tab', addWorkspaceTab).catch(console.error);
+  listen('ycs4:warning-save', event => {
+    const panelId = String(event.payload?.panelId || '');
+    document.getElementById(panelId)?.querySelector('[data-item-action="save"]')?.click();
+  }).catch(console.error);
+  listen('ycs4:warning-discard', event => {
+    const panelId = String(event.payload?.panelId || '');
+    const tab = workspaceTabs.querySelector(`[data-workspace-panel-id="${CSS.escape(panelId)}"]`);
+    if (tab) removeWorkspaceTab(tab);
+  }).catch(console.error);
   listen('ycs4:texture-saved', event => {
     const id = String(event.payload?.id || '').trim();
     const name = String(event.payload?.name || id || 'Texture').trim();
     const visualId = String(event.payload?.visualId || '').trim();
+    const affectedItemIds = Array.isArray(event.payload?.affectedItemIds)
+      ? event.payload.affectedItemIds.map(value => String(value))
+      : [];
     const existingShell = visualId
       ? document.querySelector(`.workspace-object-shell[data-workspace-visual-id="${CSS.escape(visualId)}"]`)
       : null;
@@ -1829,6 +2026,14 @@ if (!isDetachedFloatingWindow) {
     }
     if (button) button.setAttribute('aria-label', name);
     if (shell) loadTexturePreviewForShell(shell);
+    for (const itemId of affectedItemIds) {
+      for (const itemShell of collectWorkspaceHierarchyShells().filter(candidate => (
+        candidate.dataset.objectType === 'Item'
+        && candidate.dataset.workspaceReferenceId === itemId
+      ))) {
+        loadItemPreviewForShell(itemShell);
+      }
+    }
     persistWorkspaceLayout();
     syncPrimaryWorkspaceObjects();
   }).catch(console.error);
@@ -1926,6 +2131,13 @@ workspaceTabs.addEventListener('click', event => {
   const tab = closeButton.closest('.workspace-tab');
   if (tab) {
     event.stopPropagation();
+    const panel = tab.dataset.workspacePanelId
+      ? document.getElementById(tab.dataset.workspacePanelId)
+      : null;
+    if (panel?.classList.contains('workspace-item-editor') && panel.dataset.dirty === 'true') {
+      showUnsavedChangesWarning(panel);
+      return;
+    }
     removeWorkspaceTab(tab);
   }
 });
@@ -2297,22 +2509,42 @@ const removeWorkspaceObjectWithLifecycle = async shell => {
   const canonicalShell = resolvePrimarySearchResult(shell);
   if (!canonicalShell) return false;
 
-  const savedItemId = canonicalShell.dataset.objectType === 'Item'
-    ? canonicalShell.dataset.workspaceReferenceId
-    : '';
-  if (savedItemId) {
+  const objectType = canonicalShell.dataset.objectType || '';
+  const referenceId = canonicalShell.dataset.workspaceReferenceId || '';
+  if (referenceId) {
+    const lifecycle = savedWorkspaceLifecycles.get(objectType);
+    if (!lifecycle) {
+      console.error(`Refusing visual-only deletion for unregistered saved ${objectType} '${referenceId}'.`);
+      return false;
+    }
     try {
-      await invoke('delete_basic_item', { id: savedItemId });
+      if (lifecycle.usageCommand) {
+        const usages = await invoke(lifecycle.usageCommand, { textureId: referenceId });
+        if (usages.length > 0) {
+          showTextureUsageWarning(referenceId, usages);
+          return false;
+        }
+      }
+      await invoke(lifecycle.deleteCommand, { id: referenceId });
     } catch (error) {
-      console.error(`Failed to delete saved Item '${savedItemId}'.`, error);
+      console.error(`Failed to delete saved ${objectType} '${referenceId}'.`, error);
+      if (lifecycle.usageCommand) {
+        try {
+          const usages = await invoke(lifecycle.usageCommand, { textureId: referenceId });
+          if (usages.length > 0) showTextureUsageWarning(referenceId, usages);
+        } catch (usageError) {
+          console.error(`Failed to inspect ${objectType} usage for '${referenceId}'.`, usageError);
+        }
+      }
       return false;
     }
 
     const matchingReferences = collectWorkspaceHierarchyShells().filter(candidate => (
-      candidate.dataset.objectType === 'Item'
-      && candidate.dataset.workspaceReferenceId === savedItemId
+      candidate.dataset.objectType === objectType
+      && candidate.dataset.workspaceReferenceId === referenceId
     ));
     for (const reference of matchingReferences) removeObjectContainerShell(reference);
+    lifecycle.onDeleted?.(referenceId);
     return true;
   }
 
@@ -2690,6 +2922,7 @@ const resetTextureImportDialog = () => {
   textureImportName.value = '';
   textureImportId.value = '';
   textureImportId.disabled = false;
+  setTextureImportFilter('');
   textureImportRows.value = '1';
   textureImportDefaultFrame.value = '0';
   textureImportTicksPerFrame.value = '4';
@@ -2734,6 +2967,7 @@ const loadTextureBundleIntoDialog = async id => {
     textureImportName.value = String(metadata.label || id);
     textureImportId.value = id;
     textureImportId.disabled = true;
+    setTextureImportFilter(String(metadata.filterTo || ''));
     textureImportRows.value = String(Math.max(1, Number(metadata.rows) || 1));
     textureImportDefaultFrame.value = String(Math.max(0, Number(metadata.defaultFrame) || 0));
     textureImportTicksPerFrame.value = String(Math.max(1, Number(metadata.ticksPerFrame) || 4));
@@ -2883,6 +3117,56 @@ textureImportAnimated.addEventListener('click', () => {
   requestAnimationFrame(syncDialogOverlayScrollbars);
 });
 
+const setTextureImportFilter = value => {
+  const normalizedValue = value === 'item' ? 'item' : '';
+  const selected = textureImportFilterOptionButtons.find(option => (
+    option.dataset.textureFilterValue === normalizedValue
+  )) || textureImportFilterOptionButtons[0];
+  textureImportFilterButton.dataset.value = normalizedValue;
+  textureImportFilterValue.textContent = selected.textContent.trim();
+  for (const option of textureImportFilterOptionButtons) {
+    option.setAttribute('aria-selected', String(option === selected));
+  }
+};
+
+const setTextureImportFilterOpen = open => {
+  textureImportFilterOptions.hidden = !open;
+  textureImportFilterButton.setAttribute('aria-expanded', String(open));
+  textureImportFilterButton.querySelector('.pixel-direction-icon')?.classList.toggle('pixel-direction-down', !open);
+  textureImportFilterButton.querySelector('.pixel-direction-icon')?.classList.toggle('pixel-direction-up', open);
+};
+
+textureImportFilterButton.addEventListener('click', () => {
+  setTextureImportFilterOpen(textureImportFilterOptions.hidden);
+});
+
+textureImportFilterOptions.addEventListener('click', event => {
+  const option = event.target.closest('[data-texture-filter-value]');
+  if (!option) return;
+  setTextureImportFilter(option.dataset.textureFilterValue || '');
+  setTextureImportFilterOpen(false);
+  textureImportFilterButton.focus();
+});
+
+textureImportFilter.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !textureImportFilterOptions.hidden) {
+    event.preventDefault();
+    setTextureImportFilterOpen(false);
+    textureImportFilterButton.focus();
+    return;
+  }
+  if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+  event.preventDefault();
+  setTextureImportFilterOpen(true);
+  const selectedIndex = textureImportFilterOptionButtons.findIndex(option => (
+    option.dataset.textureFilterValue === textureImportFilterButton.dataset.value
+  ));
+  const direction = event.key === 'ArrowDown' ? 1 : -1;
+  const nextIndex = (selectedIndex + direction + textureImportFilterOptionButtons.length)
+    % textureImportFilterOptionButtons.length;
+  textureImportFilterOptionButtons[nextIndex].focus();
+});
+
 textureImportSave.addEventListener('click', async () => {
   const name = textureImportName.value.trim();
   const id = textureImportId.value.trim();
@@ -2911,6 +3195,7 @@ textureImportSave.addEventListener('click', async () => {
     const metadata = {
       id,
       label: name,
+      filterTo: textureImportFilterButton.dataset.value || undefined,
       fileName: textureFile.name,
       rows,
       defaultFrame,
@@ -2919,7 +3204,7 @@ textureImportSave.addEventListener('click', async () => {
       hasMask: Boolean(maskFile) || undefined,
       hasEmissive: Boolean(emissiveFile) || undefined,
     };
-    await invoke('save_texture_bundle', {
+    const affectedItemIds = await invoke('save_texture_bundle', {
       id,
       metadata: JSON.stringify(metadata, null, 2),
       textureExt: textureFileExtension(textureFile),
@@ -2935,6 +3220,7 @@ textureImportSave.addEventListener('click', async () => {
         id,
         name,
         visualId: detachedTextureVisualId,
+        affectedItemIds,
       });
       await appWindow.close();
       return;
@@ -2945,6 +3231,14 @@ textureImportSave.addEventListener('click', async () => {
     const button = addObjectContainer('Texture', 'assets', targetGrid, name);
     const shell = button.closest('.workspace-object-shell');
     if (shell) shell.dataset.workspaceReferenceId = id;
+    for (const itemId of affectedItemIds) {
+      for (const itemShell of collectWorkspaceHierarchyShells().filter(candidate => (
+        candidate.dataset.objectType === 'Item'
+        && candidate.dataset.workspaceReferenceId === itemId
+      ))) {
+        loadItemPreviewForShell(itemShell);
+      }
+    }
     persistWorkspaceLayout();
     syncPrimaryWorkspaceObjects();
   } catch (error) {
@@ -2956,6 +3250,146 @@ textureImportSave.addEventListener('click', async () => {
 
 textureImportCancel.addEventListener('click', closeTextureImportDialog);
 textureImportClose.addEventListener('click', closeTextureImportDialog);
+
+const closeWarningDialog = () => {
+  if (isDetachedWarningWindow) {
+    appWindow.close().catch(console.error);
+    return;
+  }
+  warningDialog.hidden = true;
+  warningSaveAction = null;
+  warningCancelAction = null;
+  dialogLayer.classList.remove('dialog-layer-modal');
+  if (
+    (!preferencesDialog || preferencesDialog.hidden)
+    && (!hexColorDialog || hexColorDialog.hidden)
+    && (!confirmDialog || confirmDialog.hidden)
+    && (!textureImportDialog || textureImportDialog.hidden)
+  ) {
+    dialogLayer.hidden = true;
+  }
+};
+
+const measureWarningDialogHeight = () => {
+  const bodyStyle = getComputedStyle(warningDialogBody);
+  const visibleSections = [
+    warningDialogSummary,
+    warningDialogUsageList.hidden ? null : warningDialogUsageList,
+    warningDialog.querySelector('.warning-dialog-actions'),
+  ].filter(Boolean);
+  const gap = Number.parseFloat(bodyStyle.rowGap) || 0;
+  const bodyChrome = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']
+    .reduce((total, property) => total + (Number.parseFloat(bodyStyle[property]) || 0), 0);
+  const contentHeight = visibleSections.reduce((total, section) => (
+    total + (section === warningDialogUsageList ? section.scrollHeight : section.offsetHeight)
+  ), 0);
+  return warningTitlebar.offsetHeight
+    + bodyChrome
+    + contentHeight
+    + (gap * Math.max(0, visibleSections.length - 1));
+};
+
+const sizeAndCenterWarningDialog = () => {
+  const artPixel = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--ycs-pixel-2x'),
+  ) || 2;
+  const availableHeight = Math.max(1, dialogLayer.clientHeight - 16);
+  const desiredHeight = measureWarningDialogHeight();
+  const width = Math.round(warningDialog.offsetWidth / artPixel) * artPixel;
+  const height = Math.round(Math.min(desiredHeight, availableHeight) / artPixel) * artPixel;
+  warningDialog.style.width = `${width}px`;
+  warningDialog.style.height = `${height}px`;
+  warningDialog.style.transform = 'none';
+  warningDialog.style.left = `${snapCssValueToPhysicalPixel(
+    Math.max(0, (dialogLayer.clientWidth - width) / 2),
+  )}px`;
+  warningDialog.style.top = `${snapCssValueToPhysicalPixel(
+    Math.max(0, (dialogLayer.clientHeight - height) / 2),
+  )}px`;
+};
+
+const showInlineWarningDialog = ({
+  summary,
+  usages = [],
+  saveAction = null,
+  cancelAction = null,
+}) => {
+  warningDialogSummary.textContent = summary;
+  warningDialogUsageList.replaceChildren(...usages.map(usage => {
+    const item = document.createElement('li');
+    item.textContent = usage;
+    return item;
+  }));
+  warningDialogUsageList.hidden = usages.length === 0;
+  warningSaveAction = saveAction;
+  warningCancelAction = cancelAction;
+  const hasSaveAction = typeof saveAction === 'function';
+  warningDialogOkay.hidden = hasSaveAction;
+  warningDialogSave.hidden = !hasSaveAction;
+  warningDialogCancel.hidden = !hasSaveAction;
+  warningDialog.style.left = '50%';
+  warningDialog.style.top = '50%';
+  warningDialog.style.transform = 'translate(-50%, -50%)';
+  warningDialog.hidden = false;
+  dialogLayer.classList.add('dialog-layer-modal');
+  dialogLayer.hidden = false;
+  requestAnimationFrame(async () => {
+    sizeAndCenterWarningDialog();
+    if (isDetachedWarningWindow) {
+      const uiScaleFactor = getUiScaleFactor();
+      const width = Math.round(320 * uiScaleFactor);
+      const height = Math.round(Math.min(360, measureWarningDialogHeight()) * uiScaleFactor);
+      try {
+        await appWindow.setSize(new LogicalSize(width, height));
+      } catch (error) {
+        console.error('Unable to fit detached Warning window:', error);
+      }
+    }
+  });
+  (hasSaveAction ? warningDialogSave : warningDialogOkay).focus();
+};
+
+const showWarningDialog = ({
+  summary,
+  usages = [],
+  saveAction = null,
+  cancelAction = null,
+  panelId = '',
+}) => {
+  if (isDetachedWarningWindow) {
+    showInlineWarningDialog({ summary, usages, saveAction, cancelAction });
+    return;
+  }
+  openDetachedWarningWindow({ summary, usages, panelId }).catch(() => {
+    showInlineWarningDialog({ summary, usages, saveAction, cancelAction });
+  });
+};
+
+const showTextureUsageWarning = (textureId, usages) => showWarningDialog({
+  summary: `Cannot delete "${textureId}". This Texture is used by:`,
+  usages,
+});
+
+const showUnsavedChangesWarning = panel => showWarningDialog({
+  summary: 'Save changes before closing this Item?',
+  saveAction: () => panel.querySelector('[data-item-action="save"]')?.click(),
+  cancelAction: () => {
+    const tab = workspaceTabs.querySelector(`[data-workspace-panel-id="${CSS.escape(panel.id)}"]`);
+    if (tab) removeWorkspaceTab(tab);
+  },
+  panelId: panel.id,
+});
+
+warningDialogOkay.addEventListener('click', closeWarningDialog);
+warningDialogSave.addEventListener('click', () => {
+  const saveAction = warningSaveAction;
+  Promise.resolve(saveAction?.()).finally(closeWarningDialog);
+});
+warningDialogCancel.addEventListener('click', () => {
+  const cancelAction = warningCancelAction;
+  Promise.resolve(cancelAction?.()).finally(closeWarningDialog);
+});
+warningClose.addEventListener('click', closeWarningDialog);
 
 const closeConfirmDialog = () => {
   if (confirmDialog) confirmDialog.hidden = true;
@@ -3397,6 +3831,60 @@ if (confirmTitlebar) {
   confirmTitlebar.addEventListener('pointercancel', stopConfirmDialogDrag);
 }
 
+warningTitlebar.addEventListener('pointerdown', event => {
+  if (event.button !== 0 || event.target.closest('button')) return;
+  event.preventDefault();
+  if (isDetachedWarningWindow) {
+    appWindow.startDragging().catch(console.error);
+    return;
+  }
+  const rect = warningDialog.getBoundingClientRect();
+  const layerRect = dialogLayer.getBoundingClientRect();
+  const uiScaleFactor = getUiScaleFactor();
+  warningDialog.style.transform = 'none';
+  warningDialog.style.left = `${snapCssValueToPhysicalPixel(
+    (rect.left - layerRect.left) / uiScaleFactor,
+  )}px`;
+  warningDialog.style.top = `${snapCssValueToPhysicalPixel(
+    (rect.top - layerRect.top) / uiScaleFactor,
+  )}px`;
+  warningDialogDragState = {
+    pointerId: event.pointerId,
+    startPointerX: event.clientX,
+    startPointerY: event.clientY,
+    startLeft: Number.parseFloat(warningDialog.style.left) || 0,
+    startTop: Number.parseFloat(warningDialog.style.top) || 0,
+  };
+  warningTitlebar.setPointerCapture(event.pointerId);
+});
+
+warningTitlebar.addEventListener('pointermove', event => {
+  if (warningDialogDragState?.pointerId !== event.pointerId) return;
+  const uiScaleFactor = getUiScaleFactor();
+  const left = warningDialogDragState.startLeft
+    + (event.clientX - warningDialogDragState.startPointerX) / uiScaleFactor;
+  const top = warningDialogDragState.startTop
+    + (event.clientY - warningDialogDragState.startPointerY) / uiScaleFactor;
+  warningDialog.style.left = `${snapCssValueToPhysicalPixel(clamp(
+    left,
+    0,
+    Math.max(0, dialogLayer.clientWidth - warningDialog.offsetWidth),
+  ))}px`;
+  warningDialog.style.top = `${snapCssValueToPhysicalPixel(clamp(
+    top,
+    0,
+    Math.max(0, dialogLayer.clientHeight - warningDialog.offsetHeight),
+  ))}px`;
+});
+
+const stopWarningDialogDrag = event => {
+  if (warningDialogDragState?.pointerId !== event.pointerId) return;
+  warningDialogDragState = null;
+};
+
+warningTitlebar.addEventListener('pointerup', stopWarningDialogDrag);
+warningTitlebar.addEventListener('pointercancel', stopWarningDialogDrag);
+
 preferencesDialog.addEventListener('pointerdown', event => {
   const handle = event.target.closest('[data-resize]');
   if (!handle || event.button !== 0) return;
@@ -3490,6 +3978,18 @@ window.addEventListener('resize', () => {
   }
   applyStoredDialogSize();
   constrainDialogToWorkspace();
+  if (!warningDialog.hidden) {
+    warningDialog.style.left = `${snapCssValueToPhysicalPixel(clamp(
+      Number.parseFloat(warningDialog.style.left) || 0,
+      0,
+      Math.max(0, dialogLayer.clientWidth - warningDialog.offsetWidth),
+    ))}px`;
+    warningDialog.style.top = `${snapCssValueToPhysicalPixel(clamp(
+      Number.parseFloat(warningDialog.style.top) || 0,
+      0,
+      Math.max(0, dialogLayer.clientHeight - warningDialog.offsetHeight),
+    ))}px`;
+  }
 });
 
 window.addEventListener('storage', event => {
@@ -3543,6 +4043,7 @@ document.addEventListener('pointerdown', event => {
   if (!event.target.closest('#test-dropdown')) setTestDropdownOpen(false);
   if (!event.target.closest('#test-combobox')) setTestComboboxOpen(false);
   if (!event.target.closest('#workspace-create-dropdown')) setWorkspaceCreateOptionsOpen(false);
+  if (!event.target.closest('#texture-import-filter')) setTextureImportFilterOpen(false);
   if (!event.target.closest('#workspace-object-context-menu')) closeWorkspaceObjectContextMenu();
   if (!event.target.closest('.workspace-item-dropdown')) closeItemEditorDropdowns();
   if (event.target.closest('.menu-entry')) return;
@@ -3555,6 +4056,11 @@ document.addEventListener('keydown', event => {
 
   if (textureImportDialog && !textureImportDialog.hidden) {
     closeTextureImportDialog();
+    return;
+  }
+
+  if (!warningDialog.hidden) {
+    closeWarningDialog();
     return;
   }
 

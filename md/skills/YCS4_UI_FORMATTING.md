@@ -133,6 +133,12 @@ Edit > Test is the live component reference. Add genuinely reusable controls the
 - In-workspace dialogs drag from their titlebar except over controls and resize from edges and corners using window-level pointer tracking.
 - Persist dialog size where returning to the previous size benefits the user; position only needs session persistence unless a page specifies otherwise.
 - Escape and the close control perform the same cancellation behavior.
+- Warning dialogs use the canonical floating-dialog structure and open as owned frameless Tauri windows so their titlebars can move them beyond the main YCS4 window. Their geometry remains physical-pixel snapped. Size the window to its measured message, blocker list, action row, and shared body padding; cap long lists and scroll them. Do not leave filler space between the final blocker and the bottom action row.
+- Warning action rows stay bottom-anchored and use the same bottom body padding as Texture Import actions.
+- Warning windows are owner-modal and remain above their owner. Disable every other YCS window while a Warning is open, then restore those windows only after the Warning closes or window creation fails.
+- The Texture editor uses a fixed window and preview size large enough for every conditional Texture field to be visible simultaneously. Toggling Spritesheet or Animated must not resize the window or introduce normal-form scrolling.
+- A blocked destructive action uses `Warning`, a concise reason, a readable list of blockers when applicable, and one centered `Okay` button.
+- Closing a dirty editor tab uses `Warning` with an unsaved-changes message and `Save` and `Cancel` buttons. `Save` runs the editor's normal validated save lifecycle. `Cancel` discards the editor state and closes the tab; X and Escape dismiss the warning while keeping the tab open.
 
 ## Interaction and accessibility
 

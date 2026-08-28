@@ -1,0 +1,35 @@
+{
+  "_injections": [
+    {
+      "content": "    public static final DeferredItem<Item> CAT = ITEMS.register(\"cat\",\n            () -> new Item(new Item.Properties().stacksTo(32)));",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Items",
+      "type": "java-marker"
+    },
+    {
+      "file": "resources/assets/yebisurpg/lang/en_us.json",
+      "key": "item.yebisurpg.cat",
+      "type": "json-key"
+    },
+    {
+      "content": "        if (event.getTabKey() == ModCreativeModeTabs.YEBISURPG.getKey()) event.accept(ModItems.CAT.get());",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModCreativeTabContents.java",
+      "marker": "YCS_Tab_Contents",
+      "type": "java-marker"
+    },
+    {
+      "file": "resources/assets/yebisurpg/textures/item/cat.png",
+      "type": "created-file"
+    },
+    {
+      "file": "resources/assets/yebisurpg/models/item/cat.json",
+      "type": "created-file"
+    }
+  ],
+  "creativeTab": "yebisurpg",
+  "displayName": "Cat",
+  "holdingMode": "generated",
+  "id": "cat",
+  "stackSize": 32,
+  "texture": "mrow"
+}

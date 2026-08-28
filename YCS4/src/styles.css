@@ -176,7 +176,8 @@ body.detached-floating-window .dialog-layer {
 }
 
 body.detached-floating-window #preferences-dialog,
-body.detached-floating-window #texture-import-dialog {
+body.detached-floating-window #texture-import-dialog,
+body.detached-floating-window #warning-dialog {
   top: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
@@ -1984,14 +1985,69 @@ body.detached-floating-window #texture-import-dialog {
   flex: 1 1 0;
 }
 
+.warning-dialog {
+  z-index: 12;
+  width: min(320px, calc(100% - 16px));
+  min-width: min(240px, calc(100% - 16px));
+  height: min(140px, calc(100% - 16px));
+  min-height: min(140px, calc(100% - 16px));
+}
+
+.warning-dialog[hidden] {
+  display: none !important;
+}
+
+.warning-dialog-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: calc(3 * var(--ycs-pixel-2x));
+  gap: calc(2 * var(--ycs-pixel-2x));
+}
+
+.warning-dialog-summary {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--ycs-text-normal);
+  font-size: var(--ycs-ui-font-size);
+  line-height: normal;
+  user-select: none;
+}
+
+.warning-dialog-usage-list {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding-left: calc(5 * var(--ycs-pixel-2x));
+  overflow: auto;
+  color: var(--ycs-text-normal);
+  font-size: var(--ycs-ui-font-size);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.warning-dialog-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: calc(2 * var(--ycs-pixel-2x));
+  margin-top: auto;
+}
+
+.warning-dialog-button {
+  width: var(--ycs-control-min-width);
+  min-width: var(--ycs-control-min-width);
+}
+
 .texture-import-dialog {
   z-index: 11;
-  width: 600px;
-  min-width: 600px;
-  max-width: 600px;
-  height: 390px;
-  min-height: 390px;
-  max-height: 390px;
+  width: 612px;
+  min-width: 612px;
+  max-width: 612px;
+  height: 440px;
+  min-height: 440px;
+  max-height: 440px;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -2017,7 +2073,7 @@ body.detached-floating-window #texture-import-dialog {
   flex: 0 0 auto;
   grid-template-columns:
     minmax(0, 1fr)
-    minmax(0, min(50%, calc(10 * var(--ycs-dialog-line-height))));
+    minmax(0, min(50%, calc(11 * var(--ycs-dialog-line-height))));
   column-gap: calc(3 * var(--ycs-pixel-2x));
   min-width: calc((2 * var(--ycs-control-min-width)) + var(--ycs-labeled-control-start));
 }
@@ -2035,6 +2091,7 @@ body.detached-floating-window #texture-import-dialog {
   box-sizing: border-box;
   width: 100%;
   height: auto;
+  max-height: calc(11 * var(--ycs-dialog-line-height));
   aspect-ratio: 1;
   border-style: solid;
   border-width: calc(3 * var(--ycs-pixel-2x));
