@@ -123,11 +123,14 @@ const textureImportTitlebar = document.getElementById('texture-import-titlebar')
 const textureImportClose = document.getElementById('texture-import-close');
 const textureImportName = document.getElementById('texture-import-name');
 const textureImportId = document.getElementById('texture-import-id');
-const textureImportFilter = document.getElementById('texture-import-filter');
 const textureImportFilterButton = document.getElementById('texture-import-filter-button');
-const textureImportFilterValue = document.getElementById('texture-import-filter-value');
-const textureImportFilterOptions = document.getElementById('texture-import-filter-options');
-const textureImportFilterOptionButtons = [...textureImportFilterOptions.querySelectorAll('[data-texture-filter-value]')];
+const textureFilterDialog = document.getElementById('texture-filter-dialog');
+const textureFilterPreview = document.getElementById('texture-filter-preview');
+const textureFilterSearchInput = document.getElementById('texture-filter-search-input');
+const textureFilterSearchButton = document.getElementById('texture-filter-search-button');
+const textureFilterOptions = document.getElementById('texture-filter-options');
+const textureFilterOptionButtons = [...textureFilterOptions.querySelectorAll('[data-texture-filter-value]')];
+const textureFilterSelectedValues = new Set();
 const textureImportSpritesheet = document.getElementById('texture-import-spritesheet');
 const textureImportSpritesheetFields = document.getElementById('texture-import-spritesheet-fields');
 const textureImportRows = document.getElementById('texture-import-rows');
@@ -317,9 +320,12 @@ const dialogScrollbarSyncers = [];
 const dialogScrollbarObservers = [];
 
 const initializeDialogOverlayScrollbars = () => {
-  for (const scroller of document.querySelectorAll('.floating-dialog-body')) {
+  for (const scroller of document.querySelectorAll('.floating-dialog-body, [data-dialog-overlay-scroller]')) {
     const host = document.createElement('div');
     host.className = 'floating-dialog-body-scroll-host';
+    if (scroller.hasAttribute('data-dialog-overlay-scroller')) {
+      host.classList.add('dialog-overlay-scroll-host-inline');
+    }
     scroller.before(host);
     host.append(scroller);
 
@@ -375,8 +381,11 @@ const initializeDialogOverlayScrollbars = () => {
         getComputedStyle(document.documentElement).getPropertyValue('--ycs-pixel-2x'),
       ) || 2;
       const minimumThumbSize = Math.min(trackSize, 6 * artPixel);
-      const thumbSize = Math.max(minimumThumbSize, trackSize * (viewportSize / contentSize));
-      const scrollRange = contentSize - viewportSize;
+      const thumbSize = Math.min(
+        trackSize,
+        Math.max(minimumThumbSize, trackSize * (viewportSize / Math.max(1, contentSize))),
+      );
+      const scrollRange = Math.max(0, contentSize - viewportSize);
       const travel = Math.max(0, trackSize - thumbSize);
       const thumbPosition = scrollRange > 0
         ? (scroller[axis.scrollOffset] / scrollRange) * travel
@@ -400,7 +409,7 @@ const initializeDialogOverlayScrollbars = () => {
 
         const trackBounds = axis.scrollbar.getBoundingClientRect();
         const thumbBounds = axis.thumb.getBoundingClientRect();
-        const scrollRange = scroller[axis.scrollSize] - scroller[axis.clientSize];
+        const scrollRange = Math.max(0, scroller[axis.scrollSize] - scroller[axis.clientSize]);
         const travel = Math.max(0, trackBounds[axis.rectSize] - thumbBounds[axis.rectSize]);
 
         if (event.target !== axis.thumb) {
@@ -950,10 +959,8 @@ const closeHexColorDialog = () => {
   hexColorDialog.hidden = true;
 };
 
-const openHexColorDialog = () => {
-  testHexInput.blur();
-  syncTestHexColor();
-  hexColorDialog.hidden = false;
+const positionHexColorDialog = () => {
+  if (hexColorDialog.hidden || !testHexControl.isConnected) return;
   const fieldBounds = testHexControl.getBoundingClientRect();
   const layerBounds = dialogLayer.getBoundingClientRect();
   const uiScaleFactor = getUiScaleFactor();
@@ -971,8 +978,21 @@ const openHexColorDialog = () => {
     0,
     Math.max(0, dialogLayer.clientHeight - hexColorDialog.offsetHeight),
   ))}px`;
+};
+
+const openHexColorDialog = () => {
+  testHexInput.blur();
+  syncTestHexColor();
+  hexColorDialog.hidden = false;
+  positionHexColorDialog();
   requestAnimationFrame(syncDialogOverlayScrollbars);
 };
+
+document.addEventListener('scroll', event => {
+  if (event.target instanceof Node && hexColorDialog.contains(event.target)) return;
+  if (!hexColorDialog.hidden) closeHexColorDialog();
+}, { capture: true, passive: true });
+window.addEventListener('resize', positionHexColorDialog, { passive: true });
 
 syncTestHexColor();
 
@@ -3008,6 +3028,7 @@ function openTextureImportDialog(targetGrid = workspaceObjectGrid, editingShell 
 }
 
 const closeTextureImportDialog = () => {
+  setTextureImportFilterOpen(false);
   if (isDetachedTextureWindow) {
     appWindow.close().catch(console.error);
     return;
@@ -3119,52 +3140,97 @@ textureImportAnimated.addEventListener('click', () => {
 
 const setTextureImportFilter = value => {
   const normalizedValue = value === 'item' ? 'item' : '';
-  const selected = textureImportFilterOptionButtons.find(option => (
-    option.dataset.textureFilterValue === normalizedValue
-  )) || textureImportFilterOptionButtons[0];
+  textureFilterSelectedValues.clear();
+  if (normalizedValue) textureFilterSelectedValues.add(normalizedValue);
+  syncTextureFilterSelection();
+};
+
+function syncTextureFilterSelection() {
+  const normalizedValue = textureFilterSelectedValues.has('item') ? 'item' : '';
   textureImportFilterButton.dataset.value = normalizedValue;
-  textureImportFilterValue.textContent = selected.textContent.trim();
-  for (const option of textureImportFilterOptionButtons) {
-    option.setAttribute('aria-selected', String(option === selected));
+  textureFilterPreview.replaceChildren();
+  for (const option of textureFilterOptionButtons) {
+    const selected = textureFilterSelectedValues.has(option.dataset.textureFilterValue);
+    option.setAttribute('aria-selected', String(selected));
+    option.setAttribute('aria-pressed', String(selected));
+  }
+  for (const value of textureFilterSelectedValues) {
+    const option = textureFilterOptionButtons.find(candidate => (
+      candidate.dataset.textureFilterValue === value
+    ));
+    if (!option) continue;
+    const preview = document.createElement('button');
+    preview.className = 'pixel-option';
+    preview.type = 'button';
+    preview.textContent = option.dataset.textureFilterLabel;
+    preview.setAttribute('aria-label', `Remove ${option.dataset.textureFilterLabel} filter`);
+    preview.addEventListener('click', () => {
+      textureFilterSelectedValues.delete(option.dataset.textureFilterValue);
+      syncTextureFilterSelection();
+    });
+    textureFilterPreview.append(preview);
+  }
+  requestAnimationFrame(() => {
+    textureFilterPreview.style.height = 'auto';
+    const previewStyle = getComputedStyle(textureFilterPreview);
+    const minimumPreviewHeight = Number.parseFloat(previewStyle.minHeight) || 0;
+    const previewBorderHeight = (Number.parseFloat(previewStyle.borderTopWidth) || 0)
+      + (Number.parseFloat(previewStyle.borderBottomWidth) || 0);
+    const previewHeight = Math.max(
+      minimumPreviewHeight,
+      textureFilterPreview.scrollHeight + previewBorderHeight,
+    );
+    textureFilterPreview.style.height = `${previewHeight}px`;
+    const previewExtraHeight = Math.max(0, previewHeight - minimumPreviewHeight);
+    textureFilterDialog.style.height = `calc(240px + ${previewExtraHeight}px)`;
+    syncDialogOverlayScrollbars();
+  });
+}
+
+const filterTextureFilterOptions = () => {
+  const query = textureFilterSearchInput.value.trim().toLocaleLowerCase();
+  for (const option of textureFilterOptions.querySelectorAll('[data-texture-filter-label]')) {
+    option.hidden = Boolean(query)
+      && !option.dataset.textureFilterLabel.toLocaleLowerCase().includes(query);
   }
 };
 
 const setTextureImportFilterOpen = open => {
-  textureImportFilterOptions.hidden = !open;
+  textureFilterDialog.hidden = !open;
   textureImportFilterButton.setAttribute('aria-expanded', String(open));
-  textureImportFilterButton.querySelector('.pixel-direction-icon')?.classList.toggle('pixel-direction-down', !open);
-  textureImportFilterButton.querySelector('.pixel-direction-icon')?.classList.toggle('pixel-direction-up', open);
+  if (!open) return;
+  const buttonBounds = textureImportFilterButton.getBoundingClientRect();
+  const layerBounds = dialogLayer.getBoundingClientRect();
+  const uiScaleFactor = getUiScaleFactor();
+  textureFilterDialog.style.left = `${snapCssValueToPhysicalPixel(clamp(
+    (buttonBounds.right - layerBounds.left) / uiScaleFactor + (2 * Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ycs-pixel-2x'))),
+    0,
+    Math.max(0, dialogLayer.clientWidth - textureFilterDialog.offsetWidth),
+  ))}px`;
+  textureFilterDialog.style.top = `${snapCssValueToPhysicalPixel(clamp(
+    (buttonBounds.top - layerBounds.top) / uiScaleFactor,
+    0,
+    Math.max(0, dialogLayer.clientHeight - textureFilterDialog.offsetHeight),
+  ))}px`;
 };
 
 textureImportFilterButton.addEventListener('click', () => {
-  setTextureImportFilterOpen(textureImportFilterOptions.hidden);
+  setTextureImportFilterOpen(textureFilterDialog.hidden);
 });
 
-textureImportFilterOptions.addEventListener('click', event => {
+textureFilterOptions.addEventListener('click', event => {
   const option = event.target.closest('[data-texture-filter-value]');
   if (!option) return;
-  setTextureImportFilter(option.dataset.textureFilterValue || '');
-  setTextureImportFilterOpen(false);
-  textureImportFilterButton.focus();
+  const value = option.dataset.textureFilterValue;
+  if (textureFilterSelectedValues.has(value)) textureFilterSelectedValues.delete(value);
+  else textureFilterSelectedValues.add(value);
+  syncTextureFilterSelection();
 });
 
-textureImportFilter.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !textureImportFilterOptions.hidden) {
-    event.preventDefault();
-    setTextureImportFilterOpen(false);
-    textureImportFilterButton.focus();
-    return;
-  }
-  if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
-  event.preventDefault();
-  setTextureImportFilterOpen(true);
-  const selectedIndex = textureImportFilterOptionButtons.findIndex(option => (
-    option.dataset.textureFilterValue === textureImportFilterButton.dataset.value
-  ));
-  const direction = event.key === 'ArrowDown' ? 1 : -1;
-  const nextIndex = (selectedIndex + direction + textureImportFilterOptionButtons.length)
-    % textureImportFilterOptionButtons.length;
-  textureImportFilterOptionButtons[nextIndex].focus();
+textureFilterSearchInput.addEventListener('input', filterTextureFilterOptions);
+textureFilterSearchButton.addEventListener('click', () => {
+  filterTextureFilterOptions();
+  textureFilterSearchInput.focus();
 });
 
 textureImportSave.addEventListener('click', async () => {
@@ -3661,6 +3727,30 @@ testHexInput.addEventListener('dblclick', event => {
   openHexColorDialog();
 });
 
+hexColorDialogValue.addEventListener('focus', () => {
+  hexColorDialogValue.maxLength = 6;
+  hexColorDialogValue.value = testHexValue;
+  requestAnimationFrame(() => hexColorDialogValue.select());
+});
+
+hexColorDialogValue.addEventListener('input', () => {
+  const sanitizedValue = hexColorDialogValue.value
+    .replace(/^#/, '')
+    .replace(/[^0-9a-f]/gi, '')
+    .slice(0, 6)
+    .toUpperCase();
+  hexColorDialogValue.value = sanitizedValue;
+  if (!isCompleteHex(sanitizedValue)) return;
+  Object.assign(testColor, parseHexRgb(sanitizedValue));
+  syncHueFromRgb();
+  syncTestHexColor();
+});
+
+hexColorDialogValue.addEventListener('blur', () => {
+  hexColorDialogValue.maxLength = 7;
+  hexColorDialogValue.value = `#${testHexValue}`;
+});
+
 for (const input of hexChannelInputs) {
   input.addEventListener('input', () => {
     testColor[input.dataset.hexChannel] = Number(input.value);
@@ -4030,7 +4120,11 @@ document.addEventListener('contextmenu', event => {
 });
 
 document.addEventListener('pointerdown', event => {
-  if (textureImportDialog && !textureImportDialog.hidden && !event.target.closest('#texture-import-dialog')) {
+  if (
+    textureImportDialog
+    && !textureImportDialog.hidden
+    && !event.target.closest('#texture-import-dialog, #texture-filter-dialog')
+  ) {
     closeTextureImportDialog();
   }
   if (confirmDialog && !confirmDialog.hidden && !event.target.closest('#confirm-dialog')) {
@@ -4043,7 +4137,9 @@ document.addEventListener('pointerdown', event => {
   if (!event.target.closest('#test-dropdown')) setTestDropdownOpen(false);
   if (!event.target.closest('#test-combobox')) setTestComboboxOpen(false);
   if (!event.target.closest('#workspace-create-dropdown')) setWorkspaceCreateOptionsOpen(false);
-  if (!event.target.closest('#texture-import-filter')) setTextureImportFilterOpen(false);
+  if (!event.target.closest('#texture-import-filter-button, #texture-filter-dialog')) {
+    setTextureImportFilterOpen(false);
+  }
   if (!event.target.closest('#workspace-object-context-menu')) closeWorkspaceObjectContextMenu();
   if (!event.target.closest('.workspace-item-dropdown')) closeItemEditorDropdowns();
   if (event.target.closest('.menu-entry')) return;
@@ -4053,6 +4149,12 @@ document.addEventListener('pointerdown', event => {
 
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
+
+  if (!textureFilterDialog.hidden) {
+    setTextureImportFilterOpen(false);
+    textureImportFilterButton.focus();
+    return;
+  }
 
   if (textureImportDialog && !textureImportDialog.hidden) {
     closeTextureImportDialog();

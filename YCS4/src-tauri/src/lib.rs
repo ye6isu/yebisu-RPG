@@ -633,6 +633,7 @@ fn save_basic_item(
     holding_mode: &str,
     stack_size: u32,
     creative_tab: &str,
+    authoring_fields: Value,
 ) -> Result<String, String> {
     validate_texture_id(id)?;
     if texture_id.is_empty() { return Err("Select a Texture before saving".to_string()); }
@@ -725,6 +726,14 @@ fn save_basic_item(
     injections.push(json!({ "type": "created-file", "file": model_destination }));
 
     let object = item.as_object_mut().ok_or_else(|| "Existing Item JSON must be an object".to_string())?;
+    let authored = authoring_fields.as_object()
+        .ok_or_else(|| "Item authoring fields must be an object".to_string())?;
+    for (key, value) in authored {
+        if matches!(key.as_str(), "id" | "displayName" | "texture" | "holdingMode" | "stackSize" | "creativeTab" | "dataComponents" | "_injections") {
+            continue;
+        }
+        object.insert(key.clone(), value.clone());
+    }
     object.insert("id".to_string(), Value::String(id.to_string()));
     object.insert("displayName".to_string(), Value::String(display_name.to_string()));
     object.insert("texture".to_string(), Value::String(texture_id.to_string()));

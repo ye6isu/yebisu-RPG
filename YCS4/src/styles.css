@@ -1589,6 +1589,15 @@ body.detached-floating-window #warning-dialog {
   align-items: stretch;
 }
 
+.workspace-item-section-title {
+  margin-top: calc(2 * var(--ycs-pixel-2x));
+  color: var(--ycs-text-normal);
+  font-size: var(--ycs-ui-font-size);
+  line-height: var(--ycs-dialog-line-height);
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
 .workspace-item-field-row {
   display: grid;
   width: 100%;
@@ -1705,7 +1714,7 @@ body.detached-floating-window #warning-dialog {
 .workspace-item-inline-controls {
   display: flex;
   align-items: center;
-  gap: var(--ycs-workspace-action-gap);
+  gap: calc(var(--ycs-workspace-action-gap) + 1px);
 }
 
 .workspace-file-icon {
@@ -1987,7 +1996,7 @@ body.detached-floating-window #warning-dialog {
 
 .warning-dialog {
   z-index: 12;
-  width: min(320px, calc(100% - 16px));
+  width: min(310px, calc(100% - 16px));
   min-width: min(240px, calc(100% - 16px));
   height: min(140px, calc(100% - 16px));
   min-height: min(140px, calc(100% - 16px));
@@ -2162,7 +2171,7 @@ body.detached-floating-window #warning-dialog {
   align-items: center;
   justify-items: center;
   align-content: start;
-  row-gap: 0;
+  row-gap: var(--ycs-pixel-2x);
   padding: calc(3 * var(--ycs-pixel-2x));
 }
 
@@ -2173,6 +2182,286 @@ body.detached-floating-window #warning-dialog {
 .hex-color-dialog-value {
   cursor: text;
   user-select: text;
+}
+
+#texture-import-filter-button {
+  width: var(--ycs-control-min-width);
+  min-width: var(--ycs-control-min-width);
+}
+
+.texture-filter-dialog {
+  z-index: 12;
+  width: min(165px, calc(100% - 16px));
+  height: auto;
+  max-height: calc(100% - 16px);
+  min-width: 100px;
+  min-height: 0;
+  transform: none;
+}
+
+.texture-filter-dialog[hidden] {
+  display: none;
+}
+
+.texture-filter-dialog-titlebar {
+  cursor: default;
+}
+
+.item-tags-dialog {
+  top: 50%;
+  left: 50%;
+  width: min(330px, calc(100% - 16px));
+  transform: translate(-50%, -50%);
+}
+
+.item-states-dialog {
+  z-index: 12;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  height: min(320px, calc(100% - 16px));
+  min-width: 0;
+  min-height: 120px;
+  transform: none;
+}
+
+.item-states-dialog[hidden] {
+  display: none;
+}
+
+.item-authoring-dialog {
+  z-index: 12;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  height: auto;
+  max-height: calc(100% - 16px);
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+}
+
+.item-authoring-dialog[hidden] {
+  display: none;
+}
+
+.item-authoring-dialog-body,
+#item-authoring-dialog-content,
+[data-item-dialog-fields] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ycs-workspace-action-gap);
+}
+
+[data-item-dialog-fields][hidden] {
+  display: none;
+}
+
+.item-authoring-dialog > .floating-dialog-body-scroll-host {
+  width: auto;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.item-authoring-dialog > .floating-dialog-body-scroll-host > .item-authoring-dialog-body {
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.item-states-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ycs-workspace-action-gap);
+  padding: calc(3 * var(--ycs-pixel-2x));
+}
+
+.item-states-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ycs-workspace-action-gap);
+}
+
+.item-state-entry {
+  position: relative;
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.item-state-entry-dropdown-open {
+  z-index: 30;
+}
+
+.item-state-entry-titlebar {
+  cursor: default;
+}
+
+.item-state-entry-titlebar > .floating-dialog-close {
+  margin-left: auto;
+}
+
+.item-state-entry-body {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  flex-direction: column;
+  padding: calc(2 * var(--ycs-pixel-2x));
+  border-style: solid;
+  border-color: transparent;
+  border-width: var(--ycs-window-border-side) var(--ycs-window-border-side) var(--ycs-window-border-bottom);
+  border-image-source: url("../assets/sprite/generated/window_body.png");
+  border-image-slice: 4 4 8 4 fill;
+  border-image-repeat: repeat;
+}
+
+.item-state-entry-body > .workspace-item-field-row {
+  min-width: 0;
+  grid-template-columns:
+    minmax(calc(var(--ycs-labeled-control-start) - var(--ycs-labeled-control-gap)), max-content)
+    var(--ycs-control-min-width);
+}
+
+.item-state-entry-body .workspace-item-dropdown,
+.item-state-entry-body .workspace-item-dropdown-button,
+.item-state-entry-body .workspace-item-dropdown-options,
+.item-state-entry-body .pixel-combobox {
+  width: 100%;
+  min-width: 0;
+}
+
+.item-state-entry-body .workspace-item-dropdown-options,
+.item-state-entry-body .pixel-combobox-options {
+  z-index: 20;
+}
+
+.item-states-add {
+  width: 100%;
+  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
+/* These content-sized dialogs opt out of the generic absolute body layout so
+   their outer window can measure the actual controls without resizing them. */
+.item-states-dialog > .floating-dialog-body-scroll-host,
+.texture-filter-dialog > .floating-dialog-body-scroll-host {
+  width: auto;
+  min-width: 0;
+}
+
+.item-states-dialog > .floating-dialog-body-scroll-host > .item-states-dialog-body,
+.texture-filter-dialog > .floating-dialog-body-scroll-host > .texture-filter-dialog-body {
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: auto;
+}
+
+.texture-filter-dialog > .floating-dialog-body-scroll-host {
+  flex: 0 0 auto;
+}
+
+.texture-filter-dialog > .floating-dialog-body-scroll-host > .texture-filter-dialog-body {
+  overflow: visible;
+}
+
+.texture-filter-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ycs-pixel-2x);
+  padding: calc(3 * var(--ycs-pixel-2x));
+}
+
+.texture-filter-preview {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--ycs-pixel-2x);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--ycs-option-height) + (8 * var(--ycs-pixel-2x)));
+  height: auto;
+  padding: var(--ycs-pixel-2x);
+  border-style: solid;
+  border-width: calc(3 * var(--ycs-pixel-2x));
+  border-image-source: url("../assets/sprite/generated/preview_2x.png");
+  border-image-slice: 6 6 6 6 fill;
+  border-image-repeat: stretch;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+
+.texture-filter-preview > .pixel-option,
+.texture-filter-options > .pixel-button {
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.texture-filter-search {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: calc(2 * var(--ycs-workspace-action-gap));
+}
+
+.texture-filter-search > .pixel-text-box {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.texture-filter-search > .workspace-top-control-button {
+  flex: 0 0 var(--ycs-workspace-action-button-width);
+}
+
+.texture-filter-options {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: var(--ycs-pixel-2x);
+  width: 100%;
+  height: calc((5 * var(--ycs-button-min-height)) + (4 * var(--ycs-pixel-2x)));
+  min-height: calc((5 * var(--ycs-button-min-height)) + (4 * var(--ycs-pixel-2x)));
+  max-height: calc((5 * var(--ycs-button-min-height)) + (4 * var(--ycs-pixel-2x)));
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.texture-filter-options::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.dialog-overlay-scroll-host-inline {
+  position: relative;
+  width: 100%;
+  height: calc((5 * var(--ycs-button-min-height)) + (4 * var(--ycs-pixel-2x)));
+  min-height: calc((5 * var(--ycs-button-min-height)) + (4 * var(--ycs-pixel-2x)));
+  flex: 0 0 auto;
+}
+
+.dialog-overlay-scroll-host-inline > .texture-filter-options {
+  width: 100%;
+  height: 100%;
+}
+
+.dialog-overlay-scroll-host-inline > .dialog-overlay-scrollbar-vertical {
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.dialog-overlay-scroll-host-inline > .dialog-overlay-scrollbar-horizontal {
+  display: none;
 }
 
 .hex-color-picker {

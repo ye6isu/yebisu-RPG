@@ -3,17 +3,24 @@ import {
   CREATIVE_TAB_OPTIONS,
   loadCreativeTabOptions,
 } from './data/creative-tabs.js';
+import { ITEM_TAG_OPTIONS } from './data/item-tags.js';
 
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+
+const ITEM_NUMERIC_FIELDS = new Set([
+  'attackDamage', 'attackSpeed', 'nutrition', 'saturation', 'fuel',
+  'craftingCount', 'smeltingExp', 'smeltingTime', 'blastingExp', 'blastingTime',
+  'smokingExp', 'smokingTime', 'campfireExp', 'campfireTime', 'stonecutCount',
+]);
 
 const textureMimeType = extension => extension === 'jpg' || extension === 'jpeg'
   ? 'image/jpeg'
   : `image/${extension}`;
 
-const filterTextureOptions = combobox => {
+const filterTextureOptions = (combobox, showAll = false) => {
   const query = combobox.querySelector('[data-item-texture-input]').value.trim().toLocaleLowerCase();
   for (const option of combobox.querySelectorAll('[data-item-texture-value]')) {
-    option.hidden = Boolean(query)
+    option.hidden = !showAll && Boolean(query)
       && !option.dataset.itemTextureLabel.toLocaleLowerCase().includes(query);
   }
 };
@@ -232,6 +239,335 @@ export const initializeItemEditorPage = ({
   onItemSaved,
   onItemDeleted,
 }) => {
+  const dialogLayer = document.getElementById('dialog-layer');
+  const tagsDialog = document.getElementById('item-tags-dialog');
+  const tagsPreview = document.getElementById('item-tags-preview');
+  const tagsSearchInput = document.getElementById('item-tags-search-input');
+  const tagsSearchButton = document.getElementById('item-tags-search-button');
+  const tagsOptions = document.getElementById('item-tags-options');
+  const statesDialog = document.getElementById('item-states-dialog');
+  const statesList = document.getElementById('item-states-list');
+  const statesAdd = document.getElementById('item-states-add');
+  const authoringDialog = document.getElementById('item-authoring-dialog');
+  const authoringDialogTitle = document.getElementById('item-authoring-dialog-title');
+  const authoringDialogContent = document.getElementById('item-authoring-dialog-content');
+  let activeDialogPanel = null;
+  let activeDialogAnchor = null;
+  let activeAuthoringFields = null;
+
+  const closeItemDialog = dialog => {
+    if (dialog === authoringDialog && activeAuthoringFields) {
+      const { fields, parent, nextSibling } = activeAuthoringFields;
+      fields.hidden = true;
+      parent.insertBefore(fields, nextSibling);
+      activeAuthoringFields = null;
+    }
+    dialog.hidden = true;
+    activeDialogPanel = null;
+    activeDialogAnchor = null;
+    if (![...dialogLayer.querySelectorAll('.floating-dialog')].some(candidate => !candidate.hidden)) {
+      dialogLayer.hidden = true;
+    }
+  };
+
+  const openAuthoringDialog = (panel, anchor, key, title) => {
+    const fields = panel.querySelector(`[data-item-dialog-fields="${key}"]`);
+    if (!fields) return;
+    activeAuthoringFields = { fields, parent: fields.parentNode, nextSibling: fields.nextSibling };
+    openItemDialog(authoringDialog, panel, anchor);
+    authoringDialogTitle.textContent = title;
+    fields.hidden = false;
+    authoringDialogContent.replaceChildren(fields);
+    syncConditionalFields(panel);
+    positionDialogBeside(authoringDialog, anchor);
+  };
+
+  const renderItemTags = () => {
+    if (!activeDialogPanel) return;
+    const selectedTags = activeDialogPanel.itemTags || [];
+    tagsPreview.replaceChildren();
+    for (const tag of selectedTags) {
+      const preview = document.createElement('button');
+      preview.className = 'pixel-option';
+      preview.type = 'button';
+      preview.textContent = tag;
+      preview.setAttribute('aria-label', `Remove ${tag}`);
+      preview.addEventListener('click', () => {
+        activeDialogPanel.itemTags = selectedTags.filter(value => value !== tag);
+        activeDialogPanel.dataset.dirty = 'true';
+        renderItemTags();
+      });
+      tagsPreview.append(preview);
+    }
+    for (const option of tagsOptions.querySelectorAll('[data-item-tag-value]')) {
+      const selected = selectedTags.includes(option.dataset.itemTagValue);
+      option.setAttribute('aria-selected', String(selected));
+      option.setAttribute('aria-pressed', String(selected));
+    }
+    requestAnimationFrame(() => {
+      if (!tagsDialog.hidden && activeDialogAnchor) positionDialogBeside(tagsDialog, activeDialogAnchor);
+    });
+  };
+
+  const loadItemTagOptions = async () => {
+    const values = new Set(ITEM_TAG_OPTIONS);
+    try {
+      const ids = await invoke('list_ycs_data', { category: 'tags' });
+      for (const id of ids) {
+        try {
+          const raw = await invoke('load_ycs_data', { category: 'tags', id });
+          const data = JSON.parse(raw);
+          values.add(String(data.tagName || data.id || id));
+        } catch {}
+      }
+    } catch {}
+    tagsOptions.replaceChildren(...[...values].sort().map(tag => {
+      const option = document.createElement('button');
+      option.className = 'pixel-button';
+      option.type = 'button';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', 'false');
+      option.setAttribute('aria-pressed', 'false');
+      option.dataset.itemTagValue = tag;
+      option.textContent = tag;
+      return option;
+    }));
+    renderItemTags();
+  };
+
+  const openItemDialog = (dialog, panel, anchor) => {
+    activeDialogPanel = panel;
+    activeDialogAnchor = anchor;
+    dialogLayer.hidden = false;
+    dialog.hidden = false;
+  };
+
+  const positionDialogBeside = (dialog, anchor) => {
+    if (!anchor?.isConnected || dialog.hidden) return;
+    const anchorBounds = anchor.getBoundingClientRect();
+    const layerBounds = dialogLayer.getBoundingClientRect();
+    const uiScale = Number.parseFloat(getComputedStyle(document.getElementById('ui-shell')).zoom) || 1;
+    const artPixel = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--ycs-pixel-2x'),
+    ) || 1;
+    const left = clamp(
+      (anchorBounds.right - layerBounds.left) / uiScale + (2 * artPixel),
+      0,
+      Math.max(0, dialogLayer.clientWidth - dialog.offsetWidth),
+    );
+    const top = clamp(
+      (anchorBounds.top - layerBounds.top) / uiScale,
+      0,
+      Math.max(0, dialogLayer.clientHeight - dialog.offsetHeight),
+    );
+    dialog.style.left = `${left}px`;
+    dialog.style.top = `${top}px`;
+    dialog.style.transform = 'none';
+  };
+
+  const closeItemDialogsOnScroll = event => {
+    if (event.target instanceof Node && dialogLayer.contains(event.target)) return;
+    if (!tagsDialog.hidden) closeItemDialog(tagsDialog);
+    if (!statesDialog.hidden) closeItemDialog(statesDialog);
+    if (!authoringDialog.hidden) closeItemDialog(authoringDialog);
+  };
+
+  document.addEventListener('scroll', closeItemDialogsOnScroll, { capture: true, passive: true });
+  window.addEventListener('resize', () => {
+    if (!tagsDialog.hidden && activeDialogAnchor) positionDialogBeside(tagsDialog, activeDialogAnchor);
+    if (!statesDialog.hidden && activeDialogAnchor) positionDialogBeside(statesDialog, activeDialogAnchor);
+    if (!authoringDialog.hidden && activeDialogAnchor) positionDialogBeside(authoringDialog, activeDialogAnchor);
+  }, { passive: true });
+
+  const renderItemStates = () => {
+    if (!activeDialogPanel) return;
+    const states = activeDialogPanel.itemStates || [];
+    statesList.replaceChildren(...states.map((state, index) => {
+      const entry = document.createElement('section');
+      entry.className = 'item-state-entry';
+      const titlebar = document.createElement('header');
+      titlebar.className = 'floating-dialog-titlebar item-state-entry-titlebar';
+      const title = document.createElement('span');
+      title.className = 'floating-dialog-title';
+      title.textContent = `State ${index + 2}`;
+      titlebar.append(title);
+      if (index > 0) {
+        const remove = document.createElement('button');
+        remove.className = 'dialogue-title-button floating-dialog-close';
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Delete State ${index + 2}`);
+        const removeIcon = document.createElement('img');
+        removeIcon.src = './assets/sprite/generated/dialogue_icon_2x.png';
+        removeIcon.alt = '';
+        removeIcon.draggable = false;
+        remove.append(removeIcon);
+        remove.addEventListener('click', () => {
+          activeDialogPanel.itemStates.splice(index, 1);
+          activeDialogPanel.dataset.dirty = 'true';
+          renderItemStates();
+        });
+        titlebar.append(remove);
+      }
+
+      const body = document.createElement('div');
+      body.className = 'item-state-entry-body';
+      const holdingRow = document.createElement('div');
+      holdingRow.className = 'workspace-item-field-row';
+      const holdingLabel = document.createElement('span');
+      holdingLabel.textContent = 'Holding Mode';
+      const holdingDropdown = activeDialogPanel
+        .querySelector('[data-item-dropdown="holdingMode"]')
+        .cloneNode(true);
+      holdingRow.append(holdingLabel, holdingDropdown);
+      const holdingTrigger = holdingDropdown.querySelector('.workspace-item-dropdown-button');
+      const holdingOptions = holdingDropdown.querySelector('.workspace-item-dropdown-options');
+      const selectedHolding = holdingOptions.querySelector(
+        `[data-item-dropdown-value="${CSS.escape(state.holdingMode || 'generated')}"]`,
+      ) || holdingOptions.querySelector('[data-item-dropdown-value="generated"]');
+      state.holdingMode = selectedHolding.dataset.itemDropdownValue;
+      holdingTrigger.dataset.value = state.holdingMode;
+      holdingTrigger.querySelector('[data-item-dropdown-label]').textContent = selectedHolding.textContent.trim();
+      for (const option of holdingOptions.querySelectorAll('[data-item-dropdown-value]')) {
+        option.setAttribute('aria-selected', String(option === selectedHolding));
+        option.addEventListener('click', () => {
+          state.holdingMode = option.dataset.itemDropdownValue;
+          activeDialogPanel.dataset.dirty = 'true';
+          renderItemStates();
+        });
+      }
+      holdingTrigger.addEventListener('click', () => {
+        const open = holdingOptions.hidden;
+        for (const sibling of statesList.querySelectorAll('.item-state-entry-dropdown-open')) {
+          sibling.classList.remove('item-state-entry-dropdown-open');
+          sibling.querySelectorAll('[aria-expanded="true"]').forEach(trigger => trigger.setAttribute('aria-expanded', 'false'));
+          sibling.querySelectorAll('.workspace-item-dropdown-options, .pixel-combobox-options').forEach(options => { options.hidden = true; });
+        }
+        holdingOptions.hidden = !open;
+        holdingTrigger.setAttribute('aria-expanded', String(open));
+        entry.classList.toggle('item-state-entry-dropdown-open', open);
+      });
+
+      const textureRow = document.createElement('div');
+      textureRow.className = 'workspace-item-field-row';
+      const textureLabel = document.createElement('span');
+      textureLabel.textContent = 'Texture';
+      const textureCombobox = activeDialogPanel
+        .querySelector('[data-item-texture-combobox]')
+        .cloneNode(true);
+      textureRow.append(textureLabel, textureCombobox);
+      const textureInput = textureCombobox.querySelector('[data-item-texture-input]');
+      const textureButton = textureCombobox.querySelector('[data-item-texture-button]');
+      const textureOptions = textureCombobox.querySelector('[data-item-texture-options]');
+      const textureKey = state.holdingMode === '3d' ? 'geoTexture' : 'texture';
+      textureInput.value = '';
+      textureInput.dataset.value = '';
+      textureInput.dataset.selectedLabel = '';
+      for (const option of textureOptions.querySelectorAll('[data-item-texture-value]')) {
+        option.hidden = false;
+        const selected = option.dataset.itemTextureValue === state[textureKey];
+        option.setAttribute('aria-selected', String(selected));
+        option.addEventListener('click', () => {
+          state[textureKey] = option.dataset.itemTextureValue;
+          activeDialogPanel.dataset.dirty = 'true';
+          renderItemStates();
+        });
+        if (selected) {
+          textureInput.value = option.dataset.itemTextureLabel;
+          textureInput.dataset.value = option.dataset.itemTextureValue;
+          textureInput.dataset.selectedLabel = option.dataset.itemTextureLabel;
+        }
+      }
+      textureButton.addEventListener('click', () => {
+        const open = textureOptions.hidden;
+        for (const sibling of statesList.querySelectorAll('.item-state-entry-dropdown-open')) {
+          sibling.classList.remove('item-state-entry-dropdown-open');
+          sibling.querySelectorAll('[aria-expanded="true"]').forEach(trigger => trigger.setAttribute('aria-expanded', 'false'));
+          sibling.querySelectorAll('.workspace-item-dropdown-options, .pixel-combobox-options').forEach(options => { options.hidden = true; });
+        }
+        textureOptions.hidden = !open;
+        textureButton.setAttribute('aria-expanded', String(open));
+        entry.classList.toggle('item-state-entry-dropdown-open', open);
+        if (open) for (const option of textureOptions.children) option.hidden = false;
+      });
+      textureInput.addEventListener('input', () => {
+        const query = textureInput.value.trim().toLocaleLowerCase();
+        textureOptions.hidden = false;
+        textureButton.setAttribute('aria-expanded', 'true');
+        for (const option of textureOptions.children) {
+          option.hidden = Boolean(query)
+            && !option.dataset.itemTextureLabel.toLocaleLowerCase().includes(query);
+        }
+      });
+      body.append(holdingRow, textureRow);
+      if (state.holdingMode === '3d') {
+        const createModelRow = (label, key, accept) => {
+          const row = document.createElement('div');
+          row.className = 'workspace-item-field-row';
+          const rowLabel = document.createElement('span');
+          rowLabel.textContent = label;
+          const button = document.createElement('button');
+          button.className = 'pixel-button pixel-file-button';
+          button.type = 'button';
+          const buttonLabel = document.createElement('span');
+          buttonLabel.textContent = state[key] || 'Add';
+          button.append(buttonLabel);
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = accept;
+          input.hidden = true;
+          button.addEventListener('click', () => input.click());
+          input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            state[key] = file.name;
+            activeDialogPanel.dataset.dirty = 'true';
+            renderItemStates();
+          });
+          row.append(rowLabel, button, input);
+          return row;
+        };
+        body.append(
+          createModelRow('Model', 'geoModel', '.json,application/json'),
+          createModelRow('Display Model', 'displayModel', '.json,application/json'),
+        );
+      }
+      entry.append(titlebar, body);
+      return entry;
+    }));
+  };
+
+  statesAdd.addEventListener('click', () => {
+    if (!activeDialogPanel) return;
+    activeDialogPanel.itemStates.push({
+      holdingMode: 'generated', texture: '', geoTexture: '', geoModel: '', displayModel: '',
+    });
+    activeDialogPanel.dataset.dirty = 'true';
+    renderItemStates();
+  });
+
+  tagsOptions.addEventListener('click', event => {
+    const option = event.target.closest('[data-item-tag-value]');
+    if (!option || !activeDialogPanel) return;
+    const selectedTags = activeDialogPanel.itemTags || [];
+    const tag = option.dataset.itemTagValue;
+    activeDialogPanel.itemTags = selectedTags.includes(tag)
+      ? selectedTags.filter(value => value !== tag)
+      : [...selectedTags, tag];
+    activeDialogPanel.dataset.dirty = 'true';
+    renderItemTags();
+  });
+
+  const filterItemTags = () => {
+    const query = tagsSearchInput.value.trim().toLocaleLowerCase();
+    for (const option of tagsOptions.querySelectorAll('[data-item-tag-value]')) {
+      option.hidden = Boolean(query) && !option.dataset.itemTagValue.toLocaleLowerCase().includes(query);
+    }
+  };
+  tagsSearchInput.addEventListener('input', filterItemTags);
+  tagsSearchButton.addEventListener('click', () => {
+    filterItemTags();
+    tagsSearchInput.focus();
+  });
   let nextItemNumber = 1;
 
   const closeDropdowns = exceptDropdown => {
@@ -250,18 +586,26 @@ export const initializeItemEditorPage = ({
     }
   };
 
-  const checkboxState = (panel, key) => panel
-    .querySelector(`[data-item-checkbox="${key}"]`)
+  const findItemControl = (panel, selector) => panel.querySelector(selector)
+    || (activeDialogPanel === panel ? authoringDialogContent.querySelector(selector) : null);
+
+  const checkboxState = (panel, key) => findItemControl(panel, `[data-item-checkbox="${key}"]`)
     ?.getAttribute('aria-checked') === 'true';
 
   const syncConditionalFields = panel => {
-    for (const row of panel.querySelectorAll('[data-item-condition]')) {
+    const rows = [...panel.querySelectorAll('[data-item-condition]')];
+    if (activeDialogPanel === panel) rows.push(...authoringDialogContent.querySelectorAll('[data-item-condition]'));
+    for (const row of rows) {
       const visible = row.dataset.itemCondition.split(',').every(rawCondition => {
         const condition = rawCondition.trim();
         const inverted = condition.startsWith('!');
-        const key = inverted ? condition.slice(1) : condition;
-        const checked = checkboxState(panel, key);
-        return inverted ? !checked : checked;
+        const expression = inverted ? condition.slice(1) : condition;
+        const [key, expectedValue] = expression.split('=', 2);
+        const matches = expectedValue === undefined
+          ? checkboxState(panel, key)
+          : findItemControl(panel, `[data-item-dropdown="${key}"] [data-item-dropdown-button]`)
+            ?.dataset.value === expectedValue;
+        return inverted ? !matches : matches;
       });
       row.hidden = !visible;
     }
@@ -276,9 +620,17 @@ export const initializeItemEditorPage = ({
     const panel = fragment.querySelector('.workspace-item-editor');
     panel.id = panelId;
     panel.dataset.dirty = 'false';
+    panel.itemTags = [];
+    panel.itemAbilitySlots = [];
+    panel.itemAbilitiesEnabled = false;
+    panel.itemRecipes = {};
+    panel.itemStates = [{
+      holdingMode: 'generated', texture: '', geoTexture: '', geoModel: '', displayModel: '',
+    }];
     populateCreativeTabOptions(panel);
     host.append(fragment);
     const texturesReady = populateTextureOptions(panel);
+    panel.textureOptionsReady = texturesReady;
     const tabsReady = loadCreativeTabOptions().then(creativeTabs => {
       if (panel.isConnected) populateCreativeTabOptions(panel, creativeTabs);
     });
@@ -338,8 +690,13 @@ export const initializeItemEditorPage = ({
           };
           selectDropdown('holdingMode', data.holdingMode || 'generated');
           selectDropdown('creativeTab', data.creativeTab || '');
+          selectDropdown('toolType', data.toolType || 'sword');
+          selectDropdown('toolTier', data.toolTier || 'iron');
+          const savedTextureId = data.holdingMode === '3d'
+            ? String(data.geoTexture || data.texture || '')
+            : String(data.texture || '');
           const textureOption = panel.querySelector(
-            `[data-item-texture-value="${CSS.escape(String(data.texture || ''))}"]`,
+            `[data-item-texture-value="${CSS.escape(savedTextureId)}"]`,
           );
           if (textureOption) {
             const textureInput = panel.querySelector('[data-item-texture-input]');
@@ -348,6 +705,51 @@ export const initializeItemEditorPage = ({
             textureInput.dataset.selectedLabel = textureOption.dataset.itemTextureLabel;
             textureOption.setAttribute('aria-selected', 'true');
           }
+          for (const input of panel.querySelectorAll('[data-item-field]')) {
+            const key = input.dataset.itemField;
+            if (['itemId', 'displayName', 'stackSize'].includes(key) || data[key] === undefined || data[key] === null) continue;
+            input.value = String(data[key]);
+          }
+          for (const key of ['geoModel', 'displayModel']) {
+            const value = String(data[key] || '');
+            const button = panel.querySelector(`[data-item-file-button="${key}"]`);
+            const label = button?.querySelector('span');
+            if (label) label.textContent = value || 'Add';
+            if (value) button?.setAttribute('title', value);
+          }
+          for (const checkbox of panel.querySelectorAll('[data-item-checkbox]')) {
+            const key = checkbox.dataset.itemCheckbox;
+            const checked = key === 'multiState' ? Boolean(data.states?.length) : Boolean(data[key]);
+            checkbox.setAttribute('aria-checked', String(checked));
+          }
+          const setField = (key, value) => {
+            const input = panel.querySelector(`[data-item-field="${key}"]`);
+            if (input && value !== undefined && value !== null) input.value = String(value);
+          };
+          const setCheckbox = (key, checked) => panel
+            .querySelector(`[data-item-checkbox="${key}"]`)
+            ?.setAttribute('aria-checked', String(Boolean(checked)));
+          panel.itemAbilitySlots = Array.isArray(data.itemAbilitySlots) ? [...data.itemAbilitySlots] : [];
+          panel.itemAbilitiesEnabled = Boolean(data.itemAbilitiesEnabled);
+          panel.itemRecipes = data.recipes && typeof data.recipes === 'object' ? { ...data.recipes } : {};
+          setCheckbox('recipeEnabled', Object.keys(panel.itemRecipes).length > 0);
+          const crafting = panel.itemRecipes.shaped || panel.itemRecipes.shapeless;
+          setCheckbox('craftingEnabled', Boolean(crafting));
+          setField('craftingType', panel.itemRecipes.shapeless ? 'shapeless' : 'shaped');
+          setField('craftingCount', crafting?.count ?? 1);
+          for (const [prefix, recipeKey] of [
+            ['smelting', 'smelting'], ['blasting', 'blasting'], ['smoking', 'smoking'],
+            ['campfire', 'campfire'], ['stonecut', 'stonecutting'],
+          ]) setCheckbox(`${prefix}Enabled`, Boolean(panel.itemRecipes[recipeKey]));
+          const enabledMethods = new Set(Array.isArray(data.enabledMethods) ? data.enabledMethods : []);
+          for (const method of panel.querySelectorAll('[data-item-method]')) {
+            method.setAttribute('aria-checked', String(enabledMethods.has(method.dataset.itemMethod)));
+          }
+          panel.itemTags = Array.isArray(data.tags) ? [...data.tags] : [];
+          panel.itemStates = Array.isArray(data.states) && data.states.length
+            ? [...data.states]
+            : [{ holdingMode: 'generated', texture: '', geoTexture: '', geoModel: '', displayModel: '' }];
+          syncConditionalFields(panel);
           panel.dataset.dirty = 'false';
         })
         .catch(error => {
@@ -368,6 +770,12 @@ export const initializeItemEditorPage = ({
   };
 
   host.addEventListener('click', async event => {
+    const method = event.target.closest('[data-item-method]');
+    if (method) {
+      method.setAttribute('aria-checked', String(method.getAttribute('aria-checked') !== 'true'));
+      method.closest('.workspace-item-editor').dataset.dirty = 'true';
+      return;
+    }
     const checkbox = event.target.closest('[data-item-checkbox]');
     if (checkbox) {
       checkbox.setAttribute(
@@ -376,6 +784,38 @@ export const initializeItemEditorPage = ({
       );
       syncConditionalFields(checkbox.closest('.workspace-item-editor'));
       checkbox.closest('.workspace-item-editor').dataset.dirty = 'true';
+      return;
+    }
+
+    const fileButton = event.target.closest('[data-item-file-button]');
+    if (fileButton) {
+      const panel = fileButton.closest('.workspace-item-editor');
+      panel.querySelector(`[data-item-file-input="${fileButton.dataset.itemFileButton}"]`)?.click();
+      return;
+    }
+
+    const dialogAction = event.target.closest('[data-item-dialog-action]');
+    if (dialogAction) {
+      const panel = dialogAction.closest('.workspace-item-editor');
+      if (dialogAction.dataset.itemDialogAction === 'tags') {
+        openItemDialog(tagsDialog, panel, dialogAction);
+        tagsSearchInput.value = '';
+        await loadItemTagOptions();
+        filterItemTags();
+        positionDialogBeside(tagsDialog, dialogAction);
+        tagsSearchInput.focus();
+      } else if (dialogAction.dataset.itemDialogAction === 'states') {
+        openItemDialog(statesDialog, panel, dialogAction);
+        await panel.textureOptionsReady;
+        renderItemStates();
+        positionDialogBeside(statesDialog, dialogAction);
+      } else if (dialogAction.dataset.itemDialogAction === 'recipes') {
+        openAuthoringDialog(panel, dialogAction, 'recipes', 'Recipe');
+      } else if (dialogAction.dataset.itemDialogAction === 'tooltip') {
+        openAuthoringDialog(panel, dialogAction, 'tooltip', 'Tooltip');
+      } else if (dialogAction.dataset.itemDialogAction === 'customClass') {
+        openAuthoringDialog(panel, dialogAction, 'customClass', 'Custom Class');
+      }
       return;
     }
 
@@ -403,6 +843,54 @@ export const initializeItemEditorPage = ({
           panel.querySelector('[data-item-field="stackSize"]').value,
           10,
         ) || 64));
+        const authoringFields = {};
+        for (const input of panel.querySelectorAll('[data-item-field]')) {
+          const key = input.dataset.itemField;
+          if (['itemId', 'displayName', 'stackSize'].includes(key)) continue;
+          const rawValue = input.value.trim();
+          authoringFields[key] = ITEM_NUMERIC_FIELDS.has(key)
+            ? (rawValue === '' ? null : Number(rawValue))
+            : rawValue;
+        }
+        for (const key of ['toolType', 'toolTier']) {
+          const trigger = panel.querySelector(`[data-item-dropdown="${key}"] [data-item-dropdown-button]`);
+          authoringFields[key] = trigger?.dataset.value || (key === 'toolType' ? 'sword' : 'iron');
+        }
+        for (const checkbox of panel.querySelectorAll('[data-item-checkbox]')) {
+          const key = checkbox.dataset.itemCheckbox;
+          if (key === 'multiState') continue;
+          authoringFields[key] = checkbox.getAttribute('aria-checked') === 'true';
+        }
+        authoringFields.itemAbilitySlots = [...(panel.itemAbilitySlots || [])];
+        authoringFields.itemAbilitiesEnabled = Boolean(panel.itemAbilitiesEnabled);
+        const recipes = authoringFields.recipeEnabled ? { ...(panel.itemRecipes || {}) } : {};
+        if (authoringFields.recipeEnabled) {
+          delete recipes.shaped;
+          delete recipes.shapeless;
+          if (authoringFields.craftingEnabled) {
+            const type = authoringFields.craftingType === 'shapeless' ? 'shapeless' : 'shaped';
+            recipes[type] = { ...(panel.itemRecipes?.[type] || {}), count: authoringFields.craftingCount || 1 };
+          }
+          for (const [prefix, recipeKey] of [
+            ['smelting', 'smelting'], ['blasting', 'blasting'], ['smoking', 'smoking'],
+            ['campfire', 'campfire'], ['stonecut', 'stonecutting'],
+          ]) {
+            if (authoringFields[`${prefix}Enabled`]) recipes[recipeKey] ||= {};
+            else delete recipes[recipeKey];
+            delete authoringFields[`${prefix}Enabled`];
+          }
+          delete authoringFields.craftingEnabled;
+          delete authoringFields.craftingType;
+          delete authoringFields.craftingCount;
+        }
+        authoringFields.recipes = recipes;
+        delete authoringFields.recipeEnabled;
+        authoringFields.enabledMethods = [...panel.querySelectorAll('[data-item-method][aria-checked="true"]')]
+          .map(methodButton => methodButton.dataset.itemMethod);
+        authoringFields.geoTexture = holdingMode === '3d' ? textureId : String(authoringFields.geoTexture || '');
+        authoringFields.tags = [...(panel.itemTags || [])];
+        authoringFields.states = panel.querySelector('[data-item-checkbox="multiState"]')
+          ?.getAttribute('aria-checked') === 'true' ? [...(panel.itemStates || [])] : [];
         if (!itemId || !textureId) {
           status.textContent = 'Item ID and Texture are required.';
           return;
@@ -419,6 +907,7 @@ export const initializeItemEditorPage = ({
             holdingMode,
             stackSize,
             creativeTab,
+            authoringFields,
           });
           panel.dataset.created = 'true';
           panel.dataset.lastSavedId = itemId;
@@ -483,7 +972,7 @@ export const initializeItemEditorPage = ({
       options.hidden = !opening;
       textureButton.setAttribute('aria-expanded', String(opening));
       if (opening) {
-        filterTextureOptions(combobox);
+        filterTextureOptions(combobox, true);
         combobox.querySelector('[data-item-texture-input]').focus();
       }
       return;
@@ -500,6 +989,7 @@ export const initializeItemEditorPage = ({
       for (const sibling of option.parentElement.querySelectorAll('[role="option"]')) {
         sibling.setAttribute('aria-selected', String(sibling === option));
       }
+      syncConditionalFields(option.closest('.workspace-item-editor'));
       trigger.focus();
       option.closest('.workspace-item-editor').dataset.dirty = 'true';
       return;
@@ -532,6 +1022,35 @@ export const initializeItemEditorPage = ({
     filterTextureOptions(combobox);
   });
 
+  host.addEventListener('change', event => {
+    const fileInput = event.target.closest('[data-item-file-input]');
+    const file = fileInput?.files?.[0];
+    if (!fileInput || !file) return;
+    const panel = fileInput.closest('.workspace-item-editor');
+    const key = fileInput.dataset.itemFileInput;
+    const valueInput = panel.querySelector(`[data-item-field="${key}"]`);
+    const button = panel.querySelector(`[data-item-file-button="${key}"]`);
+    if (valueInput) valueInput.value = file.name;
+    const label = button?.querySelector('span');
+    if (label) label.textContent = file.name;
+    button?.setAttribute('title', file.name);
+    panel.dataset.dirty = 'true';
+  });
+
+  authoringDialog.addEventListener('click', event => {
+    const method = event.target.closest('[data-item-method]');
+    if (method && activeDialogPanel) {
+      method.setAttribute('aria-checked', String(method.getAttribute('aria-checked') !== 'true'));
+      activeDialogPanel.dataset.dirty = 'true';
+      return;
+    }
+    const checkbox = event.target.closest('[data-item-checkbox]');
+    if (!checkbox || !activeDialogPanel) return;
+    checkbox.setAttribute('aria-checked', String(checkbox.getAttribute('aria-checked') !== 'true'));
+    activeDialogPanel.dataset.dirty = 'true';
+    syncConditionalFields(activeDialogPanel);
+  });
+
   host.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
     const dropdown = event.target.closest('.workspace-item-dropdown, [data-item-texture-combobox]');
@@ -539,6 +1058,32 @@ export const initializeItemEditorPage = ({
     const trigger = dropdown.querySelector('[data-item-dropdown-button], [data-item-texture-input]');
     closeDropdowns();
     trigger.focus();
+  });
+
+  document.addEventListener('pointerdown', event => {
+    if (!tagsDialog.hidden && !event.target.closest('#item-tags-dialog, [data-item-dialog-action="tags"]')) {
+      closeItemDialog(tagsDialog);
+    }
+    if (!statesDialog.hidden && !event.target.closest('#item-states-dialog, [data-item-dialog-action="states"]')) {
+      closeItemDialog(statesDialog);
+    }
+    if (!authoringDialog.hidden && !event.target.closest('#item-authoring-dialog, [data-item-dialog-action="recipes"], [data-item-dialog-action="tooltip"], [data-item-dialog-action="customClass"]')) {
+      closeItemDialog(authoringDialog);
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (!tagsDialog.hidden) {
+      closeItemDialog(tagsDialog);
+      event.stopImmediatePropagation();
+    } else if (!statesDialog.hidden) {
+      closeItemDialog(statesDialog);
+      event.stopImmediatePropagation();
+    } else if (!authoringDialog.hidden) {
+      closeItemDialog(authoringDialog);
+      event.stopImmediatePropagation();
+    }
   });
 
   return { addItemWorkspace, closeSavedItemWorkspaces, closeDropdowns };
