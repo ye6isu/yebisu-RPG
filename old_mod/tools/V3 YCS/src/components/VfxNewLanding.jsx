@@ -61,18 +61,40 @@ const EASING_PRESET_FAMILIES = [
   { label: 'Elastic', type: 'elastic', amountLabel: 'Amount', defaultAmount: 1, min: 0, max: 4, step: 0.1 },
   { label: 'Bounce', type: 'bounce', amountLabel: 'Strength', defaultAmount: 1, min: 0, max: 4, step: 0.1 },
 ];
+const OBJECT_TYPE_OPTIONS = [
+  { value: 'plane', label: 'Plane' },
+  { value: 'emitter', label: 'Emitter' },
+];
 
 function sanitizeId(value) {
   return String(value || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 }
 
-function makeObjectId(objects) {
-  let index = objects.length + 1;
-  while (objects.some(object => object.id === `plane_${index}`)) index += 1;
-  return `plane_${index}`;
+function makeObjectIdentity(objects, type) {
+  const label = type === 'emitter' ? 'Emitter' : 'Plane';
+  let index = 1;
+  let name = `${label} ${index}`;
+  let id = sanitizeId(name);
+  while (objects.some(object => object.id === id)) {
+    index += 1;
+    name = `${label} ${index}`;
+    id = sanitizeId(name);
+  }
+  return { id, name };
 }
 
 function objectDefaults(overrides = {}) {
+  if (overrides.type === 'emitter') {
+    return {
+      id: '',
+      name: 'Emitter',
+      type: 'emitter',
+      start: 0,
+      end: 100,
+      expanded: false,
+      ...overrides,
+    };
+  }
   const position = overrides.position || { x: '0', y: '0', z: '0' };
   const pivot = overrides.pivot || { x: '0', y: '0', z: '0' };
   return {
@@ -81,7 +103,6 @@ function objectDefaults(overrides = {}) {
     type: 'plane',
     position,
     pivot,
-    baseRotation: { x: '0', y: '0', z: '0' },
     rotation: { x: '0', y: '0', z: '0' },
     scale: { x: '1', y: '1', z: '1' },
     width: '1',
@@ -107,7 +128,7 @@ function number(value, fallback = 0) {
 }
 
 function authoredObject(object) {
-  const { start, end, expanded, ...source } = object;
+  const { start, end, expanded, baseRotation: _legacyBaseRotation, ...source } = object;
   const startTick = clamp(Math.floor(number(start, 0)), MIN_TIMELINE_TICK, MAX_TIMELINE_TICK - 1);
   const endTick = clamp(
     Math.floor(number(end, startTick + 1)),
@@ -160,11 +181,6 @@ function runtimePlane(effectId, source) {
       y: number(object.pivot?.y),
       z: number(object.pivot?.z),
     },
-    baseRotation: {
-      x: number(object.baseRotation?.x),
-      y: number(object.baseRotation?.y),
-      z: number(object.baseRotation?.z),
-    },
     rotation: {
       x: number(object.rotation?.x),
       y: number(object.rotation?.y),
@@ -196,6 +212,89 @@ function runtimePlane(effectId, source) {
     scaleZKeyframes: runtimeKeyframes(object, 'scaleZ', 1),
     opacityKeyframes: runtimeKeyframes(object, 'opacity', 1),
   };
+}
+
+function runtimeEmitter(source) {
+  const object = authoredObject(source);
+  return {
+    id: sanitizeId(object.id) || 'emitter',
+    name: object.name,
+    type: 'emitter',
+    startTick: number(object.startTick),
+    endTick: number(object.endTick, 1),
+  };
+}
+
+function runtimeObject(effectId, source) {
+  return source.type === 'emitter'
+    ? runtimeEmitter(source)
+    : runtimePlane(effectId, source);
+}
+
+function timelinePropertiesForObject(object) {
+  return object.type === 'plane' ? TIMELINE_PROPERTIES : [];
+}
+
+function LegacyObjectAddMenu({ onAdd }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const closeOutside = event => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', closeOutside);
+    return () => document.removeEventListener('mousedown', closeOutside);
+  }, []);
+
+  return (
+    <div ref={menuRef} className="vfx-new-add-object-menu">
+      <button
+        className="ycs-button vfx-new-add-object-button"
+        type="button"
+        onClick={() => setOpen(current => !current)}
+        title="Add VFX object"
+        aria-label="Add VFX object"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span aria-hidden="true">+</span>
+        <span className="vfx-new-add-object-chevron" aria-hidden="true">▼</span>
+      </button>
+      {open && (
+        <div className="dropdown vfx-new-add-object-dropdown" role="menu">
+          {OBJECT_TYPE_OPTIONS.map(option => (
+            <button
+              key={option.value}
+              className="dropdown-item"
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onAdd(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ObjectAddButton({ onAdd }) {
+  return (
+    <button
+      className="ycs-button icon vfx-new-add-object-button vfx-new-add-object-button-direct"
+      type="button"
+      onClick={() => onAdd('plane')}
+      title="Add Plane"
+      aria-label="Add Plane"
+    >
+      <span aria-hidden="true">+</span>
+    </button>
+  );
 }
 
 async function removeInjections(injections) {
@@ -808,7 +907,6 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
   const keyframeDragRef = useRef(null);
   const keyframeMarqueeRef = useRef(null);
   const previewTickRef = useRef(previewTick);
-  const nextPlaneNumberRef = useRef(1);
   const leftTimelineScrollRef = useRef(null);
   const rightTimelineScrollRef = useRef(null);
   const paneSizesRef = useRef({ leftWidth, rightWidth, bottomHeight, bottomLeftWidth, curveHeight });
@@ -823,14 +921,15 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
   const selectedObject = timelineObjects.find(object => object.id === selectedObjectId) ?? null;
   let timelineContentHeight = 0;
   const timelineObjectLayout = visibleTimelineObjects.map(object => {
+    const properties = timelinePropertiesForObject(object);
     const top = timelineContentHeight;
     timelineContentHeight += TIMELINE_ROW_HEIGHT
-      + (object.expanded ? TIMELINE_PROPERTIES.length * TIMELINE_ROW_HEIGHT : 0);
+      + (object.expanded ? properties.length * TIMELINE_ROW_HEIGHT : 0);
     const startPosition = ((object.start - timelineView.start) / timelineSpan) * 100;
     const endPosition = ((object.end - timelineView.start) / timelineSpan) * 100;
     const left = bufferedPreviewPixelPosition(startPosition, previewBarWidth);
     const right = bufferedPreviewPixelPosition(endPosition, previewBarWidth);
-    return { ...object, top, left, right };
+    return { ...object, properties, top, left, right };
   });
   const verticalScrollContentKey = visibleTimelineObjects
     .map(object => `${object.id}:${object.expanded}`)
@@ -879,7 +978,6 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
       setSelectedObjectId(null);
       setSelectedKeyframes([]);
       setCurrentInjections([]);
-      nextPlaneNumberRef.current = 1;
       return;
     }
 
@@ -890,13 +988,18 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
         if (cancelled) return;
         const loaded = JSON.parse(raw);
         const duration = clamp(Math.floor(number(loaded.durationTicks, 100)), 1, 12000);
-        const objects = (loaded.objects || []).map((object, index) => objectDefaults({
-          ...object,
-          id: object.id || `plane_${index + 1}`,
-          name: object.name || object.id || `Plane ${index + 1}`,
-          start: number(object.startTick, 0),
-          end: number(object.endTick, duration),
-        }));
+        const objects = (loaded.objects || []).map((object, index) => {
+          const type = object.type === 'emitter' ? 'emitter' : 'plane';
+          const fallbackName = `${type === 'emitter' ? 'Emitter' : 'Plane'} ${index + 1}`;
+          return objectDefaults({
+            ...object,
+            type,
+            id: object.id || sanitizeId(fallbackName),
+            name: object.name || object.id || fallbackName,
+            start: number(object.startTick, 0),
+            end: number(object.endTick, duration),
+          });
+        });
         setEffectEditorId(loaded.id || effectId);
         setEffectName(loaded.name || loaded.id || effectId);
         setDurationTicks(duration);
@@ -906,7 +1009,6 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
         setSelectedObjectId(objects[0]?.id || null);
         setSelectedKeyframes([]);
         setCurrentInjections(Array.isArray(loaded._injections) ? loaded._injections : []);
-        nextPlaneNumberRef.current = objects.length + 1;
       })
       .catch(error => {
         if (!cancelled) setStatus({ ok: false, message: String(error) });
@@ -1185,19 +1287,18 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
     setTimelineView({ start: 0, end: nextDuration });
   };
 
-  const addPlane = () => {
+  const addObject = type => {
     setTimelineObjects(current => {
-      const id = makeObjectId(current);
-      const planeNumber = nextPlaneNumberRef.current;
-      nextPlaneNumberRef.current += 1;
-      const plane = objectDefaults({
-        id,
-        name: `Plane ${planeNumber}`,
+      const identity = makeObjectIdentity(current, type);
+      const object = objectDefaults({
+        ...identity,
+        type,
         start: 0,
         end: durationTicks,
       });
-      setSelectedObjectId(id);
-      return [...current, plane];
+      setSelectedObjectId(identity.id);
+      setSelectedKeyframes([]);
+      return [...current, object];
     });
   };
 
@@ -1215,7 +1316,9 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
 
   const toggleObjectExpanded = objectId => {
     setTimelineObjects(current => current.map(object => (
-      object.id === objectId ? { ...object, expanded: !object.expanded } : object
+      object.id === objectId && timelinePropertiesForObject(object).length > 0
+        ? { ...object, expanded: !object.expanded }
+        : object
     )));
   };
 
@@ -1290,62 +1393,74 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
     }));
   };
 
+  const writeObjectVectorAtPreviewTick = (object, field, nextValue) => {
+    const keyframeFields = propertyKeyframeFields(object, field);
+    const animated = keyframeFields.some(keyframeField => keyframesForField(object, keyframeField).length > 0);
+    if (!animated) return { ...object, [field]: authoredKeyframeValue(nextValue) };
+    if (keyframeFields.length === 1) {
+      const keyframeField = `${keyframeFields[0]}Keyframes`;
+      const keyframes = keyframesForField(object, keyframeFields[0]);
+      const keyframeIndex = keyframes.findIndex(keyframe => sameKeyframeTick(keyframe.tick, previewTick));
+      if (keyframeIndex < 0) {
+        return {
+          ...object,
+          [keyframeField]: [...keyframes, {
+            id: makeKeyframeId(keyframes, keyframeFields[0]),
+            tick: String(previewTick),
+            value: authoredKeyframeValue(nextValue),
+            easing: linearEasing(),
+          }].sort((first, second) => number(first.tick) - number(second.tick)),
+        };
+      }
+      return {
+        ...object,
+        [keyframeField]: keyframes.map((keyframe, index) => (
+          index === keyframeIndex
+            ? { ...keyframe, value: authoredKeyframeValue(nextValue) }
+            : keyframe
+        )),
+      };
+    }
+    const patch = {};
+    keyframeFields.forEach((keyframeName, index) => {
+      const keyframeField = `${keyframeName}Keyframes`;
+      const keyframes = keyframesForField(object, keyframeName);
+      const keyframeIndex = keyframes.findIndex(keyframe => sameKeyframeTick(keyframe.tick, previewTick));
+      const axisName = ['x', 'y', 'z'][index];
+      if (keyframeIndex < 0) {
+        patch[keyframeField] = [...keyframes, {
+          id: makeKeyframeId(keyframes, keyframeName),
+          tick: String(previewTick),
+          value: String(nextValue[axisName]),
+          easing: linearEasing(),
+        }].sort((first, second) => number(first.tick) - number(second.tick));
+      } else {
+        patch[keyframeField] = keyframes.map((keyframe, keyframeArrayIndex) => (
+          keyframeArrayIndex === keyframeIndex
+            ? { ...keyframe, value: String(nextValue[axisName]) }
+            : keyframe
+        ));
+      }
+    });
+    return { ...object, ...patch };
+  };
+
   const updateObjectVector = (objectId, field, axis, value) => {
     setPlaying(false);
     setTimelineObjects(current => current.map(object => {
       if (object.id !== objectId) return object;
-      const keyframeFields = propertyKeyframeFields(object, field);
-      const animated = keyframeFields.some(keyframeField => keyframesForField(object, keyframeField).length > 0);
-      if (!animated) return { ...object, [field]: { ...object[field], [axis]: value } };
       const currentValue = propertyValueAtTick(object, field, previewTick);
-      const nextValue = { ...currentValue, [axis]: value };
-      if (keyframeFields.length === 1) {
-        const keyframeField = `${keyframeFields[0]}Keyframes`;
-        const keyframes = keyframesForField(object, keyframeFields[0]);
-        const keyframeIndex = keyframes.findIndex(keyframe => sameKeyframeTick(keyframe.tick, previewTick));
-        if (keyframeIndex < 0) {
-          return {
-            ...object,
-            [keyframeField]: [...keyframes, {
-              id: makeKeyframeId(keyframes, keyframeFields[0]),
-              tick: String(previewTick),
-              value: authoredKeyframeValue(nextValue),
-              easing: linearEasing(),
-            }].sort((first, second) => number(first.tick) - number(second.tick)),
-          };
-        }
-        return {
-          ...object,
-          [keyframeField]: keyframes.map((keyframe, index) => (
-            index === keyframeIndex
-              ? { ...keyframe, value: authoredKeyframeValue(nextValue) }
-              : keyframe
-          )),
-        };
-      }
-      const patch = {};
-      keyframeFields.forEach((keyframeName, index) => {
-        const keyframeField = `${keyframeName}Keyframes`;
-        const keyframes = keyframesForField(object, keyframeName);
-        const keyframeIndex = keyframes.findIndex(keyframe => sameKeyframeTick(keyframe.tick, previewTick));
-        const axisName = ['x', 'y', 'z'][index];
-        if (keyframeIndex < 0) {
-          patch[keyframeField] = [...keyframes, {
-            id: makeKeyframeId(keyframes, keyframeName),
-            tick: String(previewTick),
-            value: String(nextValue[axisName]),
-            easing: linearEasing(),
-          }].sort((first, second) => number(first.tick) - number(second.tick));
-        } else {
-          patch[keyframeField] = keyframes.map((keyframe, keyframeArrayIndex) => (
-            keyframeArrayIndex === keyframeIndex
-              ? { ...keyframe, value: String(nextValue[axisName]) }
-              : keyframe
-          ));
-        }
-      });
-      return { ...object, ...patch };
+      return writeObjectVectorAtPreviewTick(object, field, { ...currentValue, [axis]: value });
     }));
+  };
+
+  const updateObjectVectorFromViewport = (objectId, field, value) => {
+    setPlaying(false);
+    setTimelineObjects(current => current.map(object => (
+      object.id === objectId
+        ? writeObjectVectorAtPreviewTick(object, field, value)
+        : object
+    )));
   };
 
   const updateObjectScalar = (objectId, field, value) => {
@@ -1506,7 +1621,7 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
       setStatus({ ok: false, message: 'ID is required.' });
       return;
     }
-    if (timelineObjects.some(object => !object.texture)) {
+    if (timelineObjects.some(object => object.type === 'plane' && !object.texture)) {
       setStatus({ ok: false, message: 'Every plane needs a texture.' });
       return;
     }
@@ -1521,10 +1636,11 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
     try {
       await removeInjections(currentInjections);
       const duration = clamp(Math.floor(number(durationTicks, 100)), 1, 12000);
-      const runtimeObjects = timelineObjects.map(object => runtimePlane(id, object));
+      const runtimeObjects = timelineObjects.map(object => runtimeObject(id, object));
       const injections = [];
 
       for (let index = 0; index < timelineObjects.length; index += 1) {
+        if (timelineObjects[index].type !== 'plane') continue;
         const textureFile = `resources/assets/yebisurpg/textures/vfx/${id}/${runtimeObjects[index].id}.png`;
         await invoke('copy_texture_to_mod', {
           textureId: timelineObjects[index].texture,
@@ -2053,7 +2169,7 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
           </div>
           <div className="vfx-new-objects-header">
             <span>Objects</span>
-            <button className="ycs-button icon" type="button" onClick={addPlane} title="Add Plane" aria-label="Add Plane">+</button>
+            <ObjectAddButton onAdd={addObject} />
           </div>
           <div className="vfx-new-object-list-shell">
             <div ref={objectListScrollRef} className="vfx-new-object-list">
@@ -2075,7 +2191,7 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
                     }
                   }}
                 >
-                  <span className="vfx-new-object-icon" />
+                  <span className={`vfx-new-object-icon ${object.type}`} title={object.type === 'emitter' ? 'Emitter' : 'Plane'} />
                   {renamingObject?.id === object.id && renamingObject.source === 'objects' ? (
                     <input
                       autoFocus
@@ -2146,6 +2262,8 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
           selectedId={selectedObjectId}
           textureUrls={textureUrls}
           previewTick={previewTick}
+          onTransformStart={() => setPlaying(false)}
+          onTransformChange={updateObjectVectorFromViewport}
         />
 
         <div
@@ -2164,12 +2282,14 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
               <div className="vfx-new-inspector-fields-inner">
                 {selectedObject ? (
                   <>
-                    <FieldRow label="Name / Object ID">
+                    <FieldRow label="Name">
                       <StringField
                         value={selectedObject.name}
                         onChange={value => updateObjectIdentity(selectedObject.id, value)}
                       />
                     </FieldRow>
+                    {selectedObject.type === 'plane' && (
+                      <>
                     <FieldRow label="Texture">
                       <StandardDropdownField
                         value={selectedObject.texture}
@@ -2190,15 +2310,6 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
                       <VectorFields
                         value={inspectorPropertyValue(selectedObject, 'scale', previewTick)}
                         onChange={(axis, value) => updateObjectVector(selectedObject.id, 'scale', axis, value)}
-                      />
-                    </FieldRow>
-                    <FieldRow label="Plane Rotation">
-                      <VectorFields
-                        value={selectedObject.baseRotation}
-                        onChange={(axis, value) => updateObject(selectedObject.id, {
-                          baseRotation: { ...selectedObject.baseRotation, [axis]: value },
-                        })}
-                        dragStep={1}
                       />
                     </FieldRow>
                     <FieldRow label="Position">
@@ -2267,6 +2378,8 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
                         />
                       </div>
                     </FieldRow>
+                      </>
+                    )}
                   </>
                 ) : (
                   <div className="vfx-new-inspector-empty">Select an object.</div>
@@ -2395,19 +2508,23 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
                     }}
                   >
                     <div className="vfx-new-timeline-layer-row">
-                      <button
-                        type="button"
-                        className={`vfx-new-timeline-disclosure ${object.expanded ? 'expanded' : ''}`}
-                        onClick={event => {
-                          event.stopPropagation();
-                          toggleObjectExpanded(object.id);
-                        }}
-                        title={object.expanded ? `Collapse ${object.name}` : `Expand ${object.name}`}
-                        aria-label={object.expanded ? `Collapse ${object.name}` : `Expand ${object.name}`}
-                        aria-expanded={object.expanded}
-                      >
-                        <span />
-                      </button>
+                      {object.properties.length > 0 ? (
+                        <button
+                          type="button"
+                          className={`vfx-new-timeline-disclosure ${object.expanded ? 'expanded' : ''}`}
+                          onClick={event => {
+                            event.stopPropagation();
+                            toggleObjectExpanded(object.id);
+                          }}
+                          title={object.expanded ? `Collapse ${object.name}` : `Expand ${object.name}`}
+                          aria-label={object.expanded ? `Collapse ${object.name}` : `Expand ${object.name}`}
+                          aria-expanded={object.expanded}
+                        >
+                          <span />
+                        </button>
+                      ) : (
+                        <span className="vfx-new-timeline-disclosure-spacer" aria-hidden="true" />
+                      )}
                       {renamingObject?.id === object.id && renamingObject.source === 'timeline' ? (
                         <input
                           autoFocus
@@ -2430,7 +2547,7 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
                       )}
                     </div>
                   </div>
-                  {object.expanded && TIMELINE_PROPERTIES.map(property => (
+                  {object.expanded && object.properties.map(property => (
                     <div
                       key={property}
                       className="vfx-new-timeline-property-row"
@@ -2531,7 +2648,7 @@ function VfxNewLanding({ effectId = null, onBack = () => {}, isActive = false })
               <div className="vfx-new-timeline-track-rows" style={{ height: Math.max(TIMELINE_ROW_HEIGHT, timelineContentHeight) }}>
                 {timelineObjectLayout.map(object => (
                   <div key={object.id}>
-                    {object.expanded && TIMELINE_PROPERTIES.map((property, index) => (
+                    {object.expanded && object.properties.map((property, index) => (
                       <div
                         key={property}
                         className="vfx-new-timeline-property-track"

@@ -74,6 +74,48 @@
   font-weight: 600;
 }
 
+.vfx-new-add-object-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.vfx-new-add-object-button {
+  width: 40px;
+  height: 28px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.vfx-new-add-object-button-direct {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
+.vfx-new-add-object-chevron {
+  font-size: 7px;
+  opacity: 0.7;
+}
+
+.dropdown.vfx-new-add-object-dropdown {
+  left: auto;
+  right: 0;
+  width: 160px;
+  min-width: 160px;
+  overflow: hidden;
+}
+
+.vfx-new-add-object-dropdown .dropdown-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+}
+
 .vfx-new-object-list-shell {
   position: relative;
   flex: 1 1 auto;
@@ -129,6 +171,10 @@
   flex: 0 0 12px;
   border: 1px solid currentColor;
   box-sizing: border-box;
+}
+
+.vfx-new-object-icon.emitter {
+  border-radius: 50%;
 }
 
 .vfx-new-object-name {
@@ -772,6 +818,12 @@
   background: transparent;
   color: var(--ycs-text);
   cursor: pointer;
+}
+
+.vfx-new-timeline-disclosure-spacer {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
 }
 
 .vfx-new-timeline-disclosure > span {
