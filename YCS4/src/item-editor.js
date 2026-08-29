@@ -248,9 +248,14 @@ export const initializeItemEditorPage = ({
   const statesDialog = document.getElementById('item-states-dialog');
   const statesList = document.getElementById('item-states-list');
   const statesAdd = document.getElementById('item-states-add');
+  const recipeDialog = document.getElementById('item-recipe-dialog');
+  const recipeDialogContent = document.getElementById('item-recipe-dialog-content');
   const authoringDialog = document.getElementById('item-authoring-dialog');
   const authoringDialogTitle = document.getElementById('item-authoring-dialog-title');
   const authoringDialogContent = document.getElementById('item-authoring-dialog-content');
+  const recipeAddControl = document.getElementById('item-recipe-add-control');
+  const recipeAddButton = document.getElementById('item-recipe-add');
+  const recipeAddOptions = document.getElementById('item-recipe-add-options');
   let activeDialogPanel = null;
   let activeDialogAnchor = null;
   let activeAuthoringFields = null;
@@ -261,6 +266,14 @@ export const initializeItemEditorPage = ({
       fields.hidden = true;
       parent.insertBefore(fields, nextSibling);
       activeAuthoringFields = null;
+    }
+    if (dialog === authoringDialog) {
+      authoringDialog.classList.remove('item-tooltip-dialog');
+    }
+    if (dialog === recipeDialog) {
+      recipeAddControl.hidden = true;
+      recipeAddOptions.hidden = true;
+      recipeAddButton.setAttribute('aria-expanded', 'false');
     }
     dialog.hidden = true;
     activeDialogPanel = null;
@@ -276,11 +289,123 @@ export const initializeItemEditorPage = ({
     activeAuthoringFields = { fields, parent: fields.parentNode, nextSibling: fields.nextSibling };
     openItemDialog(authoringDialog, panel, anchor);
     authoringDialogTitle.textContent = title;
+    authoringDialog.classList.toggle('item-tooltip-dialog', key === 'tooltip');
     fields.hidden = false;
     authoringDialogContent.replaceChildren(fields);
     syncConditionalFields(panel);
     positionDialogBeside(authoringDialog, anchor);
+    if (key === 'tooltip') requestAnimationFrame(() => {
+      resizeTooltipTextareas(fields);
+      positionDialogBeside(authoringDialog, anchor);
+    });
   };
+
+  const resizeTooltipTextarea = textarea => {
+    textarea.style.height = '';
+    const styles = getComputedStyle(textarea);
+    const borderHeight = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth);
+    const minimumHeight = Number.parseFloat(styles.minHeight) || 0;
+    textarea.style.height = `${Math.max(minimumHeight, textarea.scrollHeight + borderHeight)}px`;
+  };
+
+  const resizeTooltipTextareas = root => {
+    for (const textarea of root.querySelectorAll('.item-tooltip-textarea:not([hidden])')) {
+      resizeTooltipTextarea(textarea);
+    }
+  };
+
+  const recipeLabels = {
+    shaped: 'Shaped Crafting', shapeless: 'Shapeless Crafting', smelting: 'Smelting',
+    blasting: 'Blasting', smoking: 'Smoking', campfire: 'Campfire', stonecutting: 'Stonecutting',
+  };
+
+  const normalizeItemRecipes = value => {
+    if (Array.isArray(value)) {
+      return value
+        .filter(recipe => recipe && typeof recipe === 'object' && typeof recipe.type === 'string')
+        .map(recipe => ({ ...recipe }));
+    }
+    if (!value || typeof value !== 'object') return [];
+    return Object.entries(value)
+      .map(([type, recipe]) => ({
+        ...(recipe && typeof recipe === 'object' ? recipe : {}),
+        type,
+      }));
+  };
+
+  const syncRecipeOptionStackPositions = () => {
+    const options = [...recipeAddOptions.querySelectorAll('[data-item-recipe-type]')];
+    const visibleOptions = options.filter(option => !option.hidden);
+    for (const option of options) delete option.dataset.stackPosition;
+    for (const [index, option] of visibleOptions.entries()) {
+      option.dataset.stackPosition = visibleOptions.length === 1
+        ? 'only'
+        : index === 0
+          ? 'first'
+          : index === visibleOptions.length - 1
+            ? 'last'
+            : 'middle';
+    }
+  };
+
+  const renderItemRecipes = () => {
+    if (!activeDialogPanel || recipeDialog.hidden) return;
+    const recipes = activeDialogPanel.itemRecipes || [];
+    const typeNumbers = new Map();
+    recipeDialogContent.replaceChildren(...recipes
+      .map((recipe, index) => ({ recipe, index }))
+      .filter(({ recipe }) => recipeLabels[recipe.type])
+      .map(({ recipe, index }) => {
+        const type = recipe.type;
+        const typeNumber = (typeNumbers.get(type) || 0) + 1;
+        typeNumbers.set(type, typeNumber);
+        const entry = document.createElement('section');
+        entry.className = 'item-recipe-entry';
+        const titlebar = document.createElement('header');
+        titlebar.className = 'floating-dialog-titlebar item-recipe-entry-titlebar';
+        const title = document.createElement('span');
+        title.className = 'floating-dialog-title';
+        title.textContent = `${recipeLabels[type]} ${typeNumber}`;
+        const remove = document.createElement('button');
+        remove.className = 'dialogue-title-button floating-dialog-close';
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Remove ${recipeLabels[type]} recipe`);
+        const removeIcon = document.createElement('img');
+        removeIcon.src = './assets/sprite/generated/dialogue_icon_2x.png';
+        removeIcon.alt = '';
+        removeIcon.draggable = false;
+        remove.append(removeIcon);
+        remove.addEventListener('click', () => {
+          activeDialogPanel.itemRecipes.splice(index, 1);
+          activeDialogPanel.dataset.dirty = 'true';
+          renderItemRecipes();
+        });
+        const body = document.createElement('div');
+        body.className = 'item-recipe-entry-body';
+        titlebar.append(title, remove);
+        entry.append(titlebar, body);
+        return entry;
+      }));
+    for (const option of recipeAddOptions.querySelectorAll('[data-item-recipe-type]')) option.hidden = false;
+    syncRecipeOptionStackPositions();
+    requestAnimationFrame(() => positionDialogBeside(recipeDialog, activeDialogAnchor));
+  };
+
+  recipeAddButton.addEventListener('click', () => {
+    const open = recipeAddOptions.hidden;
+    recipeAddOptions.hidden = !open;
+    recipeAddButton.setAttribute('aria-expanded', String(open));
+  });
+
+  recipeAddOptions.addEventListener('click', event => {
+    const option = event.target.closest('[data-item-recipe-type]');
+    if (!option || !activeDialogPanel) return;
+    activeDialogPanel.itemRecipes.push({ type: option.dataset.itemRecipeType });
+    activeDialogPanel.dataset.dirty = 'true';
+    recipeAddOptions.hidden = true;
+    recipeAddButton.setAttribute('aria-expanded', 'false');
+    renderItemRecipes();
+  });
 
   const renderItemTags = () => {
     if (!activeDialogPanel) return;
@@ -369,6 +494,7 @@ export const initializeItemEditorPage = ({
     if (event.target instanceof Node && dialogLayer.contains(event.target)) return;
     if (!tagsDialog.hidden) closeItemDialog(tagsDialog);
     if (!statesDialog.hidden) closeItemDialog(statesDialog);
+    if (!recipeDialog.hidden) closeItemDialog(recipeDialog);
     if (!authoringDialog.hidden) closeItemDialog(authoringDialog);
   };
 
@@ -376,6 +502,7 @@ export const initializeItemEditorPage = ({
   window.addEventListener('resize', () => {
     if (!tagsDialog.hidden && activeDialogAnchor) positionDialogBeside(tagsDialog, activeDialogAnchor);
     if (!statesDialog.hidden && activeDialogAnchor) positionDialogBeside(statesDialog, activeDialogAnchor);
+    if (!recipeDialog.hidden && activeDialogAnchor) positionDialogBeside(recipeDialog, activeDialogAnchor);
     if (!authoringDialog.hidden && activeDialogAnchor) positionDialogBeside(authoringDialog, activeDialogAnchor);
   }, { passive: true });
 
@@ -391,23 +518,21 @@ export const initializeItemEditorPage = ({
       title.className = 'floating-dialog-title';
       title.textContent = `State ${index + 2}`;
       titlebar.append(title);
-      if (index > 0) {
-        const remove = document.createElement('button');
-        remove.className = 'dialogue-title-button floating-dialog-close';
-        remove.type = 'button';
-        remove.setAttribute('aria-label', `Delete State ${index + 2}`);
-        const removeIcon = document.createElement('img');
-        removeIcon.src = './assets/sprite/generated/dialogue_icon_2x.png';
-        removeIcon.alt = '';
-        removeIcon.draggable = false;
-        remove.append(removeIcon);
-        remove.addEventListener('click', () => {
-          activeDialogPanel.itemStates.splice(index, 1);
-          activeDialogPanel.dataset.dirty = 'true';
-          renderItemStates();
-        });
-        titlebar.append(remove);
-      }
+      const remove = document.createElement('button');
+      remove.className = 'dialogue-title-button floating-dialog-close';
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Delete State ${index + 2}`);
+      const removeIcon = document.createElement('img');
+      removeIcon.src = './assets/sprite/generated/dialogue_icon_2x.png';
+      removeIcon.alt = '';
+      removeIcon.draggable = false;
+      remove.append(removeIcon);
+      remove.addEventListener('click', () => {
+        activeDialogPanel.itemStates.splice(index, 1);
+        activeDialogPanel.dataset.dirty = 'true';
+        renderItemStates();
+      });
+      titlebar.append(remove);
 
       const body = document.createElement('div');
       body.className = 'item-state-entry-body';
@@ -536,6 +661,17 @@ export const initializeItemEditorPage = ({
     }));
   };
 
+  const closeItemStateDropdowns = exceptControl => {
+    for (const entry of statesList.querySelectorAll('.item-state-entry-dropdown-open')) {
+      const openControl = entry.querySelector('[aria-expanded="true"]')
+        ?.closest('.workspace-item-dropdown, .pixel-combobox');
+      if (exceptControl && openControl === exceptControl) continue;
+      entry.classList.remove('item-state-entry-dropdown-open');
+      entry.querySelectorAll('[aria-expanded="true"]').forEach(trigger => trigger.setAttribute('aria-expanded', 'false'));
+      entry.querySelectorAll('.workspace-item-dropdown-options, .pixel-combobox-options').forEach(options => { options.hidden = true; });
+    }
+  };
+
   statesAdd.addEventListener('click', () => {
     if (!activeDialogPanel) return;
     activeDialogPanel.itemStates.push({
@@ -623,10 +759,8 @@ export const initializeItemEditorPage = ({
     panel.itemTags = [];
     panel.itemAbilitySlots = [];
     panel.itemAbilitiesEnabled = false;
-    panel.itemRecipes = {};
-    panel.itemStates = [{
-      holdingMode: 'generated', texture: '', geoTexture: '', geoModel: '', displayModel: '',
-    }];
+    panel.itemRecipes = [];
+    panel.itemStates = [];
     populateCreativeTabOptions(panel);
     host.append(fragment);
     const texturesReady = populateTextureOptions(panel);
@@ -719,8 +853,7 @@ export const initializeItemEditorPage = ({
           }
           for (const checkbox of panel.querySelectorAll('[data-item-checkbox]')) {
             const key = checkbox.dataset.itemCheckbox;
-            const checked = key === 'multiState' ? Boolean(data.states?.length) : Boolean(data[key]);
-            checkbox.setAttribute('aria-checked', String(checked));
+            checkbox.setAttribute('aria-checked', String(Boolean(data[key])));
           }
           const setField = (key, value) => {
             const input = panel.querySelector(`[data-item-field="${key}"]`);
@@ -729,18 +862,13 @@ export const initializeItemEditorPage = ({
           const setCheckbox = (key, checked) => panel
             .querySelector(`[data-item-checkbox="${key}"]`)
             ?.setAttribute('aria-checked', String(Boolean(checked)));
+          setCheckbox(
+            'tooltipCustomHint',
+            data.tooltipUseDefaultHint === false || Boolean(String(data.tooltipShiftHint || '').trim()),
+          );
           panel.itemAbilitySlots = Array.isArray(data.itemAbilitySlots) ? [...data.itemAbilitySlots] : [];
           panel.itemAbilitiesEnabled = Boolean(data.itemAbilitiesEnabled);
-          panel.itemRecipes = data.recipes && typeof data.recipes === 'object' ? { ...data.recipes } : {};
-          setCheckbox('recipeEnabled', Object.keys(panel.itemRecipes).length > 0);
-          const crafting = panel.itemRecipes.shaped || panel.itemRecipes.shapeless;
-          setCheckbox('craftingEnabled', Boolean(crafting));
-          setField('craftingType', panel.itemRecipes.shapeless ? 'shapeless' : 'shaped');
-          setField('craftingCount', crafting?.count ?? 1);
-          for (const [prefix, recipeKey] of [
-            ['smelting', 'smelting'], ['blasting', 'blasting'], ['smoking', 'smoking'],
-            ['campfire', 'campfire'], ['stonecut', 'stonecutting'],
-          ]) setCheckbox(`${prefix}Enabled`, Boolean(panel.itemRecipes[recipeKey]));
+          panel.itemRecipes = normalizeItemRecipes(data.recipes);
           const enabledMethods = new Set(Array.isArray(data.enabledMethods) ? data.enabledMethods : []);
           for (const method of panel.querySelectorAll('[data-item-method]')) {
             method.setAttribute('aria-checked', String(enabledMethods.has(method.dataset.itemMethod)));
@@ -748,7 +876,7 @@ export const initializeItemEditorPage = ({
           panel.itemTags = Array.isArray(data.tags) ? [...data.tags] : [];
           panel.itemStates = Array.isArray(data.states) && data.states.length
             ? [...data.states]
-            : [{ holdingMode: 'generated', texture: '', geoTexture: '', geoModel: '', displayModel: '' }];
+            : [];
           syncConditionalFields(panel);
           panel.dataset.dirty = 'false';
         })
@@ -810,7 +938,10 @@ export const initializeItemEditorPage = ({
         renderItemStates();
         positionDialogBeside(statesDialog, dialogAction);
       } else if (dialogAction.dataset.itemDialogAction === 'recipes') {
-        openAuthoringDialog(panel, dialogAction, 'recipes', 'Recipe');
+        recipeAddControl.hidden = false;
+        openItemDialog(recipeDialog, panel, dialogAction);
+        renderItemRecipes();
+        positionDialogBeside(recipeDialog, dialogAction);
       } else if (dialogAction.dataset.itemDialogAction === 'tooltip') {
         openAuthoringDialog(panel, dialogAction, 'tooltip', 'Tooltip');
       } else if (dialogAction.dataset.itemDialogAction === 'customClass') {
@@ -863,34 +994,20 @@ export const initializeItemEditorPage = ({
         }
         authoringFields.itemAbilitySlots = [...(panel.itemAbilitySlots || [])];
         authoringFields.itemAbilitiesEnabled = Boolean(panel.itemAbilitiesEnabled);
-        const recipes = authoringFields.recipeEnabled ? { ...(panel.itemRecipes || {}) } : {};
-        if (authoringFields.recipeEnabled) {
-          delete recipes.shaped;
-          delete recipes.shapeless;
-          if (authoringFields.craftingEnabled) {
-            const type = authoringFields.craftingType === 'shapeless' ? 'shapeless' : 'shaped';
-            recipes[type] = { ...(panel.itemRecipes?.[type] || {}), count: authoringFields.craftingCount || 1 };
-          }
-          for (const [prefix, recipeKey] of [
-            ['smelting', 'smelting'], ['blasting', 'blasting'], ['smoking', 'smoking'],
-            ['campfire', 'campfire'], ['stonecut', 'stonecutting'],
-          ]) {
-            if (authoringFields[`${prefix}Enabled`]) recipes[recipeKey] ||= {};
-            else delete recipes[recipeKey];
-            delete authoringFields[`${prefix}Enabled`];
-          }
-          delete authoringFields.craftingEnabled;
-          delete authoringFields.craftingType;
-          delete authoringFields.craftingCount;
-        }
-        authoringFields.recipes = recipes;
-        delete authoringFields.recipeEnabled;
+        authoringFields.recipes = (panel.itemRecipes || []).map(recipe => ({ ...recipe }));
+        authoringFields.tooltipUseDefaultHint = !authoringFields.tooltipCustomHint;
+        if (!authoringFields.tooltipCustomHint) authoringFields.tooltipShiftHint = '';
+        delete authoringFields.tooltipCustomHint;
+        authoringFields.tooltipEnabled = Boolean(
+          String(authoringFields.tooltipNormal || '').trim()
+          || String(authoringFields.tooltipHidden || '').trim()
+          || String(authoringFields.tooltipShiftHint || '').trim(),
+        );
         authoringFields.enabledMethods = [...panel.querySelectorAll('[data-item-method][aria-checked="true"]')]
           .map(methodButton => methodButton.dataset.itemMethod);
         authoringFields.geoTexture = holdingMode === '3d' ? textureId : String(authoringFields.geoTexture || '');
         authoringFields.tags = [...(panel.itemTags || [])];
-        authoringFields.states = panel.querySelector('[data-item-checkbox="multiState"]')
-          ?.getAttribute('aria-checked') === 'true' ? [...(panel.itemStates || [])] : [];
+        authoringFields.states = [...(panel.itemStates || [])];
         if (!itemId || !textureId) {
           status.textContent = 'Item ID and Texture are required.';
           return;
@@ -1049,6 +1166,18 @@ export const initializeItemEditorPage = ({
     checkbox.setAttribute('aria-checked', String(checkbox.getAttribute('aria-checked') !== 'true'));
     activeDialogPanel.dataset.dirty = 'true';
     syncConditionalFields(activeDialogPanel);
+    requestAnimationFrame(() => {
+      resizeTooltipTextareas(authoringDialog);
+      if (activeDialogAnchor) positionDialogBeside(authoringDialog, activeDialogAnchor);
+    });
+  });
+
+  authoringDialog.addEventListener('input', event => {
+    const textarea = event.target.closest('.item-tooltip-textarea');
+    if (!textarea || !activeDialogPanel) return;
+    activeDialogPanel.dataset.dirty = 'true';
+    resizeTooltipTextarea(textarea);
+    if (activeDialogAnchor) positionDialogBeside(authoringDialog, activeDialogAnchor);
   });
 
   host.addEventListener('keydown', event => {
@@ -1061,13 +1190,24 @@ export const initializeItemEditorPage = ({
   });
 
   document.addEventListener('pointerdown', event => {
+    if (!statesDialog.hidden) {
+      const stateControl = event.target.closest('#item-states-dialog .workspace-item-dropdown, #item-states-dialog .pixel-combobox');
+      closeItemStateDropdowns(stateControl);
+    }
+    if (!recipeAddOptions.hidden && !event.target.closest('#item-recipe-add-control')) {
+      recipeAddOptions.hidden = true;
+      recipeAddButton.setAttribute('aria-expanded', 'false');
+    }
     if (!tagsDialog.hidden && !event.target.closest('#item-tags-dialog, [data-item-dialog-action="tags"]')) {
       closeItemDialog(tagsDialog);
     }
     if (!statesDialog.hidden && !event.target.closest('#item-states-dialog, [data-item-dialog-action="states"]')) {
       closeItemDialog(statesDialog);
     }
-    if (!authoringDialog.hidden && !event.target.closest('#item-authoring-dialog, [data-item-dialog-action="recipes"], [data-item-dialog-action="tooltip"], [data-item-dialog-action="customClass"]')) {
+    if (!recipeDialog.hidden && !event.target.closest('#item-recipe-dialog, [data-item-dialog-action="recipes"]')) {
+      closeItemDialog(recipeDialog);
+    }
+    if (!authoringDialog.hidden && !event.target.closest('#item-authoring-dialog, [data-item-dialog-action="tooltip"], [data-item-dialog-action="customClass"]')) {
       closeItemDialog(authoringDialog);
     }
   });
@@ -1079,6 +1219,14 @@ export const initializeItemEditorPage = ({
       event.stopImmediatePropagation();
     } else if (!statesDialog.hidden) {
       closeItemDialog(statesDialog);
+      event.stopImmediatePropagation();
+    } else if (!recipeAddOptions.hidden) {
+      recipeAddOptions.hidden = true;
+      recipeAddButton.setAttribute('aria-expanded', 'false');
+      recipeAddButton.focus();
+      event.stopImmediatePropagation();
+    } else if (!recipeDialog.hidden) {
+      closeItemDialog(recipeDialog);
       event.stopImmediatePropagation();
     } else if (!authoringDialog.hidden) {
       closeItemDialog(authoringDialog);
