@@ -2214,12 +2214,22 @@ body.detached-floating-window #warning-dialog {
   transform: translate(-50%, -50%);
 }
 
+.item-states-dialog,
+.item-recipe-dialog {
+  --item-collection-dialog-width: calc(
+    var(--ycs-labeled-control-start)
+    + var(--ycs-control-min-width)
+    + (10 * var(--ycs-pixel-2x))
+    + (4 * var(--ycs-window-border-side))
+  );
+  width: min(var(--item-collection-dialog-width), calc(100% - 16px));
+  max-width: calc(100% - 16px);
+  min-width: min(var(--item-collection-dialog-width), calc(100% - 16px));
+}
+
 .item-states-dialog {
   z-index: 12;
-  width: max-content;
-  max-width: calc(100% - 16px);
   height: min(320px, calc(100% - 16px));
-  min-width: 0;
   min-height: 120px;
   transform: none;
 }
@@ -2243,6 +2253,181 @@ body.detached-floating-window #warning-dialog {
   display: none;
 }
 
+.item-recipe-dialog {
+  height: auto;
+  max-height: calc(100% - 16px);
+  min-height: 0;
+  transform: none;
+  z-index: 12;
+}
+
+.item-recipe-dialog[hidden] {
+  display: none;
+}
+
+.item-authoring-dialog.item-tooltip-dialog {
+  width: min(330px, calc(100% - 16px));
+  min-width: min(330px, calc(100% - 16px));
+  height: auto;
+  min-height: 0;
+}
+
+.item-tooltip-dialog .item-authoring-dialog-body {
+  padding: calc(3 * var(--ycs-pixel-2x));
+}
+
+.item-tooltip-dialog [data-item-dialog-fields="tooltip"] {
+  gap: var(--ycs-workspace-action-gap);
+}
+
+[data-item-dialog-fields="tooltip"] > label.workspace-item-field-row,
+.item-tooltip-custom-hint-group > label.workspace-item-field-row {
+  display: flex;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(2 * var(--ycs-workspace-action-gap));
+}
+
+[data-item-dialog-fields="tooltip"] > label.workspace-item-field-row > .pixel-text-box,
+.item-tooltip-custom-hint-group > label.workspace-item-field-row > .pixel-text-box {
+  width: 100%;
+  min-width: 0;
+}
+
+.item-tooltip-textarea {
+  height: var(--ycs-hex-height);
+  min-height: var(--ycs-hex-height);
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.item-tooltip-custom-hint-group {
+  display: flex;
+  margin-top: calc(2 * var(--ycs-workspace-action-gap));
+  flex-direction: column;
+  gap: calc(2 * var(--ycs-workspace-action-gap));
+}
+
+.item-tooltip-custom-hint-group[hidden] {
+  display: none;
+}
+
+.item-tooltip-custom-hint-toggle {
+  height: var(--ycs-checkbox-size);
+  min-height: var(--ycs-checkbox-size);
+}
+
+
+.item-recipe-add-control {
+  position: relative;
+  margin-left: auto;
+}
+
+.item-recipe-add-control[hidden],
+.item-recipe-add-options[hidden] {
+  display: none;
+}
+
+.item-recipe-add-icon {
+  position: relative;
+  width: var(--ycs-dialog-icon-size);
+  height: var(--ycs-dialog-icon-size);
+}
+
+.item-recipe-add-icon::before,
+.item-recipe-add-icon::after {
+  position: absolute;
+  background: currentColor;
+  content: '';
+}
+
+.item-recipe-add-icon::before {
+  inset: 40% 0;
+}
+
+.item-recipe-add-icon::after {
+  inset: 0 40%;
+}
+
+.dialogue-title-button.item-recipe-add[aria-expanded="true"] {
+  border-width:
+    var(--ycs-button-toggled-border-top)
+    var(--ycs-button-border-side)
+    var(--ycs-button-toggled-border-bottom);
+  border-image-source: url("../assets/sprite/generated/button_toggled.png");
+  border-image-slice: 8 4 4 4 fill;
+  border-image-width:
+    var(--ycs-button-toggled-border-top)
+    var(--ycs-button-border-side)
+    var(--ycs-button-toggled-border-bottom)
+    var(--ycs-button-border-side);
+}
+
+.dialogue-title-button.item-recipe-add[aria-expanded="true"]:hover {
+  border-image-source: url("../assets/sprite/generated/button_toggled_hovered.png");
+}
+
+.item-recipe-add-options {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  top: 100%;
+  right: 0;
+  width: max-content;
+  min-width: var(--ycs-control-min-width);
+}
+
+.item-recipe-add-options > .pixel-option {
+  display: block;
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.item-recipe-list {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: var(--ycs-workspace-action-gap);
+  padding: calc(3 * var(--ycs-pixel-2x));
+}
+
+.item-recipe-entry {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+.item-recipe-entry-titlebar > .floating-dialog-close {
+  margin-left: auto;
+}
+
+.item-recipe-entry-body {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--ycs-workspace-action-gap);
+  min-height: calc(12 * var(--ycs-pixel-2x));
+  padding: calc(2 * var(--ycs-pixel-2x));
+  border-style: solid;
+  border-color: transparent;
+  border-width: var(--ycs-window-border-side) var(--ycs-window-border-side) var(--ycs-window-border-bottom);
+  border-image-source: url("../assets/sprite/generated/window_body.png");
+  border-image-slice: 4 4 8 4 fill;
+  border-image-repeat: repeat;
+  image-rendering: pixelated;
+}
+
 .item-authoring-dialog-body,
 #item-authoring-dialog-content,
 [data-item-dialog-fields] {
@@ -2261,6 +2446,20 @@ body.detached-floating-window #warning-dialog {
   flex: 0 0 auto;
 }
 
+.item-recipe-dialog > .floating-dialog-body-scroll-host {
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.item-recipe-dialog > .floating-dialog-body-scroll-host > .item-recipe-dialog-body {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
 .item-authoring-dialog > .floating-dialog-body-scroll-host > .item-authoring-dialog-body {
   position: relative;
   inset: auto;
@@ -2274,6 +2473,28 @@ body.detached-floating-window #warning-dialog {
   flex-direction: column;
   gap: var(--ycs-workspace-action-gap);
   padding: calc(3 * var(--ycs-pixel-2x));
+}
+
+.item-states-dialog:has(.item-state-entry-dropdown-open) > .floating-dialog-body-scroll-host,
+.item-states-dialog:has(.item-state-entry-dropdown-open) > .floating-dialog-body-scroll-host > .item-states-dialog-body {
+  overflow: visible;
+}
+
+.item-states-dialog > .floating-dialog-body-scroll-host {
+  width: max-content;
+  min-width: 0;
+}
+
+.item-states-dialog > .floating-dialog-body-scroll-host > .item-states-dialog-body {
+  position: relative;
+  inset: auto;
+  width: max-content;
+  min-width: 0;
+  height: 100%;
+}
+
+.item-states-dialog:has(.item-state-entry-dropdown-open) > .floating-dialog-body-scroll-host > .dialog-overlay-scrollbar {
+  display: none;
 }
 
 .item-states-list {
@@ -2339,10 +2560,8 @@ body.detached-floating-window #warning-dialog {
   z-index: 20;
 }
 
-.item-states-add {
-  width: 100%;
-  align-self: flex-start;
-  flex: 0 0 auto;
+.item-states-title-add {
+  margin-left: auto;
 }
 
 /* These content-sized dialogs opt out of the generic absolute body layout so

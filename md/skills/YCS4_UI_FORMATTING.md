@@ -122,6 +122,14 @@ Edit > Test is the live component reference. Add genuinely reusable controls the
 - Horizontal and vertical axes appear independently and synchronize with wheel, touchpad, track-click, drag, resize, and content mutations.
 - Do not add padding merely to reserve a scrollbar lane.
 
+### Nested content-sized dialogs
+
+- A collection dialog containing repeatable inner dialog-style panels uses a fixed width sized for its populated panel, and keeps that exact width while empty. Adding or removing entries must never resize the outer dialog.
+- Calculate the fixed width from the complete largest supported inner layout: label column, labeled-control gap, complete compound-control width, inner padding and borders, outer padding and borders. Connected arrow buttons and combobox triggers are part of the control width; never count only the textbox portion.
+- Apply the resulting shared width to both `width` and `min-width`, subject only to the normal viewport maximum. Do not use `max-content` on the outer collection dialog, because an empty collection would collapse.
+- The inner body may remain in normal flow to report height and prevent clipping, but it does not determine whether the empty outer dialog shrinks.
+- Overflow menus may escape the inner panel when required. Opening a dropdown must not enlarge its parent dialog or create a scrollbar from the temporary option list.
+
 ## Floating dialogs
 
 - All YCS4 dialogs reuse the canonical floating-dialog structure and shared window sprites.

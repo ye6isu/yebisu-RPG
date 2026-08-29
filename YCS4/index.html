@@ -572,10 +572,30 @@
           <section id="item-states-dialog" class="floating-dialog item-states-dialog" role="dialog" aria-labelledby="item-states-dialog-title" hidden>
             <header class="floating-dialog-titlebar hex-color-dialog-titlebar">
               <span id="item-states-dialog-title" class="floating-dialog-title">Multiple States</span>
+              <button id="item-states-add" class="dialogue-title-button item-states-title-add" type="button" aria-label="Add state"><span class="item-recipe-add-icon" aria-hidden="true"></span></button>
             </header>
             <div class="floating-dialog-body item-states-dialog-body">
               <div id="item-states-list" class="item-states-list"></div>
-              <button id="item-states-add" class="pixel-button item-states-add" type="button">Add</button>
+            </div>
+          </section>
+          <section id="item-recipe-dialog" class="floating-dialog item-recipe-dialog" role="dialog" aria-labelledby="item-recipe-dialog-title" hidden>
+            <header class="floating-dialog-titlebar hex-color-dialog-titlebar">
+              <span id="item-recipe-dialog-title" class="floating-dialog-title">Recipe</span>
+              <div id="item-recipe-add-control" class="item-recipe-add-control">
+                <button id="item-recipe-add" class="dialogue-title-button item-recipe-add" type="button" aria-label="Add recipe" aria-haspopup="listbox" aria-expanded="false"><span class="item-recipe-add-icon" aria-hidden="true"></span></button>
+                <div id="item-recipe-add-options" class="pixel-option-stack item-recipe-add-options" role="listbox" hidden>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="shaped">Shaped Crafting</button>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="shapeless">Shapeless Crafting</button>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="smelting">Smelting</button>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="blasting">Blasting</button>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="smoking">Smoking</button>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="campfire">Campfire</button>
+                  <button class="pixel-option" type="button" role="option" data-item-recipe-type="stonecutting">Stonecutting</button>
+                </div>
+              </div>
+            </header>
+            <div class="floating-dialog-body item-recipe-dialog-body">
+              <div id="item-recipe-dialog-content" class="item-recipe-list"></div>
             </div>
           </section>
           <section id="item-authoring-dialog" class="floating-dialog item-authoring-dialog" role="dialog" aria-labelledby="item-authoring-dialog-title" hidden>
@@ -645,13 +665,11 @@
             <input type="file" accept=".json,application/json" data-item-file-input="displayModel" hidden />
             <input type="hidden" data-item-field="displayModel" />
           </div>
-          <div class="workspace-item-field-row">
-            <span>Multiple States</span>
-            <div class="workspace-item-inline-controls">
-              <button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="multiState"></button>
-              <button class="pixel-button" type="button" data-item-dialog-action="states" data-item-condition="multiState" hidden>Edit</button>
-            </div>
-          </div>
+          <div class="workspace-item-field-row"><span>Multiple States</span><button class="pixel-button" type="button" data-item-dialog-action="states">Edit</button></div>
+          <label class="workspace-item-field-row">
+            <span>Stack Size</span>
+            <input class="pixel-text-box" type="number" min="1" max="99" value="64" data-item-field="stackSize" />
+          </label>
           <div class="workspace-item-field-row">
             <span>Creative Tab</span>
             <div class="workspace-item-dropdown" data-item-dropdown="creativeTab">
@@ -664,10 +682,8 @@
               </div>
             </div>
           </div>
-          <label class="workspace-item-field-row">
-            <span>Stack Size</span>
-            <input class="pixel-text-box" type="number" min="1" max="99" value="64" data-item-field="stackSize" />
-          </label>
+          <label class="workspace-item-field-row"><span>Attack Damage</span><input class="pixel-text-box" type="number" data-item-field="attackDamage" /></label>
+          <label class="workspace-item-field-row"><span>Attack Speed</span><input class="pixel-text-box" type="number" data-item-field="attackSpeed" /></label>
           <div class="workspace-item-field-row"><span>Tool</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="toolEnabled"></button></div>
           <div class="workspace-item-field-row" data-item-condition="toolEnabled" hidden>
             <span>Tool Type</span>
@@ -696,10 +712,6 @@
               </div>
             </div>
           </div>
-          <div class="workspace-item-field-row"><span>Tags</span><button class="pixel-button" type="button" data-item-dialog-action="tags">Edit</button></div>
-          <div class="workspace-item-field-row"><span>Data Components</span><button class="pixel-button" type="button" disabled aria-label="Data Components are not wired yet">Edit</button></div>
-          <label class="workspace-item-field-row"><span>Attack Damage</span><input class="pixel-text-box" type="number" data-item-field="attackDamage" /></label>
-          <label class="workspace-item-field-row"><span>Attack Speed</span><input class="pixel-text-box" type="number" data-item-field="attackSpeed" /></label>
           <div class="workspace-item-field-row"><span>Food</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="foodEnabled"></button></div>
           <label class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Nutrition</span><input class="pixel-text-box" type="number" value="4" data-item-field="nutrition" /></label>
           <label class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Saturation</span><input class="pixel-text-box" type="number" step="0.1" value="0.3" data-item-field="saturation" /></label>
@@ -707,31 +719,19 @@
           <div class="workspace-item-field-row" data-item-condition="foodEnabled" hidden><span>Fast Food</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="fastFood"></button></div>
           <div class="workspace-item-field-row"><span>Fuel</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="fuelEnabled"></button></div>
           <label class="workspace-item-field-row" data-item-condition="fuelEnabled" hidden><span>Burn Time</span><input class="pixel-text-box" type="number" data-item-field="fuel" /></label>
-          <div class="workspace-item-field-row"><span>Tooltip</span><div class="workspace-item-inline-controls"><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="tooltipEnabled"></button><button class="pixel-button" type="button" data-item-dialog-action="tooltip" data-item-condition="tooltipEnabled" hidden>Edit</button></div></div>
+          <div class="workspace-item-field-row"><span>Tooltip</span><button class="pixel-button" type="button" data-item-dialog-action="tooltip">Edit</button></div>
           <div data-item-dialog-fields="tooltip" hidden>
-            <label class="workspace-item-field-row"><span>Normal Text</span><input class="pixel-text-box" type="text" data-item-field="tooltipNormal" /></label>
+            <label class="workspace-item-field-row item-tooltip-message-row"><span>Message</span><textarea class="pixel-text-box item-tooltip-textarea" rows="1" wrap="soft" data-item-field="tooltipNormal"></textarea></label>
             <div class="workspace-item-field-row"><span>Shift to Reveal</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="tooltipShift"></button></div>
-            <div class="workspace-item-field-row" data-item-condition="tooltipShift" hidden><span>Default Hint</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="true" data-item-checkbox="tooltipUseDefaultHint"></button></div>
-            <label class="workspace-item-field-row" data-item-condition="tooltipShift,!tooltipUseDefaultHint" hidden><span>Custom Hint</span><input class="pixel-text-box" type="text" data-item-field="tooltipShiftHint" /></label>
-            <label class="workspace-item-field-row" data-item-condition="tooltipShift" hidden><span>Hidden Text</span><input class="pixel-text-box" type="text" data-item-field="tooltipHidden" /></label>
-          </div>
-          <div class="workspace-item-field-row">
-            <span>Recipe</span>
-            <div class="workspace-item-inline-controls">
-              <button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="recipeEnabled"></button>
-              <button class="pixel-button" type="button" data-item-dialog-action="recipes" data-item-condition="recipeEnabled" hidden>Edit</button>
+            <label class="workspace-item-field-row" data-item-condition="tooltipShift" hidden><span>Hidden Text</span><textarea class="pixel-text-box item-tooltip-textarea" rows="1" wrap="soft" data-item-field="tooltipHidden"></textarea></label>
+            <div class="item-tooltip-custom-hint-group" data-item-condition="tooltipShift" hidden>
+              <div class="workspace-item-field-row item-tooltip-custom-hint-toggle"><span>Custom Hint</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="tooltipCustomHint"></button></div>
+              <label class="workspace-item-field-row" data-item-condition="tooltipCustomHint" hidden><textarea class="pixel-text-box item-tooltip-textarea" rows="1" wrap="soft" data-item-field="tooltipShiftHint" aria-label="Custom Hint Text"></textarea></label>
             </div>
           </div>
-          <div data-item-dialog-fields="recipes" hidden>
-            <div class="workspace-item-field-row"><span>Crafting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="craftingEnabled"></button></div>
-            <label class="workspace-item-field-row" data-item-condition="craftingEnabled" hidden><span>Type</span><input class="pixel-text-box" type="text" value="shaped" data-item-field="craftingType" /></label>
-            <label class="workspace-item-field-row" data-item-condition="craftingEnabled" hidden><span>Count</span><input class="pixel-text-box" type="number" min="1" value="1" data-item-field="craftingCount" /></label>
-            <div class="workspace-item-field-row"><span>Smelting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="smeltingEnabled"></button></div>
-            <div class="workspace-item-field-row"><span>Blasting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="blastingEnabled"></button></div>
-            <div class="workspace-item-field-row"><span>Smoking</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="smokingEnabled"></button></div>
-            <div class="workspace-item-field-row"><span>Campfire</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="campfireEnabled"></button></div>
-            <div class="workspace-item-field-row"><span>Stonecutting</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="stonecutEnabled"></button></div>
-          </div>
+          <div class="workspace-item-field-row"><span>Recipe</span><button class="pixel-button" type="button" data-item-dialog-action="recipes">Edit</button></div>
+          <div class="workspace-item-field-row"><span>Tags</span><button class="pixel-button" type="button" data-item-dialog-action="tags">Edit</button></div>
+          <div class="workspace-item-field-row"><span>Data Components</span><button class="pixel-button" type="button" disabled aria-label="Data Components are not wired yet">Edit</button></div>
           <div class="workspace-item-field-row"><span>Custom Class</span><div class="workspace-item-inline-controls"><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="customClass"></button><button class="pixel-button" type="button" data-item-dialog-action="customClass" data-item-condition="customClass" hidden>Edit</button></div></div>
           <div data-item-dialog-fields="customClass" hidden>
             <div class="workspace-item-field-row"><span>Block Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="useOn"></button></div>
