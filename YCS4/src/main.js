@@ -89,7 +89,6 @@ const workspaceCreateButton = document.getElementById('workspace-create-button')
 const workspaceCreateOptions = document.getElementById('workspace-create-options');
 const workspaceTopControls = document.querySelector('.workspace-top-controls');
 const workspaceSearchInput = document.getElementById('workspace-search-input');
-const workspaceSearchButton = document.getElementById('workspace-search-button');
 const workspaceCreateOptionButtons = [
   ...workspaceCreateOptions.querySelectorAll('[data-workspace-create-option]'),
 ];
@@ -792,7 +791,6 @@ workspaceSearchInput.setAttribute('autocorrect', 'off');
 workspaceSearchInput.setAttribute('autocapitalize', 'off');
 workspaceSearchInput.setAttribute('spellcheck', 'false');
 workspaceSearchInput.addEventListener('input', syncPrimaryWorkspaceObjects);
-workspaceSearchButton.addEventListener('click', syncPrimaryWorkspaceObjects);
 setWorkspaceCreateMode(homeTab.dataset.workspaceMode || 'home');
 syncPrimaryWorkspaceObjects();
 
@@ -1787,6 +1785,7 @@ const itemEditorPage = initializeItemEditorPage({
   template: itemEditorTemplate,
   workspaceTabs,
   createTab: createClosableWorkspaceTab,
+  setActiveTab: setActiveWorkspaceTab,
   removeTab: removeWorkspaceTab,
   onItemSaved: ({ id, previousId, displayName, textureId }) => {
     const escapedPreviousId = CSS.escape(previousId);

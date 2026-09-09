@@ -50,6 +50,7 @@ Use semantic state attributes such as `aria-pressed`, `aria-expanded`, `aria-sel
 | Textbox | `pixel-text-box` | `text_box.png` |
 | File field | `pixel-button pixel-file-button` | `button.png` |
 | Combobox | `pixel-combobox` containing a textbox, button, and option stack | shared sprites |
+| Ingredient combobox | reusable `ingredient-combobox.js` component | shared textbox, button, option, and scrollbar sprites |
 | Checkbox | `pixel-checkbox` | `checkbox.png` |
 | Divider | `pixel-divider` plus its orientation class | divider sprite |
 | Direction icon | `pixel-direction-icon` plus direction class | `direction.png` |
@@ -75,6 +76,7 @@ Edit > Test is the live component reference. Add genuinely reusable controls the
 - Vertically connected options use `pixel-option-stack` so only the outer top and bottom edges are drawn.
 - Expanded triggers show the pressed button treatment and an Up direction icon; closed triggers show Down.
 - Searchable or large sets use the shared combobox pattern. Options remain vertical and use the full dropdown width.
+- Item-valued fields use `createIngredientCombobox()` from `ingredient-combobox.js`. Its shared catalog includes project and vanilla Items plus project, vanilla, and NeoForge item tags; tag values carry a leading `#`. Its default field, dropdown button, connected option textures, filtering, six-row stepped scrolling, keyboard behavior, and overlay scrollbar are one reusable component; page-specific layouts may provide only a narrowly scoped option-host sizing class.
 
 ### Text, numeric, and file fields
 

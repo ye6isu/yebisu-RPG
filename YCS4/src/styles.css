@@ -2216,12 +2216,7 @@ body.detached-floating-window #warning-dialog {
 
 .item-states-dialog,
 .item-recipe-dialog {
-  --item-collection-dialog-width: calc(
-    var(--ycs-labeled-control-start)
-    + var(--ycs-control-min-width)
-    + (10 * var(--ycs-pixel-2x))
-    + (4 * var(--ycs-window-border-side))
-  );
+  --item-collection-dialog-width: 330px;
   width: min(var(--item-collection-dialog-width), calc(100% - 16px));
   max-width: calc(100% - 16px);
   min-width: min(var(--item-collection-dialog-width), calc(100% - 16px));
@@ -2414,6 +2409,7 @@ body.detached-floating-window #warning-dialog {
 
 .item-recipe-entry-body {
   display: flex;
+  position: relative;
   flex-direction: row;
   align-items: flex-start;
   gap: var(--ycs-workspace-action-gap);
@@ -2426,6 +2422,203 @@ body.detached-floating-window #warning-dialog {
   border-image-slice: 4 4 8 4 fill;
   border-image-repeat: repeat;
   image-rendering: pixelated;
+}
+
+.item-shaped-recipe-controls {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--ycs-workspace-action-gap);
+}
+
+.item-shaped-recipe-yield {
+  display: grid;
+  grid-template-columns: auto minmax(0, var(--ycs-control-min-width)) auto max-content;
+  align-items: center;
+  gap: var(--ycs-labeled-control-gap);
+}
+
+.item-shaped-recipe-ingredient {
+  display: flex;
+  align-items: center;
+  gap: var(--ycs-workspace-action-gap);
+}
+
+.item-shaped-recipe-add-ingredient > .item-recipe-add-icon,
+.item-shaped-recipe-remove-ingredient > img {
+  width: var(--ycs-dialog-icon-size);
+  height: var(--ycs-dialog-icon-size);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.item-shaped-recipe-ingredients {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ycs-pixel-2x);
+}
+
+.pixel-combobox.item-shaped-recipe-combobox {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.item-shaped-recipe-combobox > .pixel-combobox-control,
+.item-shaped-recipe-combobox .pixel-combobox-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.ingredient-combobox-options-host {
+  --ingredient-visible-options: 6;
+  position: absolute;
+  z-index: 35;
+  top: auto;
+  right: calc(-4 * var(--ycs-pixel-2x));
+  left: 0;
+  width: calc(100% + (4 * var(--ycs-pixel-2x)));
+  min-width: 0;
+  box-sizing: border-box;
+  padding-right: calc(4 * var(--ycs-pixel-2x));
+  height: calc(
+    (var(--ingredient-visible-options) * var(--ycs-option-middle-height))
+    + var(--ycs-option-border-side)
+    + var(--ycs-option-border-bottom)
+  );
+}
+
+.item-shaped-recipe-options-host {
+  --ingredient-visible-options: 6;
+  position: absolute;
+  z-index: 35;
+  top: auto;
+  right: auto;
+  left: 0;
+  width: min(
+    calc(var(--item-collection-dialog-width) + (4 * var(--ycs-pixel-2x))),
+    calc(100vw - 24px)
+  );
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  padding-right: calc(4 * var(--ycs-pixel-2x));
+  height: calc(
+    (var(--ingredient-visible-options) * var(--ycs-option-middle-height))
+    + var(--ycs-option-border-side)
+    + var(--ycs-option-border-bottom)
+  );
+}
+
+.ingredient-combobox-options-host:has(> .ingredient-combobox-options[hidden]) {
+  display: none;
+}
+
+.ingredient-combobox-options {
+  display: flex;
+  width: calc(100% - (4 * var(--ycs-pixel-2x)));
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  flex-direction: column;
+  max-height: calc(8 * var(--ycs-option-height));
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ingredient-combobox-options[hidden] {
+  display: none;
+}
+
+.ingredient-combobox-options::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.item-shaped-recipe-options-host > .dialog-overlay-scrollbar-vertical {
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.ingredient-combobox-options > .pixel-option {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-shaped-recipe-grid {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, max-content);
+  grid-template-rows: repeat(3, max-content);
+  gap: var(--ycs-pixel-2x);
+}
+
+.item-shaped-recipe-cell {
+  flex: 0 0 auto;
+}
+
+.item-shaped-recipe-cell[data-filled="true"] {
+  color: var(--ycs-text-normal);
+}
+
+.item-shapeless-ingredient-count {
+  width: calc((10 * var(--ycs-pixel-2x)) + (2 * var(--ycs-button-border-side)));
+  min-width: calc((10 * var(--ycs-pixel-2x)) + (2 * var(--ycs-button-border-side)));
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.item-shapeless-recipe-heading {
+  grid-template-columns:
+    minmax(calc(var(--ycs-labeled-control-start) - var(--ycs-labeled-control-gap)), max-content)
+    minmax(0, 1fr);
+}
+
+.item-shapeless-recipe-heading > .pixel-text-box {
+  width: 100%;
+  min-width: 0;
+}
+
+.item-shapeless-recipe-heading > .item-shaped-recipe-add-ingredient {
+  justify-self: start;
+}
+
+.item-processing-recipe-controls {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--ycs-workspace-action-gap);
+}
+
+.item-processing-recipe-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-template-columns:
+    minmax(calc(var(--ycs-labeled-control-start) - var(--ycs-labeled-control-gap)), max-content)
+    var(--ycs-control-min-width);
+  align-items: center;
+  gap: var(--ycs-labeled-control-gap);
+}
+
+.item-processing-recipe-row > .pixel-text-box,
+.pixel-combobox.item-processing-recipe-ingredient,
+.item-processing-recipe-ingredient > .pixel-combobox-control,
+.item-processing-recipe-ingredient .pixel-combobox-input {
+  width: 100%;
+  min-width: 0;
 }
 
 .item-authoring-dialog-body,
@@ -2460,6 +2653,12 @@ body.detached-floating-window #warning-dialog {
   overflow: visible;
 }
 
+.item-recipe-dialog:has(.ingredient-combobox-options:not([hidden]))
+  > .floating-dialog-body-scroll-host
+  > .dialog-overlay-scrollbar {
+  display: none;
+}
+
 .item-authoring-dialog > .floating-dialog-body-scroll-host > .item-authoring-dialog-body {
   position: relative;
   inset: auto;
@@ -2481,14 +2680,14 @@ body.detached-floating-window #warning-dialog {
 }
 
 .item-states-dialog > .floating-dialog-body-scroll-host {
-  width: max-content;
+  width: 100%;
   min-width: 0;
 }
 
 .item-states-dialog > .floating-dialog-body-scroll-host > .item-states-dialog-body {
   position: relative;
   inset: auto;
-  width: max-content;
+  width: 100%;
   min-width: 0;
   height: 100%;
 }
@@ -2499,6 +2698,8 @@ body.detached-floating-window #warning-dialog {
 
 .item-states-list {
   display: flex;
+  width: 100%;
+  box-sizing: border-box;
   flex-direction: column;
   gap: var(--ycs-workspace-action-gap);
 }
@@ -2506,9 +2707,9 @@ body.detached-floating-window #warning-dialog {
 .item-state-entry {
   position: relative;
   display: flex;
-  width: max-content;
+  width: 100%;
   max-width: 100%;
-  align-self: flex-start;
+  align-self: stretch;
   flex: 0 0 auto;
   flex-direction: column;
   overflow: visible;
@@ -2528,7 +2729,8 @@ body.detached-floating-window #warning-dialog {
 
 .item-state-entry-body {
   display: flex;
-  width: max-content;
+  width: 100%;
+  box-sizing: border-box;
   max-width: 100%;
   flex-direction: column;
   padding: calc(2 * var(--ycs-pixel-2x));
@@ -2578,6 +2780,12 @@ body.detached-floating-window #warning-dialog {
   inset: auto;
   width: auto;
   height: auto;
+}
+
+.item-states-dialog > .floating-dialog-body-scroll-host,
+.item-states-dialog > .floating-dialog-body-scroll-host > .item-states-dialog-body {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .texture-filter-dialog > .floating-dialog-body-scroll-host {

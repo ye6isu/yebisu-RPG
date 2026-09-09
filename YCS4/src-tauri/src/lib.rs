@@ -572,6 +572,40 @@ fn delete_source_json_key(file: &str, key: &str) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+fn add_source_json_array_value(file: &str, key: &str, value: &str) -> Result<(), String> {
+    let path = safe_source_path(file)?;
+    let mut root: Value = if path.is_file() {
+        serde_json::from_str(&fs::read_to_string(&path).map_err(|error| error.to_string())?)
+            .map_err(|error| format!("Invalid JSON in {}: {}", file, error))?
+    } else {
+        json!({ "replace": false, "values": [] })
+    };
+    let object = root.as_object_mut().ok_or_else(|| format!("{} must contain a JSON object", file))?;
+    object.entry("replace".to_string()).or_insert(Value::Bool(false));
+    let values = object.entry(key.to_string()).or_insert_with(|| Value::Array(Vec::new()))
+        .as_array_mut().ok_or_else(|| format!("{}.{} must be an array", file, key))?;
+    if !values.iter().any(|entry| entry.as_str() == Some(value)) {
+        values.push(Value::String(value.to_string()));
+    }
+    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+    fs::write(path, serde_json::to_string_pretty(&root).map_err(|error| error.to_string())?)
+        .map_err(|error| error.to_string())
+}
+
+fn remove_source_json_array_value(file: &str, key: &str, value: &str) -> Result<bool, String> {
+    let path = safe_source_path(file)?;
+    if !path.is_file() { return Ok(true); }
+    let mut root: Value = serde_json::from_str(&fs::read_to_string(&path).map_err(|error| error.to_string())?)
+        .map_err(|error| format!("Invalid JSON in {}: {}", file, error))?;
+    let empty = if let Some(values) = root.get_mut(key).and_then(Value::as_array_mut) {
+        values.retain(|entry| entry.as_str() != Some(value));
+        values.is_empty()
+    } else { true };
+    fs::write(path, serde_json::to_string_pretty(&root).map_err(|error| error.to_string())?)
+        .map_err(|error| error.to_string())?;
+    Ok(empty)
+}
+
 fn remove_item_injections(item: &Value) -> Result<(), String> {
     let Some(injections) = item.get("_injections").and_then(Value::as_array) else { return Ok(()); };
     for injection in injections.iter().rev() {
@@ -586,6 +620,17 @@ fn remove_item_injections(item: &Value) -> Result<(), String> {
                 file,
                 injection.get("key").and_then(Value::as_str).unwrap_or(""),
             )?,
+            "json-array-value" => {
+                let empty = remove_source_json_array_value(
+                    file,
+                    injection.get("key").and_then(Value::as_str).unwrap_or("values"),
+                    injection.get("value").and_then(Value::as_str).unwrap_or(""),
+                )?;
+                if empty && injection.get("removeFileWhenEmpty").and_then(Value::as_bool).unwrap_or(false) {
+                    let path = safe_source_path(file)?;
+                    if path.is_file() { fs::remove_file(path).map_err(|error| error.to_string())?; }
+                }
+            },
             "created-file" => {
                 let path = safe_source_path(file)?;
                 if path.is_file() { fs::remove_file(path).map_err(|error| error.to_string())?; }
@@ -602,17 +647,168 @@ fn is_basic_item_injection(injection: &Value, id: &str) -> bool {
     let marker = injection.get("marker").and_then(Value::as_str).unwrap_or("");
     let key = injection.get("key").and_then(Value::as_str).unwrap_or("");
     match kind {
-        "java-marker" => matches!(marker, "YCS_Mod_Items" | "YCS_Tab_Contents" | "YCS_Mod_Item_Model"),
-        "json-key" => file.ends_with("/lang/en_us.json") && key == format!("item.yebisurpg.{}", id),
+        "java-marker" => matches!(marker, "YCS_Mod_Items" | "YCS_Mod_Item_Imports" | "YCS_Tab_Contents" | "YCS_Mod_Item_Model" | "YCS_Mod_Fuel" | "YCS_Geo_Collect"),
+        "json-key" => file.ends_with("/lang/en_us.json") && (key == format!("item.yebisurpg.{}", id) || key.starts_with(&format!("tooltip.yebisurpg.{}.", id))),
+        "json-array-value" => injection.get("value").and_then(Value::as_str) == Some(format!("yebisurpg:{}", id).as_str()),
         "created-file" => {
             file == format!("resources/assets/yebisurpg/textures/item/{}.png", id)
                 || file == format!("resources/assets/yebisurpg/textures/item/{}.png.mcmeta", id)
                 || file == format!("resources/assets/yebisurpg/models/item/{}.json", id)
                 || file.starts_with(&format!("resources/assets/yebisurpg/textures/item/{}_frame", id))
                 || file.starts_with(&format!("resources/assets/yebisurpg/models/item/{}_frame", id))
+                || file.starts_with(&format!("resources/assets/yebisurpg/textures/item/{}_state", id))
+                || file.starts_with(&format!("resources/assets/yebisurpg/models/item/{}_state", id))
+                || file.starts_with(&format!("resources/assets/yebisurpg/textures/geo/item/{}_state", id))
+                || file.starts_with(&format!("resources/assets/yebisurpg/geo/item/{}_state", id))
+                || file == format!("resources/assets/yebisurpg/textures/geo/item/{}.png", id)
+                || file == format!("resources/assets/yebisurpg/geo/item/{}.geo.json", id)
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_shaped_", id))
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_shapeless_", id))
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_smelting_", id))
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_blasting_", id))
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_smoking_", id))
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_campfire_", id))
+                || file.starts_with(&format!("resources/data/yebisurpg/recipe/{}_stonecutting_", id))
         }
         _ => false,
     }
+}
+
+fn build_shaped_recipe_outputs(id: &str, authoring_fields: &Value) -> Result<Vec<(String, Value)>, String> {
+    let recipes = authoring_fields.get("recipes").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut outputs = Vec::new();
+    let mut shaped_number = 0usize;
+    for recipe in recipes {
+        if recipe.get("type").and_then(Value::as_str) != Some("shaped") { continue; }
+        shaped_number += 1;
+        let ingredients = recipe.get("ingredients").and_then(Value::as_array)
+            .ok_or_else(|| format!("Shaped Crafting {} has no ingredient list", shaped_number))?;
+        let pattern_values = recipe.get("pattern").and_then(Value::as_array)
+            .ok_or_else(|| format!("Shaped Crafting {} has no 3x3 pattern", shaped_number))?;
+        if pattern_values.len() != 9 {
+            return Err(format!("Shaped Crafting {} must contain exactly 9 grid slots", shaped_number));
+        }
+        let mut pattern = Vec::with_capacity(3);
+        let mut key = Map::new();
+        let mut has_ingredient = false;
+        for row in 0..3 {
+            let mut pattern_row = String::with_capacity(3);
+            for column in 0..3 {
+                let value = &pattern_values[row * 3 + column];
+                if value.is_null() {
+                    pattern_row.push(' ');
+                    continue;
+                }
+                let index = value.as_u64()
+                    .ok_or_else(|| format!("Shaped Crafting {} has an invalid grid ingredient", shaped_number))?
+                    as usize;
+                let ingredient = ingredients.get(index).and_then(Value::as_str).unwrap_or("").trim();
+                if ingredient.is_empty() {
+                    return Err(format!("Shaped Crafting {} uses an empty ingredient brush", shaped_number));
+                }
+                if index >= 9 {
+                    return Err(format!("Shaped Crafting {} supports at most 9 ingredient brushes", shaped_number));
+                }
+                let symbol = char::from(b'A' + index as u8);
+                pattern_row.push(symbol);
+                has_ingredient = true;
+                key.entry(symbol.to_string()).or_insert_with(|| {
+                    if let Some(tag) = ingredient.strip_prefix('#') {
+                        json!({ "tag": tag })
+                    } else {
+                        json!({ "item": ingredient })
+                    }
+                });
+            }
+            pattern.push(Value::String(pattern_row));
+        }
+        if !has_ingredient {
+            return Err(format!("Shaped Crafting {} must use at least one ingredient", shaped_number));
+        }
+        let yield_count = recipe.get("yield").and_then(Value::as_u64).unwrap_or(1).clamp(1, 99);
+        let recipe_json = json!({
+            "type": "minecraft:crafting_shaped",
+            "pattern": pattern,
+            "key": key,
+            "result": { "id": format!("yebisurpg:{}", id), "count": yield_count }
+        });
+        outputs.push((
+            format!("resources/data/yebisurpg/recipe/{}_shaped_{}.json", id, shaped_number),
+            recipe_json,
+        ));
+    }
+    Ok(outputs)
+}
+
+fn build_shapeless_recipe_outputs(id: &str, authoring_fields: &Value) -> Result<Vec<(String, Value)>, String> {
+    let recipes = authoring_fields.get("recipes").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut outputs = Vec::new();
+    let mut shapeless_number = 0usize;
+    for recipe in recipes {
+        if recipe.get("type").and_then(Value::as_str) != Some("shapeless") { continue; }
+        shapeless_number += 1;
+        let authored_ingredients = recipe.get("ingredients").and_then(Value::as_array)
+            .ok_or_else(|| format!("Shapeless Crafting {} has no ingredient list", shapeless_number))?;
+        let mut ingredients = Vec::new();
+        for (index, authored) in authored_ingredients.iter().enumerate() {
+            let (value, count) = if let Some(value) = authored.as_str() {
+                (value.trim(), 1u64)
+            } else {
+                (authored.get("value").and_then(Value::as_str).unwrap_or("").trim(), authored.get("count").and_then(Value::as_u64).unwrap_or(1).clamp(1, 9))
+            };
+            if value.is_empty() { return Err(format!("Shapeless Crafting {} ingredient {} is empty", shapeless_number, index + 1)); }
+            let generated = if let Some(tag) = value.strip_prefix('#') { json!({ "tag": tag }) } else { json!({ "item": value }) };
+            for _ in 0..count { ingredients.push(generated.clone()); }
+        }
+        if ingredients.is_empty() { return Err(format!("Shapeless Crafting {} must use at least one ingredient", shapeless_number)); }
+        if ingredients.len() > 9 { return Err(format!("Shapeless Crafting {} requires {} slots; Minecraft supports at most 9", shapeless_number, ingredients.len())); }
+        let yield_count = recipe.get("yield").and_then(Value::as_u64).unwrap_or(1).clamp(1, 99);
+        outputs.push((format!("resources/data/yebisurpg/recipe/{}_shapeless_{}.json", id, shapeless_number), json!({
+            "type": "minecraft:crafting_shapeless",
+            "ingredients": ingredients,
+            "result": { "id": format!("yebisurpg:{}", id), "count": yield_count }
+        })));
+    }
+    Ok(outputs)
+}
+
+fn build_processing_recipe_outputs(id: &str, authoring_fields: &Value) -> Result<Vec<(String, Value)>, String> {
+    let recipes = authoring_fields.get("recipes").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut outputs = Vec::new();
+    let mut type_numbers = std::collections::HashMap::<String, usize>::new();
+    for recipe in recipes {
+        let Some(kind) = recipe.get("type").and_then(Value::as_str) else { continue; };
+        if !matches!(kind, "smelting" | "blasting" | "smoking" | "campfire" | "stonecutting") { continue; }
+        let number = type_numbers.entry(kind.to_string()).or_insert(0);
+        *number += 1;
+        let ingredient = recipe.get("ingredient").and_then(Value::as_str).unwrap_or("").trim();
+        if ingredient.is_empty() { return Err(format!("{} recipe {} requires an input ingredient", kind, number)); }
+        let input = if let Some(tag) = ingredient.strip_prefix('#') { json!({ "tag": tag }) } else { json!({ "item": ingredient }) };
+        let yield_count = recipe.get("yield").and_then(Value::as_u64)
+            .ok_or_else(|| format!("{} recipe {} requires a yield", kind, number))?
+            .clamp(1, 99);
+        let recipe_json = if kind == "stonecutting" {
+            json!({
+                "type": "minecraft:stonecutting",
+                "ingredient": input,
+                "result": { "id": format!("yebisurpg:{}", id), "count": yield_count }
+            })
+        } else {
+            let cooking_time = recipe.get("cookingTime").and_then(Value::as_u64)
+                .ok_or_else(|| format!("{} recipe {} requires a cooking time", kind, number))?
+                .max(1);
+            let serializer = if kind == "campfire" { "campfire_cooking" } else { kind };
+            json!({
+                "type": format!("minecraft:{}", serializer),
+                "ingredient": input,
+                "result": { "id": format!("yebisurpg:{}", id), "count": yield_count },
+                "experience": 0.0,
+                "cookingtime": cooking_time
+            })
+        };
+        outputs.push((format!("resources/data/yebisurpg/recipe/{}_{}_{}.json", id, kind, number), recipe_json));
+    }
+    Ok(outputs)
 }
 
 fn remove_basic_item_injections(item: &Value, id: &str) -> Result<Vec<Value>, String> {
@@ -622,6 +818,94 @@ fn remove_basic_item_injections(item: &Value, id: &str) -> Result<Vec<Value>, St
         remove_item_injections(&wrapper)?;
     }
     Ok(injections.into_iter().filter(|entry| !is_basic_item_injection(entry, id)).collect())
+}
+
+fn java_float(value: f64) -> String {
+    let mut rendered = value.to_string();
+    if !rendered.contains('.') && !rendered.contains('e') && !rendered.contains('E') { rendered.push_str(".0"); }
+    format!("{}f", rendered)
+}
+
+fn build_basic_item_registration(id: &str, stack_size: u32, authored: &Map<String, Value>) -> Result<(String, Vec<String>), String> {
+    let constant = id.to_ascii_uppercase();
+    let tool_enabled = authored.get("toolEnabled").and_then(Value::as_bool).unwrap_or(false);
+    let tool_type = authored.get("toolType").and_then(Value::as_str).unwrap_or("sword");
+    let tool_class = match tool_type {
+        "sword" => "SwordItem", "pickaxe" => "PickaxeItem", "axe" => "AxeItem",
+        "shovel" => "ShovelItem", "hoe" => "HoeItem",
+        _ => return Err(format!("Unsupported tool type '{}'", tool_type)),
+    };
+    let tier = match authored.get("toolTier").and_then(Value::as_str).unwrap_or("iron") {
+        "wood" => "Tiers.WOOD", "stone" => "Tiers.STONE", "iron" => "Tiers.IRON",
+        "gold" => "Tiers.GOLD", "diamond" => "Tiers.DIAMOND", "netherite" => "Tiers.NETHERITE",
+        value => return Err(format!("Unsupported tool tier '{}'", value)),
+    };
+    let mut imports = Vec::<String>::new();
+    let mut properties = if !tool_enabled && stack_size != 64 { format!(".stacksTo({})", stack_size.clamp(1, 99)) } else { String::new() };
+
+    if authored.get("foodEnabled").and_then(Value::as_bool).unwrap_or(false) {
+        let nutrition = authored.get("nutrition").and_then(Value::as_i64).unwrap_or(4).max(0);
+        let saturation = authored.get("saturation").and_then(Value::as_f64).unwrap_or(0.3).max(0.0);
+        let mut food = format!("new FoodProperties.Builder().nutrition({}).saturationModifier({})", nutrition, java_float(saturation));
+        if authored.get("canAlwaysEat").and_then(Value::as_bool).unwrap_or(false) { food.push_str(".alwaysEdible()"); }
+        if authored.get("fastFood").and_then(Value::as_bool).unwrap_or(false) { food.push_str(".fast()"); }
+        properties.push_str(&format!(".food({}.build())", food));
+    }
+
+    let attack_damage = authored.get("attackDamage").and_then(Value::as_f64);
+    let attack_speed = authored.get("attackSpeed").and_then(Value::as_f64);
+    if attack_damage.is_some() || attack_speed.is_some() {
+        if tool_enabled {
+            let default_damage = match tool_type { "sword" => 3.0, "axe" => 5.0, "pickaxe" => 1.0, "shovel" => 1.5, _ => 0.0 };
+            let default_speed = match tool_type { "sword" => -2.4, "axe" => -3.1, "pickaxe" => -2.8, "shovel" | "hoe" => -3.0, _ => 0.0 };
+            let helper = if tool_type == "sword" { "SwordItem" } else { "DiggerItem" };
+            properties.push_str(&format!(".attributes({}::createAttributes({}, {}, {}))", helper, tier, java_float(attack_damage.unwrap_or(default_damage)), java_float(attack_speed.unwrap_or(default_speed))).replace("::", "."));
+            imports.push(if tool_type == "sword" { "import net.minecraft.world.item.SwordItem;" } else { "import net.minecraft.world.item.DiggerItem;" }.to_string());
+        } else {
+            let mut modifiers = Vec::new();
+            if let Some(value) = attack_damage { modifiers.push(format!(".add(Attributes.ATTACK_DAMAGE, new AttributeModifier(Item.BASE_ATTACK_DAMAGE_ID, {}, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)", value)); }
+            if let Some(value) = attack_speed { modifiers.push(format!(".add(Attributes.ATTACK_SPEED, new AttributeModifier(Item.BASE_ATTACK_SPEED_ID, {}, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)", value)); }
+            properties.push_str(&format!(".attributes(ItemAttributeModifiers.builder(){}.build())", modifiers.join("")));
+            imports.extend([
+                "import net.minecraft.world.item.component.ItemAttributeModifiers;",
+                "import net.minecraft.world.entity.ai.attributes.AttributeModifier;",
+                "import net.minecraft.world.entity.ai.attributes.Attributes;",
+                "import net.minecraft.world.entity.EquipmentSlotGroup;",
+            ].into_iter().map(str::to_string));
+        }
+    }
+
+    let tooltip_enabled = authored.get("tooltipEnabled").and_then(Value::as_bool).unwrap_or(false);
+    let base_class = if tool_enabled { tool_class } else { "Item" };
+    let args = if tool_enabled { format!("{}, new Item.Properties(){}", tier, properties) } else { format!("new Item.Properties(){}", properties) };
+    let constructor = if tooltip_enabled {
+        let normal = authored.get("tooltipNormal").and_then(Value::as_str).unwrap_or("").trim();
+        let hidden = authored.get("tooltipHidden").and_then(Value::as_str).unwrap_or("").trim();
+        let shift = authored.get("tooltipShift").and_then(Value::as_bool).unwrap_or(false);
+        let default_hint = authored.get("tooltipUseDefaultHint").and_then(Value::as_bool).unwrap_or(true);
+        let custom_hint = authored.get("tooltipShiftHint").and_then(Value::as_str).unwrap_or("").trim();
+        let mut lines = Vec::new();
+        if !normal.is_empty() { lines.push(format!("                tooltipData.add(Component.translatable(\"tooltip.yebisurpg.{}.normal\"));", id)); }
+        if shift {
+            if default_hint || !custom_hint.is_empty() {
+                let key = if default_hint { "tooltip.yebisurpg.shift_hint".to_string() } else { format!("tooltip.yebisurpg.{}.shift_hint", id) };
+                lines.push(format!("                if (!flag.hasShiftDown()) tooltipData.add(Component.translatable(\"{}\").withStyle(net.minecraft.ChatFormatting.GRAY));", key));
+            }
+            if !hidden.is_empty() { lines.push(format!("                if (flag.hasShiftDown()) tooltipData.add(Component.translatable(\"tooltip.yebisurpg.{}.hidden\"));", id)); }
+        }
+        lines.push("                super.appendHoverText(stack, context, tooltipData, flag);".to_string());
+        imports.extend([
+            "import java.util.List;", "import net.minecraft.network.chat.Component;",
+            "import net.minecraft.world.item.ItemStack;", "import net.minecraft.world.item.TooltipFlag;",
+            "import net.minecraft.world.item.Item.TooltipContext;",
+        ].into_iter().map(str::to_string));
+        format!("new {}({}) {{\n            @Override\n            public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipData, TooltipFlag flag) {{\n{}\n            }}\n        }}", base_class, args, lines.join("\n"))
+    } else {
+        format!("new {}({})", base_class, args)
+    };
+    imports.sort(); imports.dedup();
+    let registered_type = if tool_enabled { base_class } else { "Item" };
+    Ok((format!("    public static final DeferredItem<{}> {} = ITEMS.register(\"{}\",\n            () -> {});", registered_type, constant, id, constructor), imports))
 }
 
 #[tauri::command]
@@ -640,9 +924,12 @@ fn save_basic_item(
     if !matches!(holding_mode, "generated" | "handheld" | "3d") {
         return Err("Unsupported Holding Mode".to_string());
     }
-    if holding_mode == "3d" {
-        return Err("3D Model requires the geo model, geo texture, and display model fields".to_string());
-    }
+    let authored = authoring_fields.as_object()
+        .ok_or_else(|| "Item authoring fields must be an object".to_string())?;
+    let (registration, item_imports) = build_basic_item_registration(id, stack_size, authored)?;
+    let shaped_recipe_outputs = build_shaped_recipe_outputs(id, &authoring_fields)?;
+    let shapeless_recipe_outputs = build_shapeless_recipe_outputs(id, &authoring_fields)?;
+    let processing_recipe_outputs = build_processing_recipe_outputs(id, &authoring_fields)?;
     let (texture_extension, texture_data) = read_texture_sidecar(
         &ycs_data_dir().join("textures"),
         texture_id,
@@ -683,21 +970,27 @@ fn save_basic_item(
 
     let java_file = "java/net/ye6isu/yebisuRPG/item/ModItems.java";
     let constant = id.to_ascii_uppercase();
-    let properties = if stack_size == 64 { String::new() } else { format!(".stacksTo({})", stack_size.clamp(1, 99)) };
-    let registration = format!(
-        "    public static final DeferredItem<Item> {} = ITEMS.register(\"{}\",\n            () -> new Item(new Item.Properties(){}));",
-        constant, id, properties,
-    );
     inject_marker_content(java_file, "YCS_Mod_Items", &registration)?;
     let mut injections = retained_injections;
     injections.push(json!({
         "type": "java-marker", "file": java_file, "marker": "YCS_Mod_Items", "content": registration,
     }));
+    for import_line in item_imports {
+        inject_marker_content(java_file, "YCS_Mod_Item_Imports", &import_line)?;
+        injections.push(json!({ "type": "java-marker", "file": java_file, "marker": "YCS_Mod_Item_Imports", "content": import_line }));
+    }
 
     let lang_file = "resources/assets/yebisurpg/lang/en_us.json";
     let lang_key = format!("item.yebisurpg.{}", id);
     set_source_json_key(lang_file, &lang_key, if display_name.is_empty() { id } else { display_name })?;
     injections.push(json!({ "type": "json-key", "file": lang_file, "key": lang_key }));
+    for (suffix, field) in [("normal", "tooltipNormal"), ("shift_hint", "tooltipShiftHint"), ("hidden", "tooltipHidden")] {
+        let value = authored.get(field).and_then(Value::as_str).unwrap_or("").trim();
+        if value.is_empty() { continue; }
+        let key = format!("tooltip.yebisurpg.{}.{}", id, suffix);
+        set_source_json_key(lang_file, &key, value)?;
+        injections.push(json!({ "type": "json-key", "file": lang_file, "key": key }));
+    }
 
     if !creative_tab.is_empty() {
         let tab_file = "java/net/ye6isu/yebisuRPG/item/ModCreativeTabContents.java";
@@ -710,6 +1003,29 @@ fn save_basic_item(
         injections.push(json!({ "type": "java-marker", "file": tab_file, "marker": "YCS_Tab_Contents", "content": tab_line }));
     }
 
+    if authored.get("fuelEnabled").and_then(Value::as_bool).unwrap_or(false) {
+        let burn_time = authored.get("fuel").and_then(Value::as_i64).filter(|value| *value > 0)
+            .ok_or_else(|| "Fuel requires a positive Burn Time".to_string())?;
+        let fuel_file = "java/net/ye6isu/yebisuRPG/item/ModFuelEvents.java";
+        let fuel_line = format!("        if (event.getItemStack().is(ModItems.{}.get())) {{ event.setBurnTime({}); }}", constant, burn_time);
+        inject_marker_content(fuel_file, "YCS_Mod_Fuel", &fuel_line)?;
+        injections.push(json!({ "type": "java-marker", "file": fuel_file, "marker": "YCS_Mod_Fuel", "content": fuel_line }));
+    }
+
+    let item_value = format!("yebisurpg:{}", id);
+    for tag in authored.get("tags").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
+        let Some((namespace, path)) = tag.trim_start_matches('#').split_once(':') else {
+            return Err(format!("Invalid item tag '{}'", tag));
+        };
+        if namespace.is_empty() || path.is_empty() || path.contains("..") || path.starts_with('/') || path.starts_with('\\') {
+            return Err(format!("Invalid item tag '{}'", tag));
+        }
+        let tag_file = format!("resources/data/{}/tags/item/{}.json", namespace, path);
+        let tag_file_was_created = !safe_source_path(&tag_file)?.is_file();
+        add_source_json_array_value(&tag_file, "values", &item_value)?;
+        injections.push(json!({ "type": "json-array-value", "file": tag_file, "key": "values", "value": item_value, "removeFileWhenEmpty": tag_file_was_created }));
+    }
+
     let texture_destination = format!("resources/assets/yebisurpg/textures/item/{}.png", id);
     let texture_path = safe_source_path(&texture_destination)?;
     if let Some(parent) = texture_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
@@ -717,17 +1033,115 @@ fn save_basic_item(
     injections.push(json!({ "type": "created-file", "file": texture_destination }));
 
     let model_destination = format!("resources/assets/yebisurpg/models/item/{}.json", id);
-    let parent = if holding_mode == "handheld" { "minecraft:item/handheld" } else { "minecraft:item/generated" };
-    let model = json!({ "parent": parent, "textures": { "layer0": format!("yebisurpg:item/{}", id) } });
-    let model_path = safe_source_path(&model_destination)?;
-    if let Some(parent) = model_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
-    fs::write(model_path, serde_json::to_string_pretty(&model).map_err(|error| error.to_string())?)
-        .map_err(|error| error.to_string())?;
-    injections.push(json!({ "type": "created-file", "file": model_destination }));
+    let additional_states = authored.get("states").and_then(Value::as_array).cloned().unwrap_or_default();
+    if additional_states.is_empty() && holding_mode != "3d" {
+        let parent = if holding_mode == "handheld" { "minecraft:item/handheld" } else { "minecraft:item/generated" };
+        let model = json!({ "parent": parent, "textures": { "layer0": format!("yebisurpg:item/{}", id) } });
+        let model_path = safe_source_path(&model_destination)?;
+        if let Some(parent) = model_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+        fs::write(model_path, serde_json::to_string_pretty(&model).map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+        injections.push(json!({ "type": "created-file", "file": model_destination }));
+    } else {
+        let mut states = vec![json!({
+            "holdingMode": holding_mode,
+            "texture": texture_id,
+            "geoTexture": authored.get("geoTexture").and_then(Value::as_str).unwrap_or(texture_id),
+            "geoModelData": authored.get("geoModelData").cloned().unwrap_or(Value::Null),
+            "displayModelData": authored.get("displayModelData").cloned().unwrap_or(Value::Null),
+        })];
+        states.extend(additional_states);
+        let mut specs = Vec::new();
+        let mut overrides = Vec::new();
+        let mut has_geo = false;
+        for (index, state) in states.iter().enumerate() {
+            let state_mode = state.get("holdingMode").and_then(Value::as_str).unwrap_or("generated");
+            let state_id = format!("{}_state{}", id, index);
+            let state_model_destination = format!("resources/assets/yebisurpg/models/item/{}.json", state_id);
+            if state_mode == "3d" {
+                has_geo = true;
+                let geo_bytes = state.get("geoModelData").and_then(Value::as_array)
+                    .ok_or_else(|| format!("State {} requires imported Model data", index + 1))?
+                    .iter().map(|value| value.as_u64().filter(|byte| *byte <= 255).map(|byte| byte as u8).ok_or_else(|| "Invalid model byte data".to_string())).collect::<Result<Vec<_>, _>>()?;
+                serde_json::from_slice::<Value>(&geo_bytes).map_err(|error| format!("State {} Model is invalid JSON: {}", index + 1, error))?;
+                let geo_destination = format!("resources/assets/yebisurpg/geo/item/{}.geo.json", state_id);
+                let geo_path = safe_source_path(&geo_destination)?;
+                if let Some(parent) = geo_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+                fs::write(geo_path, geo_bytes).map_err(|error| error.to_string())?;
+                injections.push(json!({ "type": "created-file", "file": geo_destination }));
+                let state_texture = state.get("geoTexture").and_then(Value::as_str).unwrap_or("");
+                if state_texture.is_empty() { return Err(format!("State {} requires a Texture", index + 1)); }
+                let (extension, bytes) = read_texture_sidecar(&ycs_data_dir().join("textures"), state_texture)?
+                    .ok_or_else(|| format!("State {} Texture '{}' was not found", index + 1, state_texture))?;
+                if extension != "png" { return Err(format!("State {} Texture must be PNG", index + 1)); }
+                let geo_texture_destination = format!("resources/assets/yebisurpg/textures/geo/item/{}.png", state_id);
+                let geo_texture_path = safe_source_path(&geo_texture_destination)?;
+                if let Some(parent) = geo_texture_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+                fs::write(geo_texture_path, bytes).map_err(|error| error.to_string())?;
+                injections.push(json!({ "type": "created-file", "file": geo_texture_destination }));
+                let display = state.get("displayModelData").and_then(Value::as_array)
+                    .map(|values| values.iter().filter_map(|value| value.as_u64().filter(|byte| *byte <= 255).map(|byte| byte as u8)).collect::<Vec<_>>());
+                let display_bytes = display.filter(|bytes| !bytes.is_empty()).unwrap_or_else(|| b"{\n  \"parent\": \"minecraft:builtin/entity\"\n}".to_vec());
+                serde_json::from_slice::<Value>(&display_bytes).map_err(|error| format!("State {} Display Model is invalid JSON: {}", index + 1, error))?;
+                let state_model_path = safe_source_path(&state_model_destination)?;
+                if let Some(parent) = state_model_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+                fs::write(state_model_path, display_bytes).map_err(|error| error.to_string())?;
+                injections.push(json!({ "type": "created-file", "file": state_model_destination }));
+                specs.push(format!("new GeoItemRegistry.StateSpec(\"geo\", \"{}\", 0, false, 0, 0)", state_id));
+            } else {
+                let state_texture = state.get("texture").and_then(Value::as_str).unwrap_or("");
+                if state_texture.is_empty() { return Err(format!("State {} requires a Texture", index + 1)); }
+                let (extension, bytes) = read_texture_sidecar(&ycs_data_dir().join("textures"), state_texture)?
+                    .ok_or_else(|| format!("State {} Texture '{}' was not found", index + 1, state_texture))?;
+                if extension != "png" { return Err(format!("State {} Texture must be PNG", index + 1)); }
+                let state_texture_destination = format!("resources/assets/yebisurpg/textures/item/{}.png", state_id);
+                let state_texture_path = safe_source_path(&state_texture_destination)?;
+                if let Some(parent) = state_texture_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+                fs::write(state_texture_path, bytes).map_err(|error| error.to_string())?;
+                injections.push(json!({ "type": "created-file", "file": state_texture_destination }));
+                let parent = if state_mode == "handheld" { "minecraft:item/handheld" } else { "minecraft:item/generated" };
+                let state_model = json!({ "parent": parent, "textures": { "layer0": format!("yebisurpg:item/{}", state_id) } });
+                let state_model_path = safe_source_path(&state_model_destination)?;
+                if let Some(parent) = state_model_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+                fs::write(state_model_path, serde_json::to_string_pretty(&state_model).map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+                injections.push(json!({ "type": "created-file", "file": state_model_destination }));
+                specs.push(format!("new GeoItemRegistry.StateSpec(\"flat\", \"{}\", 0, false, 0, 0)", state_id));
+            }
+            overrides.push(json!({ "predicate": { "custom_model_data": index }, "model": format!("yebisurpg:item/{}", state_id) }));
+        }
+        let base_model = json!({ "parent": if has_geo { "minecraft:builtin/entity" } else { "minecraft:item/generated" }, "overrides": overrides });
+        let base_model_path = safe_source_path(&model_destination)?;
+        if let Some(parent) = base_model_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+        fs::write(base_model_path, serde_json::to_string_pretty(&base_model).map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+        injections.push(json!({ "type": "created-file", "file": model_destination }));
+        if has_geo {
+            let registry_file = "java/net/ye6isu/yebisuRPG/client/renderer/GeoItemRegistry.java";
+            let collect_line = format!("        tryRegisterMixedStates(items, ModItems.{}, java.util.List.of({}));", constant, specs.join(", "));
+            inject_marker_content(registry_file, "YCS_Geo_Collect", &collect_line)?;
+            injections.push(json!({ "type": "java-marker", "file": registry_file, "marker": "YCS_Geo_Collect", "content": collect_line }));
+        }
+    }
+
+    for (recipe_destination, recipe) in shaped_recipe_outputs {
+        let recipe_path = safe_source_path(&recipe_destination)?;
+        if let Some(parent) = recipe_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+        fs::write(recipe_path, serde_json::to_string_pretty(&recipe).map_err(|error| error.to_string())?)
+            .map_err(|error| error.to_string())?;
+        injections.push(json!({ "type": "created-file", "file": recipe_destination }));
+    }
+    for (recipe_destination, recipe) in shapeless_recipe_outputs {
+        let recipe_path = safe_source_path(&recipe_destination)?;
+        if let Some(parent) = recipe_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+        fs::write(recipe_path, serde_json::to_string_pretty(&recipe).map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+        injections.push(json!({ "type": "created-file", "file": recipe_destination }));
+    }
+    for (recipe_destination, recipe) in processing_recipe_outputs {
+        let recipe_path = safe_source_path(&recipe_destination)?;
+        if let Some(parent) = recipe_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+        fs::write(recipe_path, serde_json::to_string_pretty(&recipe).map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+        injections.push(json!({ "type": "created-file", "file": recipe_destination }));
+    }
 
     let object = item.as_object_mut().ok_or_else(|| "Existing Item JSON must be an object".to_string())?;
-    let authored = authoring_fields.as_object()
-        .ok_or_else(|| "Item authoring fields must be an object".to_string())?;
     for (key, value) in authored {
         if matches!(key.as_str(), "id" | "displayName" | "texture" | "holdingMode" | "stackSize" | "creativeTab" | "dataComponents" | "_injections") {
             continue;

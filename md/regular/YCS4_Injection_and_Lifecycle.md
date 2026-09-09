@@ -129,7 +129,7 @@ Cleanup walks the manifest in reverse. This preserves dependency order when late
 5. Bind or create the visual container only after backend success.
 6. Close the object editor tab after the successful save; failed saves keep it open with the error state intact.
 
-Closing an Item tab with editor changes opens the canonical Warning dialog. Save delegates to the Item editor's normal save action and closes only after backend success. Cancel discards the editor state and closes the tab; X and Escape dismiss the warning without closing the tab.
+Closing an Item tab with editor changes opens the canonical Warning dialog. Save delegates to the Item editor's normal save action and closes only after backend success. Cancel discards the editor state and closes the tab; X and Escape dismiss the warning without closing the tab. A saved Item ID owns at most one open editor panel; reopening its workspace object activates that existing tab, including while its initial data load is still pending.
 
 ### Existing object
 
@@ -171,7 +171,7 @@ The current Item editor uses scoped ownership because V4 exposes fewer fields th
 - stack size clamped to 1–99;
 - optional project or vanilla creative tab.
 
-The V4 Item editor also exposes and round-trips the durable V3 authoring fields for tags, multiple-state metadata, tool settings, combat, food, fuel, tooltip, recipes, and custom-class method selection. Tool Type and Tier use the bounded V3 option sets, while the tag selector includes the complete V3 Vanilla and NeoForge catalog plus dynamically authored project tags. Item Abilities are currently hidden but their previously saved values remain preserved. Tooltip uses a direct Edit row and empty tooltip text disables tooltip generation. Recipe also uses direct Edit and owns a dedicated dialog so Tooltip or Custom Class layout state cannot affect it. It stores an ordered recipe-entry array, permits multiple entries of the same type, adds entries from a titlebar menu, and removes each entry independently from its inner titlebar. Legacy one-entry-per-type recipe objects normalize into this array when loaded. Recipe entry bodies, including Shaped Crafting, are intentionally empty until their type-specific editors are reworked. Multiple States uses direct Edit, starts with no additional states, and adds State 2 onward from its titlebar button. Both collection dialogs use the same fixed populated-panel width while empty or populated under the nested-dialog rule in `YCS4_UI_FORMATTING.md`. Custom Class retains its checkbox-and-Edit row. These fields remain authoring data until their individual generators are ported. Data Components are deliberately excluded from the V4 save payload for now.
+The V4 Item editor exposes the durable V3 authoring fields for tags, multiple states, tool settings, combat, food, fuel, tooltip, recipes, and custom-class method selection. Tags, multiple states, tool settings, combat, food, fuel, tooltip, and recipes now generate runtime artifacts through the reversible manifest lifecycle. Tool Type and Tier use the bounded V3 option sets. The tag selector includes the complete V3 Vanilla and NeoForge catalog plus dynamically authored project tags; saving edits only this Item's membership in each shared tag JSON rather than overwriting other values. Tooltip uses a direct Edit row, generates translatable hover text and owned language keys, and empty tooltip text disables generation. Multiple States treats the main Appearance fields as State 1 and its dialog entries as State 2 onward; flat states generate copied textures/models and state selection uses vanilla `CUSTOM_MODEL_DATA`, while geo states additionally generate geo/display assets and register with the existing renderer. Imported model bytes are persisted in the Item authoring JSON so reopen, rename, and regeneration remain possible. Recipe uses direct Edit and owns a dedicated dialog. It stores an ordered recipe-entry array and supports every exposed type. Ingredient comboboxes reproduce the YCS3 item-and-tag catalog and the Recipe dialog-width floating list. Item Abilities remain hidden but preserved. Custom Class remains authoring-only, and Data Components remain deliberately excluded from the V4 save payload.
 
 It generates and owns:
 
@@ -180,8 +180,16 @@ It generates and owns:
 - optional creative-tab content registration;
 - `textures/item/<id>.png`;
 - `models/item/<id>.json` using the generated or handheld parent.
+- one `data/yebisurpg/recipe/<id>_shaped_<n>.json` file per authored Shaped Crafting entry, including item or `#tag` ingredients and its yield.
+- one `data/yebisurpg/recipe/<id>_shapeless_<n>.json` file per authored Shapeless Crafting entry; ingredient quantities expand into repeated recipe inputs and are limited to nine total slots.
+- numbered Smelting, Blasting, Smoking, Campfire, and Stonecutting recipe JSON files. Cooking entries require an explicitly entered yield, item-or-tag input, and cooking time; Stonecutting requires an explicitly entered yield and input without an inapplicable time field. Their ingredient comboboxes use the same control width as the numeric fields.
+- optional Item properties for food and attack attributes, or the selected vanilla tool class/tier and its attributes;
+- optional translated normal/Shift tooltip behavior and owned language keys;
+- optional furnace fuel registration in `ModFuelEvents.java`;
+- ownership-safe membership entries in selected item-tag JSON files;
+- optional flat/geo state textures and models plus `GeoItemRegistry` registration when a custom renderer is required.
 
-The 3D Model option remains visible for compatibility but save rejects it until V4 exposes the geo model, geo texture, and display-model inputs.
+The 3D Model option requires an imported geo model and PNG texture. A display model is optional and falls back to `minecraft:builtin/entity`.
 
 `delete_basic_item` removes the complete manifest and then the Item JSON. It is idempotent when the Item is already absent.
 
@@ -212,7 +220,7 @@ Texture Save resolves every Item whose `texture` field matches the saved Texture
 
 ## Current limitations
 
-- Only the basic Item fields use the full V4 injection path today; the additional ported Item fields round-trip without generating their runtime artifacts yet.
+- Basic Item fields, Tags, Tooltip, Multiple States, Tool, Combat, Food, Fuel, and all exposed Recipe types use the full V4 injection path. Custom Class remains authoring-only and Data Components remain excluded.
 - Workspace hierarchy is local browser state and is not portable project metadata.
 - Folder deletion contains an unused confirmation-dialog path; actual removal currently unwraps children directly.
 - General transactional rollback is not implemented if generation fails after some old outputs were removed.

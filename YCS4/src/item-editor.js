@@ -4,6 +4,10 @@ import {
   loadCreativeTabOptions,
 } from './data/creative-tabs.js';
 import { ITEM_TAG_OPTIONS } from './data/item-tags.js';
+import {
+  createIngredientCombobox,
+  loadIngredientOptions,
+} from './ingredient-combobox.js';
 
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 
@@ -235,6 +239,7 @@ export const initializeItemEditorPage = ({
   template,
   workspaceTabs,
   createTab,
+  setActiveTab,
   removeTab,
   onItemSaved,
   onItemDeleted,
@@ -243,7 +248,6 @@ export const initializeItemEditorPage = ({
   const tagsDialog = document.getElementById('item-tags-dialog');
   const tagsPreview = document.getElementById('item-tags-preview');
   const tagsSearchInput = document.getElementById('item-tags-search-input');
-  const tagsSearchButton = document.getElementById('item-tags-search-button');
   const tagsOptions = document.getElementById('item-tags-options');
   const statesDialog = document.getElementById('item-states-dialog');
   const statesList = document.getElementById('item-states-list');
@@ -318,6 +322,401 @@ export const initializeItemEditorPage = ({
     shaped: 'Shaped Crafting', shapeless: 'Shapeless Crafting', smelting: 'Smelting',
     blasting: 'Blasting', smoking: 'Smoking', campfire: 'Campfire', stonecutting: 'Stonecutting',
   };
+  const activeShapedRecipeBrushes = new WeakMap();
+  let recipeItemOptions = [];
+  const loadRecipeItemOptions = async () => {
+    recipeItemOptions = await loadIngredientOptions();
+  };
+
+  const closeShapedIngredientComboboxes = exceptCombobox => {
+    for (const combobox of recipeDialog.querySelectorAll('.item-shaped-recipe-combobox')) {
+      if (combobox === exceptCombobox) continue;
+      combobox.querySelector('.pixel-combobox-options').hidden = true;
+      combobox.querySelector('.pixel-combobox-button').setAttribute('aria-expanded', 'false');
+      combobox.querySelector('.pixel-direction-icon').className = 'pixel-direction-icon pixel-direction-down';
+    }
+  };
+
+  const addShapedOptionsOverlayScrollbar = (host, options) => {
+    const scrollbar = document.createElement('div');
+    scrollbar.className = 'dialog-overlay-scrollbar dialog-overlay-scrollbar-vertical';
+    scrollbar.setAttribute('aria-hidden', 'true');
+    const thumb = document.createElement('div');
+    thumb.className = 'dialog-overlay-scrollbar-thumb';
+    scrollbar.append(thumb);
+    host.append(scrollbar);
+
+    const visibleOptions = () => [...options.children].filter(option => !option.hidden);
+    const setSnappedScroll = target => {
+      const candidates = visibleOptions();
+      if (!candidates.length) return;
+      const nearest = candidates.reduce((best, option) => (
+        Math.abs(option.offsetTop - target) < Math.abs(best.offsetTop - target) ? option : best
+      ));
+      options.scrollTop = nearest.offsetTop;
+    };
+
+    const sync = () => {
+      const viewportSize = options.clientHeight;
+      const contentSize = options.scrollHeight;
+      const hasOverflow = contentSize > viewportSize + 0.5;
+      scrollbar.hidden = !hasOverflow;
+      if (!hasOverflow) return;
+      const artPixel = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--ycs-pixel-2x'),
+      ) || 2;
+      const trackSize = scrollbar.clientHeight;
+      const thumbSize = Math.min(trackSize, Math.max(6 * artPixel, trackSize * (viewportSize / contentSize)));
+      const scrollRange = Math.max(0, contentSize - viewportSize);
+      const travel = Math.max(0, trackSize - thumbSize);
+      thumb.style.height = `${thumbSize}px`;
+      thumb.style.top = `${scrollRange ? (options.scrollTop / scrollRange) * travel : 0}px`;
+    };
+    let dragState = null;
+    scrollbar.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      sync();
+      const trackBounds = scrollbar.getBoundingClientRect();
+      const thumbBounds = thumb.getBoundingClientRect();
+      const scrollRange = Math.max(0, options.scrollHeight - options.clientHeight);
+      const travel = Math.max(0, trackBounds.height - thumbBounds.height);
+      if (event.target !== thumb) {
+        const target = (travel
+          ? clamp(event.clientY - trackBounds.top - (thumbBounds.height / 2), 0, travel) / travel
+          : 0) * scrollRange;
+        setSnappedScroll(target);
+        sync();
+        return;
+      }
+      dragState = { pointerId: event.pointerId, startY: event.clientY, startScroll: options.scrollTop, scrollRange, travel };
+      scrollbar.setPointerCapture(event.pointerId);
+    });
+    scrollbar.addEventListener('pointermove', event => {
+      if (dragState?.pointerId !== event.pointerId) return;
+      const target = dragState.startScroll + (dragState.travel
+        ? ((event.clientY - dragState.startY) / dragState.travel) * dragState.scrollRange
+        : 0);
+      setSnappedScroll(target);
+    });
+    const stopDrag = event => {
+      if (dragState?.pointerId === event.pointerId) dragState = null;
+    };
+    scrollbar.addEventListener('pointerup', stopDrag);
+    scrollbar.addEventListener('pointercancel', stopDrag);
+    options.addEventListener('scroll', sync, { passive: true });
+    options.addEventListener('wheel', event => {
+      if (!event.deltaY) return;
+      event.preventDefault();
+      const candidates = visibleOptions();
+      if (!candidates.length) return;
+      const currentIndex = candidates.reduce((bestIndex, option, index) => (
+        Math.abs(option.offsetTop - options.scrollTop)
+          < Math.abs(candidates[bestIndex].offsetTop - options.scrollTop)
+          ? index
+          : bestIndex
+      ), 0);
+      const nextIndex = clamp(currentIndex + Math.sign(event.deltaY), 0, candidates.length - 1);
+      setSnappedScroll(candidates[nextIndex].offsetTop);
+      sync();
+    }, { passive: false });
+    options.snapToOption = option => setSnappedScroll(option.offsetTop);
+    options.syncOverlayScrollbar = () => requestAnimationFrame(sync);
+  };
+
+  const normalizeShapedRecipe = recipe => {
+    recipe.yield = Math.min(99, Math.max(1, Number.parseInt(recipe.yield, 10) || 1));
+    recipe.ingredients = Array.isArray(recipe.ingredients)
+      ? recipe.ingredients.map(ingredient => String(ingredient || ''))
+      : [];
+    recipe.pattern = Array.from({ length: 9 }, (_, index) => {
+      const ingredientIndex = Number.parseInt(recipe.pattern?.[index], 10);
+      return Number.isInteger(ingredientIndex)
+        && ingredientIndex >= 0
+        && ingredientIndex < recipe.ingredients.length
+        ? ingredientIndex
+        : null;
+    });
+  };
+
+  const syncShapedOptionStackPositions = options => {
+    const allOptions = [...options.children];
+    const visibleOptions = allOptions.filter(option => !option.hidden);
+    for (const option of allOptions) delete option.dataset.stackPosition;
+    visibleOptions.forEach((option, index) => {
+      option.dataset.stackPosition = visibleOptions.length === 1
+        ? 'only'
+        : index === 0
+          ? 'first'
+          : index === visibleOptions.length - 1
+            ? 'last'
+            : 'middle';
+    });
+    options.parentElement?.style.setProperty(
+      '--item-shaped-visible-options',
+      String(Math.max(1, Math.min(6, visibleOptions.length))),
+    );
+  };
+
+  const syncShapedScrolledOptionStackPositions = options => {
+    if (options.hidden || !options.clientHeight) return;
+    const allOptions = [...options.children];
+    const filteredOptions = allOptions.filter(option => !option.hidden);
+    if (!filteredOptions.length) return;
+    const firstIndex = filteredOptions.reduce((bestIndex, option, index) => (
+      Math.abs(option.offsetTop - options.scrollTop)
+        < Math.abs(filteredOptions[bestIndex].offsetTop - options.scrollTop)
+        ? index
+        : bestIndex
+    ), 0);
+    const viewportOptions = filteredOptions.slice(firstIndex, firstIndex + 6);
+    if (!viewportOptions.length) return;
+    for (const option of allOptions) delete option.dataset.stackPosition;
+    filteredOptions.forEach(option => { option.dataset.stackPosition = 'middle'; });
+    const first = viewportOptions[0];
+    const last = viewportOptions[viewportOptions.length - 1];
+    if (first === last) {
+      first.dataset.stackPosition = 'only';
+    } else {
+      first.dataset.stackPosition = 'first';
+      last.dataset.stackPosition = 'last';
+    }
+    requestAnimationFrame(() => {
+      if (!options.hidden) options.scrollTop = first.offsetTop;
+    });
+  };
+
+  const renderShapedRecipe = (body, recipe) => {
+    normalizeShapedRecipe(recipe);
+    let activeBrush = activeShapedRecipeBrushes.get(recipe);
+    if (!Number.isInteger(activeBrush) || activeBrush < 0 || activeBrush >= recipe.ingredients.length) {
+      activeBrush = recipe.ingredients.length ? 0 : null;
+      activeShapedRecipeBrushes.set(recipe, activeBrush);
+    }
+
+    const controls = document.createElement('div');
+    controls.className = 'item-shaped-recipe-controls';
+    const yieldRow = document.createElement('div');
+    yieldRow.className = 'item-shaped-recipe-yield dialog-labeled-row';
+    const yieldLabel = document.createElement('span');
+    yieldLabel.textContent = 'Yield';
+    const yieldInput = document.createElement('input');
+    yieldInput.className = 'pixel-text-box';
+    yieldInput.type = 'number';
+    yieldInput.min = '1';
+    yieldInput.max = '99';
+    yieldInput.value = String(recipe.yield);
+    yieldInput.setAttribute('aria-label', 'Recipe yield');
+    yieldInput.addEventListener('input', () => {
+      recipe.yield = Math.min(99, Math.max(1, Number.parseInt(yieldInput.value, 10) || 1));
+      activeDialogPanel.dataset.dirty = 'true';
+    });
+    const ingredientLabel = document.createElement('span');
+    ingredientLabel.textContent = 'Ingredients';
+    const addIngredient = document.createElement('button');
+    addIngredient.className = 'pixel-button pixel-combobox-button item-shaped-recipe-add-ingredient';
+    addIngredient.type = 'button';
+    addIngredient.setAttribute('aria-label', 'Add ingredient');
+    const addIcon = document.createElement('span');
+    addIcon.className = 'item-recipe-add-icon';
+    addIcon.setAttribute('aria-hidden', 'true');
+    addIngredient.append(addIcon);
+    addIngredient.addEventListener('click', () => {
+      recipe.ingredients.push('');
+      activeShapedRecipeBrushes.set(recipe, recipe.ingredients.length - 1);
+      activeDialogPanel.dataset.dirty = 'true';
+      renderItemRecipes();
+    });
+    yieldRow.append(yieldLabel, yieldInput, ingredientLabel, addIngredient);
+
+    const ingredientList = document.createElement('div');
+    ingredientList.className = 'item-shaped-recipe-ingredients';
+    recipe.ingredients.forEach((ingredient, ingredientIndex) => {
+      const row = document.createElement('div');
+      row.className = 'item-shaped-recipe-ingredient';
+      const combobox = createIngredientCombobox({
+        options: recipeItemOptions,
+        value: ingredient,
+        ariaLabel: `Ingredient ${ingredientIndex + 1}`,
+        optionHostClass: 'item-shaped-recipe-options-host',
+        onChange: value => {
+          recipe.ingredients[ingredientIndex] = value;
+          activeDialogPanel.dataset.dirty = 'true';
+        },
+      });
+      combobox.classList.add('item-shaped-recipe-combobox');
+      const brush = document.createElement('button');
+      brush.className = 'pixel-button pixel-combobox-button item-shaped-recipe-brush';
+      brush.type = 'button';
+      brush.textContent = String(ingredientIndex + 1);
+      brush.setAttribute('aria-label', `Select ingredient brush ${ingredientIndex + 1}`);
+      brush.setAttribute('aria-pressed', String(activeBrush === ingredientIndex));
+      brush.addEventListener('click', () => {
+        activeShapedRecipeBrushes.set(recipe, ingredientIndex);
+        renderItemRecipes();
+      });
+      const remove = document.createElement('button');
+      remove.className = 'pixel-button pixel-combobox-button item-shaped-recipe-remove-ingredient';
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove ingredient ${ingredientIndex + 1}`);
+      const removeIcon = document.createElement('img');
+      removeIcon.src = './assets/sprite/generated/dialogue_icon_2x.png';
+      removeIcon.alt = '';
+      removeIcon.draggable = false;
+      remove.append(removeIcon);
+      remove.addEventListener('click', () => {
+        recipe.ingredients.splice(ingredientIndex, 1);
+        recipe.pattern = recipe.pattern.map(value => value === ingredientIndex
+          ? null
+          : value > ingredientIndex ? value - 1 : value);
+        activeShapedRecipeBrushes.set(recipe, recipe.ingredients.length ? 0 : null);
+        activeDialogPanel.dataset.dirty = 'true';
+        renderItemRecipes();
+      });
+      row.append(combobox, brush, remove);
+      ingredientList.append(row);
+    });
+    controls.append(yieldRow, ingredientList);
+
+    const grid = document.createElement('div');
+    grid.className = 'item-shaped-recipe-grid';
+    grid.setAttribute('aria-label', '3 by 3 crafting grid');
+    recipe.pattern.forEach((ingredientIndex, cellIndex) => {
+      const cell = document.createElement('button');
+      cell.className = 'pixel-button pixel-combobox-button item-shaped-recipe-cell';
+      cell.type = 'button';
+      const syncCell = () => {
+        const value = recipe.pattern[cellIndex];
+        const ingredientId = value === null ? '' : recipe.ingredients[value] || `Ingredient ${value + 1}`;
+        cell.textContent = value === null ? '' : String(value + 1);
+        cell.setAttribute('aria-label', value === null
+          ? `Empty crafting slot ${cellIndex + 1}`
+          : `Crafting slot ${cellIndex + 1}: ${ingredientId}`);
+        cell.dataset.filled = String(value !== null);
+      };
+      syncCell();
+      cell.addEventListener('click', () => {
+        const brushIndex = activeShapedRecipeBrushes.get(recipe);
+        recipe.pattern[cellIndex] = Number.isInteger(brushIndex) ? brushIndex : null;
+        activeDialogPanel.dataset.dirty = 'true';
+        syncCell();
+      });
+      cell.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        recipe.pattern[cellIndex] = null;
+        activeDialogPanel.dataset.dirty = 'true';
+        syncCell();
+      });
+      grid.append(cell);
+    });
+    body.append(controls, grid);
+  };
+
+  const renderShapelessRecipe = (body, recipe) => {
+    recipe.yield = Math.min(99, Math.max(1, Number.parseInt(recipe.yield, 10) || 1));
+    recipe.ingredients = Array.isArray(recipe.ingredients)
+      ? recipe.ingredients.map(ingredient => typeof ingredient === 'string'
+        ? { value: ingredient, count: 1 }
+        : { value: String(ingredient?.value || ''), count: Math.min(9, Math.max(1, Number.parseInt(ingredient?.count, 10) || 1)) })
+      : [];
+    const controls = document.createElement('div');
+    controls.className = 'item-shaped-recipe-controls';
+    const heading = document.createElement('div');
+    heading.className = 'item-shaped-recipe-yield item-shapeless-recipe-heading dialog-labeled-row';
+    const yieldLabel = document.createElement('span');
+    yieldLabel.textContent = 'Yield';
+    const yieldInput = document.createElement('input');
+    yieldInput.className = 'pixel-text-box';
+    yieldInput.type = 'number'; yieldInput.min = '1'; yieldInput.max = '99'; yieldInput.value = String(recipe.yield);
+    yieldInput.setAttribute('aria-label', 'Recipe yield');
+    yieldInput.addEventListener('input', () => {
+      recipe.yield = Math.min(99, Math.max(1, Number.parseInt(yieldInput.value, 10) || 1));
+      activeDialogPanel.dataset.dirty = 'true';
+    });
+    const ingredientsLabel = document.createElement('span');
+    ingredientsLabel.textContent = 'Ingredients';
+    const add = document.createElement('button');
+    add.className = 'pixel-button pixel-combobox-button item-shaped-recipe-add-ingredient';
+    add.type = 'button'; add.setAttribute('aria-label', 'Add ingredient');
+    const addIcon = document.createElement('span');
+    addIcon.className = 'item-recipe-add-icon'; addIcon.setAttribute('aria-hidden', 'true'); add.append(addIcon);
+    add.addEventListener('click', () => {
+      recipe.ingredients.push({ value: '', count: 1 });
+      activeDialogPanel.dataset.dirty = 'true'; renderItemRecipes();
+    });
+    heading.append(yieldLabel, yieldInput, ingredientsLabel, add);
+    const list = document.createElement('div');
+    list.className = 'item-shaped-recipe-ingredients';
+    recipe.ingredients.forEach((ingredient, index) => {
+      const row = document.createElement('div');
+      row.className = 'item-shaped-recipe-ingredient';
+      const combobox = createIngredientCombobox({
+        options: recipeItemOptions, value: ingredient.value,
+        ariaLabel: `Ingredient ${index + 1}`,
+        optionHostClass: 'item-shaped-recipe-options-host',
+        onChange: value => { ingredient.value = value; activeDialogPanel.dataset.dirty = 'true'; },
+      });
+      combobox.classList.add('item-shaped-recipe-combobox');
+      const count = document.createElement('input');
+      count.className = 'pixel-text-box item-shapeless-ingredient-count';
+      count.type = 'number'; count.min = '1'; count.max = '9'; count.value = String(ingredient.count);
+      count.setAttribute('aria-label', `Ingredient ${index + 1} quantity`);
+      count.addEventListener('input', () => {
+        ingredient.count = Math.min(9, Math.max(1, Number.parseInt(count.value, 10) || 1));
+        activeDialogPanel.dataset.dirty = 'true';
+      });
+      const remove = document.createElement('button');
+      remove.className = 'pixel-button pixel-combobox-button item-shaped-recipe-remove-ingredient';
+      remove.type = 'button'; remove.setAttribute('aria-label', `Remove ingredient ${index + 1}`);
+      const icon = document.createElement('img');
+      icon.src = './assets/sprite/generated/dialogue_icon_2x.png'; icon.alt = ''; icon.draggable = false; remove.append(icon);
+      remove.addEventListener('click', () => {
+        recipe.ingredients.splice(index, 1); activeDialogPanel.dataset.dirty = 'true'; renderItemRecipes();
+      });
+      row.append(combobox, count, remove); list.append(row);
+    });
+    controls.append(heading, list); body.append(controls);
+  };
+
+  const renderProcessingRecipe = (body, recipe) => {
+    const isStonecutting = recipe.type === 'stonecutting';
+    recipe.yield = recipe.yield === '' || recipe.yield === null || recipe.yield === undefined
+      ? ''
+      : Math.min(99, Math.max(1, Number.parseInt(recipe.yield, 10) || 1));
+    recipe.ingredient = String(recipe.ingredient || '');
+    if (!isStonecutting) recipe.cookingTime = recipe.cookingTime === '' || recipe.cookingTime === null || recipe.cookingTime === undefined
+      ? ''
+      : Math.max(1, Number.parseInt(recipe.cookingTime, 10) || 1);
+    const controls = document.createElement('div');
+    controls.className = 'item-processing-recipe-controls';
+    const addRow = (labelText, control) => {
+      const row = document.createElement('div');
+      row.className = 'item-processing-recipe-row dialog-labeled-row';
+      const label = document.createElement('span'); label.textContent = labelText;
+      row.append(label, control); controls.append(row);
+    };
+    const yieldInput = document.createElement('input');
+    yieldInput.className = 'pixel-text-box'; yieldInput.type = 'number'; yieldInput.min = '1'; yieldInput.max = '99'; yieldInput.value = String(recipe.yield);
+    yieldInput.setAttribute('aria-label', 'Recipe yield');
+    yieldInput.addEventListener('input', () => { recipe.yield = yieldInput.value === '' ? '' : Math.min(99, Math.max(1, Number.parseInt(yieldInput.value, 10) || 1)); activeDialogPanel.dataset.dirty = 'true'; });
+    addRow('Yield', yieldInput);
+    const ingredient = createIngredientCombobox({
+      options: recipeItemOptions, value: recipe.ingredient, ariaLabel: 'Input ingredient',
+      optionHostClass: 'item-shaped-recipe-options-host',
+      onChange: value => { recipe.ingredient = value; activeDialogPanel.dataset.dirty = 'true'; },
+    });
+    ingredient.classList.add('item-processing-recipe-ingredient');
+    addRow('Ingredient', ingredient);
+    if (!isStonecutting) {
+      const time = document.createElement('input');
+      time.className = 'pixel-text-box'; time.type = 'number'; time.min = '1'; time.value = String(recipe.cookingTime);
+      time.setAttribute('aria-label', 'Cooking time in ticks');
+      time.addEventListener('input', () => { recipe.cookingTime = time.value === '' ? '' : Math.max(1, Number.parseInt(time.value, 10) || 1); activeDialogPanel.dataset.dirty = 'true'; });
+      addRow('Cooking Time', time);
+    }
+    body.append(controls);
+  };
 
   const normalizeItemRecipes = value => {
     if (Array.isArray(value)) {
@@ -382,6 +781,9 @@ export const initializeItemEditorPage = ({
         });
         const body = document.createElement('div');
         body.className = 'item-recipe-entry-body';
+        if (type === 'shaped') renderShapedRecipe(body, recipe);
+        if (type === 'shapeless') renderShapelessRecipe(body, recipe);
+        if (['smelting', 'blasting', 'smoking', 'campfire', 'stonecutting'].includes(type)) renderProcessingRecipe(body, recipe);
         titlebar.append(title, remove);
         entry.append(titlebar, body);
         return entry;
@@ -400,7 +802,14 @@ export const initializeItemEditorPage = ({
   recipeAddOptions.addEventListener('click', event => {
     const option = event.target.closest('[data-item-recipe-type]');
     if (!option || !activeDialogPanel) return;
-    activeDialogPanel.itemRecipes.push({ type: option.dataset.itemRecipeType });
+    const recipe = { type: option.dataset.itemRecipeType };
+    if (recipe.type === 'shaped') Object.assign(recipe, { yield: 1, ingredients: [], pattern: Array(9).fill(null) });
+    if (recipe.type === 'shapeless') Object.assign(recipe, { yield: 1, ingredients: [] });
+    if (['smelting', 'blasting', 'smoking', 'campfire'].includes(recipe.type)) {
+      Object.assign(recipe, { yield: '', ingredient: '', cookingTime: '' });
+    }
+    if (recipe.type === 'stonecutting') Object.assign(recipe, { yield: '', ingredient: '' });
+    activeDialogPanel.itemRecipes.push(recipe);
     activeDialogPanel.dataset.dirty = 'true';
     recipeAddOptions.hidden = true;
     recipeAddButton.setAttribute('aria-expanded', 'false');
@@ -641,10 +1050,11 @@ export const initializeItemEditorPage = ({
           input.accept = accept;
           input.hidden = true;
           button.addEventListener('click', () => input.click());
-          input.addEventListener('change', () => {
+          input.addEventListener('change', async () => {
             const file = input.files?.[0];
             if (!file) return;
             state[key] = file.name;
+            state[`${key}Data`] = [...new Uint8Array(await file.arrayBuffer())];
             activeDialogPanel.dataset.dirty = 'true';
             renderItemStates();
           });
@@ -700,10 +1110,6 @@ export const initializeItemEditorPage = ({
     }
   };
   tagsSearchInput.addEventListener('input', filterItemTags);
-  tagsSearchButton.addEventListener('click', () => {
-    filterItemTags();
-    tagsSearchInput.focus();
-  });
   let nextItemNumber = 1;
 
   const closeDropdowns = exceptDropdown => {
@@ -749,6 +1155,17 @@ export const initializeItemEditorPage = ({
   };
 
   const addItemWorkspace = (existingId = '') => {
+    if (existingId) {
+      const existingPanel = [...host.querySelectorAll('.workspace-item-editor')]
+        .find(panel => panel.dataset.lastSavedId === existingId);
+      if (existingPanel) {
+        const existingTab = workspaceTabs.querySelector(
+          `[data-workspace-panel-id="${CSS.escape(existingPanel.id)}"]`,
+        );
+        if (existingTab) setActiveTab(existingTab);
+        return existingTab;
+      }
+    }
     const number = nextItemNumber;
     nextItemNumber += 1;
     const panelId = `item-workspace-${number}`;
@@ -756,10 +1173,12 @@ export const initializeItemEditorPage = ({
     const panel = fragment.querySelector('.workspace-item-editor');
     panel.id = panelId;
     panel.dataset.dirty = 'false';
+    if (existingId) panel.dataset.lastSavedId = existingId;
     panel.itemTags = [];
     panel.itemAbilitySlots = [];
     panel.itemAbilitiesEnabled = false;
     panel.itemRecipes = [];
+    panel.itemFileData = {};
     panel.itemStates = [];
     populateCreativeTabOptions(panel);
     host.append(fragment);
@@ -877,6 +1296,10 @@ export const initializeItemEditorPage = ({
           panel.itemStates = Array.isArray(data.states) && data.states.length
             ? [...data.states]
             : [];
+          panel.itemFileData = {
+            geoModel: Array.isArray(data.geoModelData) ? [...data.geoModelData] : null,
+            displayModel: Array.isArray(data.displayModelData) ? [...data.displayModelData] : null,
+          };
           syncConditionalFields(panel);
           panel.dataset.dirty = 'false';
         })
@@ -940,6 +1363,7 @@ export const initializeItemEditorPage = ({
       } else if (dialogAction.dataset.itemDialogAction === 'recipes') {
         recipeAddControl.hidden = false;
         openItemDialog(recipeDialog, panel, dialogAction);
+        await loadRecipeItemOptions();
         renderItemRecipes();
         positionDialogBeside(recipeDialog, dialogAction);
       } else if (dialogAction.dataset.itemDialogAction === 'tooltip') {
@@ -1006,6 +1430,8 @@ export const initializeItemEditorPage = ({
         authoringFields.enabledMethods = [...panel.querySelectorAll('[data-item-method][aria-checked="true"]')]
           .map(methodButton => methodButton.dataset.itemMethod);
         authoringFields.geoTexture = holdingMode === '3d' ? textureId : String(authoringFields.geoTexture || '');
+        authoringFields.geoModelData = panel.itemFileData?.geoModel || null;
+        authoringFields.displayModelData = panel.itemFileData?.displayModel || null;
         authoringFields.tags = [...(panel.itemTags || [])];
         authoringFields.states = [...(panel.itemStates || [])];
         if (!itemId || !textureId) {
@@ -1139,12 +1565,14 @@ export const initializeItemEditorPage = ({
     filterTextureOptions(combobox);
   });
 
-  host.addEventListener('change', event => {
+  host.addEventListener('change', async event => {
     const fileInput = event.target.closest('[data-item-file-input]');
     const file = fileInput?.files?.[0];
     if (!fileInput || !file) return;
     const panel = fileInput.closest('.workspace-item-editor');
     const key = fileInput.dataset.itemFileInput;
+    panel.itemFileData ||= {};
+    panel.itemFileData[key] = [...new Uint8Array(await file.arrayBuffer())];
     const valueInput = panel.querySelector(`[data-item-field="${key}"]`);
     const button = panel.querySelector(`[data-item-file-button="${key}"]`);
     if (valueInput) valueInput.value = file.name;
@@ -1197,6 +1625,10 @@ export const initializeItemEditorPage = ({
     if (!recipeAddOptions.hidden && !event.target.closest('#item-recipe-add-control')) {
       recipeAddOptions.hidden = true;
       recipeAddButton.setAttribute('aria-expanded', 'false');
+    }
+    if (!recipeDialog.hidden) {
+      const recipeCombobox = event.target.closest('#item-recipe-dialog .item-shaped-recipe-combobox');
+      closeShapedIngredientComboboxes(recipeCombobox);
     }
     if (!tagsDialog.hidden && !event.target.closest('#item-tags-dialog, [data-item-dialog-action="tags"]')) {
       closeItemDialog(tagsDialog);
