@@ -38,6 +38,7 @@ Normal Item and Texture containers can display a texture preview. A container wi
 - Items have a V4 editor and backend save/delete lifecycle.
 - Textures are stored as metadata plus image sidecars in `ycs-data/textures/` and can be referenced by Items.
 - Folders are visual organization and are not domain objects.
+- Data is a top-level workspace mode whose Variable, Attribute, Data Component, and Resources sections load their existing `ycs-data` categories into five-row stepped lists with shared overlay scrolling. Resource-managed entity variables and attributes remain owned and presented by their Resource rather than being duplicated in the Variable or Attribute lists. Resource rows include sampled HUD previews and open a YCS3-field-compatible preview editor with a shared texture combobox; the preview itself is the draggable zero-to-maximum amount control, and its in-session amount is shared with the corresponding Data-row preview. Resource HUD text remains white to match the runtime renderer. Editor action buttons use the Item editor's Delete, Cancel, Save order; transactional Resource persistence is still pending.
 - Other V3 object creators are not automatically part of V4. Each must be ported through this lifecycle deliberately.
 
 ## Workspace hierarchy and folders

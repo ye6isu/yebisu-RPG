@@ -92,6 +92,7 @@
           <aside class="workspace-action-rail" aria-label="Home workspace actions">
             <div class="workspace-actions workspace-actions-top">
               <button class="pixel-button workspace-action-button" type="button" aria-label="Home" aria-pressed="true" data-workspace-toggle data-workspace-mode="home"><span class="workspace-mode-icon workspace-mode-icon-first" aria-hidden="true"></span></button>
+              <button class="pixel-button workspace-action-button" type="button" aria-label="Data" aria-pressed="false" data-workspace-toggle data-workspace-mode="data"><span class="workspace-mode-icon workspace-mode-icon-data" aria-hidden="true"></span></button>
               <button class="pixel-button workspace-action-button" type="button" aria-label="Assets" aria-pressed="false" data-workspace-toggle data-workspace-mode="assets"><span class="workspace-mode-icon workspace-mode-icon-second" aria-hidden="true"></span></button>
             </div>
             <div class="workspace-actions workspace-actions-bottom">
@@ -102,10 +103,11 @@
           </aside>
           <main id="home-workspace" class="workspace-container" role="tabpanel" aria-labelledby="home-tab">
         <div class="workspace-top-controls" aria-label="Workspace top controls">
-          <div class="workspace-top-controls-left">
+          <div class="workspace-top-controls-left" data-primary-workspace-modes="home assets">
             <input id="workspace-search-input" class="pixel-text-box workspace-top-text-box" type="text" aria-label="Search workspace" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
           </div>
-          <div id="workspace-create-dropdown" class="workspace-create-dropdown">
+          <span id="data-workspace-heading" class="data-workspace-heading" data-primary-workspace-modes="data" hidden>Variable</span>
+          <div id="workspace-create-dropdown" class="workspace-create-dropdown" data-primary-workspace-modes="home assets">
             <button
               id="workspace-create-button"
               class="pixel-button workspace-top-control-button"
@@ -125,14 +127,86 @@
               <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Test" data-workspace-create-mode="home">Test</button>
             </div>
           </div>
+          <div id="data-workspace-actions" class="data-workspace-actions" data-primary-workspace-modes="data" hidden>
+            <button id="data-workspace-delete-toggle" class="pixel-button workspace-top-control-button" type="button" aria-label="Toggle row deletion" aria-pressed="false">
+              <span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span>
+            </button>
+            <div id="data-workspace-filter-dropdown" class="workspace-create-dropdown data-workspace-filter-dropdown">
+              <button id="data-workspace-filter-button" class="pixel-button workspace-top-control-button" type="button" aria-label="Sort variables" aria-haspopup="menu" aria-expanded="false" aria-controls="data-workspace-filter-options">
+                <img class="workspace-tool-icon" src="./assets/sprite/tool_icon.png" alt="" draggable="false" />
+              </button>
+              <div id="data-workspace-filter-options" class="preferences-scale-options pixel-option-stack workspace-create-options data-workspace-filter-options" role="menu" hidden>
+                <button class="pixel-option workspace-create-option" type="button" role="menuitemradio" aria-checked="true" data-data-sort="added-ascending">Added: Oldest First</button>
+                <button class="pixel-option workspace-create-option" type="button" role="menuitemradio" aria-checked="false" data-data-sort="added-descending">Added: Newest First</button>
+                <button class="pixel-option workspace-create-option" type="button" role="menuitemradio" aria-checked="false" data-data-sort="alphabetical-ascending">Alphabetical: A-Z</button>
+                <button class="pixel-option workspace-create-option" type="button" role="menuitemradio" aria-checked="false" data-data-sort="alphabetical-descending">Alphabetical: Z-A</button>
+              </div>
+            </div>
+            <button id="data-workspace-add-button" class="pixel-button workspace-top-control-button" type="button" aria-label="Add">+</button>
+          </div>
         </div>
         <div id="workspace-item-editors" class="workspace-item-editors"></div>
         <section class="workspace-inner-container" aria-label="Home workspace content">
+          <div id="data-variable-rows-host" class="data-variable-rows-host" data-primary-workspace-modes="data" aria-label="Variable rows" hidden>
+            <div id="data-variable-rows" class="data-variable-rows"></div>
+            <div id="data-variable-scrollbar" class="data-variable-scrollbar" aria-hidden="true" hidden>
+              <div id="data-variable-scrollbar-thumb" class="data-variable-scrollbar-thumb"></div>
+            </div>
+          </div>
           <div id="workspace-object-grid" class="workspace-object-grid"></div>
           <div id="workspace-object-scrollbar" class="workspace-object-scrollbar" aria-hidden="true" hidden>
             <div id="workspace-object-scrollbar-thumb" class="workspace-object-scrollbar-thumb"></div>
           </div>
         </section>
+        <div id="data-additional-sections" class="data-additional-sections" data-primary-workspace-modes="data" hidden>
+          <section class="data-additional-section" aria-labelledby="data-attribute-heading">
+            <header class="data-additional-section-header">
+              <span id="data-attribute-heading">Attribute</span>
+              <div class="data-workspace-actions">
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Toggle attribute row deletion" aria-pressed="false" data-demo-delete-toggle><span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span></button>
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Sort attributes"><img class="workspace-tool-icon" src="./assets/sprite/tool_icon.png" alt="" draggable="false" /></button>
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Add attribute" data-demo-add>+</button>
+              </div>
+            </header>
+            <div class="workspace-inner-container data-additional-content" data-ycs-data-category="attributes">
+              <div class="data-variable-rows" data-demo-row-list></div>
+              <div class="data-variable-scrollbar" aria-hidden="true" hidden><div class="data-variable-scrollbar-thumb"></div></div>
+            </div>
+          </section>
+          <section class="data-additional-section" aria-labelledby="data-component-heading">
+            <header class="data-additional-section-header">
+              <span id="data-component-heading">Data Component</span>
+              <div class="data-workspace-actions">
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Toggle data-component row deletion" aria-pressed="false" data-demo-delete-toggle><span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span></button>
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Sort data components"><img class="workspace-tool-icon" src="./assets/sprite/tool_icon.png" alt="" draggable="false" /></button>
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Add data component" data-demo-add>+</button>
+              </div>
+            </header>
+            <div class="workspace-inner-container data-additional-content" data-ycs-data-category="components">
+              <div class="data-variable-rows" data-demo-row-list></div>
+              <div class="data-variable-scrollbar" aria-hidden="true" hidden><div class="data-variable-scrollbar-thumb"></div></div>
+            </div>
+          </section>
+          <section class="data-additional-section" aria-labelledby="data-resources-heading">
+            <header class="data-additional-section-header">
+              <span id="data-resources-heading">Resources</span>
+              <div class="data-workspace-actions">
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Toggle resource row deletion" aria-pressed="false" data-demo-delete-toggle><span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span></button>
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Sort resources"><img class="workspace-tool-icon" src="./assets/sprite/tool_icon.png" alt="" draggable="false" /></button>
+                <button class="pixel-button workspace-top-control-button" type="button" aria-label="Add resource" data-demo-add>+</button>
+              </div>
+            </header>
+            <div class="workspace-inner-container data-additional-content" data-ycs-data-category="resources">
+              <div class="data-variable-rows" data-demo-row-list></div>
+              <div class="data-variable-scrollbar" aria-hidden="true" hidden><div class="data-variable-scrollbar-thumb"></div></div>
+            </div>
+          </section>
+        </div>
+        <div id="data-page-scrollbar" class="data-page-scrollbar" data-primary-workspace-modes="data" aria-hidden="true" hidden>
+          <div id="data-page-scrollbar-thumb" class="data-page-scrollbar-thumb"></div>
+        </div>
+        <div class="data-page-scroll-mask data-page-scroll-mask-top" data-primary-workspace-modes="data" aria-hidden="true" hidden></div>
+        <div class="data-page-scroll-mask data-page-scroll-mask-bottom" data-primary-workspace-modes="data" aria-hidden="true" hidden></div>
         <section id="workspace-task-terminal" class="workspace-task-terminal" aria-label="Task command output" hidden>
           <span id="workspace-task-terminal-resize-handle" class="workspace-task-terminal-resize-handle" aria-hidden="true"></span>
           <div id="workspace-task-terminal-title" class="workspace-task-terminal-title">Run Client</div>

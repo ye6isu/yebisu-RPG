@@ -88,7 +88,20 @@ const workspaceTabDirectionsRight = document.getElementById('workspace-tab-direc
 const workspaceCreateButton = document.getElementById('workspace-create-button');
 const workspaceCreateOptions = document.getElementById('workspace-create-options');
 const workspaceTopControls = document.querySelector('.workspace-top-controls');
+const primaryWorkspaceModeElements = [...document.querySelectorAll('[data-primary-workspace-modes]')];
 const workspaceSearchInput = document.getElementById('workspace-search-input');
+const dataWorkspaceAddButton = document.getElementById('data-workspace-add-button');
+const dataWorkspaceDeleteToggle = document.getElementById('data-workspace-delete-toggle');
+const dataWorkspaceFilterDropdown = document.getElementById('data-workspace-filter-dropdown');
+const dataWorkspaceFilterButton = document.getElementById('data-workspace-filter-button');
+const dataWorkspaceFilterOptions = document.getElementById('data-workspace-filter-options');
+const dataWorkspaceFilterOptionButtons = [...dataWorkspaceFilterOptions.querySelectorAll('[data-data-sort]')];
+const dataVariableRows = document.getElementById('data-variable-rows');
+const dataVariableScrollbar = document.getElementById('data-variable-scrollbar');
+const dataVariableScrollbarThumb = document.getElementById('data-variable-scrollbar-thumb');
+const dataPageScrollbar = document.getElementById('data-page-scrollbar');
+const dataPageScrollbarThumb = document.getElementById('data-page-scrollbar-thumb');
+const dataPageScrollMasks = [...document.querySelectorAll('.data-page-scroll-mask')];
 const workspaceCreateOptionButtons = [
   ...workspaceCreateOptions.querySelectorAll('[data-workspace-create-option]'),
 ];
@@ -167,6 +180,7 @@ const uiScaleStorageKey = 'ycs4.ui-scale-percent';
 const taskTerminalHeightStorageKey = 'ycs4.task-terminal-height';
 const workspaceLayoutStorageKey = 'ycs4.workspace-layout';
 const allowedUiScalePercentages = new Set([100, 200, 300, 400, 500]);
+const dataVariableVisibleRowCount = 5;
 const minimumDialogWidth = 180;
 const minimumDialogHeight = 120;
 let dialogDragState = null;
@@ -178,6 +192,377 @@ let textureImportTargetGrid = null;
 let textureImportEditingShell = null;
 let dialogResizeState = null;
 let testDropdownSelection = 'Option 1';
+let dataVariableFirstVisibleIndex = 0;
+let dataVariableScrollbarDragState = null;
+let dataVariableNextAddedOrder = 1;
+let dataVariableSortMode = 'added-ascending';
+const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+let dataPageScrollbarDragState = null;
+let openResourceWorkspace = () => {};
+
+const getDataVariableRows = () => [...dataVariableRows.querySelectorAll(':scope > .row_container')];
+const syncDataVariableRows = requestedIndex => {
+  const rows = getDataVariableRows();
+  const maximumIndex = Math.max(0, rows.length - dataVariableVisibleRowCount);
+  dataVariableFirstVisibleIndex = clamp(
+    requestedIndex ?? dataVariableFirstVisibleIndex,
+    0,
+    maximumIndex,
+  );
+  rows.forEach((row, index) => {
+    row.hidden = index < dataVariableFirstVisibleIndex
+      || index >= dataVariableFirstVisibleIndex + dataVariableVisibleRowCount;
+  });
+  const overflow = maximumIndex > 0;
+  dataVariableScrollbar.hidden = !overflow;
+  if (!overflow) return;
+  const trackHeight = dataVariableScrollbar.clientHeight;
+  const thumbHeight = Math.max(
+    8,
+    trackHeight * Math.min(1, dataVariableVisibleRowCount / rows.length),
+  );
+  const travel = Math.max(0, trackHeight - thumbHeight);
+  dataVariableScrollbarThumb.style.height = `${thumbHeight}px`;
+  dataVariableScrollbarThumb.style.top = `${maximumIndex ? dataVariableFirstVisibleIndex / maximumIndex * travel : 0}px`;
+};
+const createDataRow = ({ category, id, data, addedOrder }) => {
+  const row = document.createElement('div');
+  row.className = 'pixel-button object-container row_container';
+  const displayName = String(data.name || data.titleText || data.displayName || data.id || id);
+  row.dataset.addedOrder = String(addedOrder);
+  row.dataset.sortName = displayName;
+  row.dataset.dataId = id;
+  row.setAttribute('aria-label', row.dataset.sortName);
+  const primary = document.createElement('span');
+  primary.className = 'data-row-primary';
+  primary.textContent = displayName;
+  row.append(primary);
+  if (category === 'resources') {
+    row.classList.add('resource-row');
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
+    const maximum = Math.max(0, Number(data.maximumDefault) || 0);
+    const amount = maximum > 0 ? Math.round(Math.random() * maximum * 10) / 10 : 0;
+    data._previewAmount = amount;
+    const rowPreview = document.createElement('div');
+    rowPreview.className = 'workspace-resource-preview data-resource-row-preview';
+    const rowFrame = document.createElement('div');
+    rowFrame.className = 'workspace-resource-preview-frame';
+    const rowFillClip = document.createElement('div');
+    rowFillClip.className = 'workspace-resource-preview-fill-clip';
+    rowFillClip.dataset.resourceRowPreviewFill = '';
+    rowFillClip.style.width = `${(maximum > 0 ? amount / maximum : 0) * 132}px`;
+    const rowFill = document.createElement('img');
+    rowFill.className = 'workspace-resource-preview-fill';
+    rowFill.alt = '';
+    rowFill.draggable = false;
+    rowFillClip.append(rowFill);
+    rowFrame.append(rowFillClip);
+    const rowValue = document.createElement('span');
+    rowValue.className = 'workspace-resource-preview-value';
+    rowValue.dataset.resourceRowPreviewValue = '';
+    rowValue.textContent = `${amount}/${maximum}`;
+    rowValue.style.color = '#FFFFFF';
+    rowPreview.append(rowFrame, rowValue);
+    row.append(rowPreview);
+    if (data.barTexture) {
+      invoke('load_texture_bundle', { id: data.barTexture }).then(([, extension, bytes]) => {
+        if (!row.isConnected) return;
+        const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : `image/${extension}`;
+        rowFill.src = URL.createObjectURL(new Blob([Uint8Array.from(bytes)], { type: mime }));
+      }).catch(error => console.error(`Unable to load Resource row texture ${data.barTexture}:`, error));
+    }
+    const open = () => openResourceWorkspace(id, data);
+    row.addEventListener('click', event => {
+      if (!event.target.closest('.data-variable-delete-button')) open();
+    });
+    row.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      open();
+    });
+  }
+  const deleteButton = document.createElement('button');
+  deleteButton.className = 'pixel-button data-variable-delete-button';
+  deleteButton.type = 'button';
+  deleteButton.setAttribute('aria-label', `Delete ${displayName}`);
+  deleteButton.hidden = dataWorkspaceDeleteToggle.getAttribute('aria-pressed') !== 'true';
+  const deleteIcon = document.createElement('img');
+  deleteIcon.className = 'data-row-delete-icon';
+  deleteIcon.src = './assets/sprite/generated/dialogue_icon_2x.png';
+  deleteIcon.alt = '';
+  deleteIcon.draggable = false;
+  deleteButton.append(deleteIcon);
+  row.append(deleteButton);
+  return row;
+};
+
+const loadYcsDataCategory = async category => {
+  const ids = await invoke('list_ycs_data', { category });
+  const records = await Promise.all(ids.map(async (id, addedOrder) => {
+    try {
+      const data = JSON.parse(await invoke('load_ycs_data', { category, id }));
+      return { id, data, addedOrder };
+    } catch (error) {
+      console.error(`Unable to load ${category}/${id}:`, error);
+      return null;
+    }
+  }));
+  return records.filter(Boolean);
+};
+const sortDataVariableRows = mode => {
+  dataVariableSortMode = mode;
+  const rows = getDataVariableRows();
+  rows.sort((left, right) => {
+    if (mode.startsWith('alphabetical')) {
+      const comparison = left.dataset.sortName.localeCompare(right.dataset.sortName, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      return mode === 'alphabetical-descending' ? -comparison : comparison;
+    }
+    const comparison = Number(left.dataset.addedOrder) - Number(right.dataset.addedOrder);
+    return mode === 'added-descending' ? -comparison : comparison;
+  });
+  dataVariableRows.append(...rows);
+  for (const option of dataWorkspaceFilterOptionButtons) {
+    option.setAttribute('aria-checked', String(option.dataset.dataSort === mode));
+  }
+  syncDataVariableRows(0);
+};
+const setDataWorkspaceFilterOpen = (open, focusFirst = false) => {
+  dataWorkspaceFilterOptions.hidden = !open;
+  dataWorkspaceFilterButton.setAttribute('aria-expanded', String(open));
+  if (open && focusFirst) dataWorkspaceFilterOptionButtons[0]?.focus();
+};
+
+loadYcsDataCategory('entityvars').then(records => {
+  const visibleRecords = records.filter(({ data }) => data.resourceManaged !== true);
+  dataVariableRows.replaceChildren(...visibleRecords.map(record => createDataRow({ category: 'entityvars', ...record })));
+  dataVariableNextAddedOrder = records.length + 1;
+  sortDataVariableRows(dataVariableSortMode);
+}).catch(error => console.error('Unable to load entity variables:', error));
+
+dataWorkspaceAddButton.addEventListener('click', () => {});
+dataWorkspaceDeleteToggle.addEventListener('click', () => {
+  const pressed = dataWorkspaceDeleteToggle.getAttribute('aria-pressed') !== 'true';
+  dataWorkspaceDeleteToggle.setAttribute('aria-pressed', String(pressed));
+  for (const button of dataVariableRows.querySelectorAll('.data-variable-delete-button')) {
+    button.hidden = !pressed;
+  }
+});
+
+for (const content of document.querySelectorAll('[data-ycs-data-category]')) {
+  const category = content.dataset.ycsDataCategory;
+  const rowList = content.querySelector('[data-demo-row-list]');
+  const scrollbar = content.querySelector('.data-variable-scrollbar');
+  const thumb = content.querySelector('.data-variable-scrollbar-thumb');
+  let firstVisibleIndex = 0;
+  let dragState = null;
+  const rows = () => [...rowList.querySelectorAll(':scope > .row_container')];
+  const syncRows = requestedIndex => {
+    const currentRows = rows();
+    const maximumIndex = Math.max(0, currentRows.length - dataVariableVisibleRowCount);
+    firstVisibleIndex = clamp(requestedIndex ?? firstVisibleIndex, 0, maximumIndex);
+    currentRows.forEach((row, index) => {
+      row.hidden = index < firstVisibleIndex
+        || index >= firstVisibleIndex + dataVariableVisibleRowCount;
+    });
+    scrollbar.hidden = maximumIndex === 0;
+    if (maximumIndex === 0) return;
+    const trackHeight = scrollbar.clientHeight;
+    const thumbHeight = Math.max(8, trackHeight * Math.min(1, dataVariableVisibleRowCount / currentRows.length));
+    const travel = Math.max(0, trackHeight - thumbHeight);
+    thumb.style.height = `${thumbHeight}px`;
+    thumb.style.top = `${firstVisibleIndex / maximumIndex * travel}px`;
+  };
+  const section = content.closest('.data-additional-section');
+  const toggle = section.querySelector('[data-demo-delete-toggle]');
+  toggle.addEventListener('click', () => {
+    const pressed = toggle.getAttribute('aria-pressed') !== 'true';
+    toggle.setAttribute('aria-pressed', String(pressed));
+    for (const button of rowList.querySelectorAll('.data-variable-delete-button')) button.hidden = !pressed;
+  });
+  section.querySelector('[data-demo-add]').addEventListener('click', () => {});
+  rowList.addEventListener('click', event => {
+    const button = event.target.closest('.data-variable-delete-button');
+    if (button) {
+      button.closest('.row_container')?.remove();
+      syncRows(firstVisibleIndex);
+    }
+  });
+  rowList.addEventListener('wheel', event => {
+    if (!event.deltaY || rows().length <= dataVariableVisibleRowCount) return;
+    event.preventDefault();
+    syncRows(firstVisibleIndex + Math.sign(event.deltaY));
+  }, { passive: false });
+  scrollbar.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    const maximumIndex = Math.max(0, rows().length - dataVariableVisibleRowCount);
+    const track = scrollbar.getBoundingClientRect();
+    const knob = thumb.getBoundingClientRect();
+    const travel = Math.max(0, track.height - knob.height);
+    if (event.target !== thumb) {
+      syncRows(Math.round((travel ? clamp(event.clientY - track.top - knob.height / 2, 0, travel) / travel : 0) * maximumIndex));
+      return;
+    }
+    dragState = { id: event.pointerId, y: event.clientY, index: firstVisibleIndex, maximumIndex, travel };
+    scrollbar.setPointerCapture(event.pointerId);
+  });
+  scrollbar.addEventListener('pointermove', event => {
+    if (!dragState || dragState.id !== event.pointerId) return;
+    const delta = dragState.travel ? Math.round((event.clientY - dragState.y) / dragState.travel * dragState.maximumIndex) : 0;
+    syncRows(dragState.index + delta);
+  });
+  const stopDrag = event => { if (dragState?.id === event.pointerId) dragState = null; };
+  scrollbar.addEventListener('pointerup', stopDrag);
+  scrollbar.addEventListener('pointercancel', stopDrag);
+  loadYcsDataCategory(category).then(records => {
+    const visibleRecords = category === 'attributes'
+      ? records.filter(({ data }) => data.resourceManaged !== true)
+      : records;
+    const orderedRecords = category === 'resources'
+      ? [...visibleRecords].sort((left, right) => {
+        if (left.id === 'stamina') return right.id === 'stamina' ? 0 : -1;
+        if (right.id === 'stamina') return 1;
+        return (Number(left.data.order) || 0) - (Number(right.data.order) || 0)
+          || left.id.localeCompare(right.id);
+      })
+      : visibleRecords;
+    rowList.replaceChildren(...orderedRecords.map(record => createDataRow({ category, ...record })));
+    syncRows(0);
+  }).catch(error => console.error(`Unable to load ${category}:`, error));
+}
+
+const syncDataPageScrollbar = () => {
+  workspaceTaskTerminal.style.transform = homeTab.dataset.workspaceMode === 'data'
+    ? `translateY(${homeWorkspace.scrollTop}px)`
+    : '';
+  for (const mask of dataPageScrollMasks) {
+    mask.style.transform = `translateY(${homeWorkspace.scrollTop}px)`;
+  }
+  const range = Math.max(0, homeWorkspace.scrollHeight - homeWorkspace.clientHeight);
+  const visible = homeTab.dataset.workspaceMode === 'data' && range > 0.5;
+  dataPageScrollbar.hidden = !visible;
+  if (!visible) return;
+  dataPageScrollbar.style.transform = `translateY(${homeWorkspace.scrollTop}px)`;
+  const trackHeight = dataPageScrollbar.clientHeight;
+  const thumbHeight = Math.max(8, trackHeight * homeWorkspace.clientHeight / homeWorkspace.scrollHeight);
+  const travel = Math.max(0, trackHeight - thumbHeight);
+  dataPageScrollbarThumb.style.height = `${thumbHeight}px`;
+  dataPageScrollbarThumb.style.top = `${range ? homeWorkspace.scrollTop / range * travel : 0}px`;
+};
+homeWorkspace.addEventListener('scroll', syncDataPageScrollbar, { passive: true });
+window.addEventListener('resize', syncDataPageScrollbar, { passive: true });
+dataPageScrollbar.addEventListener('pointerdown', event => {
+  event.preventDefault();
+  const range = Math.max(0, homeWorkspace.scrollHeight - homeWorkspace.clientHeight);
+  const track = dataPageScrollbar.getBoundingClientRect();
+  const knob = dataPageScrollbarThumb.getBoundingClientRect();
+  const travel = Math.max(0, track.height - knob.height);
+  if (event.target !== dataPageScrollbarThumb) {
+    homeWorkspace.scrollTop = (travel
+      ? clamp(event.clientY - track.top - knob.height / 2, 0, travel) / travel
+      : 0) * range;
+    return;
+  }
+  dataPageScrollbarDragState = { id: event.pointerId, y: event.clientY, scroll: homeWorkspace.scrollTop, range, travel };
+  dataPageScrollbar.setPointerCapture(event.pointerId);
+});
+dataPageScrollbar.addEventListener('pointermove', event => {
+  const drag = dataPageScrollbarDragState;
+  if (!drag || drag.id !== event.pointerId) return;
+  homeWorkspace.scrollTop = drag.scroll + (drag.travel ? (event.clientY - drag.y) / drag.travel * drag.range : 0);
+});
+const stopDataPageScrollbarDrag = event => {
+  if (dataPageScrollbarDragState?.id === event.pointerId) dataPageScrollbarDragState = null;
+};
+dataPageScrollbar.addEventListener('pointerup', stopDataPageScrollbarDrag);
+dataPageScrollbar.addEventListener('pointercancel', stopDataPageScrollbarDrag);
+
+dataWorkspaceFilterButton.addEventListener('click', () => {
+  setDataWorkspaceFilterOpen(dataWorkspaceFilterOptions.hidden);
+});
+dataWorkspaceFilterButton.addEventListener('keydown', event => {
+  if (!['ArrowDown', 'Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  setDataWorkspaceFilterOpen(true, true);
+});
+dataWorkspaceFilterOptions.addEventListener('click', event => {
+  const option = event.target.closest('[data-data-sort]');
+  if (!option) return;
+  sortDataVariableRows(option.dataset.dataSort);
+  setDataWorkspaceFilterOpen(false);
+  dataWorkspaceFilterButton.focus();
+});
+dataWorkspaceFilterOptions.addEventListener('keydown', event => {
+  const currentIndex = dataWorkspaceFilterOptionButtons.indexOf(event.target.closest('[data-data-sort]'));
+  if (currentIndex < 0) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    setDataWorkspaceFilterOpen(false);
+    dataWorkspaceFilterButton.focus();
+    return;
+  }
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    sortDataVariableRows(dataWorkspaceFilterOptionButtons[currentIndex].dataset.dataSort);
+    setDataWorkspaceFilterOpen(false);
+    dataWorkspaceFilterButton.focus();
+    return;
+  }
+  const direction = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+  if (!direction) return;
+  event.preventDefault();
+  dataWorkspaceFilterOptionButtons[(currentIndex + direction + dataWorkspaceFilterOptionButtons.length) % dataWorkspaceFilterOptionButtons.length].focus();
+});
+dataVariableRows.addEventListener('click', event => {
+  const deleteButton = event.target.closest('.data-variable-delete-button');
+  if (!deleteButton) return;
+  deleteButton.closest('.row_container')?.remove();
+  syncDataVariableRows(dataVariableFirstVisibleIndex);
+});
+dataVariableRows.addEventListener('wheel', event => {
+  if (!event.deltaY || getDataVariableRows().length <= dataVariableVisibleRowCount) return;
+  event.preventDefault();
+  syncDataVariableRows(dataVariableFirstVisibleIndex + Math.sign(event.deltaY));
+}, { passive: false });
+dataVariableScrollbar.addEventListener('pointerdown', event => {
+  event.preventDefault();
+  const rows = getDataVariableRows();
+  const maximumIndex = Math.max(0, rows.length - dataVariableVisibleRowCount);
+  const trackBounds = dataVariableScrollbar.getBoundingClientRect();
+  const thumbBounds = dataVariableScrollbarThumb.getBoundingClientRect();
+  const travel = Math.max(0, trackBounds.height - thumbBounds.height);
+  if (event.target !== dataVariableScrollbarThumb) {
+    const position = event.clientY - trackBounds.top - (thumbBounds.height / 2);
+    syncDataVariableRows(Math.round((travel ? clamp(position / travel, 0, 1) : 0) * maximumIndex));
+    return;
+  }
+  dataVariableScrollbarDragState = {
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    startIndex: dataVariableFirstVisibleIndex,
+    maximumIndex,
+    travel,
+  };
+  dataVariableScrollbar.setPointerCapture(event.pointerId);
+});
+dataVariableScrollbar.addEventListener('pointermove', event => {
+  const drag = dataVariableScrollbarDragState;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const indexDelta = drag.travel
+    ? Math.round((event.clientY - drag.startY) / drag.travel * drag.maximumIndex)
+    : 0;
+  syncDataVariableRows(drag.startIndex + indexDelta);
+});
+const stopDataVariableScrollbarDrag = event => {
+  if (dataVariableScrollbarDragState?.pointerId === event.pointerId) {
+    dataVariableScrollbarDragState = null;
+  }
+};
+dataVariableScrollbar.addEventListener('pointerup', stopDataVariableScrollbarDrag);
+dataVariableScrollbar.addEventListener('pointercancel', stopDataVariableScrollbarDrag);
 let testComboboxSelection = 'Option 1';
 let testHexValue = '7C5CFC';
 let hexPickerPointerId = null;
@@ -225,8 +610,6 @@ const syncUiScaleControl = () => {
 syncUiScaleControl();
 
 const getUiScaleFactor = () => uiScalePercent / 200;
-
-const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 
 const syncWorkspaceObjectScrollbar = () => {
   const viewportSize = workspaceObjectGrid.clientHeight;
@@ -955,6 +1338,14 @@ const syncTestHexColor = () => {
 
 const closeHexColorDialog = () => {
   hexColorDialog.hidden = true;
+  if (
+    (!preferencesDialog || preferencesDialog.hidden)
+    && (!confirmDialog || confirmDialog.hidden)
+    && (!textureImportDialog || textureImportDialog.hidden)
+    && (!warningDialog || warningDialog.hidden)
+  ) {
+    dialogLayer.hidden = true;
+  }
 };
 
 const positionHexColorDialog = () => {
@@ -981,6 +1372,7 @@ const positionHexColorDialog = () => {
 const openHexColorDialog = () => {
   testHexInput.blur();
   syncTestHexColor();
+  dialogLayer.hidden = false;
   hexColorDialog.hidden = false;
   positionHexColorDialog();
   requestAnimationFrame(syncDialogOverlayScrollbars);
@@ -1505,6 +1897,10 @@ const setActiveWorkspaceTab = activeTab => {
   workspaceTopControls.hidden = !showingPrimaryWorkspace;
   workspaceInnerContainer.hidden = !showingPrimaryWorkspace;
   workspaceObjectGrid.hidden = !showingPrimaryWorkspace;
+  for (const element of primaryWorkspaceModeElements) {
+    const modes = (element.dataset.primaryWorkspaceModes || '').split(/\s+/);
+    element.hidden = !showingPrimaryWorkspace || !modes.includes(homeTab.dataset.workspaceMode);
+  }
   for (const panel of workspaceItemEditors.querySelectorAll('.workspace-item-editor')) {
     panel.hidden = panel.id !== activePanelId;
   }
@@ -1514,13 +1910,21 @@ const setActiveWorkspaceTab = activeTab => {
 
 const workspaceToggleButtons = [...document.querySelectorAll('[data-workspace-toggle]')];
 const setPrimaryWorkspaceMode = mode => {
-  const label = mode === 'assets' ? 'Assets' : 'Home';
+  const label = mode === 'assets' ? 'Assets' : mode === 'data' ? 'Data' : 'Home';
+  setDataWorkspaceFilterOpen(false);
   homeTab.dataset.workspaceMode = mode;
+  homeWorkspace.dataset.workspaceMode = mode;
   primaryWorkspaceTabLabel.textContent = label;
   homeTab.setAttribute('aria-label', label);
+  for (const element of primaryWorkspaceModeElements) {
+    const modes = (element.dataset.primaryWorkspaceModes || '').split(/\s+/);
+    element.hidden = !modes.includes(mode);
+  }
   workspaceSearchInput.value = '';
   setWorkspaceCreateMode(mode);
   syncPrimaryWorkspaceObjects();
+  if (mode === 'data') requestAnimationFrame(() => syncDataVariableRows());
+  requestAnimationFrame(syncDataPageScrollbar);
 };
 
 for (const button of workspaceToggleButtons) {
@@ -1818,6 +2222,259 @@ const itemEditorPage = initializeItemEditorPage({
   },
 });
 const { addItemWorkspace, closeDropdowns: closeItemEditorDropdowns } = itemEditorPage;
+
+openResourceWorkspace = (resourceId, resourceData) => {
+  const existingPanel = [...workspaceItemEditors.querySelectorAll('.workspace-resource-editor')]
+    .find(panel => panel.dataset.resourceId === resourceId);
+  if (existingPanel) {
+    const existingTab = workspaceTabs.querySelector(`[data-workspace-panel-id="${CSS.escape(existingPanel.id)}"]`);
+    if (existingTab) setActiveWorkspaceTab(existingTab);
+    return;
+  }
+
+  const safeId = resourceId.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const panelId = `resource-editor-${safeId}`;
+  const tabId = `resource-tab-${safeId}`;
+  const labelText = String(resourceData.name || resourceId);
+  const panel = document.createElement('section');
+  panel.id = panelId;
+  panel.className = 'workspace-item-editor workspace-resource-editor';
+  panel.dataset.resourceId = resourceId;
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', tabId);
+
+  const viewport = document.createElement('div');
+  viewport.className = 'workspace-item-scroll-viewport';
+  const form = document.createElement('div');
+  form.className = 'workspace-item-editor-form';
+  const fields = [
+    ['Name', resourceData.name ?? ''],
+    ['ID', resourceData.id ?? resourceId],
+    ['Current Default', resourceData.currentDefault ?? 0],
+    ['Maximum Default', resourceData.maximumDefault ?? 0],
+    ['Regeneration Default', resourceData.regenerationDefault ?? 0],
+    ['Order', resourceData.order ?? 0],
+  ];
+  const inputs = new Map();
+  fields.forEach(([labelTextValue, value], index) => {
+    const row = document.createElement('label');
+    row.className = `workspace-item-field-row${index === 0 ? ' workspace-item-primary-row' : ''}`;
+    const label = document.createElement('span');
+    label.textContent = labelTextValue;
+    const input = document.createElement('input');
+    input.className = 'pixel-text-box';
+    input.type = typeof value === 'number' ? 'number' : 'text';
+    input.value = String(value);
+    input.dataset.resourceField = labelTextValue;
+    inputs.set(labelTextValue, input);
+    row.append(label, input);
+    if (index === 0) {
+      const actions = document.createElement('div');
+      actions.className = 'workspace-item-actions';
+      const save = document.createElement('button');
+      save.className = 'pixel-button workspace-item-action-button';
+      save.type = 'button';
+      save.setAttribute('aria-label', 'Save resource');
+      save.innerHTML = '<span class="workspace-file-icon workspace-file-icon-save" aria-hidden="true"></span>';
+      const close = document.createElement('button');
+      close.className = 'pixel-button workspace-item-action-button';
+      close.type = 'button';
+      close.setAttribute('aria-label', 'Cancel resource');
+      close.innerHTML = '<span class="workspace-file-icon workspace-file-icon-cancel" aria-hidden="true"></span>';
+      const remove = document.createElement('button');
+      remove.className = 'pixel-button workspace-item-action-button';
+      remove.type = 'button';
+      remove.setAttribute('aria-label', 'Delete resource');
+      remove.innerHTML = '<span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span>';
+      close.addEventListener('click', () => {
+        const tab = document.getElementById(tabId);
+        if (tab) removeWorkspaceTab(tab);
+      });
+      actions.append(remove, close, save);
+      row.append(actions);
+    }
+    form.append(row);
+  });
+
+  const textureRow = document.createElement('div');
+  textureRow.className = 'workspace-item-field-row';
+  const textureLabel = document.createElement('span');
+  textureLabel.textContent = 'Bar Texture';
+  const textureDropdown = document.createElement('div');
+  textureDropdown.className = 'pixel-combobox workspace-item-dropdown workspace-item-texture-combobox';
+  const textureControl = document.createElement('div');
+  textureControl.className = 'pixel-combobox-control';
+  const textureInput = document.createElement('input');
+  textureInput.className = 'pixel-text-box pixel-combobox-input';
+  textureInput.type = 'text';
+  textureInput.value = String(resourceData.barTexture || '');
+  textureInput.placeholder = '(None)';
+  textureInput.setAttribute('aria-label', 'Bar Texture');
+  const textureButton = document.createElement('button');
+  textureButton.className = 'pixel-button pixel-combobox-button';
+  textureButton.type = 'button';
+  textureButton.dataset.value = String(resourceData.barTexture || '');
+  textureButton.setAttribute('aria-haspopup', 'listbox');
+  textureButton.setAttribute('aria-expanded', 'false');
+  const textureArrow = document.createElement('span');
+  textureArrow.className = 'pixel-direction-icon pixel-direction-down';
+  textureArrow.setAttribute('aria-hidden', 'true');
+  textureButton.append(textureArrow);
+  const textureOptions = document.createElement('div');
+  textureOptions.className = 'preferences-scale-options pixel-option-stack pixel-combobox-options workspace-item-texture-options';
+  textureOptions.setAttribute('role', 'listbox');
+  textureOptions.hidden = true;
+  textureControl.append(textureInput, textureButton);
+  textureDropdown.append(textureControl, textureOptions);
+  textureRow.append(textureLabel, textureDropdown);
+
+  const amountInput = document.createElement('input');
+  amountInput.className = 'workspace-resource-preview-range';
+  amountInput.type = 'range';
+  amountInput.min = '0';
+  amountInput.step = '0.1';
+  amountInput.max = String(Math.max(0, Number(resourceData.maximumDefault) || 0));
+  amountInput.value = String(clamp(
+    Number(resourceData._previewAmount ?? resourceData.currentDefault) || 0,
+    0,
+    Number(amountInput.max),
+  ));
+  amountInput.setAttribute('aria-label', 'Preview resource amount');
+  const previewRow = document.createElement('div');
+  previewRow.className = 'workspace-item-field-row workspace-resource-preview-row';
+  const previewLabel = document.createElement('span');
+  previewLabel.textContent = 'Preview';
+  const preview = document.createElement('div');
+  preview.className = 'workspace-resource-preview';
+  const previewFrame = document.createElement('div');
+  previewFrame.className = 'workspace-resource-preview-frame';
+  const previewFillClip = document.createElement('div');
+  previewFillClip.className = 'workspace-resource-preview-fill-clip';
+  const previewFill = document.createElement('img');
+  previewFill.className = 'workspace-resource-preview-fill';
+  previewFill.alt = '';
+  previewFill.draggable = false;
+  previewFillClip.append(previewFill);
+  previewFrame.append(previewFillClip);
+  const previewValue = document.createElement('span');
+  previewValue.className = 'workspace-resource-preview-value';
+  preview.append(previewFrame, previewValue, amountInput);
+  previewRow.append(previewLabel, preview);
+  form.append(textureRow, previewRow);
+
+  const formatResourceValue = value => Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
+  const syncResourcePreview = () => {
+    const current = Math.max(0, Number(amountInput.value) || 0);
+    const maximum = Math.max(0, Number(inputs.get('Maximum Default')?.value) || 0);
+    const fraction = maximum > 0 ? clamp(current / maximum, 0, 1) : 0;
+    previewFillClip.style.width = `${fraction * 132 * 1.25}px`;
+    previewValue.textContent = `${formatResourceValue(current)}/${formatResourceValue(maximum)}`;
+    resourceData._previewAmount = current;
+    const resourceRow = document.querySelector(`.resource-row[data-data-id="${CSS.escape(resourceId)}"]`);
+    const rowFill = resourceRow?.querySelector('[data-resource-row-preview-fill]');
+    const rowValue = resourceRow?.querySelector('[data-resource-row-preview-value]');
+    if (rowFill) rowFill.style.width = `${fraction * 132}px`;
+    if (rowValue) rowValue.textContent = `${formatResourceValue(current)}/${formatResourceValue(maximum)}`;
+  };
+  inputs.get('Current Default')?.addEventListener('input', syncResourcePreview);
+  inputs.get('Maximum Default')?.addEventListener('input', () => {
+    const maximum = Math.max(0, Number(inputs.get('Maximum Default')?.value) || 0);
+    amountInput.max = String(maximum);
+    amountInput.value = String(clamp(Number(amountInput.value) || 0, 0, maximum));
+    syncResourcePreview();
+  });
+  amountInput.addEventListener('input', () => {
+    syncResourcePreview();
+  });
+  syncResourcePreview();
+
+  const textureUrls = new Map();
+  const selectTexture = (id, label, url) => {
+    textureButton.dataset.value = id;
+    textureInput.value = label || id || '';
+    previewFill.src = url || '';
+    previewFill.hidden = !url;
+    textureOptions.hidden = true;
+    textureButton.setAttribute('aria-expanded', 'false');
+    for (const option of textureOptions.querySelectorAll('[data-resource-texture-value]')) {
+      option.setAttribute('aria-selected', String(option.dataset.resourceTextureValue === id));
+    }
+  };
+  textureButton.addEventListener('click', () => {
+    const open = textureOptions.hidden;
+    textureOptions.hidden = !open;
+    textureButton.setAttribute('aria-expanded', String(open));
+  });
+  textureInput.addEventListener('focus', () => {
+    textureOptions.hidden = false;
+    textureButton.setAttribute('aria-expanded', 'true');
+  });
+  textureInput.addEventListener('input', () => {
+    const query = textureInput.value.trim().toLocaleLowerCase();
+    for (const option of textureOptions.querySelectorAll('[data-resource-texture-value]')) {
+      option.hidden = Boolean(query)
+        && !option.dataset.resourceTextureLabel.toLocaleLowerCase().includes(query)
+        && !option.dataset.resourceTextureValue.toLocaleLowerCase().includes(query);
+    }
+  });
+  textureOptions.addEventListener('click', event => {
+    const option = event.target.closest('[data-resource-texture-value]');
+    if (!option) return;
+    const id = option.dataset.resourceTextureValue;
+    selectTexture(id, option.dataset.resourceTextureLabel, textureUrls.get(id) || '');
+  });
+  const loadResourceTexture = async id => {
+    const [metadataText, extension, data] = await invoke('load_texture_bundle', { id });
+    const metadata = JSON.parse(metadataText);
+    const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : `image/${extension}`;
+    const url = URL.createObjectURL(new Blob([Uint8Array.from(data)], { type: mime }));
+    textureUrls.set(id, url);
+    return { id, label: String(metadata.label || id), url };
+  };
+  const initialTextureId = String(resourceData.barTexture || '');
+  if (initialTextureId) {
+    loadResourceTexture(initialTextureId)
+      .then(selected => selectTexture(selected.id, selected.label, selected.url))
+      .catch(error => console.error(`Unable to load selected Resource texture ${initialTextureId}:`, error));
+  }
+  invoke('list_ycs_data', { category: 'textures' }).then(async ids => {
+    const entries = await Promise.all(ids.map(async id => {
+      try {
+        return await loadResourceTexture(id);
+      } catch (error) {
+        console.error(`Unable to load Resource texture ${id}:`, error);
+        return null;
+      }
+    }));
+    const options = entries.filter(Boolean).map(({ id, label, url }) => {
+      const option = document.createElement('button');
+      option.className = 'pixel-option workspace-item-texture-option';
+      option.type = 'button';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(id === textureButton.dataset.value));
+      option.dataset.resourceTextureValue = id;
+      option.dataset.resourceTextureLabel = label;
+      const image = document.createElement('img');
+      image.className = 'workspace-item-texture-option-preview';
+      image.src = url;
+      image.alt = '';
+      const text = document.createElement('span');
+      text.textContent = label;
+      option.append(image, text);
+      return option;
+    });
+    textureOptions.replaceChildren(...options);
+    const selectedId = textureButton.dataset.value;
+    const selected = entries.find(entry => entry?.id === selectedId);
+    if (selected) selectTexture(selected.id, selected.label, selected.url);
+  }).catch(error => console.error('Unable to list Resource textures:', error));
+  viewport.append(form);
+  panel.append(viewport);
+  workspaceItemEditors.append(panel);
+  const { tab } = createClosableWorkspaceTab({ id: tabId, labelText, panelId });
+  tab.dataset.workspaceEditorType = 'resource';
+};
+
 const folderPage = initializeFolderPage({
   host: workspaceItemEditors,
   createTab: createClosableWorkspaceTab,
@@ -4136,6 +4793,7 @@ document.addEventListener('pointerdown', event => {
   if (!event.target.closest('#test-dropdown')) setTestDropdownOpen(false);
   if (!event.target.closest('#test-combobox')) setTestComboboxOpen(false);
   if (!event.target.closest('#workspace-create-dropdown')) setWorkspaceCreateOptionsOpen(false);
+  if (!event.target.closest('#data-workspace-filter-dropdown')) setDataWorkspaceFilterOpen(false);
   if (!event.target.closest('#texture-import-filter-button, #texture-filter-dialog')) {
     setTextureImportFilterOpen(false);
   }
@@ -4202,6 +4860,12 @@ document.addEventListener('keydown', event => {
   if (!workspaceCreateOptions.hidden) {
     setWorkspaceCreateOptionsOpen(false);
     workspaceCreateButton.focus();
+    return;
+  }
+
+  if (!dataWorkspaceFilterOptions.hidden) {
+    setDataWorkspaceFilterOpen(false);
+    dataWorkspaceFilterButton.focus();
     return;
   }
 

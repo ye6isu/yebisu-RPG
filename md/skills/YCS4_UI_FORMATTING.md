@@ -97,6 +97,7 @@ Edit > Test is the live component reference. Add genuinely reusable controls the
 - Use frames from the shared direction and action sprite sheets instead of Unicode arrows, font glyphs, or unrelated SVGs.
 - Icons inherit `currentColor` where supported so hover and disabled states remain synchronized with their control.
 - Icon-only buttons require an accessible label.
+- Editor action groups use the shared Item-editor order: Delete, Cancel, Save. A conditionally unavailable action stays hidden without reordering the remaining actions, so equivalent actions retain predictable positions across editors.
 
 ## Layout rules
 
