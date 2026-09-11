@@ -14,6 +14,7 @@ export const initializeFolderPage = ({
 
     const number = nextFolderPageNumber;
     nextFolderPageNumber += 1;
+    const folderMode = folderShell.dataset.workspaceMode === 'assets' ? 'assets' : 'home';
     const panel = document.createElement('section');
     panel.id = `folder-workspace-${number}`;
     panel.className = 'workspace-item-editor workspace-folder-page';
@@ -25,25 +26,20 @@ export const initializeFolderPage = ({
     topControls.innerHTML = `
       <div class="workspace-top-controls-left">
         <input class="pixel-text-box workspace-top-text-box workspace-search-input" type="text" aria-label="Search folder" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
-        <button class="pixel-button workspace-top-control-button workspace-search-button" type="button" aria-label="Search">
-          <img class="workspace-search-icon" src="./assets/sprite/home/home_icon.png" alt="" draggable="false" />
-        </button>
       </div>
       <div class="workspace-create-dropdown">
         <button class="pixel-button workspace-top-control-button folder-create-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Create">+</button>
         <div class="preferences-scale-options pixel-option-stack workspace-create-options" role="menu" hidden>
-          <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Item" data-workspace-create-mode="home">Item</button>
-          <div class="workspace-create-divider-row" role="separator" data-workspace-create-mode="home">
+          <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="${folderMode === 'assets' ? 'Texture' : 'Item'}" data-workspace-create-mode="${folderMode}">${folderMode === 'assets' ? 'Texture' : 'Item'}</button>
+          <div class="workspace-create-divider-row" role="separator" data-workspace-create-mode="${folderMode}">
             <div class="pixel-divider pixel-divider-horizontal workspace-create-divider" aria-hidden="true"></div>
           </div>
-          <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Folder" data-workspace-create-mode="home">Folder</button>
-          <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Test" data-workspace-create-mode="home">Test</button>
+          <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Folder" data-workspace-create-mode="${folderMode}">Folder</button>
         </div>
       </div>
     `;
 
     const searchInput = topControls.querySelector('.workspace-search-input');
-    const searchButton = topControls.querySelector('.workspace-search-button');
     const createButton = topControls.querySelector('.folder-create-button');
     const createOptions = topControls.querySelector('.workspace-create-options');
 
@@ -59,7 +55,6 @@ export const initializeFolderPage = ({
       }
     };
     searchInput.addEventListener('input', syncGrid);
-    searchButton.addEventListener('click', syncGrid);
 
     createButton.addEventListener('click', event => {
       event.stopPropagation();
@@ -77,7 +72,7 @@ export const initializeFolderPage = ({
     for (const option of createOptions.querySelectorAll('.workspace-create-option')) {
       option.addEventListener('click', () => {
         const type = option.dataset.workspaceCreateOption;
-        createObject(type, 'home', grid);
+        createObject(type, folderMode, grid);
         createOptions.hidden = true;
         createButton.setAttribute('aria-expanded', 'false');
       });

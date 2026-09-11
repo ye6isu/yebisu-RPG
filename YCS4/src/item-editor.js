@@ -526,6 +526,139 @@ export const initializeItemEditorPage = ({
     hurtEnemy: 'Hurt Entity',
     interactLivingEntity: 'Entity Interaction',
   };
+
+  const compileMethodGraph = (graphState, methodKey) => {
+    const graph = graphState?.content;
+    if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.connections)) return [];
+    const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+    const safeSuffix = node => String(node.id).replace(/[^a-zA-Z0-9]/g, '').slice(-12) || 'node';
+    const eventEntity = {
+      use: 'player', finishUsingItem: 'livingEntity', releaseUsing: 'livingEntity',
+      inventoryTick: 'entity', hurtEnemy: 'attacker', interactLivingEntity: 'player',
+    }[methodKey] || 'player';
+    const targetEntity = methodKey === 'hurtEnemy' ? 'target'
+      : methodKey === 'interactLivingEntity' ? 'interactionTarget' : eventEntity;
+    const incoming = (nodeId, pinId, type = 'data') => graph.connections.find(connection => (
+      connection.to === nodeId && connection.type === type && (connection.toPin || 'input') === pinId
+    ));
+    const outgoing = (nodeId, pinId) => graph.connections.find(connection => (
+      connection.from === nodeId && connection.type === 'flow' && (connection.fromPin || 'output') === pinId
+    ));
+    const numberLiteral = (value, fallback) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? String(parsed) : fallback;
+    };
+    const stringLiteral = value => JSON.stringify(String(value ?? ''));
+    const inputValue = (node, pinId, fallback = '0') => {
+      const connection = incoming(node.id, pinId);
+      if (connection) return expression(connection.from, connection.fromPin || 'output', new Set());
+      const definition = nodeDefinitionFor(node.kind);
+      const raw = pinId === (definition.inputId || 'input') ? node.value : node.values?.[pinId];
+      return numberLiteral(raw, fallback);
+    };
+    const expression = (nodeId, outputPin, visiting) => {
+      if (visiting.has(nodeId)) return '0';
+      visiting.add(nodeId);
+      const node = nodes.get(nodeId);
+      if (!node) return '0';
+      const suffix = safeSuffix(node);
+      if (node.kind === 'entity.context') {
+        const context = node.value || node.opcode;
+        return context === 'entity.target' ? targetEntity : context === 'aoe.iterator.entity' ? 'iteratorEntity' : eventEntity;
+      }
+      if (node.kind === 'logic.boolean') return node.value === false ? 'false' : 'true';
+      if (node.kind === 'logic.not') return `!(${inputValue(node, 'input', 'false')})`;
+      if (node.kind === 'number.literal') return numberLiteral(node.value, '0');
+      if (node.kind === 'text.literal') return stringLiteral(node.value);
+      if (node.kind === 'number.math') {
+        const a = inputValue(node, 'a');
+        const b = inputValue(node, 'b');
+        const operation = node.values?.operation || '+';
+        if (operation === 'min') return `Math.min((double)(${a}), (double)(${b}))`;
+        if (operation === 'max') return `Math.max((double)(${a}), (double)(${b}))`;
+        if (operation === 'pow') return `Math.pow((double)(${a}), (double)(${b}))`;
+        const operator = ['+', '-', '*', '/', '%'].includes(operation) ? operation : '+';
+        return `((${a}) ${operator} (${b}))`;
+      }
+      if (node.kind === 'entity.position') {
+        const entityValue = inputValue(node, 'input', eventEntity);
+        return `${entityValue}.get${String(outputPin || 'x').toUpperCase()}()`;
+      }
+      if (node.kind === 'entity.look_dir') {
+        const entityValue = inputValue(node, 'input', eventEntity);
+        const axis = String(outputPin || 'x').toLowerCase();
+        return `${entityValue}.getLookAngle().${axis}`;
+      }
+      if (node.kind === 'entity.get_health') {
+        const entityValue = inputValue(node, 'input', eventEntity);
+        return `(${entityValue} instanceof LivingEntity living_${suffix} ? living_${suffix}.getHealth() : 0.0)`;
+      }
+      if (node.kind === 'entity.is_crouching') return `${inputValue(node, 'input', eventEntity)}.isCrouching()`;
+      if (node.kind === 'entity.is_dashing') return `DashUtil.isDashing(${inputValue(node, 'input', eventEntity)})`;
+      return '0';
+    };
+    const compileFlow = (nodeId, visiting = new Set()) => {
+      if (!nodeId || visiting.has(nodeId)) return [];
+      const node = nodes.get(nodeId);
+      if (!node || node.start) return [];
+      const nextVisiting = new Set(visiting).add(nodeId);
+      if (node.kind === 'control.if') {
+        const count = Math.max(1, Number(node.conditionCount) || 1);
+        const lines = [];
+        for (let index = 0; index < count; index += 1) {
+          const pinId = index === 0 ? 'condition' : `condition-${index}`;
+          const condition = incoming(node.id, pinId);
+          const conditionValue = condition ? expression(condition.from, condition.fromPin || 'output', new Set()) : 'false';
+          lines.push(`${index === 0 ? 'if' : 'else if'} (${conditionValue}) {`);
+          const branch = outgoing(node.id, `if-${index}`);
+          lines.push(...compileFlow(branch?.to, nextVisiting).map(line => `    ${line}`));
+          lines.push('}');
+        }
+        const elseBranch = outgoing(node.id, 'else');
+        if (elseBranch) {
+          lines[lines.length - 1] += ' else {';
+          lines.push(...compileFlow(elseBranch.to, nextVisiting).map(line => `    ${line}`));
+          lines.push('}');
+        }
+        const continuation = outgoing(node.id, 'then');
+        return [...lines, ...compileFlow(continuation?.to, nextVisiting)];
+      }
+      const entityInput = pin => {
+        const connection = incoming(node.id, pin);
+        return connection ? expression(connection.from, connection.fromPin || 'output', new Set()) : eventEntity;
+      };
+      const suffix = safeSuffix(node);
+      let lines = [];
+      if (node.kind === 'effect.apply') {
+        const entityValue = entityInput('entity');
+        lines = [`if (!level.isClientSide() && ${entityValue} instanceof LivingEntity living_${suffix}) { living_${suffix}.addEffect(new MobEffectInstance(MobEffects.REGENERATION, (int)(${inputValue(node, 'duration', '0')}), Math.max(0, (int)(${inputValue(node, 'level', '0')}) - 1), false, true)); }`];
+      } else if (node.kind === 'entity.set_health') {
+        const entityValue = entityInput('entity');
+        lines = [`if (!level.isClientSide() && ${entityValue} instanceof LivingEntity living_${suffix}) { living_${suffix}.setHealth((float)Math.max(0.0, Math.min(living_${suffix}.getMaxHealth(), ${inputValue(node, 'amount', '20')}))); }`];
+      } else if (node.kind === 'entity.apply_motion') {
+        const entityValue = entityInput('entity');
+        const mode = node.values?.mode || node.settings?.mode || 'add';
+        lines = mode === 'set'
+          ? [`if (!level.isClientSide()) { ${entityValue}.setDeltaMovement(${inputValue(node, 'x')}, ${inputValue(node, 'y')}, ${inputValue(node, 'z')}); ${entityValue}.hurtMarked = true; }`]
+          : [`if (!level.isClientSide()) { ${entityValue}.push(${inputValue(node, 'x')}, ${inputValue(node, 'y')}, ${inputValue(node, 'z')}); }`];
+      } else if (node.kind === 'projectile.fire') {
+        lines = [`ProjectileUtil.fire(${entityInput('entity')}, "minecraft:arrow", ${inputValue(node, 'x')}, ${inputValue(node, 'y')}, ${inputValue(node, 'z')}, (float)(${inputValue(node, 'power', '1.5')}));`];
+      } else if (node.kind === 'entity.dash') {
+        const easing = ['LINEAR', 'EASE_IN', 'EASE_OUT', 'EASE_IN_OUT'].includes(node.values?.easing)
+          ? node.values.easing
+          : 'LINEAR';
+        lines = [`DashUtil.start(${entityInput('entity')}, ${inputValue(node, 'x')}, ${inputValue(node, 'y')}, ${inputValue(node, 'z')}, ${inputValue(node, 'distance', '10')}, (int)(${inputValue(node, 'ticks', '5')}), DashUtil.Easing.${easing}, null, null, "sphere", 1.5, 0, 0, false);`];
+      } else if (node.kind === 'entity.deal_damage') {
+        const target = entityInput('target');
+        const attacker = entityInput('attacker');
+        lines = [`if (!level.isClientSide() && ${target} instanceof LivingEntity target_${suffix} && ${attacker} instanceof LivingEntity attacker_${suffix}) { target_${suffix}.hurt(target_${suffix}.level().damageSources().mobAttack(attacker_${suffix}), (float)(${inputValue(node, 'amount', '1')})); }`];
+      }
+      const next = outgoing(node.id, 'output');
+      return [...lines, ...compileFlow(next?.to, nextVisiting)];
+    };
+    const start = graph.nodes.find(node => node.start);
+    return compileFlow(outgoing(start?.id, 'output')?.to);
+  };
   const useAnimationOptions = ['NONE', 'EAT', 'DRINK', 'BLOCK', 'BOW', 'SPEAR', 'CROSSBOW', 'SPYGLASS', 'TOOT_HORN', 'BRUSH'];
 
   const closeCustomMethodEditor = panel => {
@@ -544,8 +677,17 @@ export const initializeItemEditorPage = ({
       || panel.id;
     const storageKey = `ycs4.method-editor::item::${itemId}::${methodKey}`;
     let savedState = { version: 1, method: methodKey, content: null };
+    const methodRecord = panel.itemCustomMethods?.find(method => method.key === methodKey)
+      || (['continuousUse', 'releaseUsing'].includes(methodKey)
+        ? panel.itemCustomMethods?.find(method => method.key === 'use')
+        : null);
     try {
-      savedState = { ...savedState, ...JSON.parse(localStorage.getItem(storageKey) || '{}') };
+      savedState = {
+        ...savedState,
+        ...(methodRecord?.graphs?.[methodKey]
+          || (methodRecord?.key === methodKey ? methodRecord?.graph : null)
+          || JSON.parse(localStorage.getItem(storageKey) || '{}')),
+      };
     } catch {}
     const draftState = structuredClone(savedState);
 
@@ -571,7 +713,11 @@ export const initializeItemEditorPage = ({
     save.innerHTML = '<span class="workspace-file-icon workspace-file-icon-save" aria-hidden="true"></span>';
     cancel.addEventListener('click', () => closeCustomMethodEditor(panel));
     save.addEventListener('click', () => {
-      localStorage.setItem(storageKey, JSON.stringify(draftState));
+      if (methodRecord) {
+        methodRecord.graphs = { ...(methodRecord.graphs || {}), [methodKey]: structuredClone(draftState) };
+        if (methodRecord.key === methodKey) methodRecord.graph = structuredClone(draftState);
+      }
+      panel.dataset.dirty = 'true';
       closeCustomMethodEditor(panel);
     });
     actions.append(cancel, save);
@@ -589,7 +735,10 @@ export const initializeItemEditorPage = ({
     }
     if (!Array.isArray(graph.connections)) graph.connections = [];
     graph.nodes = graph.nodes
-      .filter(node => node.kind !== 'get-number' && node.kind !== 'number.literal' && node.kind !== 'text.literal')
+      .filter(node => ![
+        'get-number', 'test',
+        'entity.part_hit_name', 'entity.part_hit_damage',
+      ].includes(node.kind))
       .map(node => {
         if (['entity.event', 'entity.target', 'aoe.iterator.entity'].includes(node.kind)) {
           return { ...node, kind: 'entity.context', value: node.kind };
@@ -606,7 +755,7 @@ export const initializeItemEditorPage = ({
       && existingNodeIds.has(connection.to)
       && connections.findIndex(candidate => candidate.to === connection.to && candidate.type === connection.type && (candidate.toPin || 'input') === (connection.toPin || 'input')) === index
       && (connection.type !== 'flow'
-        || connections.findIndex(candidate => candidate.from === connection.from && candidate.type === 'flow') === index)
+        || connections.findIndex(candidate => candidate.from === connection.from && candidate.type === 'flow' && (candidate.fromPin || 'output') === (connection.fromPin || 'output')) === index)
     ));
     let selectedNodeId = null;
     const selectedNodeIds = new Set();
@@ -698,7 +847,7 @@ export const initializeItemEditorPage = ({
         }
         if (drag.type === 'flow') return definition.flow;
         return drag.direction === 'outgoing'
-          ? definition.inputType === drag.dataType
+          ? definition.inputType === drag.dataType || definition.inputs?.some(input => input.type === drag.dataType)
           : definition.outputType === drag.dataType;
       };
       let filteredDefinitions = [...NODE_DEFINITIONS];
@@ -739,7 +888,14 @@ export const initializeItemEditorPage = ({
       for (const button of optionButtons) button.addEventListener('click', () => {
         const definition = filteredDefinitions[Number(button.dataset.definitionIndex)];
         if (!definition) return;
-        const definitionOutputPin = definition.outputs?.[0]?.id || 'output';
+        const definitionInputPin = drag.type === 'flow'
+          ? 'input'
+          : (definition.inputType === drag.dataType
+            ? (definition.inputId || 'input')
+            : (definition.inputs?.find(input => input.type === drag.dataType)?.id || 'input'));
+        const definitionOutputPin = definition.kind === 'control.if'
+          ? 'then'
+          : (definition.outputs?.[0]?.id || 'output');
         const node = {
           id: crypto.randomUUID(),
           kind: definition.kind,
@@ -748,18 +904,20 @@ export const initializeItemEditorPage = ({
           y: (drag.pointer.y - graphView.y) / graphView.scale,
           color: definition.color,
           value: definition.field?.default,
+          values: Object.fromEntries((definition.inputs || []).map(input => [input.id, input.default ?? ''])),
+          settings: { ...(definition.defaults || {}) },
         };
         graph.nodes.push(node);
         const canAttach = acceptsDefinition(definition);
         if (canAttach && drag.direction === 'insert') {
           graph.connections = graph.connections.filter(connection => connection.id !== drag.connection.id);
           graph.connections.push(
-            { id: crypto.randomUUID(), type: drag.connection.type, dataType: drag.connection.dataType, from: drag.connection.from, to: node.id, fromPin: drag.connection.fromPin || 'output', toPin: 'input' },
+            { id: crypto.randomUUID(), type: drag.connection.type, dataType: drag.connection.dataType, from: drag.connection.from, to: node.id, fromPin: drag.connection.fromPin || 'output', toPin: definitionInputPin },
             { id: crypto.randomUUID(), type: drag.connection.type, dataType: drag.connection.dataType, from: node.id, to: drag.connection.to, fromPin: definitionOutputPin, toPin: drag.connection.toPin || 'input' },
           );
         } else if (canAttach && drag.direction === 'outgoing') {
-          if (drag.type === 'flow') graph.connections = graph.connections.filter(connection => connection.from !== drag.nodeId || connection.type !== drag.type);
-          graph.connections.push({ id: crypto.randomUUID(), type: drag.type, dataType: drag.dataType, from: drag.nodeId, to: node.id, fromPin: drag.pinId || 'output', toPin: 'input' });
+          if (drag.type === 'flow') graph.connections = graph.connections.filter(connection => connection.from !== drag.nodeId || connection.type !== drag.type || (connection.fromPin || 'output') !== (drag.pinId || 'output'));
+          graph.connections.push({ id: crypto.randomUUID(), type: drag.type, dataType: drag.dataType, from: drag.nodeId, to: node.id, fromPin: drag.pinId || 'output', toPin: definitionInputPin });
         } else if (canAttach && drag.direction === 'incoming') {
           graph.connections = graph.connections.filter(connection => connection.to !== drag.nodeId || connection.type !== drag.type);
           graph.connections.push({ id: crypto.randomUUID(), type: drag.type, dataType: drag.dataType, from: node.id, to: drag.nodeId, fromPin: definitionOutputPin, toPin: drag.pinId || 'input' });
@@ -884,7 +1042,7 @@ export const initializeItemEditorPage = ({
         inputPin.className = 'method-test-node-pin method-test-node-pin-input method-test-node-pin-data-input';
         inputPin.dataset.pinKind = 'input';
         inputPin.dataset.pinType = 'data';
-        inputPin.dataset.pinId = 'input';
+        inputPin.dataset.pinId = definition?.inputId || 'input';
         inputPin.dataset.pinDataType = definition?.inputType || '';
         inputPin.style.setProperty('--ycs-pin-color', YCS3_TYPE_COLORS[definition?.inputType] || 'white');
         const inputLabel = document.createElement('span');
@@ -960,7 +1118,11 @@ export const initializeItemEditorPage = ({
           valueField.value = String(node.value ?? definition?.field?.default ?? '');
         }
         valueField.hidden = !definition?.field
-          || Boolean(definition?.field?.hideWhenConnected && graph.connections.some(connection => connection.to === node.id && connection.type === 'data'));
+          || Boolean(definition?.field?.hideWhenConnected && graph.connections.some(connection => (
+            connection.to === node.id
+            && connection.type === 'data'
+            && (connection.toPin || 'input') === (definition.inputId || 'input')
+          )));
         valueField.setAttribute('aria-label', definition?.field?.type === 'select' ? 'Entity type' : definition?.field?.type === 'boolean' ? 'Boolean value' : definition?.field?.type === 'text' ? 'Text value' : 'Number value');
         valueField.addEventListener('input', () => {
           node.value = valueField.value;
@@ -990,6 +1152,102 @@ export const initializeItemEditorPage = ({
         dataRight.className = 'method-test-node-row-side method-test-node-row-right';
         dataRight.append(outputLabel);
         dataRight.hidden = outputLabel.hidden;
+        const ifInputPins = [];
+        const ifOutputPins = [];
+        const ifRows = [];
+        let ifElseRow = null;
+        if (definition?.kind === 'control.if') {
+          node.conditionCount = Math.max(1, Number(node.conditionCount) || 1);
+          flowOutput.dataset.pinId = 'then';
+          const branchLabel = index => index === 0 ? 'If' : `If Else ${index + 1}`;
+          const addBranchOutput = (row, right, index) => {
+            const label = document.createElement('span');
+            label.className = 'method-test-node-output-label';
+            label.textContent = branchLabel(index);
+            const pin = document.createElement('span');
+            pin.className = 'method-test-node-pin method-test-node-pin-output method-test-node-pin-flow-output';
+            pin.dataset.pinKind = 'output';
+            pin.dataset.pinType = 'flow';
+            pin.dataset.pinId = `if-${index}`;
+            right.hidden = false;
+            right.append(label);
+            row.append(pin);
+            ifOutputPins.push(pin);
+          };
+          addBranchOutput(connectionRow, dataRight, 0);
+          for (let index = 1; index < node.conditionCount; index += 1) {
+            const row = document.createElement('div');
+            row.className = 'method-test-node-connection-row method-test-node-data-row';
+            const pin = document.createElement('span');
+            pin.className = 'method-test-node-pin method-test-node-pin-input method-test-node-pin-data-input';
+            pin.dataset.pinKind = 'input';
+            pin.dataset.pinType = 'data';
+            pin.dataset.pinId = `condition-${index}`;
+            pin.dataset.pinDataType = 'boolean';
+            pin.style.setProperty('--ycs-pin-color', YCS3_TYPE_COLORS.boolean);
+            const left = document.createElement('div');
+            left.className = 'method-test-node-row-side method-test-node-row-left';
+            const label = document.createElement('span');
+            label.className = 'method-test-node-input-label';
+            label.textContent = `Condition ${index + 1}`;
+            left.append(label);
+            const right = document.createElement('div');
+            right.className = 'method-test-node-row-side method-test-node-row-right';
+            right.hidden = true;
+            row.append(pin, left, right);
+            addBranchOutput(row, right, index);
+            ifInputPins.push(pin);
+            ifRows.push(row);
+          }
+          const titleActions = document.createElement('div');
+          titleActions.className = 'method-test-node-title-actions';
+          const removeCondition = document.createElement('button');
+          removeCondition.className = 'dialogue-title-button method-test-node-if-condition-button';
+          removeCondition.type = 'button';
+          removeCondition.innerHTML = '<span class="method-test-node-if-button-icon method-test-node-if-button-minus" aria-hidden="true"></span>';
+          removeCondition.disabled = node.conditionCount <= 1;
+          removeCondition.setAttribute('aria-label', 'Remove last If Else condition');
+          removeCondition.addEventListener('pointerdown', event => event.stopPropagation());
+          removeCondition.addEventListener('click', event => {
+            event.stopPropagation();
+            if (node.conditionCount <= 1) return;
+            const removedIndex = node.conditionCount - 1;
+            graph.connections = graph.connections.filter(connection => !(
+              (connection.to === node.id && connection.type === 'data' && (connection.toPin || 'input') === `condition-${removedIndex}`)
+              || (connection.from === node.id && connection.type === 'flow' && (connection.fromPin || 'output') === `if-${removedIndex}`)
+            ));
+            node.conditionCount -= 1;
+            renderTestNodes();
+          });
+          const addCondition = document.createElement('button');
+          addCondition.className = 'dialogue-title-button method-test-node-if-condition-button';
+          addCondition.type = 'button';
+          addCondition.innerHTML = '<span class="method-test-node-if-button-icon method-test-node-if-button-plus" aria-hidden="true"></span>';
+          addCondition.setAttribute('aria-label', 'Add If Else condition');
+          addCondition.addEventListener('pointerdown', event => event.stopPropagation());
+          addCondition.addEventListener('click', event => {
+            event.stopPropagation();
+            node.conditionCount += 1;
+            renderTestNodes();
+          });
+          titleActions.append(removeCondition, addCondition);
+          nodeTitle.append(titleActions);
+          ifElseRow = document.createElement('div');
+          ifElseRow.className = 'method-test-node-connection-row method-test-node-output-row';
+          const elseRight = document.createElement('div');
+          elseRight.className = 'method-test-node-row-side method-test-node-row-right';
+          const elseLabel = document.createElement('span');
+          elseLabel.className = 'method-test-node-output-label';
+          elseLabel.textContent = 'Else';
+          const elsePin = document.createElement('span');
+          elsePin.className = 'method-test-node-pin method-test-node-pin-output method-test-node-pin-flow-output';
+          elsePin.dataset.pinKind = 'output';
+          elsePin.dataset.pinType = 'flow';
+          elsePin.dataset.pinId = 'else';
+          elseRight.append(elseLabel);
+          ifElseRow.append(elseRight, elsePin);
+          ifOutputPins.push(elsePin);
+        }
         const extraOutputRows = (definition?.outputs || []).slice(1).map(output => {
           const row = document.createElement('div');
           row.className = 'method-test-node-connection-row method-test-node-data-row method-test-node-output-row';
@@ -1006,7 +1264,84 @@ export const initializeItemEditorPage = ({
           row.append(label, pin);
           return { row, pin };
         });
-        const nodePins = [flowInput, flowOutput, inputPin, outputPin, ...extraOutputRows.map(entry => entry.pin)]
+        node.values = node.values && typeof node.values === 'object' ? node.values : {};
+        const extraInputRows = (definition?.inputs || []).map(input => {
+          const row = document.createElement('div');
+          row.className = 'method-test-node-connection-row method-test-node-data-row method-test-node-input-row';
+          const pin = document.createElement('span');
+          pin.className = 'method-test-node-pin method-test-node-pin-input method-test-node-pin-data-input';
+          pin.dataset.pinKind = 'input';
+          pin.dataset.pinType = 'data';
+          pin.dataset.pinId = input.id;
+          pin.dataset.pinDataType = input.type;
+          pin.style.setProperty('--ycs-pin-color', YCS3_TYPE_COLORS[input.type] || 'white');
+          pin.hidden = input.connectable === false;
+          const side = document.createElement('div');
+          side.className = 'method-test-node-row-side method-test-node-row-left';
+          const label = document.createElement('span');
+          label.className = 'method-test-node-input-label';
+          label.textContent = input.label;
+          side.append(label);
+          if (input.type === 'number' || input.type === 'string') {
+            const field = document.createElement('input');
+            field.className = 'pixel-text-box method-test-node-value';
+            field.type = input.type === 'number' ? 'number' : 'text';
+            node.values[input.id] = node.values[input.id] ?? input.default ?? '';
+            field.value = String(node.values[input.id]);
+            field.hidden = graph.connections.some(connection => connection.to === node.id && connection.type === 'data' && (connection.toPin || 'input') === input.id);
+            field.setAttribute('aria-label', `${input.label} value`);
+            field.addEventListener('input', () => { node.values[input.id] = field.value; });
+            field.addEventListener('pointerdown', event => event.stopPropagation());
+            side.append(field);
+          } else if (input.type === 'select') {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'workspace-item-dropdown method-test-node-dropdown';
+            dropdown.addEventListener('pointerdown', event => event.stopPropagation());
+            const trigger = document.createElement('button');
+            trigger.className = 'pixel-option preferences-scale-select workspace-item-dropdown-button method-test-node-dropdown-button';
+            trigger.type = 'button';
+            trigger.setAttribute('aria-haspopup', 'listbox');
+            trigger.setAttribute('aria-expanded', 'false');
+            const selectedLabel = document.createElement('span');
+            const arrow = document.createElement('span');
+            arrow.className = 'preferences-scale-arrow pixel-direction-icon pixel-direction-down';
+            const options = document.createElement('div');
+            options.className = 'pixel-option-stack preferences-scale-options workspace-item-dropdown-options method-test-node-dropdown-options';
+            options.hidden = true;
+            node.values[input.id] = node.values[input.id] ?? input.default ?? '';
+            const syncLabel = () => {
+              selectedLabel.textContent = input.options?.find(choice => choice.value === node.values[input.id])?.label || '';
+            };
+            for (const choice of input.options || []) {
+              const option = document.createElement('button');
+              option.className = 'pixel-option preferences-scale-option';
+              option.type = 'button';
+              option.textContent = choice.label;
+              option.addEventListener('click', event => {
+                event.stopPropagation();
+                node.values[input.id] = choice.value;
+                syncLabel();
+                options.hidden = true;
+                trigger.setAttribute('aria-expanded', 'false');
+                element.classList.remove('method-test-node-dropdown-open');
+              });
+              options.append(option);
+            }
+            trigger.addEventListener('click', event => {
+              event.stopPropagation();
+              options.hidden = !options.hidden;
+              trigger.setAttribute('aria-expanded', String(!options.hidden));
+              element.classList.toggle('method-test-node-dropdown-open', !options.hidden);
+            });
+            syncLabel();
+            trigger.append(selectedLabel, arrow);
+            dropdown.append(trigger, options);
+            side.append(dropdown);
+          }
+          row.append(pin, side);
+          return { row, pin };
+        });
+        const nodePins = [flowInput, flowOutput, inputPin, outputPin, ...ifInputPins, ...ifOutputPins, ...extraInputRows.map(entry => entry.pin), ...extraOutputRows.map(entry => entry.pin)]
           .filter(candidate => !candidate.hidden);
         for (const pin of nodePins) {
           pin.classList.toggle('method-test-node-pin-selected', selectedPin?.nodeId === node.id && selectedPin.kind === pin.dataset.pinKind && selectedPin.type === pin.dataset.pinType && selectedPin.pinId === pin.dataset.pinId);
@@ -1068,7 +1403,7 @@ export const initializeItemEditorPage = ({
                 const to = targetNode;
                 graph.connections = graph.connections.filter(connection => connection.to !== to || connection.type !== dragPin.dataset.pinType || (connection.toPin || 'input') !== target.dataset.pinId);
                 if (dragPin.dataset.pinType === 'flow') {
-                  graph.connections = graph.connections.filter(connection => connection.from !== from || connection.type !== 'flow');
+                  graph.connections = graph.connections.filter(connection => connection.from !== from || connection.type !== 'flow' || (connection.fromPin || 'output') !== dragPin.dataset.pinId);
                 }
                 if (reroutedConnection) graph.connections = graph.connections.filter(connection => connection.id !== reroutedConnection.id);
                 if (!graph.connections.some(connection => connection.from === from && connection.to === to && connection.type === dragPin.dataset.pinType && (connection.fromPin || 'output') === dragPin.dataset.pinId && (connection.toPin || 'input') === target.dataset.pinId)) {
@@ -1105,7 +1440,14 @@ export const initializeItemEditorPage = ({
           });
         }
         connectionRow.append(inputPin, dataLeft, dataRight, outputPin);
-        nodeBody.append(flowRow, connectionRow, ...extraOutputRows.map(entry => entry.row));
+        nodeBody.append(
+          flowRow,
+          connectionRow,
+          ...ifRows,
+          ...(ifElseRow ? [ifElseRow] : []),
+          ...extraInputRows.map(entry => entry.row),
+          ...extraOutputRows.map(entry => entry.row),
+        );
         element.append(nodeTitle, nodeBody);
         element.addEventListener('pointerdown', () => {
           node.layer = nextNodeLayer;
@@ -2449,9 +2791,11 @@ export const initializeItemEditorPage = ({
             ? data.dataComponents.map(component => ({ ...component }))
             : [];
           const enabledMethods = new Set(Array.isArray(data.enabledMethods) ? data.enabledMethods : []);
+          const savedCustomMethods = Array.isArray(data.customMethods) ? data.customMethods : [];
           panel.itemCustomMethods = Object.keys(customMethodLabels)
             .filter(key => enabledMethods.has(key))
             .map(key => ({
+              ...(savedCustomMethods.find(method => method.key === key) || {}),
               key,
               continuousUse: key === 'use' && enabledMethods.has('continuousUse'),
               ticks: Number(data.useDurationValue) || 32,
@@ -2613,6 +2957,14 @@ export const initializeItemEditorPage = ({
         authoringFields.enabledMethods = (panel.itemCustomMethods || []).flatMap(method => method.key === 'use' && method.continuousUse
           ? ['use', 'continuousUse', 'releaseUsing']
           : [method.key]);
+        authoringFields.compiledMethods = Object.fromEntries(authoringFields.enabledMethods.map(methodKey => {
+          const owner = (panel.itemCustomMethods || []).find(method => method.key === methodKey)
+            || (['continuousUse', 'releaseUsing'].includes(methodKey)
+              ? (panel.itemCustomMethods || []).find(method => method.key === 'use')
+              : null);
+          const graph = owner?.graphs?.[methodKey] || (owner?.key === methodKey ? owner?.graph : null);
+          return [methodKey, compileMethodGraph(graph, methodKey)];
+        }));
         const interactionMethod = (panel.itemCustomMethods || []).find(method => method.key === 'use');
         authoringFields.useDurationValue = interactionMethod?.ticks || 32;
         authoringFields.useAnim = interactionMethod?.useAnimation || 'NONE';

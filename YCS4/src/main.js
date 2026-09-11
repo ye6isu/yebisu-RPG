@@ -175,6 +175,7 @@ const confirmDialogNo = document.getElementById('confirm-dialog-no');
 const confirmClose = document.getElementById('confirm-close');
 let pendingFolderDeleteShell = null;
 let cutWorkspaceObjectShell = null;
+let cutWorkspaceObjectShells = [];
 let contextTargetGrid = null;
 const dialogSizeStorageKey = 'ycs4.preferences-dialog-size';
 const uiScaleStorageKey = 'ycs4.ui-scale-percent';
@@ -2157,6 +2158,7 @@ let selectedTaskOutput = 'runClient';
 let refreshingTaskState = false;
 let activeConsoleMode = null;
 let runConsoleError = '';
+let runClientAfterRunData = false;
 
 const outputHasSelection = () => {
   const selection = window.getSelection();
@@ -2219,6 +2221,15 @@ const refreshTaskStates = async () => {
     ]);
     renderTaskSnapshot('runClient', snapshots[0]);
     renderTaskSnapshot('runData', snapshots[1]);
+    const [runClientRunning] = snapshots[0];
+    const [runDataRunning, , runDataExitCode] = snapshots[1];
+    if (runClientAfterRunData && !runDataRunning && runDataExitCode !== null) {
+      runClientAfterRunData = false;
+      if (runDataExitCode === 0 && !runClientRunning) {
+        selectedTaskOutput = 'runClient';
+        await invoke('toggle_gradle_task', { task: 'runClient' });
+      }
+    }
   } catch (error) {
     workspaceTaskTerminalOutput.textContent = String(error);
   } finally {
@@ -2231,6 +2242,7 @@ const toggleGradleTask = async task => {
   runConsoleError = '';
   try {
     const running = await invoke('toggle_gradle_task', { task });
+    if (task === 'runData') runClientAfterRunData = running;
     taskButtons[task].setAttribute('aria-pressed', String(running));
     await refreshTaskStates();
   } catch (error) {
@@ -3074,31 +3086,34 @@ const clearWorkspaceObjectDropTargets = () => {
 let workspaceObjectPointerDrag = null;
 let workspaceMarqueeSelection = null;
 
-workspaceObjectGrid.addEventListener('pointerdown', event => {
-  if (event.button !== 0 || event.target !== workspaceObjectGrid || !['home', 'assets'].includes(homeTab.dataset.workspaceMode)) return;
-  const bounds = workspaceObjectGrid.getBoundingClientRect();
+document.addEventListener('pointerdown', event => {
+  const grid = event.target.closest('.workspace-object-grid');
+  if (event.button !== 0 || !grid || event.target !== grid) return;
+  if (grid === workspaceObjectGrid && !['home', 'assets'].includes(homeTab.dataset.workspaceMode)) return;
+  const bounds = grid.getBoundingClientRect();
   const marquee = document.createElement('div');
   marquee.className = 'workspace-selection-marquee';
-  workspaceObjectGrid.append(marquee);
-  workspaceMarqueeSelection = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, bounds, marquee };
-  workspaceObjectGrid.setPointerCapture(event.pointerId);
-  for (const shell of workspaceObjectGrid.querySelectorAll(':scope > .workspace-object-shell')) shell.classList.remove('workspace-object-selected');
+  grid.append(marquee);
+  workspaceMarqueeSelection = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, bounds, marquee, grid };
+  grid.setPointerCapture(event.pointerId);
+  for (const shell of document.querySelectorAll('.workspace-object-shell.workspace-object-selected')) shell.classList.remove('workspace-object-selected');
 });
 
-workspaceObjectGrid.addEventListener('pointermove', event => {
+document.addEventListener('pointermove', event => {
   const selection = workspaceMarqueeSelection;
   if (!selection || selection.pointerId !== event.pointerId) return;
+  const { grid } = selection;
   const left = Math.min(selection.x, event.clientX);
   const top = Math.min(selection.y, event.clientY);
   const right = Math.max(selection.x, event.clientX);
   const bottom = Math.max(selection.y, event.clientY);
-  const scaleX = workspaceObjectGrid.clientWidth / selection.bounds.width;
-  const scaleY = workspaceObjectGrid.clientHeight / selection.bounds.height;
-  selection.marquee.style.left = `${((left - selection.bounds.left) * scaleX) + workspaceObjectGrid.scrollLeft}px`;
-  selection.marquee.style.top = `${((top - selection.bounds.top) * scaleY) + workspaceObjectGrid.scrollTop}px`;
+  const scaleX = grid.clientWidth / selection.bounds.width;
+  const scaleY = grid.clientHeight / selection.bounds.height;
+  selection.marquee.style.left = `${((left - selection.bounds.left) * scaleX) + grid.scrollLeft}px`;
+  selection.marquee.style.top = `${((top - selection.bounds.top) * scaleY) + grid.scrollTop}px`;
   selection.marquee.style.width = `${(right - left) * scaleX}px`;
   selection.marquee.style.height = `${(bottom - top) * scaleY}px`;
-  for (const shell of workspaceObjectGrid.querySelectorAll(':scope > .workspace-object-shell:not([hidden])')) {
+  for (const shell of grid.querySelectorAll(':scope > .workspace-object-shell:not([hidden])')) {
     const box = shell.getBoundingClientRect();
     shell.classList.toggle('workspace-object-selected', box.right >= left && box.left <= right && box.bottom >= top && box.top <= bottom);
   }
@@ -3109,8 +3124,8 @@ const finishWorkspaceMarquee = event => {
   workspaceMarqueeSelection.marquee.remove();
   workspaceMarqueeSelection = null;
 };
-workspaceObjectGrid.addEventListener('pointerup', finishWorkspaceMarquee);
-workspaceObjectGrid.addEventListener('pointercancel', finishWorkspaceMarquee);
+document.addEventListener('pointerup', finishWorkspaceMarquee);
+document.addEventListener('pointercancel', finishWorkspaceMarquee);
 
 document.addEventListener('pointerdown', event => {
   if (event.button !== 0) return;
@@ -3129,6 +3144,9 @@ document.addEventListener('pointerdown', event => {
     startX: event.clientX,
     startY: event.clientY,
     draggedShell: shell,
+    draggedShells: shell.classList.contains('workspace-object-selected')
+      ? [...shell.parentElement.querySelectorAll(':scope > .workspace-object-shell.workspace-object-selected')]
+      : [shell],
     ghost: null,
     isDragging: false,
     hoveredFolder: null,
@@ -3147,7 +3165,7 @@ document.addEventListener('pointermove', event => {
     drag.isDragging = true;
     draggedWorkspaceObjectShell = drag.draggedShell;
     suppressWorkspaceObjectClick = true;
-    drag.draggedShell.classList.add('workspace-object-dragging');
+    for (const draggedShell of drag.draggedShells) draggedShell.classList.add('workspace-object-dragging');
 
     const ghost = drag.draggedShell.cloneNode(true);
     ghost.classList.add('workspace-object-ghost');
@@ -3173,7 +3191,7 @@ document.addEventListener('pointermove', event => {
   if (
     targetFolderShell
     && targetFolderShell !== drag.draggedShell
-    && !folderWouldCreateCycle(drag.draggedShell, targetFolderShell)
+    && drag.draggedShells.every(draggedShell => targetFolderShell !== draggedShell && !folderWouldCreateCycle(draggedShell, targetFolderShell))
   ) {
     const bounds = targetFolderShell.getBoundingClientRect();
     const relativeX = (event.clientX - bounds.left) / bounds.width;
@@ -3245,14 +3263,12 @@ const endWorkspaceObjectPointerDrag = event => {
   }
 
   if (drag.isDragging) {
-    if (drag.hoveredFolder && !folderWouldCreateCycle(drag.draggedShell, drag.hoveredFolder)) {
-      moveWorkspaceObjectShell(
-        drag.draggedShell,
-        getFolderContentHost(drag.hoveredFolder),
-      );
+    if (drag.hoveredFolder && drag.draggedShells.every(shell => !folderWouldCreateCycle(shell, drag.hoveredFolder))) {
+      const folderGrid = getFolderContentHost(drag.hoveredFolder);
+      for (const draggedShell of drag.draggedShells) moveWorkspaceObjectShell(draggedShell, folderGrid);
     }
 
-    drag.draggedShell.classList.remove('workspace-object-dragging');
+    for (const draggedShell of drag.draggedShells) draggedShell.classList.remove('workspace-object-dragging');
     draggedWorkspaceObjectShell = null;
     clearWorkspaceObjectDropTargets();
 
@@ -3314,6 +3330,7 @@ const removeObjectContainerShell = shell => {
   if (cutWorkspaceObjectShell === shell) {
     cutWorkspaceObjectShell = null;
   }
+  cutWorkspaceObjectShells = cutWorkspaceObjectShells.filter(candidate => candidate !== shell);
   const previousFolder = workspaceObjectFolderParents.get(shell) || null;
   const isFolder = Boolean(shell.querySelector('.folder-object'));
   const focusTarget = shell.nextElementSibling?.querySelector('.workspace-object')
@@ -3385,6 +3402,16 @@ const removeWorkspaceObjectWithLifecycle = async shell => {
 
   removeObjectContainerShell(canonicalShell);
   return true;
+};
+
+const removeWorkspaceObjectSelection = async anchorShell => {
+  if (!anchorShell) return;
+  const shells = anchorShell.classList.contains('workspace-object-selected')
+    ? [...anchorShell.parentElement.querySelectorAll(':scope > .workspace-object-shell.workspace-object-selected')]
+    : [anchorShell];
+  for (const shell of shells) {
+    if (shell.isConnected) await removeWorkspaceObjectWithLifecycle(shell);
+  }
 };
 
 const syncContextMenuStackPositions = () => {
@@ -3497,7 +3524,7 @@ const openEmptySpaceContextMenu = (grid, clientX, clientY) => {
 
   if (workspaceObjectPasteOption) {
     workspaceObjectPasteOption.hidden = false;
-    workspaceObjectPasteOption.disabled = !cutWorkspaceObjectShell || !cutWorkspaceObjectShell.isConnected;
+    workspaceObjectPasteOption.disabled = !cutWorkspaceObjectShells.some(shell => shell.isConnected);
   }
 
   const currentMode = contextTargetGrid.workspaceFolderOwner
@@ -3540,7 +3567,7 @@ const openWorkspaceObjectContextMenu = (shell, clientX, clientY) => {
 
   workspaceObjectCutOption.hidden = false;
   workspaceObjectPasteOption.hidden = false;
-  workspaceObjectPasteOption.disabled = !cutWorkspaceObjectShell || !cutWorkspaceObjectShell.isConnected;
+  workspaceObjectPasteOption.disabled = !cutWorkspaceObjectShells.some(shell => shell.isConnected);
   workspaceObjectNewOption.hidden = true;
   workspaceObjectNewOptions.hidden = true;
   workspaceObjectDeleteOption.hidden = false;
@@ -3580,48 +3607,54 @@ workspaceCreateOptions.addEventListener('click', event => {
   syncPrimaryWorkspaceObjects();
 });
 
-workspaceObjectGrid.addEventListener('keydown', async event => {
+document.addEventListener('keydown', async event => {
   if (!['Delete', 'Backspace'].includes(event.key)) return;
   const objectButton = event.target.closest('.workspace-object');
   if (!objectButton) return;
   event.preventDefault();
-  await removeWorkspaceObjectWithLifecycle(objectButton.closest('.workspace-object-shell'));
+  await removeWorkspaceObjectSelection(objectButton.closest('.workspace-object-shell'));
 });
 
 if (workspaceObjectCutOption) {
   workspaceObjectCutOption.addEventListener('click', () => {
-    if (cutWorkspaceObjectShell && cutWorkspaceObjectShell !== contextObjectShell) {
-      cutWorkspaceObjectShell.classList.remove('workspace-object-cut');
-    }
-    cutWorkspaceObjectShell = contextObjectShell;
-    if (cutWorkspaceObjectShell) {
-      cutWorkspaceObjectShell.classList.add('workspace-object-cut');
-    }
+    for (const shell of cutWorkspaceObjectShells) shell.classList.remove('workspace-object-cut');
+    cutWorkspaceObjectShells = contextObjectShell?.classList.contains('workspace-object-selected')
+      ? [...contextObjectShell.parentElement.querySelectorAll(':scope > .workspace-object-shell.workspace-object-selected')]
+      : (contextObjectShell ? [contextObjectShell] : []);
+    cutWorkspaceObjectShell = cutWorkspaceObjectShells[0] || null;
+    for (const shell of cutWorkspaceObjectShells) shell.classList.add('workspace-object-cut');
     closeWorkspaceObjectContextMenu();
   });
 }
 
 if (workspaceObjectPasteOption) {
   workspaceObjectPasteOption.addEventListener('click', () => {
-    if (cutWorkspaceObjectShell && cutWorkspaceObjectShell.isConnected) {
+    const shellsToPaste = cutWorkspaceObjectShells.filter(shell => shell.isConnected);
+    if (shellsToPaste.length) {
       const targetShell = contextObjectShell;
       const targetGrid = contextTargetGrid || workspaceObjectGrid;
 
       if (targetShell) {
         const isFolder = Boolean(targetShell.querySelector('.folder-object'));
-        if (isFolder && targetShell !== cutWorkspaceObjectShell && !folderWouldCreateCycle(cutWorkspaceObjectShell, targetShell)) {
-          moveWorkspaceObjectShell(cutWorkspaceObjectShell, getFolderContentHost(targetShell));
+        if (isFolder && shellsToPaste.every(shell => targetShell !== shell && !folderWouldCreateCycle(shell, targetShell))) {
+          const folderGrid = getFolderContentHost(targetShell);
+          for (const shell of shellsToPaste) moveWorkspaceObjectShell(shell, folderGrid);
         } else if (targetShell.parentElement) {
-          moveWorkspaceObjectShell(cutWorkspaceObjectShell, targetShell.parentElement, targetShell.nextElementSibling);
+          let before = targetShell.nextElementSibling;
+          for (const shell of shellsToPaste) {
+            moveWorkspaceObjectShell(shell, targetShell.parentElement, before);
+            before = shell.nextElementSibling;
+          }
         }
       } else if (targetGrid) {
-        if (!targetGrid.workspaceFolderOwner || !folderWouldCreateCycle(cutWorkspaceObjectShell, targetGrid.workspaceFolderOwner)) {
-          moveWorkspaceObjectShell(cutWorkspaceObjectShell, targetGrid);
+        if (!targetGrid.workspaceFolderOwner || shellsToPaste.every(shell => !folderWouldCreateCycle(shell, targetGrid.workspaceFolderOwner))) {
+          for (const shell of shellsToPaste) moveWorkspaceObjectShell(shell, targetGrid);
         }
       }
 
-      cutWorkspaceObjectShell.classList.remove('workspace-object-cut');
+      for (const shell of shellsToPaste) shell.classList.remove('workspace-object-cut');
       cutWorkspaceObjectShell = null;
+      cutWorkspaceObjectShells = [];
     }
     closeWorkspaceObjectContextMenu();
   });
@@ -4327,7 +4360,7 @@ workspaceObjectDeleteOption.addEventListener('click', async () => {
   closeWorkspaceObjectContextMenu();
   if (!shell) return;
 
-  await removeWorkspaceObjectWithLifecycle(shell);
+  await removeWorkspaceObjectSelection(shell);
 });
 
 workspaceCreateOptions.addEventListener('keydown', event => {

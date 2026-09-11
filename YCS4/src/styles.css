@@ -3060,6 +3060,38 @@ body.detached-floating-window #warning-dialog {
   display: none;
 }
 
+.method-test-node-title-actions {
+  display: flex;
+  position: relative;
+  z-index: 3;
+  margin-left: auto;
+  align-items: center;
+  gap: var(--ycs-dialog-title-padding);
+}
+
+.method-test-node-if-condition-button {
+  place-items: center;
+}
+
+.method-test-node-if-button-icon {
+  display: block;
+  position: relative;
+  width: calc(4 * var(--ycs-pixel-2x));
+  height: var(--ycs-pixel-2x);
+  background: var(--ycs-text-normal);
+  pointer-events: none;
+}
+
+.method-test-node-if-button-plus::after {
+  position: absolute;
+  top: calc(-1.5 * var(--ycs-pixel-2x));
+  left: calc(1.5 * var(--ycs-pixel-2x));
+  width: var(--ycs-pixel-2x);
+  height: calc(4 * var(--ycs-pixel-2x));
+  background: var(--ycs-text-normal);
+  content: "";
+}
+
 .method-test-node-input-label {
   padding-left: 0;
 }

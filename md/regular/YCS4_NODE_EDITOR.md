@@ -111,11 +111,9 @@ The textbox itself is included in the left or right group's measured width; the 
 The If node is a compound flow node adapted from YCS3 `control.if`:
 
 - Its left side begins with the Execute input and the initial Boolean condition input.
-- The initial branch produces `Condition 1 Then`.
-- An Add button appears below the final condition row.
-- Activating Add appends another Else If condition and leaves the Add button below the newly appended row, allowing any number of Else If branches.
-- Each condition has its own ordered Then output: `Condition 1 Then`, `Condition 2 Then`, and so on.
-- The node has one final Else output after all conditions.
+- The initial left-side input is `Condition 1`. Optional inputs are `Condition 2`, `Condition 3`, and so on, paired with right-side outputs `If`, `If Else 2`, `If Else 3`, and so on.
+- Dialog-style `-` and `+` controls sit at the right of the title bar. Plus appends a condition; minus removes the last optional condition and its connections. The initial condition cannot be removed.
+- The unconditional Then output shares the Execute row. Else remains below all condition branches.
 - Adding or removing conditions updates branch labels and output identity without silently reconnecting a branch to a different condition.
 - The graph representation should store an ordered condition array rather than making the rendered row index the durable identity.
 
@@ -141,7 +139,9 @@ Migration should be incremental and validated against representative saved YCS3 
 
 The YCS3 inventory currently contains 85 definitions. Straightforward single-row value and action nodes are not blocked by product questions; they require the YCS4 renderer to support named multiple pins, multiple inline controls, and execution pins from catalog data. The remaining structural groups are:
 
-- Compound nodes (`control.if`, `control.delay`, `aoe.each`, dash collision/continuation bodies) need stable branch/body pin identities and nested execution storage.
+The active prototype catalog now includes Apply Effect, Set Health, Apply Motion, Fire Projectile, Dash, Deal Damage, and a visual If node. These action nodes preserve their YCS3 opcode, typed input identities, inline numeric defaults, and ordinary execution flow. Advanced selector/compound settings retain their YCS3 defaults but are not exposed by the prototype renderer yet. Prototype Test, Hit Part Name, and Hit Part Damage were removed; HUD Return Number/Bool/Text nodes are intentionally deferred. Search results are alphabetized by display label.
+
+- The If prototype starts with one Boolean condition, provides an Add button below the last condition, exposes one execution output per condition (`If`, `If Else`, then numbered `If Else` outputs), and keeps `Else` at the bottom. Its visual branch structure is persisted in the method-editor draft, but compiler semantics remain pending. Other compound behavior (`control.delay`, `aoe.each`, and dash collision/continuation bodies) still needs stable branch/body pin identities and execution storage.
 - Dynamic data components, entity variables, resources, attributes, animation assets, item stacks, overlays, and VFX need project-backed dropdown providers and dynamic output-type resolution.
 - Context values such as Event Entity, Target Entity, Iterator Entity, hit-part values, and item-stack sources need method-context availability validation; their basic node shapes can still be migrated before compilation.
 - Client-only animation/look-direction/VFX operations and gameplay/server actions need explicit execution-domain metadata and validation before generated behavior is considered production-ready.
