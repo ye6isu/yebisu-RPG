@@ -8,6 +8,7 @@ import {
   createIngredientCombobox,
   loadIngredientOptions,
 } from './ingredient-combobox.js';
+import { NODE_DEFINITIONS, YCS3_TYPE_COLORS, nodeDefinitionFor } from './node-catalog.js';
 
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 
@@ -257,12 +258,22 @@ export const initializeItemEditorPage = ({
   const authoringDialog = document.getElementById('item-authoring-dialog');
   const authoringDialogTitle = document.getElementById('item-authoring-dialog-title');
   const authoringDialogContent = document.getElementById('item-authoring-dialog-content');
+  const dataComponentsAddControl = document.getElementById('item-data-components-add-control');
+  const dataComponentsDeleteToggle = document.getElementById('item-data-components-delete-toggle');
+  const dataComponentsAddButton = document.getElementById('item-data-components-add');
+  const dataComponentsAddOptions = document.getElementById('item-data-components-add-options');
+  const dataComponentsLocalTrigger = dataComponentsAddOptions.querySelector('.item-data-components-local-trigger');
+  const dataComponentsLocalOptions = dataComponentsAddOptions.querySelector('.item-data-components-local-options');
+  const customMethodsAddControl = document.getElementById('item-custom-methods-add-control');
+  const customMethodsAddButton = document.getElementById('item-custom-methods-add');
+  const customMethodsAddOptions = document.getElementById('item-custom-methods-add-options');
   const recipeAddControl = document.getElementById('item-recipe-add-control');
   const recipeAddButton = document.getElementById('item-recipe-add');
   const recipeAddOptions = document.getElementById('item-recipe-add-options');
   let activeDialogPanel = null;
   let activeDialogAnchor = null;
   let activeAuthoringFields = null;
+  let globalDataComponents = [];
 
   const closeItemDialog = dialog => {
     if (dialog === authoringDialog && activeAuthoringFields) {
@@ -273,6 +284,17 @@ export const initializeItemEditorPage = ({
     }
     if (dialog === authoringDialog) {
       authoringDialog.classList.remove('item-tooltip-dialog');
+      authoringDialog.classList.remove('item-data-components-dialog');
+      authoringDialog.classList.remove('item-custom-class-dialog');
+      dataComponentsAddControl.hidden = true;
+      dataComponentsAddOptions.hidden = true;
+      dataComponentsLocalOptions.hidden = true;
+      dataComponentsAddButton.setAttribute('aria-expanded', 'false');
+      dataComponentsLocalTrigger.setAttribute('aria-expanded', 'false');
+      dataComponentsDeleteToggle.setAttribute('aria-pressed', 'false');
+      customMethodsAddControl.hidden = true;
+      customMethodsAddOptions.hidden = true;
+      customMethodsAddButton.setAttribute('aria-expanded', 'false');
     }
     if (dialog === recipeDialog) {
       recipeAddControl.hidden = true;
@@ -288,12 +310,15 @@ export const initializeItemEditorPage = ({
   };
 
   const openAuthoringDialog = (panel, anchor, key, title) => {
+    if (!authoringDialog.hidden) closeItemDialog(authoringDialog);
     const fields = panel.querySelector(`[data-item-dialog-fields="${key}"]`);
     if (!fields) return;
     activeAuthoringFields = { fields, parent: fields.parentNode, nextSibling: fields.nextSibling };
     openItemDialog(authoringDialog, panel, anchor);
     authoringDialogTitle.textContent = title;
     authoringDialog.classList.toggle('item-tooltip-dialog', key === 'tooltip');
+    authoringDialog.classList.toggle('item-data-components-dialog', key === 'dataComponents');
+    authoringDialog.classList.toggle('item-custom-class-dialog', key === 'customClass');
     fields.hidden = false;
     authoringDialogContent.replaceChildren(fields);
     syncConditionalFields(panel);
@@ -317,6 +342,1136 @@ export const initializeItemEditorPage = ({
       resizeTooltipTextarea(textarea);
     }
   };
+
+  const createItemComponentBoolean = (value, onChange) => {
+    const group = document.createElement('div');
+    group.className = 'item-data-component-boolean';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Boolean value');
+    for (const optionValue of [true, false]) {
+      const button = document.createElement('button');
+      button.className = 'pixel-button item-data-component-boolean-button';
+      button.type = 'button';
+      button.textContent = optionValue ? 'True' : 'False';
+      button.setAttribute('aria-pressed', String(Boolean(value) === optionValue));
+      button.addEventListener('click', () => {
+        for (const peer of group.children) peer.setAttribute('aria-pressed', String(peer === button));
+        onChange(optionValue);
+      });
+      group.append(button);
+    }
+    return group;
+  };
+
+  const createItemComponentValue = (type, value, onChange) => {
+    if (type === 'boolean') return createItemComponentBoolean(value, onChange);
+    const field = document.createElement('label');
+    field.className = 'item-data-component-value-field';
+    const label = document.createElement('span');
+    label.textContent = type === 'string' ? 'Text value' : 'Number value';
+    const input = document.createElement('input');
+    input.className = 'pixel-text-box';
+    input.type = type === 'double' ? 'number' : 'text';
+    input.value = value ?? '';
+    input.addEventListener('input', () => onChange(input.value));
+    field.append(label, input);
+    return field;
+  };
+
+  const createGlobalComponentDropdown = (entry, rerender) => {
+    const dropdown = document.createElement('div');
+    dropdown.className = 'workspace-item-dropdown item-data-component-dropdown';
+    const trigger = document.createElement('button');
+    trigger.className = 'pixel-option preferences-scale-select workspace-item-dropdown-button';
+    trigger.type = 'button';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    const label = document.createElement('span');
+    const arrow = document.createElement('span');
+    arrow.className = 'preferences-scale-arrow pixel-direction-icon pixel-direction-down';
+    arrow.setAttribute('aria-hidden', 'true');
+    const options = document.createElement('div');
+    options.className = 'preferences-scale-options pixel-option-stack workspace-item-dropdown-options item-data-component-dropdown-options';
+    options.role = 'listbox';
+    options.hidden = true;
+    const syncLabel = () => {
+      label.textContent = globalDataComponents.find(component => component.id === entry.ref)?.name || entry.ref || '(None)';
+    };
+    for (const component of globalDataComponents) {
+      const option = document.createElement('button');
+      option.className = 'pixel-option';
+      option.type = 'button';
+      option.role = 'option';
+      option.textContent = component.name || component.id;
+      option.addEventListener('click', () => {
+        entry.ref = component.id;
+        entry.type = component.type || 'double';
+        entry.value = component.defaultValue ?? (entry.type === 'boolean' ? false : '');
+        activeDialogPanel.dataset.dirty = 'true';
+        rerender();
+      });
+      options.append(option);
+    }
+    trigger.addEventListener('click', () => {
+      options.hidden = !options.hidden;
+      trigger.setAttribute('aria-expanded', String(!options.hidden));
+    });
+    trigger.append(label, arrow);
+    dropdown.append(trigger, options);
+    syncLabel();
+    return dropdown;
+  };
+
+  const renderItemDataComponents = () => {
+    if (!activeDialogPanel || !activeAuthoringFields) return;
+    const preview = activeAuthoringFields.fields.querySelector('.item-data-components-preview');
+    if (!preview) return;
+    preview.replaceChildren();
+    const entries = activeDialogPanel.itemDataComponents || [];
+    entries.forEach((entry, index) => {
+      const row = document.createElement('div');
+      row.className = 'pixel-button object-container row_container item-data-component-row';
+      if (entry.kind === 'global') {
+        row.append(createGlobalComponentDropdown(entry, renderItemDataComponents));
+      } else {
+        const name = document.createElement('input');
+        name.className = 'pixel-text-box item-data-component-name';
+        name.type = 'text';
+        name.value = entry.name || '';
+        name.placeholder = 'Name';
+        name.setAttribute('aria-label', 'Local data component name');
+        name.addEventListener('input', () => {
+          entry.name = name.value.toLowerCase().replace(/\s/g, '_');
+          activeDialogPanel.dataset.dirty = 'true';
+        });
+        row.append(name);
+      }
+      row.append(createItemComponentValue(entry.type || 'double', entry.value, value => {
+        entry.value = value;
+        activeDialogPanel.dataset.dirty = 'true';
+      }));
+      const remove = document.createElement('button');
+      remove.className = 'pixel-button item-data-component-remove';
+      remove.type = 'button';
+      remove.hidden = dataComponentsDeleteToggle.getAttribute('aria-pressed') !== 'true';
+      remove.setAttribute('aria-label', 'Remove data component');
+      remove.innerHTML = '<img class="item-data-component-remove-icon" src="./assets/sprite/generated/dialogue_icon_2x.png" alt="" draggable="false" />';
+      remove.addEventListener('click', () => {
+        activeDialogPanel.itemDataComponents.splice(index, 1);
+        activeDialogPanel.dataset.dirty = 'true';
+        renderItemDataComponents();
+      });
+      row.append(remove);
+      preview.append(row);
+    });
+    requestAnimationFrame(() => positionDialogBeside(authoringDialog, activeDialogAnchor));
+  };
+
+  const loadGlobalDataComponents = async () => {
+    const ids = await invoke('list_ycs_data', { category: 'components' });
+    globalDataComponents = (await Promise.all(ids.map(async id => {
+      try { return { id, ...JSON.parse(await invoke('load_ycs_data', { category: 'components', id })) }; }
+      catch { return null; }
+    }))).filter(Boolean);
+  };
+
+  dataComponentsAddButton.addEventListener('click', () => {
+    dataComponentsAddOptions.hidden = !dataComponentsAddOptions.hidden;
+    dataComponentsAddButton.setAttribute('aria-expanded', String(!dataComponentsAddOptions.hidden));
+  });
+  dataComponentsDeleteToggle.addEventListener('click', () => {
+    const pressed = dataComponentsDeleteToggle.getAttribute('aria-pressed') !== 'true';
+    dataComponentsDeleteToggle.setAttribute('aria-pressed', String(pressed));
+    for (const button of authoringDialog.querySelectorAll('.item-data-component-remove')) button.hidden = !pressed;
+  });
+  const showLocalOptions = show => {
+    dataComponentsLocalOptions.hidden = !show;
+    dataComponentsLocalTrigger.setAttribute('aria-expanded', String(show));
+  };
+  dataComponentsLocalTrigger.addEventListener('pointerenter', () => showLocalOptions(true));
+  dataComponentsLocalTrigger.addEventListener('focus', () => showLocalOptions(true));
+  dataComponentsAddOptions.addEventListener('pointerleave', () => showLocalOptions(false));
+  dataComponentsAddOptions.querySelector('[data-item-component-add="global"]').addEventListener('click', () => {
+    const component = globalDataComponents[0];
+    activeDialogPanel.itemDataComponents.push({
+      kind: 'global', ref: component?.id || '', type: component?.type || 'double', value: component?.defaultValue ?? '',
+    });
+    activeDialogPanel.dataset.dirty = 'true';
+    dataComponentsAddOptions.hidden = true;
+    dataComponentsAddButton.setAttribute('aria-expanded', 'false');
+    renderItemDataComponents();
+  });
+  dataComponentsLocalOptions.addEventListener('click', event => {
+    const option = event.target.closest('[data-item-component-local-type]');
+    if (!option) return;
+    const type = option.dataset.itemComponentLocalType;
+    activeDialogPanel.itemDataComponents.push({ kind: 'local', name: '', type, value: type === 'boolean' ? false : '' });
+    activeDialogPanel.dataset.dirty = 'true';
+    dataComponentsAddOptions.hidden = true;
+    dataComponentsAddButton.setAttribute('aria-expanded', 'false');
+    showLocalOptions(false);
+    renderItemDataComponents();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (dataComponentsAddControl.contains(event.target)) return;
+    dataComponentsAddOptions.hidden = true;
+    showLocalOptions(false);
+    dataComponentsAddButton.setAttribute('aria-expanded', 'false');
+  });
+
+  const customMethodLabels = {
+    use: 'Interaction',
+    finishUsingItem: 'Finished Using',
+    inventoryTick: 'Inventory Tick',
+    hurtEnemy: 'Hurt Entity',
+    interactLivingEntity: 'Entity Interaction',
+  };
+  const useAnimationOptions = ['NONE', 'EAT', 'DRINK', 'BLOCK', 'BOW', 'SPEAR', 'CROSSBOW', 'SPYGLASS', 'TOOT_HORN', 'BRUSH'];
+
+  const closeCustomMethodEditor = panel => {
+    panel.querySelector(':scope > .item-custom-method-editor')?.remove();
+    const itemViewport = panel.querySelector(':scope > .workspace-item-scroll-viewport');
+    if (itemViewport) itemViewport.hidden = false;
+  };
+
+  const openCustomMethodEditor = (panel, methodKey, label) => {
+    closeItemDialog(authoringDialog);
+    closeCustomMethodEditor(panel);
+    const itemViewport = panel.querySelector(':scope > .workspace-item-scroll-viewport');
+    if (itemViewport) itemViewport.hidden = true;
+    const itemId = panel.dataset.lastSavedId
+      || panel.querySelector('[data-item-field="itemId"]')?.value.trim()
+      || panel.id;
+    const storageKey = `ycs4.method-editor::item::${itemId}::${methodKey}`;
+    let savedState = { version: 1, method: methodKey, content: null };
+    try {
+      savedState = { ...savedState, ...JSON.parse(localStorage.getItem(storageKey) || '{}') };
+    } catch {}
+    const draftState = structuredClone(savedState);
+
+    const editor = document.createElement('section');
+    editor.className = 'item-custom-method-editor';
+    editor.dataset.methodKey = methodKey;
+    const header = document.createElement('header');
+    header.className = 'workspace-top-controls item-custom-method-editor-header';
+    const title = document.createElement('span');
+    title.className = 'workspace-top-controls-left item-custom-method-editor-title';
+    title.textContent = label;
+    const actions = document.createElement('div');
+    actions.className = 'workspace-item-actions';
+    const cancel = document.createElement('button');
+    cancel.className = 'pixel-button workspace-item-action-button';
+    cancel.type = 'button';
+    cancel.setAttribute('aria-label', 'Cancel method');
+    cancel.innerHTML = '<span class="workspace-file-icon workspace-file-icon-cancel" aria-hidden="true"></span>';
+    const save = document.createElement('button');
+    save.className = 'pixel-button workspace-item-action-button';
+    save.type = 'button';
+    save.setAttribute('aria-label', 'Save method');
+    save.innerHTML = '<span class="workspace-file-icon workspace-file-icon-save" aria-hidden="true"></span>';
+    cancel.addEventListener('click', () => closeCustomMethodEditor(panel));
+    save.addEventListener('click', () => {
+      localStorage.setItem(storageKey, JSON.stringify(draftState));
+      closeCustomMethodEditor(panel);
+    });
+    actions.append(cancel, save);
+    header.append(title, actions);
+    const content = document.createElement('div');
+    content.className = 'workspace-inner-container item-custom-method-editor-content';
+    content.dataset.methodEditorContent = '';
+    content.methodEditorDraft = draftState;
+    const graph = draftState.content && typeof draftState.content === 'object'
+      ? draftState.content
+      : (draftState.content = { nodes: [] });
+    if (!Array.isArray(graph.nodes)) graph.nodes = [];
+    if (!graph.nodes.some(node => node.start)) {
+      graph.nodes.unshift({ id: '__method_start__', start: true, x: 24, y: 24, color: '#7a7a7a' });
+    }
+    if (!Array.isArray(graph.connections)) graph.connections = [];
+    graph.nodes = graph.nodes
+      .filter(node => node.kind !== 'get-number' && node.kind !== 'number.literal' && node.kind !== 'text.literal')
+      .map(node => {
+        if (['entity.event', 'entity.target', 'aoe.iterator.entity'].includes(node.kind)) {
+          return { ...node, kind: 'entity.context', value: node.kind };
+        }
+        if (node.kind === 'logic.true' || node.kind === 'logic.false') {
+          return { ...node, kind: 'logic.boolean', value: node.kind === 'logic.true' };
+        }
+        return node;
+      });
+    const existingNodeIds = new Set(graph.nodes.map(node => node.id));
+    graph.connections = graph.connections.map(connection => ({ type: 'data', dataType: 'number', ...connection }));
+    graph.connections = graph.connections.filter((connection, index, connections) => (
+      existingNodeIds.has(connection.from)
+      && existingNodeIds.has(connection.to)
+      && connections.findIndex(candidate => candidate.to === connection.to && candidate.type === connection.type && (candidate.toPin || 'input') === (connection.toPin || 'input')) === index
+      && (connection.type !== 'flow'
+        || connections.findIndex(candidate => candidate.from === connection.from && candidate.type === 'flow') === index)
+    ));
+    let selectedNodeId = null;
+    const selectedNodeIds = new Set();
+    let selectedConnectionId = null;
+    let selectedPin = null;
+    let activeWireDrag = null;
+    let nextNodeLayer = Math.max(0, ...graph.nodes.map(node => Number(node.layer) || 0)) + 1;
+    let lastCanvasPoint = { x: 48, y: 48 };
+    const graphView = { x: 0, y: 0, scale: 1 };
+    const graphZoomLevels = [0.5, 1, 1.5, 2, 2.5];
+    const snapScreenPixel = value => {
+      const density = Math.max(1, window.devicePixelRatio || 1);
+      return Math.round(value * density) / density;
+    };
+    const pinCenter = pin => {
+      const pinBounds = pin.getBoundingClientRect();
+      const contentBounds = content.getBoundingClientRect();
+      return {
+        x: (pinBounds.left + (pinBounds.width / 2) - contentBounds.left) * (content.clientWidth / contentBounds.width),
+        y: (pinBounds.top + (pinBounds.height / 2) - contentBounds.top) * (content.clientHeight / contentBounds.height),
+      };
+    };
+    const connectionPath = (start, end) => {
+      const direction = end.x >= start.x ? 1 : -1;
+      const bend = Math.max(24, Math.abs(end.x - start.x) * 0.5);
+      return `M ${start.x} ${start.y} C ${start.x + (bend * direction)} ${start.y}, ${end.x - (bend * direction)} ${end.y}, ${end.x} ${end.y}`;
+    };
+    const nearestCompatiblePin = (sourcePin, clientX, clientY) => {
+      let nearest = null;
+      let nearestDistance = 28;
+      for (const candidate of content.querySelectorAll('.method-test-node-pin')) {
+        if (
+          candidate === sourcePin
+          || candidate.dataset.pinKind === sourcePin.dataset.pinKind
+          || candidate.dataset.pinType !== sourcePin.dataset.pinType
+          || (candidate.dataset.pinType === 'data' && candidate.dataset.pinDataType !== sourcePin.dataset.pinDataType)
+          || candidate.closest('.method-test-node') === sourcePin.closest('.method-test-node')
+        ) continue;
+        const bounds = candidate.getBoundingClientRect();
+        const distance = Math.hypot(clientX - (bounds.left + bounds.width / 2), clientY - (bounds.top + bounds.height / 2));
+        if (distance < nearestDistance) {
+          nearest = candidate;
+          nearestDistance = distance;
+        }
+      }
+      return nearest;
+    };
+    const updateTestConnections = () => {
+      const wireLayer = content.querySelector('.method-test-node-wires');
+      if (!wireLayer) return;
+      for (const connection of graph.connections) {
+        const output = content.querySelector(`[data-node-id="${connection.from}"] .method-test-node-pin-${connection.type}-output[data-pin-id="${connection.fromPin || 'output'}"]`);
+        const input = content.querySelector(`[data-node-id="${connection.to}"] .method-test-node-pin-${connection.type}-input[data-pin-id="${connection.toPin || 'input'}"]`);
+        const group = wireLayer.querySelector(`[data-connection-id="${connection.id}"]`);
+        if (!output || !input || !group) continue;
+        const path = connectionPath(pinCenter(output), pinCenter(input));
+        for (const element of group.querySelectorAll('path')) element.setAttribute('d', path);
+      }
+    };
+    const openConnectedNodeSearch = drag => {
+      content.querySelector('.method-node-search')?.remove();
+      drag.searchOpen = true;
+      const search = document.createElement('section');
+      search.className = 'floating-dialog method-node-search';
+      const contentBounds = content.getBoundingClientRect();
+      const layoutScale = content.clientWidth ? contentBounds.width / content.clientWidth : 1;
+      const physicalScale = Math.max(1, window.devicePixelRatio * layoutScale);
+      const snapPosition = value => Math.round(value * physicalScale) / physicalScale;
+      search.style.left = `${snapPosition(drag.pointer.x)}px`;
+      search.style.top = `${snapPosition(drag.pointer.y)}px`;
+      const titlebar = document.createElement('header');
+      titlebar.className = 'floating-dialog-titlebar method-node-search-titlebar';
+      const input = document.createElement('input');
+      input.className = 'pixel-text-box method-node-search-input';
+      input.type = 'text';
+      input.placeholder = 'Search nodes';
+      input.setAttribute('aria-label', 'Search nodes');
+      titlebar.append(input);
+      const bodyHost = document.createElement('div');
+      bodyHost.className = 'floating-dialog-body-scroll-host method-node-search-body-host';
+      const options = document.createElement('div');
+      options.className = 'floating-dialog-body pixel-option-stack method-node-search-options';
+      const acceptsDefinition = definition => {
+        if (drag.direction === 'standalone') return true;
+        if (drag.direction === 'insert') {
+          return drag.connection.type === 'flow'
+            ? definition.flow
+            : definition.inputType === drag.connection.dataType && definition.outputType === drag.connection.dataType;
+        }
+        if (drag.type === 'flow') return definition.flow;
+        return drag.direction === 'outgoing'
+          ? definition.inputType === drag.dataType
+          : definition.outputType === drag.dataType;
+      };
+      let filteredDefinitions = [...NODE_DEFINITIONS];
+      let resultOffset = 0;
+      const optionButtons = Array.from({ length: 5 }, (_, index) => {
+        const button = document.createElement('button');
+        button.className = 'pixel-option preferences-scale-option';
+        button.type = 'button';
+        button.dataset.stackPosition = index === 0 ? 'first' : index === 4 ? 'last' : 'middle';
+        return button;
+      });
+      const syncOption = () => {
+        const query = input.value.trim().toLowerCase();
+        filteredDefinitions = NODE_DEFINITIONS.filter(definition => definition.label.toLowerCase().includes(query));
+        resultOffset = Math.min(resultOffset, Math.max(0, filteredDefinitions.length - 5));
+        optionButtons.forEach((button, index) => {
+          const definition = filteredDefinitions[resultOffset + index];
+          button.textContent = definition?.label || '';
+          button.disabled = !definition;
+          button.dataset.definitionIndex = definition ? String(resultOffset + index) : '';
+        });
+      };
+      syncOption();
+      input.addEventListener('input', () => { resultOffset = 0; syncOption(); });
+      input.addEventListener('keydown', event => {
+        const firstVisibleOption = optionButtons.find(candidate => !candidate.disabled);
+        if (event.key === 'Enter' && firstVisibleOption) {
+          event.preventDefault();
+          firstVisibleOption.click();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          activeWireDrag?.preview?.remove();
+          activeWireDrag = null;
+          search.remove();
+          editor.focus({ preventScroll: true });
+        }
+      });
+      for (const button of optionButtons) button.addEventListener('click', () => {
+        const definition = filteredDefinitions[Number(button.dataset.definitionIndex)];
+        if (!definition) return;
+        const definitionOutputPin = definition.outputs?.[0]?.id || 'output';
+        const node = {
+          id: crypto.randomUUID(),
+          kind: definition.kind,
+          opcode: definition.opcode,
+          x: (drag.pointer.x - graphView.x) / graphView.scale,
+          y: (drag.pointer.y - graphView.y) / graphView.scale,
+          color: definition.color,
+          value: definition.field?.default,
+        };
+        graph.nodes.push(node);
+        const canAttach = acceptsDefinition(definition);
+        if (canAttach && drag.direction === 'insert') {
+          graph.connections = graph.connections.filter(connection => connection.id !== drag.connection.id);
+          graph.connections.push(
+            { id: crypto.randomUUID(), type: drag.connection.type, dataType: drag.connection.dataType, from: drag.connection.from, to: node.id, fromPin: drag.connection.fromPin || 'output', toPin: 'input' },
+            { id: crypto.randomUUID(), type: drag.connection.type, dataType: drag.connection.dataType, from: node.id, to: drag.connection.to, fromPin: definitionOutputPin, toPin: drag.connection.toPin || 'input' },
+          );
+        } else if (canAttach && drag.direction === 'outgoing') {
+          if (drag.type === 'flow') graph.connections = graph.connections.filter(connection => connection.from !== drag.nodeId || connection.type !== drag.type);
+          graph.connections.push({ id: crypto.randomUUID(), type: drag.type, dataType: drag.dataType, from: drag.nodeId, to: node.id, fromPin: drag.pinId || 'output', toPin: 'input' });
+        } else if (canAttach && drag.direction === 'incoming') {
+          graph.connections = graph.connections.filter(connection => connection.to !== drag.nodeId || connection.type !== drag.type);
+          graph.connections.push({ id: crypto.randomUUID(), type: drag.type, dataType: drag.dataType, from: node.id, to: drag.nodeId, fromPin: definitionOutputPin, toPin: drag.pinId || 'input' });
+        }
+        activeWireDrag = null;
+        renderTestNodes();
+        editor.focus({ preventScroll: true });
+      });
+      options.append(...optionButtons);
+      options.addEventListener('wheel', event => {
+        event.preventDefault();
+        resultOffset = Math.max(0, Math.min(Math.max(0, filteredDefinitions.length - 5), resultOffset + Math.sign(event.deltaY)));
+        syncOption();
+      }, { passive: false });
+      bodyHost.append(options);
+      search.append(titlebar, bodyHost);
+      content.append(search);
+      const closeSearchOnOutside = event => {
+        if (search.contains(event.target)) return;
+        search.remove();
+        activeWireDrag?.preview?.remove();
+        activeWireDrag = null;
+        document.removeEventListener('pointerdown', closeSearchOnOutside, true);
+      };
+      requestAnimationFrame(() => document.addEventListener('pointerdown', closeSearchOnOutside, true));
+      input.focus({ preventScroll: true });
+    };
+    const renderTestNodes = () => {
+      const activeNodeIds = new Set(graph.nodes.filter(node => node.start).map(node => node.id));
+      let activatedAnotherNode = true;
+      while (activatedAnotherNode) {
+        activatedAnotherNode = false;
+        for (const connection of graph.connections) {
+          if (connection.type === 'flow' && activeNodeIds.has(connection.from) && !activeNodeIds.has(connection.to)) {
+            activeNodeIds.add(connection.to);
+            activatedAnotherNode = true;
+          }
+        }
+      }
+      const wireLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      wireLayer.classList.add('method-test-node-wires');
+      for (const connection of graph.connections) {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.dataset.connectionId = connection.id;
+        group.classList.add(`method-test-connection-${connection.type}`);
+        group.style.setProperty('--ycs-connection-color', connection.type === 'flow'
+          ? 'white'
+          : (YCS3_TYPE_COLORS[connection.dataType] || 'white'));
+        group.classList.toggle('method-test-connection-selected', connection.id === selectedConnectionId);
+        const visiblePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        visiblePath.classList.add('method-test-connection-line');
+        const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hitPath.classList.add('method-test-connection-hit');
+        hitPath.addEventListener('pointerdown', event => {
+          event.stopPropagation();
+          selectedNodeId = null;
+          selectedPin = null;
+          selectedConnectionId = connection.id;
+          renderTestNodes();
+          editor.focus({ preventScroll: true });
+        });
+        hitPath.addEventListener('contextmenu', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          graph.connections = graph.connections.filter(candidate => candidate.id !== connection.id);
+          selectedConnectionId = null;
+          renderTestNodes();
+        });
+        group.append(visiblePath, hitPath);
+        wireLayer.append(group);
+      }
+      const nodeElements = graph.nodes.map(node => {
+        const definition = node.start ? null : nodeDefinitionFor(node.kind);
+        const element = document.createElement('article');
+        element.className = 'method-test-node';
+        element.classList.toggle('method-test-node-start', Boolean(node.start));
+        element.classList.toggle('method-test-node-data-only', Boolean(definition && !definition.flow));
+        element.classList.toggle('method-test-node-output-only', Boolean(definition && !definition.inputType));
+        element.classList.toggle('method-test-node-compact', Boolean(node.start || definition?.compact));
+        element.classList.toggle('method-test-node-inactive', Boolean(definition?.flow && !activeNodeIds.has(node.id)));
+        element.dataset.nodeId = node.id;
+        element.style.left = `${snapScreenPixel(graphView.x + (node.x * graphView.scale))}px`;
+        element.style.top = `${snapScreenPixel(graphView.y + (node.y * graphView.scale))}px`;
+        element.style.zIndex = String(Number(node.layer) || 1);
+        element.style.transform = `scale(${graphView.scale})`;
+        element.style.transformOrigin = 'top left';
+        element.style.setProperty('--ycs-node-title-tint', definition?.color || node.color || '#687f9b');
+        element.classList.toggle('method-test-node-selected', selectedNodeIds.has(node.id));
+        const nodeTitle = document.createElement('header');
+        nodeTitle.className = 'method-test-node-title';
+        const nodeTitleText = document.createElement('span');
+        nodeTitleText.className = 'floating-dialog-title';
+        nodeTitleText.textContent = node.start ? 'Execute' : definition.label;
+        nodeTitle.append(nodeTitleText);
+        const nodeBody = document.createElement('div');
+        nodeBody.className = 'method-test-node-body';
+        const flowRow = document.createElement('div');
+        flowRow.className = 'method-test-node-connection-row method-test-node-flow-row';
+        const flowInput = document.createElement('span');
+        flowInput.className = 'method-test-node-pin method-test-node-pin-input method-test-node-pin-flow-input';
+        flowInput.dataset.pinKind = 'input';
+        flowInput.dataset.pinType = 'flow';
+        flowInput.dataset.pinId = 'input';
+        const flowInputLabel = Object.assign(document.createElement('span'), { className: 'method-test-node-input-label', textContent: 'Execute' });
+        const flowOutputLabel = Object.assign(document.createElement('span'), { className: 'method-test-node-output-label', textContent: 'Then' });
+        const flowOutput = document.createElement('span');
+        flowOutput.className = 'method-test-node-pin method-test-node-pin-output method-test-node-pin-flow-output';
+        flowOutput.dataset.pinKind = 'output';
+        flowOutput.dataset.pinType = 'flow';
+        flowOutput.dataset.pinId = 'output';
+        const flowLeft = document.createElement('div');
+        flowLeft.className = 'method-test-node-row-side method-test-node-row-left';
+        flowLeft.append(flowInputLabel);
+        flowLeft.hidden = node.start;
+        const flowRight = document.createElement('div');
+        flowRight.className = 'method-test-node-row-side method-test-node-row-right';
+        flowRight.append(flowOutputLabel);
+        flowRow.append(flowInput, flowLeft, flowRight, flowOutput);
+        const connectionRow = document.createElement('div');
+        connectionRow.className = 'method-test-node-connection-row method-test-node-data-row';
+        const inputPin = document.createElement('span');
+        inputPin.className = 'method-test-node-pin method-test-node-pin-input method-test-node-pin-data-input';
+        inputPin.dataset.pinKind = 'input';
+        inputPin.dataset.pinType = 'data';
+        inputPin.dataset.pinId = 'input';
+        inputPin.dataset.pinDataType = definition?.inputType || '';
+        inputPin.style.setProperty('--ycs-pin-color', YCS3_TYPE_COLORS[definition?.inputType] || 'white');
+        const inputLabel = document.createElement('span');
+        inputLabel.className = 'method-test-node-input-label';
+        inputLabel.textContent = definition?.inputLabel || 'Input';
+        const valueField = definition?.field?.type === 'boolean' || definition?.field?.type === 'select'
+          ? document.createElement('div')
+          : document.createElement('input');
+        valueField.className = definition?.field?.type === 'boolean'
+          ? 'data-inline-boolean-toggle method-test-node-boolean-toggle'
+          : definition?.field?.type === 'select'
+            ? 'workspace-item-dropdown method-test-node-dropdown'
+            : 'pixel-text-box method-test-node-value';
+        if (valueField instanceof HTMLInputElement) valueField.type = definition?.field?.type || 'number';
+        if (definition?.field?.type === 'select') {
+          node.value = node.value ?? definition.field.default;
+          const trigger = document.createElement('button');
+          trigger.className = 'pixel-option preferences-scale-select workspace-item-dropdown-button method-test-node-dropdown-button';
+          trigger.type = 'button';
+          trigger.setAttribute('aria-expanded', 'false');
+          const selectedLabel = document.createElement('span');
+          const syncSelectedLabel = () => {
+            selectedLabel.textContent = definition.field.options.find(choice => choice.value === node.value)?.label || '';
+          };
+          const arrow = document.createElement('span');
+          arrow.className = 'preferences-scale-arrow pixel-direction-icon pixel-direction-down';
+          const dropdownOptions = document.createElement('div');
+          dropdownOptions.className = 'pixel-option-stack preferences-scale-options workspace-item-dropdown-options method-test-node-dropdown-options';
+          dropdownOptions.hidden = true;
+          for (const choice of definition.field.options) {
+            const option = document.createElement('button');
+            option.className = 'pixel-option preferences-scale-option';
+            option.type = 'button';
+            option.textContent = choice.label;
+            option.addEventListener('click', event => {
+              event.stopPropagation();
+              node.value = choice.value;
+              node.opcode = choice.value;
+              syncSelectedLabel();
+              dropdownOptions.hidden = true;
+              trigger.setAttribute('aria-expanded', 'false');
+              element.classList.remove('method-test-node-dropdown-open');
+            });
+            dropdownOptions.append(option);
+          }
+          trigger.addEventListener('click', event => {
+            event.stopPropagation();
+            dropdownOptions.hidden = !dropdownOptions.hidden;
+            trigger.setAttribute('aria-expanded', String(!dropdownOptions.hidden));
+            element.classList.toggle('method-test-node-dropdown-open', !dropdownOptions.hidden);
+          });
+          syncSelectedLabel();
+          trigger.append(selectedLabel, arrow);
+          valueField.append(trigger, dropdownOptions);
+        }
+        if (definition?.field?.type === 'boolean') {
+          node.value = typeof node.value === 'boolean' ? node.value : definition.field.default;
+          for (const booleanValue of [true, false]) {
+            const toggle = document.createElement('button');
+            toggle.className = 'pixel-button data-inline-boolean-button method-test-node-boolean-button';
+            toggle.type = 'button';
+            toggle.textContent = booleanValue ? 'True' : 'False';
+            toggle.setAttribute('aria-pressed', String(node.value === booleanValue));
+            toggle.addEventListener('click', event => {
+              event.stopPropagation();
+              node.value = booleanValue;
+              node.opcode = booleanValue ? 'logic.true' : 'logic.false';
+              for (const peer of valueField.children) peer.setAttribute('aria-pressed', String(peer === toggle));
+            });
+            valueField.append(toggle);
+          }
+        } else {
+          valueField.value = String(node.value ?? definition?.field?.default ?? '');
+        }
+        valueField.hidden = !definition?.field
+          || Boolean(definition?.field?.hideWhenConnected && graph.connections.some(connection => connection.to === node.id && connection.type === 'data'));
+        valueField.setAttribute('aria-label', definition?.field?.type === 'select' ? 'Entity type' : definition?.field?.type === 'boolean' ? 'Boolean value' : definition?.field?.type === 'text' ? 'Text value' : 'Number value');
+        valueField.addEventListener('input', () => {
+          node.value = valueField.value;
+          if (definition?.kind === 'entity.context') node.opcode = valueField.value;
+        });
+        valueField.addEventListener('pointerdown', event => event.stopPropagation());
+        const outputLabel = document.createElement('span');
+        outputLabel.className = 'method-test-node-output-label';
+        const primaryOutput = definition?.outputs?.[0];
+        outputLabel.textContent = primaryOutput?.label || definition?.outputLabel || 'Return';
+        const outputPin = document.createElement('span');
+        outputPin.className = 'method-test-node-pin method-test-node-pin-output method-test-node-pin-data-output';
+        outputPin.dataset.pinKind = 'output';
+        outputPin.dataset.pinType = 'data';
+        outputPin.dataset.pinId = primaryOutput?.id || 'output';
+        outputPin.dataset.pinDataType = primaryOutput?.type || definition?.outputType || '';
+        outputPin.style.setProperty('--ycs-pin-color', YCS3_TYPE_COLORS[outputPin.dataset.pinDataType] || 'white');
+        inputPin.hidden = !definition?.inputType;
+        inputLabel.hidden = !definition?.inputType;
+        outputPin.hidden = !definition?.outputType;
+        outputLabel.hidden = !definition?.outputType;
+        const dataLeft = document.createElement('div');
+        dataLeft.className = 'method-test-node-row-side method-test-node-row-left';
+        dataLeft.append(inputLabel, valueField);
+        dataLeft.hidden = inputLabel.hidden && valueField.hidden;
+        const dataRight = document.createElement('div');
+        dataRight.className = 'method-test-node-row-side method-test-node-row-right';
+        dataRight.append(outputLabel);
+        dataRight.hidden = outputLabel.hidden;
+        const extraOutputRows = (definition?.outputs || []).slice(1).map(output => {
+          const row = document.createElement('div');
+          row.className = 'method-test-node-connection-row method-test-node-data-row method-test-node-output-row';
+          const label = document.createElement('span');
+          label.className = 'method-test-node-output-label';
+          label.textContent = output.label;
+          const pin = document.createElement('span');
+          pin.className = 'method-test-node-pin method-test-node-pin-output method-test-node-pin-data-output';
+          pin.dataset.pinKind = 'output';
+          pin.dataset.pinType = 'data';
+          pin.dataset.pinId = output.id;
+          pin.dataset.pinDataType = output.type;
+          pin.style.setProperty('--ycs-pin-color', YCS3_TYPE_COLORS[output.type] || 'white');
+          row.append(label, pin);
+          return { row, pin };
+        });
+        const nodePins = [flowInput, flowOutput, inputPin, outputPin, ...extraOutputRows.map(entry => entry.pin)]
+          .filter(candidate => !candidate.hidden);
+        for (const pin of nodePins) {
+          pin.classList.toggle('method-test-node-pin-selected', selectedPin?.nodeId === node.id && selectedPin.kind === pin.dataset.pinKind && selectedPin.type === pin.dataset.pinType && selectedPin.pinId === pin.dataset.pinId);
+          pin.addEventListener('pointerdown', event => {
+            event.stopPropagation();
+            event.preventDefault();
+            content.querySelector('.method-node-search')?.remove();
+            activeWireDrag?.preview?.remove();
+            activeWireDrag = null;
+            selectedNodeId = null;
+            selectedConnectionId = null;
+            selectedPin = { nodeId: node.id, kind: pin.dataset.pinKind, type: pin.dataset.pinType, pinId: pin.dataset.pinId };
+            for (const candidate of content.querySelectorAll('.method-test-node-pin')) candidate.classList.remove('method-test-node-pin-selected');
+            pin.classList.add('method-test-node-pin-selected');
+            const reroutedConnection = pin.dataset.pinKind === 'input'
+              ? graph.connections.find(connection => connection.to === node.id && connection.type === pin.dataset.pinType && (connection.toPin || 'input') === pin.dataset.pinId)
+              : null;
+            const dragPin = reroutedConnection
+              ? content.querySelector(`[data-node-id="${reroutedConnection.from}"] .method-test-node-pin-${pin.dataset.pinType}-output[data-pin-id="${reroutedConnection.fromPin || 'output'}"]`)
+              : pin;
+            if (!dragPin) return;
+            const preview = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            preview.classList.add('method-test-connection-line', 'method-test-connection-preview');
+            wireLayer.append(preview);
+            pin.setPointerCapture(event.pointerId);
+            const start = pinCenter(dragPin);
+            const fromNodeId = dragPin.closest('.method-test-node')?.dataset.nodeId;
+            activeWireDrag = {
+              nodeId: pin.dataset.pinKind === 'input' ? node.id : fromNodeId,
+              type: pin.dataset.pinType,
+              dataType: pin.dataset.pinDataType || undefined,
+              pinId: pin.dataset.pinId,
+              direction: pin.dataset.pinKind === 'input' ? 'incoming' : 'outgoing',
+              pointer: { ...start },
+              preview,
+              allowSearch: true,
+              searchOpen: false,
+            };
+            const moveWire = moveEvent => {
+              const bounds = content.getBoundingClientRect();
+              const snapTarget = nearestCompatiblePin(dragPin, moveEvent.clientX, moveEvent.clientY);
+              for (const candidate of content.querySelectorAll('.method-test-node-pin-snap')) candidate.classList.remove('method-test-node-pin-snap');
+              snapTarget?.classList.add('method-test-node-pin-snap');
+              const pointer = snapTarget ? pinCenter(snapTarget) : {
+                x: (moveEvent.clientX - bounds.left) * (content.clientWidth / bounds.width),
+                y: (moveEvent.clientY - bounds.top) * (content.clientHeight / bounds.height),
+              };
+              if (activeWireDrag) activeWireDrag.pointer = pointer;
+              preview.setAttribute('d', connectionPath(start, pointer));
+            };
+            const finishWire = finishEvent => {
+              if (finishEvent.pointerId !== event.pointerId) return;
+              const target = activeWireDrag?.searchOpen
+                ? null
+                : nearestCompatiblePin(dragPin, finishEvent.clientX, finishEvent.clientY);
+              const targetNode = target?.closest('.method-test-node')?.dataset.nodeId;
+              const from = dragPin.closest('.method-test-node')?.dataset.nodeId;
+              if (target && targetNode && from && targetNode !== from) {
+                const to = targetNode;
+                graph.connections = graph.connections.filter(connection => connection.to !== to || connection.type !== dragPin.dataset.pinType || (connection.toPin || 'input') !== target.dataset.pinId);
+                if (dragPin.dataset.pinType === 'flow') {
+                  graph.connections = graph.connections.filter(connection => connection.from !== from || connection.type !== 'flow');
+                }
+                if (reroutedConnection) graph.connections = graph.connections.filter(connection => connection.id !== reroutedConnection.id);
+                if (!graph.connections.some(connection => connection.from === from && connection.to === to && connection.type === dragPin.dataset.pinType && (connection.fromPin || 'output') === dragPin.dataset.pinId && (connection.toPin || 'input') === target.dataset.pinId)) {
+                  graph.connections.push({ id: crypto.randomUUID(), type: dragPin.dataset.pinType, dataType: dragPin.dataset.pinDataType || undefined, from, to, fromPin: dragPin.dataset.pinId, toPin: target.dataset.pinId });
+                }
+              }
+              for (const candidate of content.querySelectorAll('.method-test-node-pin-snap')) candidate.classList.remove('method-test-node-pin-snap');
+              pin.removeEventListener('pointermove', moveWire);
+              pin.removeEventListener('pointerup', finishWire);
+              pin.removeEventListener('pointercancel', finishWire);
+              if (activeWireDrag?.searchOpen) {
+                // Keep the preview visible behind the search to show that the
+                // selected node will be connected when it is created.
+              } else {
+                activeWireDrag = null;
+                renderTestNodes();
+              }
+            };
+            pin.addEventListener('pointermove', moveWire);
+            pin.addEventListener('pointerup', finishWire);
+            pin.addEventListener('pointercancel', finishWire);
+            editor.focus({ preventScroll: true });
+          });
+          pin.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            graph.connections = graph.connections.filter(connection => (
+              pin.dataset.pinKind === 'input'
+                ? connection.to !== node.id || connection.type !== pin.dataset.pinType || (connection.toPin || 'input') !== pin.dataset.pinId
+                : connection.from !== node.id || connection.type !== pin.dataset.pinType || (connection.fromPin || 'output') !== pin.dataset.pinId
+            ));
+            selectedPin = null;
+            renderTestNodes();
+          });
+        }
+        connectionRow.append(inputPin, dataLeft, dataRight, outputPin);
+        nodeBody.append(flowRow, connectionRow, ...extraOutputRows.map(entry => entry.row));
+        element.append(nodeTitle, nodeBody);
+        element.addEventListener('pointerdown', () => {
+          node.layer = nextNodeLayer;
+          nextNodeLayer += 1;
+          element.style.zIndex = String(node.layer);
+        }, { capture: true });
+        element.addEventListener('pointerdown', event => {
+          event.stopPropagation();
+          if (spaceHeld) {
+            beginCanvasPan(event);
+            return;
+          }
+          if (node.start) {
+            selectedNodeId = null;
+            editor.focus({ preventScroll: true });
+            return;
+          }
+          selectedNodeId = node.id;
+          if (!selectedNodeIds.has(node.id)) selectedNodeIds.clear();
+          selectedNodeIds.add(node.id);
+          selectedConnectionId = null;
+          selectedPin = null;
+          for (const candidate of content.querySelectorAll('.method-test-node')) candidate.classList.toggle('method-test-node-selected', selectedNodeIds.has(candidate.dataset.nodeId));
+          const selectedElement = element;
+          const contentBounds = content.getBoundingClientRect();
+          const scaleX = (contentBounds.width ? content.clientWidth / contentBounds.width : 1) / graphView.scale;
+          const scaleY = (contentBounds.height ? content.clientHeight / contentBounds.height : 1) / graphView.scale;
+          const drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: node.x, top: node.y };
+          const movingNodes = graph.nodes
+            .filter(candidate => selectedNodeIds.has(candidate.id) && !candidate.start)
+            .map(candidate => ({ node: candidate, x: candidate.x, y: candidate.y }));
+          selectedElement.setPointerCapture(event.pointerId);
+          const moveNode = moveEvent => {
+            if (moveEvent.pointerId !== drag.pointerId) return;
+            const dx = (moveEvent.clientX - drag.x) * scaleX;
+            const dy = (moveEvent.clientY - drag.y) * scaleY;
+            for (const moving of movingNodes) {
+              moving.node.x = moving.x + dx;
+              moving.node.y = moving.y + dy;
+              const movingElement = content.querySelector(`[data-node-id="${moving.node.id}"]`);
+              if (movingElement) {
+                movingElement.style.left = `${snapScreenPixel(graphView.x + (moving.node.x * graphView.scale))}px`;
+                movingElement.style.top = `${snapScreenPixel(graphView.y + (moving.node.y * graphView.scale))}px`;
+              }
+            }
+            updateTestConnections();
+          };
+          const stopDragging = stopEvent => {
+            if (stopEvent.pointerId !== drag.pointerId) return;
+            selectedElement.removeEventListener('pointermove', moveNode);
+            selectedElement.removeEventListener('pointerup', stopDragging);
+            selectedElement.removeEventListener('pointercancel', stopDragging);
+          };
+          selectedElement.addEventListener('pointermove', moveNode);
+          selectedElement.addEventListener('pointerup', stopDragging);
+          selectedElement.addEventListener('pointercancel', stopDragging);
+          editor.focus({ preventScroll: true });
+        });
+        return element;
+      });
+      content.replaceChildren(wireLayer, ...nodeElements);
+      updateTestConnections();
+    };
+    editor.tabIndex = -1;
+    let spaceHeld = false;
+    editor.addEventListener('pointerdown', event => {
+      const activeDropdown = event.target.closest('.method-test-node-dropdown');
+      for (const dropdown of content.querySelectorAll('.method-test-node-dropdown')) {
+        if (dropdown === activeDropdown) continue;
+        dropdown.querySelector('.method-test-node-dropdown-options').hidden = true;
+        dropdown.querySelector('.method-test-node-dropdown-button').setAttribute('aria-expanded', 'false');
+        dropdown.closest('.method-test-node')?.classList.remove('method-test-node-dropdown-open');
+      }
+    }, { capture: true });
+    const beginCanvasPan = event => {
+      event.preventDefault();
+      const start = { x: event.clientX, y: event.clientY, viewX: graphView.x, viewY: graphView.y };
+      editor.setPointerCapture(event.pointerId);
+      const pan = moveEvent => {
+        const bounds = content.getBoundingClientRect();
+        graphView.x = snapScreenPixel(start.viewX + ((moveEvent.clientX - start.x) * (content.clientWidth / bounds.width)));
+        graphView.y = snapScreenPixel(start.viewY + ((moveEvent.clientY - start.y) * (content.clientHeight / bounds.height)));
+        renderTestNodes();
+      };
+      const stop = stopEvent => {
+        if (stopEvent.pointerId !== event.pointerId) return;
+        editor.removeEventListener('pointermove', pan);
+        editor.removeEventListener('pointerup', stop);
+        editor.removeEventListener('pointercancel', stop);
+      };
+      editor.addEventListener('pointermove', pan);
+      editor.addEventListener('pointerup', stop);
+      editor.addEventListener('pointercancel', stop);
+    };
+    editor.addEventListener('pointerdown', event => {
+      if (!spaceHeld || !content.contains(event.target)) return;
+      event.stopImmediatePropagation();
+      beginCanvasPan(event);
+    }, { capture: true });
+    editor.addEventListener('pointerdown', event => {
+      if (event.target.closest('.method-test-node, .method-node-search, .method-test-connection-hit')) return;
+      selectedNodeId = null;
+      selectedNodeIds.clear();
+      selectedConnectionId = null;
+      selectedPin = null;
+      for (const candidate of content.querySelectorAll('.method-test-node-selected')) {
+        candidate.classList.remove('method-test-node-selected');
+      }
+      if (content.contains(event.target)) {
+        editor.focus({ preventScroll: true });
+        const bounds = content.getBoundingClientRect();
+        const scaleX = content.clientWidth / bounds.width;
+        const scaleY = content.clientHeight / bounds.height;
+        const start = { x: event.clientX, y: event.clientY };
+        content.setPointerCapture(event.pointerId);
+        if (spaceHeld) {
+          beginCanvasPan(event);
+        } else {
+          const marquee = document.createElement('div');
+          marquee.className = 'method-node-selection-marquee';
+          content.append(marquee);
+          const select = moveEvent => {
+            const left = Math.min(start.x, moveEvent.clientX);
+            const top = Math.min(start.y, moveEvent.clientY);
+            const right = Math.max(start.x, moveEvent.clientX);
+            const bottom = Math.max(start.y, moveEvent.clientY);
+            marquee.style.left = `${(left - bounds.left) * scaleX}px`;
+            marquee.style.top = `${(top - bounds.top) * scaleY}px`;
+            marquee.style.width = `${(right - left) * scaleX}px`;
+            marquee.style.height = `${(bottom - top) * scaleY}px`;
+            selectedNodeIds.clear();
+            for (const candidate of content.querySelectorAll('.method-test-node:not(.method-test-node-start)')) {
+              const box = candidate.getBoundingClientRect();
+              if (box.right >= left && box.left <= right && box.bottom >= top && box.top <= bottom) selectedNodeIds.add(candidate.dataset.nodeId);
+              candidate.classList.toggle('method-test-node-selected', selectedNodeIds.has(candidate.dataset.nodeId));
+            }
+          };
+          const finish = () => {
+            marquee.remove();
+            content.removeEventListener('pointermove', select);
+          };
+          content.addEventListener('pointermove', select);
+          content.addEventListener('pointerup', finish, { once: true });
+        }
+      }
+    });
+    content.addEventListener('pointermove', event => {
+      const bounds = content.getBoundingClientRect();
+      lastCanvasPoint = {
+        x: (event.clientX - bounds.left) * (content.clientWidth / bounds.width),
+        y: (event.clientY - bounds.top) * (content.clientHeight / bounds.height),
+      };
+    });
+    content.addEventListener('wheel', event => {
+      if (event.target.closest('.method-node-search')) return;
+      event.preventDefault();
+      const bounds = content.getBoundingClientRect();
+      const mouseX = (event.clientX - bounds.left) * (content.clientWidth / bounds.width);
+      const mouseY = (event.clientY - bounds.top) * (content.clientHeight / bounds.height);
+      const worldX = (mouseX - graphView.x) / graphView.scale;
+      const worldY = (mouseY - graphView.y) / graphView.scale;
+      const currentZoomIndex = graphZoomLevels.reduce((best, level, index) => (
+        Math.abs(level - graphView.scale) < Math.abs(graphZoomLevels[best] - graphView.scale) ? index : best
+      ), 0);
+      const nextZoomIndex = clamp(currentZoomIndex + (event.deltaY < 0 ? 1 : -1), 0, graphZoomLevels.length - 1);
+      graphView.scale = graphZoomLevels[nextZoomIndex];
+      graphView.x = snapScreenPixel(mouseX - (worldX * graphView.scale));
+      graphView.y = snapScreenPixel(mouseY - (worldY * graphView.scale));
+      renderTestNodes();
+    }, { passive: false });
+    editor.addEventListener('keydown', event => {
+      if (event.code === 'Space' && !event.ctrlKey) {
+        spaceHeld = true;
+        event.preventDefault();
+        return;
+      }
+      if (event.ctrlKey && event.code === 'Space' && activeWireDrag?.allowSearch) {
+        event.preventDefault();
+        if (!activeWireDrag.searchOpen) openConnectedNodeSearch(activeWireDrag);
+      } else if (event.ctrlKey && event.code === 'Space') {
+        event.preventDefault();
+        const selectedConnection = graph.connections.find(connection => connection.id === selectedConnectionId);
+        openConnectedNodeSearch(selectedConnection
+          ? { direction: 'insert', connection: { ...selectedConnection }, pointer: { ...lastCanvasPoint }, searchOpen: false }
+          : { direction: 'standalone', pointer: { ...lastCanvasPoint }, searchOpen: false });
+      } else if (event.key === 'Delete' && (selectedNodeId || selectedNodeIds.size || selectedConnectionId || selectedPin)) {
+        event.preventDefault();
+        if (selectedNodeId || selectedNodeIds.size) {
+          const removedIds = new Set(selectedNodeIds);
+          if (selectedNodeId) removedIds.add(selectedNodeId);
+          graph.nodes = graph.nodes.filter(node => !removedIds.has(node.id) || node.start);
+          graph.connections = graph.connections.filter(connection => !removedIds.has(connection.from) && !removedIds.has(connection.to));
+        } else if (selectedConnectionId) {
+          graph.connections = graph.connections.filter(connection => connection.id !== selectedConnectionId);
+        } else if (selectedPin) {
+          graph.connections = graph.connections.filter(connection => (
+            selectedPin.kind === 'input'
+              ? connection.to !== selectedPin.nodeId || connection.type !== selectedPin.type || (connection.toPin || 'input') !== selectedPin.pinId
+              : connection.from !== selectedPin.nodeId || connection.type !== selectedPin.type || (connection.fromPin || 'output') !== selectedPin.pinId
+          ));
+        }
+        selectedNodeId = null;
+        selectedNodeIds.clear();
+        selectedConnectionId = null;
+        selectedPin = null;
+        renderTestNodes();
+      }
+    });
+    window.addEventListener('keyup', event => { if (event.code === 'Space') spaceHeld = false; });
+    editor.append(header, content);
+    panel.append(editor);
+    renderTestNodes();
+    requestAnimationFrame(() => {
+      const startNode = graph.nodes.find(node => node.start);
+      if (!startNode) return;
+      graphView.x = (content.clientWidth / 2) - ((startNode.x + 50) * graphView.scale);
+      graphView.y = (content.clientHeight / 2) - ((startNode.y + 28) * graphView.scale);
+      renderTestNodes();
+    });
+    editor.focus({ preventScroll: true });
+  };
+
+  const createCustomMethodEditButton = (methodKey, label) => {
+    const button = document.createElement('button');
+    button.className = 'pixel-button item-custom-method-edit';
+    button.type = 'button';
+    button.textContent = 'Edit';
+    button.setAttribute('aria-label', `Edit ${label}`);
+    button.addEventListener('click', () => openCustomMethodEditor(activeDialogPanel, methodKey, label));
+    return button;
+  };
+
+  const createUseAnimationDropdown = method => {
+    const dropdown = document.createElement('div');
+    dropdown.className = 'workspace-item-dropdown item-custom-method-animation';
+    const trigger = document.createElement('button');
+    trigger.className = 'pixel-option preferences-scale-select workspace-item-dropdown-button';
+    trigger.type = 'button';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    const label = document.createElement('span');
+    label.textContent = useAnimationOptions.includes(method.useAnimation) ? method.useAnimation : 'NONE';
+    const arrow = document.createElement('span');
+    arrow.className = 'preferences-scale-arrow pixel-direction-icon pixel-direction-down';
+    arrow.setAttribute('aria-hidden', 'true');
+    const options = document.createElement('div');
+    options.className = 'preferences-scale-options pixel-option-stack workspace-item-dropdown-options';
+    options.role = 'listbox';
+    options.hidden = true;
+    for (const value of useAnimationOptions) {
+      const option = document.createElement('button');
+      option.className = 'pixel-option';
+      option.type = 'button';
+      option.role = 'option';
+      option.textContent = value === 'TOOT_HORN' ? 'Toot Horn' : value[0] + value.slice(1).toLowerCase();
+      option.addEventListener('click', () => {
+        method.useAnimation = value;
+        activeDialogPanel.dataset.dirty = 'true';
+        renderCustomMethods();
+      });
+      options.append(option);
+    }
+    trigger.addEventListener('click', () => {
+      options.hidden = !options.hidden;
+      trigger.setAttribute('aria-expanded', String(!options.hidden));
+    });
+    trigger.append(label, arrow);
+    dropdown.append(trigger, options);
+    return dropdown;
+  };
+
+  const renderCustomMethods = () => {
+    if (!activeDialogPanel || !activeAuthoringFields) return;
+    const list = activeAuthoringFields.fields.querySelector('.item-custom-methods-list');
+    if (!list) return;
+    const methods = activeDialogPanel.itemCustomMethods || [];
+    list.replaceChildren(...methods.map((method, index) => {
+      const entry = document.createElement('section');
+      entry.className = 'item-state-entry item-custom-method-entry';
+      const titlebar = document.createElement('header');
+      titlebar.className = 'floating-dialog-titlebar item-state-entry-titlebar';
+      const title = document.createElement('span');
+      title.className = 'floating-dialog-title';
+      title.textContent = customMethodLabels[method.key];
+      const remove = document.createElement('button');
+      remove.className = 'dialogue-title-button floating-dialog-close';
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove ${customMethodLabels[method.key]}`);
+      remove.innerHTML = '<img src="./assets/sprite/generated/dialogue_icon_2x.png" alt="" draggable="false" />';
+      remove.addEventListener('click', () => {
+        methods.splice(index, 1);
+        activeDialogPanel.dataset.dirty = 'true';
+        renderCustomMethods();
+      });
+      titlebar.append(title, remove);
+      const body = document.createElement('div');
+      body.className = 'item-state-entry-body item-custom-method-body';
+      const editRow = document.createElement('div');
+      editRow.className = 'workspace-item-field-row';
+      editRow.append(Object.assign(document.createElement('span'), { textContent: 'Method' }), createCustomMethodEditButton(method.key, customMethodLabels[method.key]));
+      body.append(editRow);
+      if (method.key === 'use') {
+        const continuousRow = document.createElement('div');
+        continuousRow.className = 'workspace-item-field-row';
+        const continuous = document.createElement('button');
+        continuous.className = 'pixel-checkbox';
+        continuous.type = 'button';
+        continuous.role = 'checkbox';
+        continuous.setAttribute('aria-checked', String(Boolean(method.continuousUse)));
+        continuous.addEventListener('click', () => {
+          method.continuousUse = continuous.getAttribute('aria-checked') !== 'true';
+          activeDialogPanel.dataset.dirty = 'true';
+          renderCustomMethods();
+        });
+        continuousRow.append(Object.assign(document.createElement('span'), { textContent: 'Continuous Use' }), continuous);
+        body.append(continuousRow);
+        if (method.continuousUse) {
+          const ticksRow = document.createElement('label');
+          ticksRow.className = 'workspace-item-field-row';
+          const ticks = document.createElement('input');
+          ticks.className = 'pixel-text-box'; ticks.type = 'number'; ticks.min = '1'; ticks.value = String(method.ticks || 32);
+          ticks.addEventListener('input', () => { method.ticks = Math.max(1, Number.parseInt(ticks.value, 10) || 1); activeDialogPanel.dataset.dirty = 'true'; });
+          ticksRow.append(Object.assign(document.createElement('span'), { textContent: 'Ticks' }), ticks);
+          const animationRow = document.createElement('div');
+          animationRow.className = 'workspace-item-field-row';
+          animationRow.append(Object.assign(document.createElement('span'), { textContent: 'Use Animation' }), createUseAnimationDropdown(method));
+          const onUseRow = document.createElement('div'); onUseRow.className = 'workspace-item-field-row';
+          onUseRow.append(Object.assign(document.createElement('span'), { textContent: 'On Use' }), createCustomMethodEditButton('continuousUse', 'On Use'));
+          const releaseRow = document.createElement('div'); releaseRow.className = 'workspace-item-field-row';
+          releaseRow.append(Object.assign(document.createElement('span'), { textContent: 'Release Using' }), createCustomMethodEditButton('releaseUsing', 'Release Using'));
+          body.append(ticksRow, animationRow, onUseRow, releaseRow);
+        }
+      }
+      entry.append(titlebar, body);
+      return entry;
+    }));
+    for (const option of customMethodsAddOptions.querySelectorAll('[data-item-custom-method]')) {
+      option.hidden = methods.some(method => method.key === option.dataset.itemCustomMethod);
+    }
+    const visibleOptions = [...customMethodsAddOptions.querySelectorAll('[data-item-custom-method]:not([hidden])')];
+    visibleOptions.forEach((option, index) => {
+      option.dataset.stackPosition = visibleOptions.length === 1 ? 'only'
+        : index === 0 ? 'first'
+          : index === visibleOptions.length - 1 ? 'last' : 'middle';
+    });
+    requestAnimationFrame(() => positionDialogBeside(authoringDialog, activeDialogAnchor));
+  };
+
+  customMethodsAddButton.addEventListener('click', () => {
+    customMethodsAddOptions.hidden = !customMethodsAddOptions.hidden;
+    customMethodsAddButton.setAttribute('aria-expanded', String(!customMethodsAddOptions.hidden));
+  });
+  customMethodsAddOptions.addEventListener('click', event => {
+    const option = event.target.closest('[data-item-custom-method]');
+    if (!option) return;
+    activeDialogPanel.itemCustomMethods.push({ key: option.dataset.itemCustomMethod, continuousUse: false, ticks: 32, useAnimation: 'NONE' });
+    activeDialogPanel.dataset.dirty = 'true';
+    customMethodsAddOptions.hidden = true;
+    customMethodsAddButton.setAttribute('aria-expanded', 'false');
+    renderCustomMethods();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (customMethodsAddControl.contains(event.target)) return;
+    customMethodsAddOptions.hidden = true;
+    customMethodsAddButton.setAttribute('aria-expanded', 'false');
+  });
 
   const recipeLabels = {
     shaped: 'Shaped Crafting', shapeless: 'Shapeless Crafting', smelting: 'Smelting',
@@ -1178,6 +2333,8 @@ export const initializeItemEditorPage = ({
     panel.itemAbilitySlots = [];
     panel.itemAbilitiesEnabled = false;
     panel.itemRecipes = [];
+    panel.itemDataComponents = [];
+    panel.itemCustomMethods = [];
     panel.itemFileData = {};
     panel.itemStates = [];
     populateCreativeTabOptions(panel);
@@ -1288,7 +2445,18 @@ export const initializeItemEditorPage = ({
           panel.itemAbilitySlots = Array.isArray(data.itemAbilitySlots) ? [...data.itemAbilitySlots] : [];
           panel.itemAbilitiesEnabled = Boolean(data.itemAbilitiesEnabled);
           panel.itemRecipes = normalizeItemRecipes(data.recipes);
+          panel.itemDataComponents = Array.isArray(data.dataComponents)
+            ? data.dataComponents.map(component => ({ ...component }))
+            : [];
           const enabledMethods = new Set(Array.isArray(data.enabledMethods) ? data.enabledMethods : []);
+          panel.itemCustomMethods = Object.keys(customMethodLabels)
+            .filter(key => enabledMethods.has(key))
+            .map(key => ({
+              key,
+              continuousUse: key === 'use' && enabledMethods.has('continuousUse'),
+              ticks: Number(data.useDurationValue) || 32,
+              useAnimation: String(data.useAnim || 'NONE'),
+            }));
           for (const method of panel.querySelectorAll('[data-item-method]')) {
             method.setAttribute('aria-checked', String(enabledMethods.has(method.dataset.itemMethod)));
           }
@@ -1368,8 +2536,21 @@ export const initializeItemEditorPage = ({
         positionDialogBeside(recipeDialog, dialogAction);
       } else if (dialogAction.dataset.itemDialogAction === 'tooltip') {
         openAuthoringDialog(panel, dialogAction, 'tooltip', 'Tooltip');
+      } else if (dialogAction.dataset.itemDialogAction === 'dataComponents') {
+        openAuthoringDialog(panel, dialogAction, 'dataComponents', 'Data Components');
+        dataComponentsAddControl.hidden = false;
+        await loadGlobalDataComponents();
+        if (
+          activeDialogPanel !== panel
+          || activeAuthoringFields?.fields.dataset.itemDialogFields !== 'dataComponents'
+        ) return;
+        renderItemDataComponents();
+        positionDialogBeside(authoringDialog, dialogAction);
       } else if (dialogAction.dataset.itemDialogAction === 'customClass') {
         openAuthoringDialog(panel, dialogAction, 'customClass', 'Custom Class');
+        customMethodsAddControl.hidden = false;
+        renderCustomMethods();
+        positionDialogBeside(authoringDialog, dialogAction);
       }
       return;
     }
@@ -1419,6 +2600,7 @@ export const initializeItemEditorPage = ({
         authoringFields.itemAbilitySlots = [...(panel.itemAbilitySlots || [])];
         authoringFields.itemAbilitiesEnabled = Boolean(panel.itemAbilitiesEnabled);
         authoringFields.recipes = (panel.itemRecipes || []).map(recipe => ({ ...recipe }));
+        authoringFields.dataComponents = (panel.itemDataComponents || []).map(component => ({ ...component }));
         authoringFields.tooltipUseDefaultHint = !authoringFields.tooltipCustomHint;
         if (!authoringFields.tooltipCustomHint) authoringFields.tooltipShiftHint = '';
         delete authoringFields.tooltipCustomHint;
@@ -1427,8 +2609,13 @@ export const initializeItemEditorPage = ({
           || String(authoringFields.tooltipHidden || '').trim()
           || String(authoringFields.tooltipShiftHint || '').trim(),
         );
-        authoringFields.enabledMethods = [...panel.querySelectorAll('[data-item-method][aria-checked="true"]')]
-          .map(methodButton => methodButton.dataset.itemMethod);
+        authoringFields.customMethods = (panel.itemCustomMethods || []).map(method => ({ ...method }));
+        authoringFields.enabledMethods = (panel.itemCustomMethods || []).flatMap(method => method.key === 'use' && method.continuousUse
+          ? ['use', 'continuousUse', 'releaseUsing']
+          : [method.key]);
+        const interactionMethod = (panel.itemCustomMethods || []).find(method => method.key === 'use');
+        authoringFields.useDurationValue = interactionMethod?.ticks || 32;
+        authoringFields.useAnim = interactionMethod?.useAnimation || 'NONE';
         authoringFields.geoTexture = holdingMode === '3d' ? textureId : String(authoringFields.geoTexture || '');
         authoringFields.geoModelData = panel.itemFileData?.geoModel || null;
         authoringFields.displayModelData = panel.itemFileData?.displayModel || null;
@@ -1639,7 +2826,7 @@ export const initializeItemEditorPage = ({
     if (!recipeDialog.hidden && !event.target.closest('#item-recipe-dialog, [data-item-dialog-action="recipes"]')) {
       closeItemDialog(recipeDialog);
     }
-    if (!authoringDialog.hidden && !event.target.closest('#item-authoring-dialog, [data-item-dialog-action="tooltip"], [data-item-dialog-action="customClass"]')) {
+    if (!authoringDialog.hidden && !event.target.closest('#item-authoring-dialog, [data-item-dialog-action="tooltip"], [data-item-dialog-action="dataComponents"], [data-item-dialog-action="customClass"]')) {
       closeItemDialog(authoringDialog);
     }
   });

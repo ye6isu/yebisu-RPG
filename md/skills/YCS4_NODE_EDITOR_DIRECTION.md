@@ -4,7 +4,7 @@
 
 This document records the proposed direction for YCS as a standalone NeoForge mod-creation tool. It is an architectural direction, not a claim that the node editor has already been implemented.
 
-YCS currently targets NeoForge for Minecraft 1.21.1. Supporting additional Minecraft versions or loaders is deferred because mappings, registration APIs, lifecycle hooks, generated Java, and injection targets can change independently between targets. Saved projects should nevertheless declare their schema and target explicitly so future generators can be introduced without making the visual graph itself version-dependent.
+YCS currently targets NeoForge for Minecraft 1.21.1. A minimal Item-method canvas prototype now verifies the shared node frame, selection, creation, deletion, and method-local persistence; it is not yet the production graph editor described below. Supporting additional Minecraft versions or loaders is deferred because mappings, registration APIs, lifecycle hooks, generated Java, and injection targets can change independently between targets. Saved projects should nevertheless declare their schema and target explicitly so future generators can be introduced without making the visual graph itself version-dependent.
 
 ```json
 {
@@ -90,6 +90,18 @@ A node editor becomes harder to read than Blocky if unrestricted wiring is allow
 - Compile and validation errors attached directly to the responsible node or connection.
 - Prevention or explicit modeling of execution cycles.
 - Graph-level copy/paste that remaps internal IDs without breaking external references.
+
+## Node Visual Format
+
+Use the current Item method-node frame and row layout as the baseline for every new node:
+
+- Use the sliced `node.png` title and body textures. The body has no top texture border.
+- Match dialog-title typography and alignment. At 100% scale, title text begins after 2 px of title padding plus its 4 px text margin.
+- Give the body 2 px top/bottom padding and 4 px left/right padding.
+- Treat each row as a left group and a right group. Keep exactly 10 px between those groups, measured from the widest left-side content to the widest right-side content. Fields and selectors belong to their corresponding group; do not distribute spare width with `space-between` as a substitute for this gap.
+- Keep output-only continuation rows, such as Y and Z, right-aligned.
+- Place input and output pins 6 px beyond their respective node texture borders.
+- Size nodes from their content rather than assigning a fixed body width.
 
 ## Execution Domains and Dedicated Servers
 

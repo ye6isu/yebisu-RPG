@@ -299,6 +299,119 @@ fn list_ycs_data(category: &str) -> Result<Vec<String>, String> {
     Ok(ids)
 }
 
+fn data_definition_config(category: &str) -> Result<(&'static str, &'static str), String> {
+    match category {
+        "entityvars" => Ok(("java/net/ye6isu/yebisuRPG/entityvar/ModAttachments.java", "YCS_Entity_Attachments")),
+        "attributes" => Ok(("java/net/ye6isu/yebisuRPG/attribute/ModAttributes.java", "YCS_Attributes")),
+        "components" => Ok(("java/net/ye6isu/yebisuRPG/component/ModDataComponents.java", "YCS_Data_Components")),
+        _ => Err(format!("Unsupported data definition category: {}", category)),
+    }
+}
+
+fn validate_data_definition_id(id: &str) -> Result<(), String> {
+    if id.is_empty() || !id.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_') {
+        return Err("Name must contain only lowercase letters, digits, and underscores".to_string());
+    }
+    Ok(())
+}
+
+fn data_definition_number(value: Option<&Value>, fallback: f64) -> f64 {
+    value.and_then(Value::as_f64)
+        .or_else(|| value.and_then(Value::as_str).and_then(|text| text.parse().ok()))
+        .unwrap_or(fallback)
+}
+
+#[tauri::command]
+fn save_data_definition(category: &str, previous_id: Option<&str>, content: &str) -> Result<String, String> {
+    let (file, marker) = data_definition_config(category)?;
+    let submitted: Value = serde_json::from_str(content)
+        .map_err(|error| format!("Invalid data definition: {}", error))?;
+    let submitted = submitted.as_object().ok_or_else(|| "Data definition must be an object".to_string())?;
+    let name = submitted.get("name").and_then(Value::as_str).unwrap_or("").trim()
+        .to_ascii_lowercase().replace(char::is_whitespace, "_");
+    validate_data_definition_id(&name)?;
+    let id = previous_id.filter(|value| !value.is_empty()).unwrap_or(&name).to_string();
+    validate_data_definition_id(&id)?;
+
+    let directory = ycs_data_dir().join(category);
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    let path = directory.join(format!("{}.json", id));
+    let previous: Option<Value> = if path.is_file() {
+        Some(serde_json::from_str(&fs::read_to_string(&path).map_err(|error| error.to_string())?)
+            .map_err(|error| format!("Invalid existing {} data: {}", category, error))?)
+    } else { None };
+    if previous_id.is_none() && previous.is_some() {
+        return Err(format!("{} '{}' already exists", category, id));
+    }
+
+    let const_name: String = name.chars().map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_uppercase() } else { '_' }).collect();
+    let mut payload = previous.as_ref().and_then(Value::as_object).cloned().unwrap_or_default();
+    let line = match category {
+        "attributes" => {
+            let minimum = data_definition_number(submitted.get("min"), 0.0);
+            let base = data_definition_number(submitted.get("base"), 0.0);
+            let maximum = data_definition_number(submitted.get("max"), 100.0);
+            if minimum > base || base > maximum {
+                return Err("Attribute must satisfy Min <= Base <= Max".to_string());
+            }
+            let title_text = submitted.get("titleText").and_then(Value::as_str).unwrap_or("");
+            let sync_to_client = submitted.get("syncToClient").and_then(Value::as_bool).unwrap_or(true);
+            payload.insert("name".to_string(), Value::String(name.clone()));
+            payload.insert("titleText".to_string(), Value::String(title_text.to_string()));
+            payload.insert("min".to_string(), json!(minimum));
+            payload.insert("base".to_string(), json!(base));
+            payload.insert("max".to_string(), json!(maximum));
+            payload.insert("syncToClient".to_string(), Value::Bool(sync_to_client));
+            format!("    public static final DeferredHolder<Attribute, Attribute> {} = registerAttribute(\"{}\", {}D, {}D, {}D, {});", const_name, name, minimum, base, maximum, sync_to_client)
+        }
+        "entityvars" | "components" => {
+            let kind = submitted.get("type").and_then(Value::as_str).unwrap_or("double");
+            let (method, java_type) = match kind {
+                "boolean" => ("registerBoolean", "Boolean"),
+                "string" => ("registerString", "String"),
+                "double" => ("registerDouble", "Double"),
+                _ => return Err("Type must be Number, Boolean, or Text".to_string()),
+            };
+            let default_value = submitted.get("defaultValue").cloned().unwrap_or(Value::String(String::new()));
+            payload.insert("name".to_string(), Value::String(name.clone()));
+            payload.insert("type".to_string(), Value::String(kind.to_string()));
+            payload.insert("defaultValue".to_string(), default_value.clone());
+            if category == "components" {
+                format!("    public static final DeferredHolder<DataComponentType<?>, DataComponentType<{}>> {} = {}(\"{}\");", java_type, const_name, method, name)
+            } else {
+                let literal = match kind {
+                    "boolean" => if default_value.as_bool().unwrap_or(false) { "true".to_string() } else { "false".to_string() },
+                    "string" => serde_json::to_string(default_value.as_str().unwrap_or("")).map_err(|error| error.to_string())?,
+                    _ => data_definition_number(Some(&default_value), 0.0).to_string(),
+                };
+                format!("    public static final DeferredHolder<AttachmentType<?>, AttachmentType<{}>> {} = {}(\"{}\", {});", java_type, const_name, method, name, literal)
+            }
+        }
+        _ => unreachable!(),
+    };
+
+    if let Some(previous) = &previous { remove_item_injections(previous)?; }
+    inject_marker_content(file, marker, &line)?;
+    payload.insert("_injections".to_string(), json!([{
+        "type": "java-marker", "file": file, "marker": marker, "content": line,
+    }]));
+    fs::write(&path, serde_json::to_string_pretty(&Value::Object(payload)).map_err(|error| error.to_string())?)
+        .map_err(|error| format!("Failed to save {}: {}", category, error))?;
+    Ok(id)
+}
+
+#[tauri::command]
+fn delete_data_definition(category: &str, id: &str) -> Result<(), String> {
+    data_definition_config(category)?;
+    validate_data_definition_id(id)?;
+    let path = ycs_data_dir().join(category).join(format!("{}.json", id));
+    if !path.is_file() { return Ok(()); }
+    let previous: Value = serde_json::from_str(&fs::read_to_string(&path).map_err(|error| error.to_string())?)
+        .map_err(|error| format!("Invalid existing {} data: {}", category, error))?;
+    remove_item_injections(&previous)?;
+    fs::remove_file(path).map_err(|error| format!("Failed to delete {}: {}", category, error))
+}
+
 fn validate_texture_id(id: &str) -> Result<(), String> {
     if id.is_empty() || !id.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_') {
         return Err("Texture ID must contain only lowercase letters, digits, and underscores".to_string());
@@ -1143,7 +1256,7 @@ fn save_basic_item(
 
     let object = item.as_object_mut().ok_or_else(|| "Existing Item JSON must be an object".to_string())?;
     for (key, value) in authored {
-        if matches!(key.as_str(), "id" | "displayName" | "texture" | "holdingMode" | "stackSize" | "creativeTab" | "dataComponents" | "_injections") {
+        if matches!(key.as_str(), "id" | "displayName" | "texture" | "holdingMode" | "stackSize" | "creativeTab" | "_injections") {
             continue;
         }
         object.insert(key.clone(), value.clone());
@@ -1271,6 +1384,8 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             list_ycs_data,
+              save_data_definition,
+              delete_data_definition,
               load_ycs_data,
                 load_texture_bundle,
                 find_texture_usage,

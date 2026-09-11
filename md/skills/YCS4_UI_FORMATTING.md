@@ -59,6 +59,7 @@ Use semantic state attributes such as `aria-pressed`, `aria-expanded`, `aria-sel
 | Workspace tab | `workspace-tab` | `tab_container.png` |
 | Workspace surface | `workspace-container` | `tab_workspace_container.png` |
 | Floating dialog | canonical `floating-dialog` structure | `window.png` and dialog sprites |
+| Gameplay node | separate title and body nine-slices; tint only the inset title fill with multiply | `node.png` |
 
 Edit > Test is the live component reference. Add genuinely reusable controls there and to this catalog; do not use it as a changelog.
 
