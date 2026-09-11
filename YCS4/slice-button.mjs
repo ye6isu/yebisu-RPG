@@ -212,6 +212,7 @@ splitVariableWidthSheet("button.png", 16, 2, [
   { width: 16, outputName: "button_toggled_hovered.png" },
 ]);
 splitTwoFrameSheet("window.png", "window_title.png", "window_body.png", 16, 16, 2);
+splitTwoFrameSheet("node.png", "node_title.png", "node_body.png", 16, 16, 2);
 scaleSingleFrame("option_container.png", "option_container_2x.png", 16, 16, 2);
 scaleSingleFrame("dialogue_icon.png", "dialogue_icon_2x.png", 5, 5, 2);
 splitTwoFrameSheet(

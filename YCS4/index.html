@@ -669,6 +669,29 @@
           <section id="item-authoring-dialog" class="floating-dialog item-authoring-dialog" role="dialog" aria-labelledby="item-authoring-dialog-title" hidden>
             <header class="floating-dialog-titlebar hex-color-dialog-titlebar">
               <span id="item-authoring-dialog-title" class="floating-dialog-title">Item Fields</span>
+              <div id="item-data-components-add-control" class="item-recipe-add-control" hidden>
+                <button id="item-data-components-delete-toggle" class="dialogue-title-button item-data-components-delete-toggle" type="button" aria-label="Toggle data component deletion" aria-pressed="false"><span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span></button>
+                <button id="item-data-components-add" class="dialogue-title-button item-recipe-add" type="button" aria-label="Add data component" aria-haspopup="menu" aria-expanded="false"><span class="item-recipe-add-icon" aria-hidden="true"></span></button>
+                <div id="item-data-components-add-options" class="pixel-option-stack item-recipe-add-options item-data-components-add-options" role="menu" hidden>
+                  <button class="pixel-option workspace-context-new-option" type="button" role="menuitem" data-stack-position="first" data-item-component-add="global">Global</button>
+                  <button class="pixel-option workspace-context-new-trigger workspace-context-new-option item-data-components-local-trigger" type="button" role="menuitem" data-stack-position="last" aria-haspopup="menu" aria-expanded="false"><span>Local</span><span class="pixel-direction-icon pixel-direction-right" aria-hidden="true"></span></button>
+                  <div class="pixel-option-stack workspace-context-submenu item-data-components-local-options" role="menu" hidden>
+                    <button class="pixel-option workspace-context-new-option" type="button" role="menuitem" data-item-component-local-type="double">Number</button>
+                    <button class="pixel-option workspace-context-new-option" type="button" role="menuitem" data-item-component-local-type="boolean">Boolean</button>
+                    <button class="pixel-option workspace-context-new-option" type="button" role="menuitem" data-item-component-local-type="string">Text</button>
+                  </div>
+                </div>
+              </div>
+              <div id="item-custom-methods-add-control" class="item-recipe-add-control" hidden>
+                <button id="item-custom-methods-add" class="dialogue-title-button item-recipe-add" type="button" aria-label="Add custom method" aria-haspopup="menu" aria-expanded="false"><span class="item-recipe-add-icon" aria-hidden="true"></span></button>
+                <div id="item-custom-methods-add-options" class="pixel-option-stack item-recipe-add-options" role="menu" hidden>
+                  <button class="pixel-option" type="button" role="menuitem" data-item-custom-method="use">Interaction</button>
+                  <button class="pixel-option" type="button" role="menuitem" data-item-custom-method="finishUsingItem">Finished Using</button>
+                  <button class="pixel-option" type="button" role="menuitem" data-item-custom-method="inventoryTick">Inventory Tick</button>
+                  <button class="pixel-option" type="button" role="menuitem" data-item-custom-method="hurtEnemy">Hurt Entity</button>
+                  <button class="pixel-option" type="button" role="menuitem" data-item-custom-method="interactLivingEntity">Entity Interaction</button>
+                </div>
+              </div>
             </header>
             <div class="floating-dialog-body item-authoring-dialog-body">
               <div id="item-authoring-dialog-content"></div>
@@ -799,17 +822,10 @@
           </div>
           <div class="workspace-item-field-row"><span>Recipe</span><button class="pixel-button" type="button" data-item-dialog-action="recipes">Edit</button></div>
           <div class="workspace-item-field-row"><span>Tags</span><button class="pixel-button" type="button" data-item-dialog-action="tags">Edit</button></div>
-          <div class="workspace-item-field-row"><span>Data Components</span><button class="pixel-button" type="button" disabled aria-label="Data Components are not wired yet">Edit</button></div>
-          <div class="workspace-item-field-row"><span>Custom Class</span><div class="workspace-item-inline-controls"><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-checkbox="customClass"></button><button class="pixel-button" type="button" data-item-dialog-action="customClass" data-item-condition="customClass" hidden>Edit</button></div></div>
-          <div data-item-dialog-fields="customClass" hidden>
-            <div class="workspace-item-field-row"><span>Block Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="useOn"></button></div>
-            <div class="workspace-item-field-row"><span>Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="use"></button></div>
-            <div class="workspace-item-field-row"><span>Continuous Use</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="continuousUse"></button></div>
-            <div class="workspace-item-field-row"><span>Finished Using</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="finishUsingItem"></button></div>
-            <div class="workspace-item-field-row"><span>Inventory Tick</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="inventoryTick"></button></div>
-            <div class="workspace-item-field-row"><span>Hurt Entity</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="hurtEnemy"></button></div>
-            <div class="workspace-item-field-row"><span>Entity Interaction</span><button class="pixel-checkbox" type="button" role="checkbox" aria-checked="false" data-item-method="interactLivingEntity"></button></div>
-          </div>
+          <div class="workspace-item-field-row"><span>Data Components</span><button class="pixel-button" type="button" data-item-dialog-action="dataComponents">Edit</button></div>
+          <div data-item-dialog-fields="dataComponents" hidden><div class="item-data-components-preview" aria-label="Selected data components"></div></div>
+          <div class="workspace-item-field-row"><span>Custom Class</span><button class="pixel-button" type="button" data-item-dialog-action="customClass">Edit</button></div>
+          <div data-item-dialog-fields="customClass" hidden><div class="item-custom-methods-list"></div></div>
           <div class="workspace-item-status" role="status" data-item-status></div>
         </div>
       </section>

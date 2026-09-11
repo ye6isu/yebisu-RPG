@@ -27,6 +27,7 @@ import net.ye6isu.yebisuRPG.vfx.network.VfxStartPayload;
 import com.mojang.math.Axis;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -136,34 +137,52 @@ public final class ClientVfxManager {
         VfxDefinition.Position position = plane.positionAt(elapsed);
         VfxDefinition.Position rotation = plane.rotationAt(elapsed);
         VfxDefinition.Position scale = plane.scaleAt(elapsed);
-        float rotationX = plane.baseRotationX() + (float)rotation.x();
-        float rotationY = plane.baseRotationY() + (float)rotation.y();
-        float rotationZ = plane.baseRotationZ() + (float)rotation.z();
-        Vec3 worldPivot = transform.origin().add(rotateLocalOffset(
+        float rotationX = (float)rotation.x();
+        float rotationY = (float)rotation.y();
+        float rotationZ = (float)rotation.z();
+        Vec3 worldPosition = transform.origin().add(rotateLocalOffset(
                 transform,
-                position.x() + plane.pivotX(),
-                position.y() + plane.pivotY(),
-                position.z() + plane.pivotZ()));
-        double relativeX = -plane.pivotX();
-        double relativeY = -plane.pivotY();
-        double relativeZ = -plane.pivotZ();
-        double scaledRelativeX = relativeX * scale.x();
-        double scaledRelativeY = relativeY * scale.y();
-        double scaledRelativeZ = relativeZ * scale.z();
+                position.x(),
+                position.y(),
+                position.z()));
+        Vec3 pivot = new Vec3(plane.pivotX(), plane.pivotY(), plane.pivotZ());
+        Vec3 rotatedBackFromPivot = rotatePlaneOffset(
+                -plane.pivotX(),
+                -plane.pivotY(),
+                -plane.pivotZ(),
+                rotationX,
+                rotationY,
+                rotationZ);
+        Vec3 worldPivot;
+        Vec3 worldCenter;
+        if (plane.billboard()) {
+            Quaternionf cameraRotation = event.getCamera().rotation();
+            worldPivot = worldPosition.add(rotateByQuaternion(cameraRotation, pivot));
+            worldCenter = worldPosition.add(rotateByQuaternion(
+                    cameraRotation,
+                    pivot.add(rotatedBackFromPivot)));
+        } else {
+            worldPivot = transform.origin().add(rotateLocalOffset(
+                    transform,
+                    position.x() + plane.pivotX(),
+                    position.y() + plane.pivotY(),
+                    position.z() + plane.pivotZ()));
+            worldCenter = transform.origin().add(rotateLocalOffset(
+                    transform,
+                    position.x() + plane.pivotX() + rotatedBackFromPivot.x,
+                    position.y() + plane.pivotY() + rotatedBackFromPivot.y,
+                    position.z() + plane.pivotZ() + rotatedBackFromPivot.z));
+        }
         double scaledHalfWidth = plane.width() * Math.abs(scale.x()) * 0.5;
         double scaledHalfHeight = plane.height() * Math.abs(scale.y()) * 0.5;
-        double radius = Math.sqrt(
-                scaledRelativeX * scaledRelativeX
-                        + scaledRelativeY * scaledRelativeY
-                        + scaledRelativeZ * scaledRelativeZ)
-                + Math.sqrt(scaledHalfWidth * scaledHalfWidth + scaledHalfHeight * scaledHalfHeight);
+        double radius = Math.sqrt(scaledHalfWidth * scaledHalfWidth + scaledHalfHeight * scaledHalfHeight);
         if (!event.getFrustum().isVisible(new AABB(
-                worldPivot.x - radius,
-                worldPivot.y - radius,
-                worldPivot.z - radius,
-                worldPivot.x + radius,
-                worldPivot.y + radius,
-                worldPivot.z + radius))) return;
+                worldCenter.x - radius,
+                worldCenter.y - radius,
+                worldCenter.z - radius,
+                worldCenter.x + radius,
+                worldCenter.y + radius,
+                worldCenter.z + radius))) return;
 
         RenderType renderType = RenderType.entityTranslucent(plane.texture());
         usedTypes.add(renderType);
@@ -185,6 +204,7 @@ public final class ClientVfxManager {
             poseStack.mulPose(Axis.YP.rotationDegrees(rotationY));
             poseStack.mulPose(Axis.XP.rotationDegrees(rotationX));
             poseStack.mulPose(Axis.ZP.rotationDegrees(rotationZ));
+            poseStack.translate(-plane.pivotX(), -plane.pivotY(), -plane.pivotZ());
         } else {
             poseStack.translate(
                     transform.origin().x - camera.x,
@@ -199,9 +219,9 @@ public final class ClientVfxManager {
             poseStack.mulPose(Axis.YP.rotationDegrees(rotationY));
             poseStack.mulPose(Axis.XP.rotationDegrees(rotationX));
             poseStack.mulPose(Axis.ZP.rotationDegrees(rotationZ));
+            poseStack.translate(-plane.pivotX(), -plane.pivotY(), -plane.pivotZ());
         }
         poseStack.scale((float)scale.x(), (float)scale.y(), (float)scale.z());
-        poseStack.translate(relativeX, relativeY, relativeZ);
 
         int frame = TextureFrameClock.frameAt(
                 (long) Math.floor(instance.startTick() + elapsed),
@@ -220,7 +240,7 @@ public final class ClientVfxManager {
         int alpha = Math.round(Mth.clamp(plane.opacityAt(elapsed), 0.0f, 1.0f) * 255.0f);
         int light = plane.fullBright()
                 ? 0x00F000F0
-                : samplePlaneLight(level, worldPivot);
+                : samplePlaneLight(level, worldCenter);
         Matrix4f matrix = poseStack.last().pose();
 
         vertex(vertices, matrix, -halfWidth, -halfHeight, 0.0f, red, green, blue, alpha, 0.0f, v1, light);
@@ -327,6 +347,26 @@ public final class ClientVfxManager {
                 x * yawCos + pitchedZ * yawSin,
                 pitchedY,
                 -x * yawSin + pitchedZ * yawCos);
+    }
+
+    private static Vec3 rotatePlaneOffset(
+            double x,
+            double y,
+            double z,
+            float rotationX,
+            float rotationY,
+            float rotationZ
+    ) {
+        return new Vec3(x, y, z)
+                .zRot((float)Math.toRadians(rotationZ))
+                .xRot((float)Math.toRadians(rotationX))
+                .yRot((float)Math.toRadians(rotationY));
+    }
+
+    private static Vec3 rotateByQuaternion(Quaternionf rotation, Vec3 value) {
+        Vector3f result = new Vector3f((float)value.x, (float)value.y, (float)value.z);
+        rotation.transform(result);
+        return new Vec3(result.x, result.y, result.z);
     }
 
     private static void vertex(

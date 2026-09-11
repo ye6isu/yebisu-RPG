@@ -5,6 +5,7 @@ import { LogicalSize } from '@tauri-apps/api/dpi';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { initializeItemEditorPage } from './item-editor.js';
 import { initializeFolderPage } from './folder-page.js';
+import { attachDataSortMenu, attachDataTypeAddMenu, createEditableDataRow, deleteEditableDataRow } from './data-inline-editor.js';
 import './styles.css';
 
 const detachedWindowType = new URLSearchParams(window.location.search).get('window');
@@ -195,12 +196,30 @@ let testDropdownSelection = 'Option 1';
 let dataVariableFirstVisibleIndex = 0;
 let dataVariableScrollbarDragState = null;
 let dataVariableNextAddedOrder = 1;
+let dataResourceDraftOrder = 1;
 let dataVariableSortMode = 'added-ascending';
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 let dataPageScrollbarDragState = null;
 let openResourceWorkspace = () => {};
 
 const getDataVariableRows = () => [...dataVariableRows.querySelectorAll(':scope > .row_container')];
+const appendGroupedDataRows = (container, rows) => {
+  const children = [];
+  rows.forEach((row, index) => {
+    if (index > 0 && row.dataset.dataType !== rows[index - 1].dataset.dataType) {
+      const dividerRow = document.createElement('div');
+      dividerRow.className = 'data-inline-group-divider-row';
+      dividerRow.setAttribute('role', 'separator');
+      const divider = document.createElement('div');
+      divider.className = 'pixel-divider pixel-divider-horizontal data-inline-group-divider';
+      divider.setAttribute('aria-hidden', 'true');
+      dividerRow.append(divider);
+      children.push(dividerRow);
+    }
+    children.push(row);
+  });
+  container.replaceChildren(...children);
+};
 const syncDataVariableRows = requestedIndex => {
   const rows = getDataVariableRows();
   const maximumIndex = Math.max(0, rows.length - dataVariableVisibleRowCount);
@@ -225,7 +244,19 @@ const syncDataVariableRows = requestedIndex => {
   dataVariableScrollbarThumb.style.height = `${thumbHeight}px`;
   dataVariableScrollbarThumb.style.top = `${maximumIndex ? dataVariableFirstVisibleIndex / maximumIndex * travel : 0}px`;
 };
-const createDataRow = ({ category, id, data, addedOrder }) => {
+const createDataRow = ({ category, id, data, addedOrder, deleteVisible }) => {
+  if (category === 'entityvars' || category === 'attributes' || category === 'components') {
+    return createEditableDataRow({
+      category,
+      id,
+      data,
+      addedOrder,
+      deleteVisible: deleteVisible ?? (category === 'entityvars'
+        ? dataWorkspaceDeleteToggle.getAttribute('aria-pressed') === 'true'
+        : false),
+      invoke,
+    });
+  }
   const row = document.createElement('div');
   row.className = 'pixel-button object-container row_container';
   const displayName = String(data.name || data.titleText || data.displayName || data.id || id);
@@ -314,6 +345,9 @@ const sortDataVariableRows = mode => {
   dataVariableSortMode = mode;
   const rows = getDataVariableRows();
   rows.sort((left, right) => {
+    const typeOrder = { double: 0, boolean: 1, string: 2 };
+    const typeComparison = (typeOrder[left.dataset.dataType] ?? 99) - (typeOrder[right.dataset.dataType] ?? 99);
+    if (typeComparison) return typeComparison;
     if (mode.startsWith('alphabetical')) {
       const comparison = left.dataset.sortName.localeCompare(right.dataset.sortName, undefined, {
         numeric: true,
@@ -324,7 +358,7 @@ const sortDataVariableRows = mode => {
     const comparison = Number(left.dataset.addedOrder) - Number(right.dataset.addedOrder);
     return mode === 'added-descending' ? -comparison : comparison;
   });
-  dataVariableRows.append(...rows);
+  appendGroupedDataRows(dataVariableRows, rows);
   for (const option of dataWorkspaceFilterOptionButtons) {
     option.setAttribute('aria-checked', String(option.dataset.dataSort === mode));
   }
@@ -343,7 +377,18 @@ loadYcsDataCategory('entityvars').then(records => {
   sortDataVariableRows(dataVariableSortMode);
 }).catch(error => console.error('Unable to load entity variables:', error));
 
-dataWorkspaceAddButton.addEventListener('click', () => {});
+attachDataTypeAddMenu(dataWorkspaceAddButton, type => {
+  const row = createDataRow({
+    category: 'entityvars',
+    id: '',
+    data: { type, defaultValue: type === 'boolean' ? false : '' },
+    addedOrder: dataVariableNextAddedOrder++,
+  });
+  dataVariableRows.append(row);
+  sortDataVariableRows(dataVariableSortMode);
+  syncDataVariableRows(Math.max(0, getDataVariableRows().indexOf(row) - dataVariableVisibleRowCount + 1));
+  row.querySelector('.data-inline-name')?.focus();
+});
 dataWorkspaceDeleteToggle.addEventListener('click', () => {
   const pressed = dataWorkspaceDeleteToggle.getAttribute('aria-pressed') !== 'true';
   dataWorkspaceDeleteToggle.setAttribute('aria-pressed', String(pressed));
@@ -360,6 +405,23 @@ for (const content of document.querySelectorAll('[data-ycs-data-category]')) {
   let firstVisibleIndex = 0;
   let dragState = null;
   const rows = () => [...rowList.querySelectorAll(':scope > .row_container')];
+  let sectionSortMode = 'added-ascending';
+  const sortRows = mode => {
+    sectionSortMode = mode;
+    const currentRows = rows();
+    const typeOrder = { double: 0, boolean: 1, string: 2, attribute: 0 };
+    currentRows.sort((left, right) => {
+      const typeComparison = (typeOrder[left.dataset.dataType] ?? 99) - (typeOrder[right.dataset.dataType] ?? 99);
+      if (typeComparison) return typeComparison;
+      if (mode.startsWith('alphabetical')) {
+        const comparison = left.dataset.sortName.localeCompare(right.dataset.sortName, undefined, { numeric: true, sensitivity: 'base' });
+        return mode === 'alphabetical-descending' ? -comparison : comparison;
+      }
+      const comparison = Number(left.dataset.addedOrder) - Number(right.dataset.addedOrder);
+      return mode === 'added-descending' ? -comparison : comparison;
+    });
+    appendGroupedDataRows(rowList, currentRows);
+  };
   const syncRows = requestedIndex => {
     const currentRows = rows();
     const maximumIndex = Math.max(0, currentRows.length - dataVariableVisibleRowCount);
@@ -378,17 +440,66 @@ for (const content of document.querySelectorAll('[data-ycs-data-category]')) {
   };
   const section = content.closest('.data-additional-section');
   const toggle = section.querySelector('[data-demo-delete-toggle]');
+  const sortButton = [...section.querySelectorAll('.workspace-top-control-button')]
+    .find(button => button.getAttribute('aria-label')?.startsWith('Sort '));
+  if (sortButton) attachDataSortMenu(sortButton, mode => {
+    sortRows(mode);
+    syncRows(0);
+    sortButton.title = mode.replace('-', ' ');
+  });
   toggle.addEventListener('click', () => {
     const pressed = toggle.getAttribute('aria-pressed') !== 'true';
     toggle.setAttribute('aria-pressed', String(pressed));
     for (const button of rowList.querySelectorAll('.data-variable-delete-button')) button.hidden = !pressed;
   });
-  section.querySelector('[data-demo-add]').addEventListener('click', () => {});
-  rowList.addEventListener('click', event => {
+  const addRow = type => {
+    if (category === 'resources') {
+      openResourceWorkspace(`new_resource_${dataResourceDraftOrder++}`, {
+        id: '',
+        name: '',
+        currentDefault: 0,
+        maximumDefault: 0,
+        regenerationDefault: 0,
+        order: rows().length,
+        barTexture: '',
+      });
+      return;
+    }
+    const row = createDataRow({
+      category,
+      id: '',
+      data: category === 'attributes'
+        ? { min: 0, base: 0, max: 100, syncToClient: true }
+        : { type, defaultValue: type === 'boolean' ? false : '' },
+      addedOrder: rows().length + 1,
+      deleteVisible: toggle.getAttribute('aria-pressed') === 'true',
+    });
+    rowList.append(row);
+    sortRows(sectionSortMode);
+    syncRows(Math.max(0, rows().indexOf(row) - dataVariableVisibleRowCount + 1));
+    row.querySelector('.data-inline-name')?.focus();
+  };
+  const addButton = section.querySelector('[data-demo-add]');
+  if (category === 'components') attachDataTypeAddMenu(addButton, addRow);
+  else addButton.addEventListener('click', () => addRow('attribute'));
+  rowList.addEventListener('click', async event => {
     const button = event.target.closest('.data-variable-delete-button');
     if (button) {
-      button.closest('.row_container')?.remove();
-      syncRows(firstVisibleIndex);
+      const row = button.closest('.row_container');
+      if (category === 'resources') {
+        row.remove();
+        syncRows(firstVisibleIndex);
+        return;
+      }
+      button.disabled = true;
+      try {
+        await deleteEditableDataRow(row, category, invoke);
+        sortRows(sectionSortMode);
+        syncRows(firstVisibleIndex);
+      } catch (error) {
+        setTimeout(() => { button.disabled = false; }, 0);
+        console.error(`Unable to delete ${category}/${row.dataset.dataId}:`, error);
+      }
     }
   });
   rowList.addEventListener('wheel', event => {
@@ -430,6 +541,7 @@ for (const content of document.querySelectorAll('[data-ycs-data-category]')) {
       })
       : visibleRecords;
     rowList.replaceChildren(...orderedRecords.map(record => createDataRow({ category, ...record })));
+    sortRows(sectionSortMode);
     syncRows(0);
   }).catch(error => console.error(`Unable to load ${category}:`, error));
 }
@@ -516,11 +628,19 @@ dataWorkspaceFilterOptions.addEventListener('keydown', event => {
   event.preventDefault();
   dataWorkspaceFilterOptionButtons[(currentIndex + direction + dataWorkspaceFilterOptionButtons.length) % dataWorkspaceFilterOptionButtons.length].focus();
 });
-dataVariableRows.addEventListener('click', event => {
+dataVariableRows.addEventListener('click', async event => {
   const deleteButton = event.target.closest('.data-variable-delete-button');
   if (!deleteButton) return;
-  deleteButton.closest('.row_container')?.remove();
-  syncDataVariableRows(dataVariableFirstVisibleIndex);
+  const row = deleteButton.closest('.row_container');
+  deleteButton.disabled = true;
+  try {
+    await deleteEditableDataRow(row, 'entityvars', invoke);
+    sortDataVariableRows(dataVariableSortMode);
+    syncDataVariableRows(dataVariableFirstVisibleIndex);
+  } catch (error) {
+    deleteButton.disabled = false;
+    console.error(`Unable to delete entityvars/${row.dataset.dataId}:`, error);
+  }
 });
 dataVariableRows.addEventListener('wheel', event => {
   if (!event.deltaY || getDataVariableRows().length <= dataVariableVisibleRowCount) return;
@@ -2952,6 +3072,45 @@ const clearWorkspaceObjectDropTargets = () => {
 };
 
 let workspaceObjectPointerDrag = null;
+let workspaceMarqueeSelection = null;
+
+workspaceObjectGrid.addEventListener('pointerdown', event => {
+  if (event.button !== 0 || event.target !== workspaceObjectGrid || !['home', 'assets'].includes(homeTab.dataset.workspaceMode)) return;
+  const bounds = workspaceObjectGrid.getBoundingClientRect();
+  const marquee = document.createElement('div');
+  marquee.className = 'workspace-selection-marquee';
+  workspaceObjectGrid.append(marquee);
+  workspaceMarqueeSelection = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, bounds, marquee };
+  workspaceObjectGrid.setPointerCapture(event.pointerId);
+  for (const shell of workspaceObjectGrid.querySelectorAll(':scope > .workspace-object-shell')) shell.classList.remove('workspace-object-selected');
+});
+
+workspaceObjectGrid.addEventListener('pointermove', event => {
+  const selection = workspaceMarqueeSelection;
+  if (!selection || selection.pointerId !== event.pointerId) return;
+  const left = Math.min(selection.x, event.clientX);
+  const top = Math.min(selection.y, event.clientY);
+  const right = Math.max(selection.x, event.clientX);
+  const bottom = Math.max(selection.y, event.clientY);
+  const scaleX = workspaceObjectGrid.clientWidth / selection.bounds.width;
+  const scaleY = workspaceObjectGrid.clientHeight / selection.bounds.height;
+  selection.marquee.style.left = `${((left - selection.bounds.left) * scaleX) + workspaceObjectGrid.scrollLeft}px`;
+  selection.marquee.style.top = `${((top - selection.bounds.top) * scaleY) + workspaceObjectGrid.scrollTop}px`;
+  selection.marquee.style.width = `${(right - left) * scaleX}px`;
+  selection.marquee.style.height = `${(bottom - top) * scaleY}px`;
+  for (const shell of workspaceObjectGrid.querySelectorAll(':scope > .workspace-object-shell:not([hidden])')) {
+    const box = shell.getBoundingClientRect();
+    shell.classList.toggle('workspace-object-selected', box.right >= left && box.left <= right && box.bottom >= top && box.top <= bottom);
+  }
+});
+
+const finishWorkspaceMarquee = event => {
+  if (!workspaceMarqueeSelection || workspaceMarqueeSelection.pointerId !== event.pointerId) return;
+  workspaceMarqueeSelection.marquee.remove();
+  workspaceMarqueeSelection = null;
+};
+workspaceObjectGrid.addEventListener('pointerup', finishWorkspaceMarquee);
+workspaceObjectGrid.addEventListener('pointercancel', finishWorkspaceMarquee);
 
 document.addEventListener('pointerdown', event => {
   if (event.button !== 0) return;

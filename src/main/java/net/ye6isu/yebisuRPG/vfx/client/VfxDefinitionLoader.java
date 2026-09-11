@@ -76,9 +76,6 @@ public final class VfxDefinitionLoader {
 
         JsonObject position = object.has("position") ? object.getAsJsonObject("position") : new JsonObject();
         JsonObject pivot = object.has("pivot") ? object.getAsJsonObject("pivot") : new JsonObject();
-        JsonObject baseRotation = object.has("baseRotation")
-                ? object.getAsJsonObject("baseRotation")
-                : new JsonObject();
         JsonObject rotation = object.has("rotation") ? object.getAsJsonObject("rotation") : new JsonObject();
         JsonObject scale = object.has("scale") ? object.getAsJsonObject("scale") : new JsonObject();
         float opacity = clamp(decimal(object, "opacity", 1.0f), 0.0f, 1.0f);
@@ -95,9 +92,6 @@ public final class VfxDefinitionLoader {
                 decimal(pivot, "x", 0.0f),
                 decimal(pivot, "y", 0.0f),
                 decimal(pivot, "z", 0.0f),
-                decimal(baseRotation, "x", 0.0f),
-                decimal(baseRotation, "y", 0.0f),
-                decimal(baseRotation, "z", 0.0f),
                 decimal(rotation, "x", 0.0f),
                 decimal(rotation, "y", 0.0f),
                 decimal(rotation, "z", 0.0f),

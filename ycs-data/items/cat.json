@@ -1,9 +1,33 @@
 {
   "_injections": [
     {
-      "content": "    public static final DeferredItem<Item> CAT = ITEMS.register(\"cat\",\n            () -> new Item(new Item.Properties().stacksTo(32)));",
+      "content": "    public static final DeferredItem<Item> CAT = ITEMS.register(\"cat\",\n            () -> new Item(new Item.Properties().stacksTo(32).attributes(ItemAttributeModifiers.builder().add(Attributes.ATTACK_SPEED, new AttributeModifier(Item.BASE_ATTACK_SPEED_ID, 6, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND).build())));",
       "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
       "marker": "YCS_Mod_Items",
+      "type": "java-marker"
+    },
+    {
+      "content": "import net.minecraft.world.entity.EquipmentSlotGroup;",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Item_Imports",
+      "type": "java-marker"
+    },
+    {
+      "content": "import net.minecraft.world.entity.ai.attributes.AttributeModifier;",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Item_Imports",
+      "type": "java-marker"
+    },
+    {
+      "content": "import net.minecraft.world.entity.ai.attributes.Attributes;",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Item_Imports",
+      "type": "java-marker"
+    },
+    {
+      "content": "import net.minecraft.world.item.component.ItemAttributeModifiers;",
+      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
+      "marker": "YCS_Mod_Item_Imports",
       "type": "java-marker"
     },
     {
@@ -26,10 +50,53 @@
       "type": "created-file"
     }
   ],
+  "attackDamage": null,
+  "attackSpeed": 6,
+  "canAlwaysEat": false,
   "creativeTab": "yebisurpg",
-  "displayName": "Cat",
+  "customClass": false,
+  "customMethods": [
+    {
+      "continuousUse": false,
+      "key": "use",
+      "ticks": 32,
+      "useAnimation": "NONE"
+    }
+  ],
+  "dataComponents": [],
+  "displayModel": "",
+  "displayModelData": null,
+  "displayName": "Cater",
+  "enabledMethods": [
+    "use"
+  ],
+  "fastFood": false,
+  "foodEnabled": false,
+  "fuel": null,
+  "fuelEnabled": false,
+  "geoModel": "",
+  "geoModelData": null,
+  "geoTexture": "",
   "holdingMode": "generated",
   "id": "cat",
+  "itemAbilitiesEnabled": false,
+  "itemAbilitySlots": [],
+  "nutrition": 4,
+  "recipes": [],
+  "saturation": 0.3,
   "stackSize": 32,
-  "texture": "mrow"
+  "states": [],
+  "tags": [],
+  "texture": "mrow",
+  "toolEnabled": false,
+  "toolTier": "iron",
+  "toolType": "sword",
+  "tooltipEnabled": false,
+  "tooltipHidden": "",
+  "tooltipNormal": "",
+  "tooltipShift": false,
+  "tooltipShiftHint": "",
+  "tooltipUseDefaultHint": true,
+  "useAnim": "NONE",
+  "useDurationValue": 32
 }

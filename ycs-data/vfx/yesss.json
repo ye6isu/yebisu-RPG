@@ -11,14 +11,9 @@
       "position": {
         "x": "0",
         "y": "0",
-        "z": "2"
+        "z": "0"
       },
       "pivot": {
-        "x": "0",
-        "y": "0",
-        "z": "-2"
-      },
-      "baseRotation": {
         "x": "0",
         "y": "0",
         "z": "0"
@@ -45,7 +40,62 @@
       "textureLoop": false,
       "startTick": "0",
       "endTick": "20",
-      "positionKeyframes": [],
+      "positionKeyframes": [
+        {
+          "id": "position_1",
+          "tick": "0",
+          "value": {
+            "x": "0",
+            "y": "0",
+            "z": "0"
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.5839624944722878,
+            "y1": 0.06415111613723468,
+            "x2": 0.8858492869251179,
+            "y2": 0.28301886792452835
+          }
+        },
+        {
+          "id": "position_2",
+          "tick": "4",
+          "value": {
+            "x": "0",
+            "y": "0",
+            "z": "4"
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.03679268315153302,
+            "y1": 0.5811321330520343,
+            "x2": 0.25566014703714623,
+            "y2": 0.9245283018867925
+          }
+        },
+        {
+          "id": "position_3",
+          "tick": "20",
+          "value": {
+            "x": "0",
+            "y": "0",
+            "z": "1"
+          },
+          "easing": {
+            "type": "cubic",
+            "mode": "inOut",
+            "amount": 1,
+            "x1": 0.3333333333333333,
+            "y1": 0.3333333333333333,
+            "x2": 0.6666666666666666,
+            "y2": 0.6666666666666666
+          }
+        }
+      ],
       "opacityKeyframes": [],
       "separatePositionDimensions": false,
       "positionXKeyframes": [
@@ -180,44 +230,7 @@
           }
         }
       ],
-      "rotationKeyframes": [
-        {
-          "id": "rotation_1",
-          "tick": "0",
-          "value": {
-            "x": "0",
-            "y": "0",
-            "z": "0"
-          },
-          "easing": {
-            "type": "expo",
-            "mode": "out",
-            "amount": 1,
-            "x1": 0.3333333333333333,
-            "y1": 0.3333333333333333,
-            "x2": 0.6666666666666666,
-            "y2": 0.6666666666666666
-          }
-        },
-        {
-          "id": "rotation_2",
-          "tick": "20",
-          "value": {
-            "x": "0",
-            "y": "-720",
-            "z": "0"
-          },
-          "easing": {
-            "type": "cubic",
-            "mode": "inOut",
-            "amount": 1,
-            "x1": 0.3333333333333333,
-            "y1": 0.3333333333333333,
-            "x2": 0.6666666666666666,
-            "y2": 0.6666666666666666
-          }
-        }
-      ],
+      "rotationKeyframes": [],
       "scaleKeyframes": [],
       "separateRotationDimensions": false,
       "rotationXKeyframes": [],
