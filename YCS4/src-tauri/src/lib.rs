@@ -12,6 +12,7 @@ use std::os::windows::process::CommandExt;
 struct TaskState {
     child: Option<Child>,
     output: Arc<Mutex<String>>,
+    last_exit_code: Option<i32>,
 }
 
 static GRADLE_TASKS: OnceLock<Mutex<HashMap<String, TaskState>>> = OnceLock::new();
@@ -213,6 +214,7 @@ fn toggle_gradle_task(task: &str) -> Result<bool, String> {
     let state = tasks.entry(task.to_string()).or_insert_with(|| TaskState {
         child: None,
         output: Arc::new(Mutex::new(String::new())),
+        last_exit_code: None,
     });
 
     if let Some(mut child) = state.child.take() {
@@ -223,6 +225,7 @@ fn toggle_gradle_task(task: &str) -> Result<bool, String> {
         {
             stop_gradle_task(&mut child)?;
             append_task_output(&state.output, "\n[stopped]\n");
+            state.last_exit_code = None;
             return Ok(false);
         }
     }
@@ -231,11 +234,12 @@ fn toggle_gradle_task(task: &str) -> Result<bool, String> {
     let child = start_gradle_task(task, Arc::clone(&output))?;
     state.output = output;
     state.child = Some(child);
+    state.last_exit_code = None;
     Ok(true)
 }
 
 #[tauri::command]
-fn gradle_task_snapshot(task: &str) -> Result<(bool, String), String> {
+fn gradle_task_snapshot(task: &str) -> Result<(bool, String, Option<i32>), String> {
     let task = supported_gradle_task(task)?;
     let mut tasks = gradle_tasks()
         .lock()
@@ -243,6 +247,7 @@ fn gradle_task_snapshot(task: &str) -> Result<(bool, String), String> {
     let state = tasks.entry(task.to_string()).or_insert_with(|| TaskState {
         child: None,
         output: Arc::new(Mutex::new(String::new())),
+        last_exit_code: None,
     });
 
     let finished = if let Some(child) = state.child.as_mut() {
@@ -252,6 +257,7 @@ fn gradle_task_snapshot(task: &str) -> Result<(bool, String), String> {
     };
     if let Some(status) = finished {
         state.child = None;
+        state.last_exit_code = status.code();
         append_task_output(&state.output, &format!("\n[process exited: {}]\n", status));
     }
 
@@ -261,7 +267,7 @@ fn gradle_task_snapshot(task: &str) -> Result<(bool, String), String> {
         .lock()
         .map_err(|_| "Gradle task output is unavailable".to_string())?
         .clone();
-    Ok((running, output))
+    Ok((running, output, state.last_exit_code))
 }
 
 fn stop_all_gradle_tasks() {
@@ -764,7 +770,8 @@ fn is_basic_item_injection(injection: &Value, id: &str) -> bool {
         "json-key" => file.ends_with("/lang/en_us.json") && (key == format!("item.yebisurpg.{}", id) || key.starts_with(&format!("tooltip.yebisurpg.{}.", id))),
         "json-array-value" => injection.get("value").and_then(Value::as_str) == Some(format!("yebisurpg:{}", id).as_str()),
         "created-file" => {
-            file == format!("resources/assets/yebisurpg/textures/item/{}.png", id)
+            file == format!("java/net/ye6isu/yebisuRPG/item/custom/{}.java", item_custom_class_name(id))
+                || file == format!("resources/assets/yebisurpg/textures/item/{}.png", id)
                 || file == format!("resources/assets/yebisurpg/textures/item/{}.png.mcmeta", id)
                 || file == format!("resources/assets/yebisurpg/models/item/{}.json", id)
                 || file.starts_with(&format!("resources/assets/yebisurpg/textures/item/{}_frame", id))
@@ -939,6 +946,83 @@ fn java_float(value: f64) -> String {
     format!("{}f", rendered)
 }
 
+fn item_custom_class_name(id: &str) -> String {
+    let mut result = String::new();
+    for part in id.split('_').filter(|part| !part.is_empty()) {
+        let mut chars = part.chars();
+        if let Some(first) = chars.next() {
+            result.extend(first.to_uppercase());
+            result.push_str(chars.as_str());
+        }
+    }
+    if result.is_empty() { result.push_str("Custom"); }
+    result.push_str("Item");
+    result
+}
+
+fn build_custom_item_class(id: &str, authored: &Map<String, Value>) -> Result<Option<(String, String)>, String> {
+    let enabled = authored.get("enabledMethods").and_then(Value::as_array).cloned().unwrap_or_default();
+    if enabled.is_empty() { return Ok(None); }
+    let class_name = item_custom_class_name(id);
+    let tool_enabled = authored.get("toolEnabled").and_then(Value::as_bool).unwrap_or(false);
+    let base_class = if tool_enabled {
+        match authored.get("toolType").and_then(Value::as_str).unwrap_or("sword") {
+            "sword" => "SwordItem", "pickaxe" => "PickaxeItem", "axe" => "AxeItem",
+            "shovel" => "ShovelItem", "hoe" => "HoeItem",
+            value => return Err(format!("Unsupported tool type '{}'", value)),
+        }
+    } else { "Item" };
+    let compiled = authored.get("compiledMethods").and_then(Value::as_object);
+    let specs = [
+        ("use", "InteractionResultHolder<ItemStack>", "use(Level level, Player player, InteractionHand usedHand)", Some("player.startUsingItem(usedHand);"), Some("return InteractionResultHolder.consume(player.getItemInHand(usedHand));")),
+        ("continuousUse", "void", "onUseTick(Level level, LivingEntity livingEntity, ItemStack stack, int remainingUseDuration)", None, None),
+        ("releaseUsing", "void", "releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeCharged)", None, None),
+        ("finishUsingItem", "ItemStack", "finishUsingItem(ItemStack stack, Level level, LivingEntity livingEntity)", None, Some("return super.finishUsingItem(stack, level, livingEntity);")),
+        ("inventoryTick", "void", "inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected)", None, None),
+        ("hurtEnemy", "boolean", "hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker)", None, Some("return super.hurtEnemy(stack, target, attacker);")),
+        ("interactLivingEntity", "InteractionResult", "interactLivingEntity(ItemStack stack, Player player, LivingEntity interactionTarget, InteractionHand usedHand)", None, Some("return super.interactLivingEntity(stack, player, interactionTarget, usedHand);")),
+    ];
+    let enabled_keys: Vec<&str> = enabled.iter().filter_map(Value::as_str).collect();
+    let mut methods = String::new();
+    for (key, return_type, signature, pre, fallback) in specs {
+        if !enabled_keys.contains(&key) { continue; }
+        let body = compiled.and_then(|map| map.get(key)).and_then(Value::as_array).cloned().unwrap_or_default();
+        methods.push_str(&format!("\n    @Override\n    public {} {} {{\n", return_type, signature));
+        if let Some(line) = pre { methods.push_str(&format!("        {}\n", line)); }
+        for line in body.iter().filter_map(Value::as_str) { methods.push_str(&format!("        {}\n", line)); }
+        if let Some(line) = fallback { methods.push_str(&format!("        {}\n", line)); }
+        methods.push_str("    }\n");
+    }
+    if authored.get("tooltipEnabled").and_then(Value::as_bool).unwrap_or(false) {
+        let normal = authored.get("tooltipNormal").and_then(Value::as_str).unwrap_or("").trim();
+        let hidden = authored.get("tooltipHidden").and_then(Value::as_str).unwrap_or("").trim();
+        methods.push_str("\n    @Override\n    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipData, TooltipFlag flag) {\n");
+        if !normal.is_empty() { methods.push_str(&format!("        tooltipData.add(Component.translatable(\"tooltip.yebisurpg.{}.normal\"));\n", id)); }
+        if authored.get("tooltipShift").and_then(Value::as_bool).unwrap_or(false) {
+            if authored.get("tooltipUseDefaultHint").and_then(Value::as_bool).unwrap_or(true) {
+                methods.push_str("        if (!flag.hasShiftDown()) tooltipData.add(Component.translatable(\"tooltip.yebisurpg.shift_hint\").withStyle(net.minecraft.ChatFormatting.GRAY));\n");
+            }
+            if !hidden.is_empty() { methods.push_str(&format!("        if (flag.hasShiftDown()) tooltipData.add(Component.translatable(\"tooltip.yebisurpg.{}.hidden\"));\n", id)); }
+        }
+        methods.push_str("        super.appendHoverText(stack, context, tooltipData, flag);\n    }\n");
+    }
+    if enabled_keys.contains(&"continuousUse") {
+        let ticks = authored.get("useDurationValue").and_then(Value::as_i64).unwrap_or(32).max(1);
+        methods.push_str(&format!("\n    @Override\n    public int getUseDuration(ItemStack stack, Level level) {{\n        return {};\n    }}\n", ticks));
+        let animation = authored.get("useAnim").and_then(Value::as_str).unwrap_or("NONE");
+        if animation != "NONE" {
+            methods.push_str(&format!("\n    @Override\n    public UseAnim getUseAnimation(ItemStack stack) {{\n        return UseAnim.{};\n    }}\n", animation));
+        }
+    }
+    let constructor = if tool_enabled {
+        format!("    public {}(Tier tier, Properties properties) {{ super(tier, properties); }}", class_name)
+    } else {
+        format!("    public {}(Properties properties) {{ super(properties); }}", class_name)
+    };
+    let source = format!("package net.ye6isu.yebisuRPG.item.custom;\n\nimport java.util.List;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.world.InteractionHand;\nimport net.minecraft.world.InteractionResult;\nimport net.minecraft.world.InteractionResultHolder;\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.effect.MobEffects;\nimport net.minecraft.world.entity.Entity;\nimport net.minecraft.world.entity.LivingEntity;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.Item.TooltipContext;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.Tier;\nimport net.minecraft.world.item.TooltipFlag;\nimport net.minecraft.world.item.UseAnim;\nimport net.minecraft.world.item.{};\nimport net.minecraft.world.level.Level;\nimport net.ye6isu.yebisuRPG.util.DashUtil;\nimport net.ye6isu.yebisuRPG.util.ProjectileUtil;\n\npublic class {} extends {} {{\n{}\n{} }}\n", base_class, class_name, base_class, constructor, methods);
+    Ok(Some((class_name, source)))
+}
+
 fn build_basic_item_registration(id: &str, stack_size: u32, authored: &Map<String, Value>) -> Result<(String, Vec<String>), String> {
     let constant = id.to_ascii_uppercase();
     let tool_enabled = authored.get("toolEnabled").and_then(Value::as_bool).unwrap_or(false);
@@ -989,9 +1073,14 @@ fn build_basic_item_registration(id: &str, stack_size: u32, authored: &Map<Strin
     }
 
     let tooltip_enabled = authored.get("tooltipEnabled").and_then(Value::as_bool).unwrap_or(false);
+    let custom_class_name = authored.get("enabledMethods").and_then(Value::as_array)
+        .filter(|methods| !methods.is_empty()).map(|_| item_custom_class_name(id));
     let base_class = if tool_enabled { tool_class } else { "Item" };
     let args = if tool_enabled { format!("{}, new Item.Properties(){}", tier, properties) } else { format!("new Item.Properties(){}", properties) };
-    let constructor = if tooltip_enabled {
+    let constructor = if let Some(class_name) = &custom_class_name {
+        imports.push(format!("import net.ye6isu.yebisuRPG.item.custom.{};", class_name));
+        format!("new {}({})", class_name, args)
+    } else if tooltip_enabled {
         let normal = authored.get("tooltipNormal").and_then(Value::as_str).unwrap_or("").trim();
         let hidden = authored.get("tooltipHidden").and_then(Value::as_str).unwrap_or("").trim();
         let shift = authored.get("tooltipShift").and_then(Value::as_bool).unwrap_or(false);
@@ -1039,6 +1128,7 @@ fn save_basic_item(
     }
     let authored = authoring_fields.as_object()
         .ok_or_else(|| "Item authoring fields must be an object".to_string())?;
+    let custom_class = build_custom_item_class(id, authored)?;
     let (registration, item_imports) = build_basic_item_registration(id, stack_size, authored)?;
     let shaped_recipe_outputs = build_shaped_recipe_outputs(id, &authoring_fields)?;
     let shapeless_recipe_outputs = build_shapeless_recipe_outputs(id, &authoring_fields)?;
@@ -1091,6 +1181,13 @@ fn save_basic_item(
     for import_line in item_imports {
         inject_marker_content(java_file, "YCS_Mod_Item_Imports", &import_line)?;
         injections.push(json!({ "type": "java-marker", "file": java_file, "marker": "YCS_Mod_Item_Imports", "content": import_line }));
+    }
+    if let Some((class_name, source)) = custom_class {
+        let class_file = format!("java/net/ye6isu/yebisuRPG/item/custom/{}.java", class_name);
+        let class_path = safe_source_path(&class_file)?;
+        if let Some(parent) = class_path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+        fs::write(&class_path, source).map_err(|error| format!("Failed to write custom Item class: {}", error))?;
+        injections.push(json!({ "type": "created-file", "file": class_file }));
     }
 
     let lang_file = "resources/assets/yebisurpg/lang/en_us.json";
