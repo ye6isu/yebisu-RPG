@@ -1,245 +1,132 @@
-<div align="center">
+# yebisu-RPG & YCS4
 
-# ⚔️ yebisu RPG
-
-**A High-Performance Modular Action-RPG Engine & Visual Tooling Suite for Minecraft**  
-*Engineered for Minecraft 1.21.1 (NeoForge) & Java 21 • Zero Runtime Dependencies • Dedicated Server Authoritative*
-
-[![Java](https://img.shields.io/badge/Java-21-orange.svg?style=flat&logo=openjdk)](https://openjdk.org/)
-[![NeoForge](https://img.shields.io/badge/NeoForge-1.21.1-blue.svg?style=flat)](https://neoforged.net/)
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB.svg?style=flat&logo=tauri)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-Backend-dea584.svg?style=flat&logo=rust)](https://www.rust-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-<br />
-
-<p align="center">
-  <img src="docs/images/modPreview.png" alt="In-Game RPG HUD and Gameplay" width="85%" />
-</p>
-<p align="center"><em>In-game action interface featuring dynamic data-driven HUDs, custom combat mechanics, and live resource synchronization</em></p>
-
-</div>
+A personal project exploring low-level game engine systems, dedicated server networking, and custom developer tooling for Minecraft (NeoForge 1.21.1 / Java 21).
 
 ---
 
-## 📌 Executive Summary
+## 📖 About This Project
 
-**yebisu RPG** is a full-stack game development project combining a custom **action-RPG engine mod** built natively on Minecraft 1.21.1 (NeoForge) with **YCS4 (yebisu Creator Studio 4)**, a bespoke desktop IDE and visual scaffolding suite built with **Tauri 2 and Rust**.
+This repository contains two main components that I developed together:
+1. **yebisu-RPG (`/src/main`)**: A Minecraft action-RPG mod focused on combat mechanics, custom animations, multi-layer rendering, and strict multiplayer synchronization.
+2. **YCS4 (`/YCS4`)**: A custom companion desktop IDE and visual scripting tool I built with **Tauri 2 (Rust + Vanilla JS)** to eliminate repetitive boilerplate and visually author game content.
 
-Unlike standard game mods that introduce heavy third-party runtime frameworks (e.g. GeckoLib, playerAnimator, Curios), **yebisu RPG was engineered from the ground up with zero required runtime dependencies**. Every core system—including skeletal animation blending, procedural torso rotation overrides, multi-layer emissive texture composition, dynamic HUD rendering, and server-authoritative state synchronization—is implemented natively at the bytecode and engine level.
+### Why I Built This
+Most Minecraft mods rely on heavy third-party runtime libraries (such as GeckoLib for animation or Curios for equipment slots). For this project, **I wanted to build everything from scratch with zero required runtime dependencies**. 
 
-Content creation is accelerated through **YCS4**, an external developer environment featuring a **node-based visual scripting canvas**, declarative JSON schemas, and a **Rust-powered reversible injection pipeline** that automatically maintains Java registrations, data generators, and assets without manual boilerplate.
-
----
-
-## 📸 In-Game & Tooling Showcase
-
-<div align="center">
-
-### In-Game Visual Systems
-<p align="center">
-  <img src="docs/images/modPreview2.png" alt="In-Game Combat & System Showcase" width="85%" />
-</p>
-<p align="center"><em>Real-time server-authoritative attribute tracking, custom entity attachments, and dynamic combat layers</em></p>
-
-### YCS4 Developer Studio & Node Pipeline
-<p align="center">
-  <img src="docs/images/YCS4.png" alt="YCS4 Developer Studio" width="85%" />
-</p>
-<p align="center"><em>YCS4 Desktop IDE: Declarative workspace management, asset bundles, and visual graph editing</em></p>
-
-</div>
+My goal was to understand and implement the foundational game systems myself:
+- How to build a custom skeletal animation playhead and blend engine.
+- How to maintain strict server authority and tick synchronization on real dedicated servers.
+- How to inject into vanilla rendering pipelines using bytecode mixins and core shaders.
+- How to design full-stack developer tooling that safely generates and modifies code without breaking hand-written sources.
 
 ---
 
-## 🏗️ System Architecture
+## 📸 Screenshots
+
+### In-Game Combat & Dynamic HUD
+![In-Game Action](docs/images/modPreview.png)
+*Custom dynamic HUD replacing vanilla status bars, displaying real-time attributes and resource gauges.*
+
+![Combat & Entity Systems](docs/images/modPreview2.png)
+*Live server-authoritative attribute tracking, player capabilities, and custom rendering passes.*
+
+### YCS4 Developer Tool
+![YCS4 Desktop Studio](docs/images/YCS4.png)
+*The desktop tool I built to visually inspect assets, manage game data, and author gameplay logic.*
+
+---
+
+## 🛠️ Systems I Engineered
+
+### 1. Dedicated Server Authority & Networking (`/src/main`)
+Because this mod was designed to run on real dedicated servers (with distinct client/server tick loops and network latency), all gameplay and visual states are strictly partitioned:
+- **Shared Clocks:** Multi-frame animated textures and timed events are calculated as a pure function of `level.getGameTime()`, ensuring smooth playback without drifting or flooding the network.
+- **Server Authority:** Dynamic visual states (like active texture layers or spell effects) are stored on the server (`TextureAuthority`) and pushed to tracking clients via custom network packets (`TextureSyncPayload`, `VfxStartPayload`).
+- **Data Attachments:** Player-specific RPG stats, stamina, and mana use NeoForge's capability-backed `ModAttachments` system.
+
+### 2. Custom Animation & Blend Pipeline (`/animation`)
+Rather than pulling in an external animation library, I implemented a lightweight animation system:
+- **`ClientAnimationEngine` & `AnimationBlender`:** Manages active animation tracks and performs real-time interpolation between combat movements and idle states.
+- **`AnimationPlayhead`:** Controls duration, keyframe curves, blend weights, and loop modes (`HOLD`, `LOOP`, `ONCE`).
+- **`TorsoRotationHolder`:** Procedurally adjusts player torso pitch and yaw during weapon swings and casting, independent of camera look direction.
+- **Matrix Interception:** Uses `ItemRenderContextHolder` to properly orient held weapons in first-person and third-person viewports during custom animations.
+
+### 3. Rendering, Mixins & Emissive Shaders (`/client/renderer`, `/mixin`)
+- **Bytecode Injections:** Used SpongePowered Mixins (`MixinPlayerRenderer`, `MixinLivingEntityRenderer`, `MixinItemInHandRenderer`) to hook into Minecraft's vanilla render passes without replacing entire renderer classes.
+- **Emissive Shading:** Created custom core shaders (`assets/yebisurpg/shaders/core/`) and dynamic render layers to support fullbright and glowing texture passes directly in vanilla render pipelines.
+- **Layered Texture Composition:** Developed a runtime compositor that layers sprite masks and dynamic overlays onto entities.
+
+### 4. Dynamic HUD & Attribute Unbounding (`/hud`, `/attribute`)
+- **`HudLayerHider`:** Intercepts vanilla GUI render events (`RenderGuiLayerEvent.Pre`) to suppress vanilla health, armor, food, and air bars.
+- **`ModHud`:** Renders custom smooth-interpolating resource gauges (HP, Mana, Stamina) based on underlying player capabilities.
+- **`AttributeRangeFix`:** Uses accessors to unlock vanilla attribute clamps, allowing RPG stats and health pools to scale freely.
+
+---
+
+## 💻 YCS4: Custom Developer Tooling (`/YCS4`)
+
+As the mod grew, manually writing Java registration calls, JSON models, recipes, and texture metadata for every item became repetitive and error-prone. I built **YCS4 (yebisu Creator Studio 4)** to streamline this pipeline.
 
 ```mermaid
-flowchart TD
-    subgraph Tooling ["YCS4 Developer Environment (Desktop App)"]
-        UI["Custom UI / Node Scripting Canvas\n(Vanilla JS + CSS)"]
-        IPC["Tauri 2 IPC Bridge"]
-        RustCore["Rust Engine (lib.rs)\n• AST Marker Parsing\n• Dependency-free FS Watchers\n• Process Manager"]
-        DataDir[("Canonical ycs-data/\n• items/\n• textures/\n• resources/")]
-        
-        UI <--> IPC <--> RustCore
-        RustCore <--> DataDir
-    end
-
-    subgraph Codegen ["Scaffolding & Reversible Injection Engine"]
-        RustCore -- "Reversible Injection (_injections)" --> ModSrc["Java Sources (/src/main/java)\n• ModItems.java\n• ModAttributes.java"]
-        RustCore -- "Asset Generation" --> ModAssets["Mod Assets (/src/main/resources)\n• JSON Models\n• Texture Sidecars"]
-    end
-
-    subgraph Runtime ["NeoForge 1.21.1 Engine Runtime"]
-        ModSrc --> EngineCore["yebisu RPG Core (@Mod)"]
-        
-        subgraph Server ["Server Authority (Dedicated Server Safe)"]
-            NetSync["Network Payloads\n• TextureSyncPayload\n• VfxStartPayload"]
-            Clock["Shared Tick Clock\nlevel.getGameTime()"]
-            Attach["Data Attachments & Capabilities\n(ModAttachments)"]
-        end
-
-        subgraph Client ["Client Rendering & Animation Pipeline"]
-            AnimEngine["ClientAnimationEngine\n• AnimationBlender\n• AnimationPlayhead"]
-            Renderer["Dynamic Render Hooks\n• TorsoRotationHolder\n• MixinPlayerRenderer"]
-            HUD["Custom HUD Engine\n• HudLayerHider\n• Dynamic Overlays"]
-        end
-
-        EngineCore --> Server
-        EngineCore --> Client
-        Server -- "Custom Packets" --> Client
-    end
+flowchart LR
+    A["YCS4 UI (Vanilla JS)"] <-->|"Tauri IPC"| B["Rust Backend (lib.rs)"]
+    B <-->|"Read/Write"| C[("Canonical JSON\n(ycs-data/)")]
+    B -->|"Reversible AST Injection"| D["Java Code & Assets\n(/src/main)"]
 ```
 
----
-
-## ⚙️ Core Mod Architecture (`/src/main`)
-
-### 1. Dedicated Server Authority & Synchronization
-The entire multiplayer runtime is architected with strict client-server separation to guarantee compatibility with real dedicated servers (independent processes and network latency):
-- **Deterministic Clocks:** Animated texture loops and timed effects calculate current state as a pure function of `level.getGameTime()`, eliminating client tick desynchronization and eliminating redundant network traffic.
-- **Explicit Push Protocol:** Dynamic runtime states (e.g. dynamic texture layers, attached VFX) are stored server-side via `TextureAuthority` and dispatched to tracking players using custom network payloads (`TextureSyncPayload`, `VfxStartPayload`, `VfxRemovePayload`) on state change, player login, and entity track start.
-- **NeoForge Data Attachments:** Player-specific RPG data, energy gauges, and runtime state machines are managed via `ModAttachments` rather than fragile NBT hacks or client-side singletons.
-
-### 2. Custom Animation & Blend Engine (`/animation`)
-Implemented natively to avoid heavyweight external animation runtimes:
-- **`ClientAnimationEngine` & `AnimationBlender`:** Manages concurrent animation playheads with real-time spherical/linear interpolation between distinct movement and combat states.
-- **`AnimationPlayhead`:** Tracks duration, blend weights, keyframe curves, and configurable loop modes (`HOLD`, `LOOP`, `ONCE`).
-- **`TorsoRotationHolder`:** Overrides player torso pitch and yaw independently from head camera rotation during weapon swings, casting, and active skills.
-- **`ItemRenderContextHolder`:** Intercepts first-person and third-person item transformation matrices to seamlessly align weapons and equipment with custom skeletal poses.
-
-### 3. Dynamic Texture & Shading Pipeline (`/texture`, `/client/renderer`)
-- **`TextureAuthority` & `TextureStack`:** Manages multi-layered sprite stacks per entity, enabling dynamic cosmetic layers, status effect overlays, and animated skins.
-- **Emissive Shading Hooks:** Uses custom core shaders (`assets/yebisurpg/shaders/core/`) and `EntityTextureRenderHooks` to render fullbright/glowing textures on models and items without requiring OptiFine or Iris.
-- **Masking & Clock Sync:** Supports multi-frame sprite sheets with configurable masking modes (`ADDITIVE`, `SUBTRACTIVE`, `ALPHA`) locked to game ticks.
-
-### 4. Non-Invasive Bytecode Injections (`/mixin`)
-Targeted SpongePowered Mixin injections into Minecraft's rendering pipeline:
-- `MixinPlayerRenderer` / `MixinPlayerModel`: Injects custom bone transforms and dynamic rendering passes.
-- `MixinItemInHandRenderer` / `MixinItemInHandLayer`: Overrides holding transforms and enables custom geometry rendering.
-- `MixinLivingEntityRenderer` / `MixinSelfLitEntityRenderers`: Adds layered texture compositing directly into vanilla entity rendering loops.
-- `AccessorRangedAttribute`: Unbounds attribute limits, allowing RPG health, defense, and speed values to scale beyond vanilla ceilings.
-
-### 5. Data-Driven HUD & Resource Engine (`/hud`)
-- **`HudLayerHider`:** Contextually suppresses vanilla GUI elements (hearts, armor, hunger, air) during RPG gameplay.
-- **Dynamic Gauges:** Renders multi-tiered resource bars (HP, Mana, Stamina) with smooth value interpolation and custom texture backplates.
+### Key Engineering Features:
+- **Hybrid Desktop Stack:** Native window management and file I/O built in **Rust** via **Tauri 2**, paired with a custom Vanilla JavaScript/CSS frontend (no bloated frameworks, fast startup, and native canvas performance).
+- **Reversible Code Generation (`_injections`):** To avoid corrupting handwritten Java code, YCS4 uses marker-based injection points. When an item or attribute is added, updated, or removed, the Rust backend tracks every generated line and cleanly cleans it up or updates it without touching the rest of the codebase.
+- **Data Authority:** All authored objects live as clean, human-readable JSON files in `ycs-data/`. The visual layout in the desktop tool is decoupled from the data, meaning reorganizing UI folders never mutates source files.
+- **Node-Based Gameplay Scripting:** Includes a prototype node editor with typed pins (`Number`, `String`, `Boolean`, `Entity`), execution flow separation, contextual node search (`Ctrl+Space`), and interactive graph navigation (panning, zoom snapping, marquee selection).
+- **Gradle Task Bridge:** Spawns and streams background Gradle tasks (`runClient`, `build`) directly within the tool.
 
 ---
 
-## 🛠️ YCS4 Tooling & Scaffolding Pipeline (`/YCS4`)
+## 📂 Project Evolution (`/legacy`)
 
-**YCS4 (yebisu Creator Studio 4)** is a dedicated visual development environment designed to eliminate boilerplate when building RPG systems.
-
-### 1. High-Performance Hybrid Architecture
-- **Tauri 2 + Rust Backend:** Native system I/O, process management, and file operations execute in compiled Rust (`YCS4/src-tauri/src/lib.rs`), providing instant responsiveness and low memory footprint.
-- **Vanilla JS + CSS Frontend:** A custom lightweight UI designed without heavy frontend frameworks, ensuring rapid load times, custom pixel-art UI components, and direct DOM manipulation for maximum canvas FPS.
-
-### 2. Reversible Code Injection (`_injections`)
-A core engineering challenge in visual game modding tools is modifying Java source files without corrupting user edits. YCS4 solves this with a **transactional AST marker injection system**:
-- Authored objects are stored strictly as declarative JSON under `ycs-data/<category>/<id>.json`.
-- The Rust backend parses target files (such as `ModItems.java` and `ModAttributes.java`), inserting registration entries tagged with reversible metadata.
-- When an object is updated or deleted in YCS4, the engine inspects the object's `_injections` record and cleans up the exact generated lines, model JSONs, and texture sidecars without touching hand-written code.
-
-### 3. Node-Based Visual Gameplay Scripting
-- **Typed Pins & Visual Wires:** Distinct data channels for `Number` (`#4d65b4`), `String` (`#5ba558`), `Boolean` (`#6494a4`), and `Entity` (`#30e1b9`).
-- **Control Flow Separation:** Explicit distinction between execution flow (`Then -> Execute`) and data evaluation (`Output -> Input`).
-- **Contextual Search (`Ctrl+Space`):** Dragging a wire and invoking search filters available nodes based on pin type compatibility and auto-inserts nodes between connected endpoints.
-- **Adaptive Canvas:** Scale-aware marquee selection, pixel-snapped zoom/pan (50% to 250%), and auto-collapsing inline literal inputs when wired.
-
-### 4. Integrated Gradle Daemon Bridge
-YCS4 interfaces with the Gradle wrapper daemon via background child processes, allowing developers to trigger `./gradlew build` or launch test clients directly from within the studio UI while streaming task output in real time.
+Before arriving at this architecture, I built three earlier iterations (v1–v3):
+- **v1 & v2:** Early gameplay prototypes exploring basic item states and combat ideas.
+- **v3:** An initial attempt at an external tool using React and Blocky visual scripting.
+- **The Shift to v4:** Earlier attempts revealed issues with tight coupling between UI tools and Java source code, as well as the fragility of client-only mechanics. Those lessons led directly to the clean separation, zero-dependency model, and reversible injection engine seen here.
+- The historical code is preserved in [`legacy/`](legacy/) as an engineering case study (see [`legacy/README.md`](legacy/README.md)).
 
 ---
 
-## 📁 Repository Structure
+## 🛠️ Tech Stack
 
-```text
-yebisu-RPG/
-├── .github/                  # CI/CD and repository workflows
-├── docs/
-│   └── images/               # In-game and tooling showcase media
-├── legacy/                   # Historical iterations & prototypes (v1–v3)
-│   ├── main/                 # Early Minecraft mod experiments
-│   ├── tools/                # Early prototypes (V1, V2, and V3 Tauri/React studio)
-│   └── README.md             # Architecture evolution case study
-├── md/
-│   ├── regular/              # Active technical specifications & architecture studies
-│   └── skills/               # Reusable standards, UI checklists, and node direction
-├── src/main/                 # Production NeoForge 1.21.1 Mod
-│   ├── java/net/ye6isu/yebisuRPG/
-│   │   ├── animation/        # Custom animation engine, playheads, and blender
-│   │   ├── attribute/        # RPG attribute definitions and range unbounding
-│   │   ├── client/           # Client-side render hooks, shaders, and debug tools
-│   │   ├── component/        # NeoForge custom DataComponents
-│   │   ├── entity/           # Custom entities and event listeners
-│   │   ├── entityvar/        # Entity capability attachments
-│   │   ├── hud/              # Custom GUI overlays and vanilla HUD suppressors
-│   │   ├── item/             # RPG items, tool tiers, and creative tabs
-│   │   ├── mixin/            # Bytecode injections (rendering, models, attributes)
-│   │   ├── network/          # Custom packet payloads and sync handlers
-│   │   ├── texture/          # Server-authoritative multi-layer texture engine
-│   │   ├── vfx/              # Dynamic visual effect definitions and listeners
-│   │   └── yebisuRPG.java    # Mod entry point and lifecycle bootstrap
-│   └── resources/            # Assets, core shaders, animations, and models
-├── ycs-data/                 # Canonical declarative authoring data (JSON)
-│   ├── attributes/           # Custom RPG attribute definitions
-│   ├── items/                # Item definitions and injection manifests
-│   ├── resources/            # HUD gauges (HP, MP, Stamina)
-│   └── textures/             # Texture metadata and sprite configurations
-├── YCS4/                     # yebisu Creator Studio 4 (Tauri 2 Desktop IDE)
-│   ├── src/                  # Vanilla JS frontend & node editor canvas
-│   └── src-tauri/            # Rust backend (injection engine, IPC, process bridge)
-├── build.gradle              # NeoForge build configuration (ModDevGradle)
-├── gradle.properties         # Project metadata and version definitions
-└── LICENSE                   # MIT License
-```
+- **Game Mod:** Java 21, NeoForge 1.21.1, Parchment Mappings, SpongePowered Mixin
+- **Tooling:** Rust (Tauri 2), JavaScript (ES6+), CSS3 Canvas
+- **Build System:** Gradle 9.x (ModDevGradle), Cargo
 
 ---
 
-## 💻 Tech Stack & Tooling
-
-| Domain | Technologies & Libraries |
-| :--- | :--- |
-| **Game Modding Engine** | Java 21, NeoForge 1.21.1, Parchment Mappings, SpongePowered Mixin |
-| **Desktop Tooling (YCS4)** | Rust (2021 Edition), Tauri 2.0, Vanilla JavaScript (ES6+), HTML5 / CSS3 Canvas |
-| **Build System & Toolchain** | Gradle 9.x, ModDevGradle, Cargo |
-| **Asset Formats** | Custom JSON Schemas, Minecraft DataComponent NBT, PNG Texture Sidecars |
-
----
-
-## 🚀 Building & Running
+## 🚀 Building the Project
 
 ### Prerequisites
-- **Java Development Kit (JDK):** [Java 21](https://adoptium.net/) or newer installed and configured in `JAVA_HOME`.
-- **Node.js & Rust** *(Optional, only if building the YCS4 desktop editor)*: [Node.js 18+](https://nodejs.org/) and [Rust / Cargo](https://rustup.rs/).
+- JDK 21+ configured in `JAVA_HOME`
 
-### 1. Build the Mod (`.jar`)
-To compile the mod and generate a distribution jar:
-
+### Compile the Mod
 ```bash
-# On Linux / macOS:
-./gradlew build
-
-# On Windows:
+# Windows
 .\gradlew.bat build
+
+# Linux / macOS
+./gradlew build
 ```
-The compiled mod artifact will be generated in `build/libs/yebisurpg-<version>.jar`.
+The compiled jar will be in `build/libs/`.
 
-### 2. Launch Development Client / Server
-Test the mod directly in the development sandbox:
-
+### Run in Dev Environment
 ```bash
-# Launch singleplayer / test client:
+# Launch test client
 .\gradlew.bat runClient
 
-# Launch dedicated server test environment:
+# Launch dedicated server test
 .\gradlew.bat runServer
 ```
 
-### 3. Launch YCS4 Developer Studio
-To run the visual editor in development mode:
-
+### Run YCS4 Tooling (Optional)
+Requires Node.js 18+ and Rust:
 ```bash
 cd YCS4
 npm install
@@ -248,6 +135,6 @@ npm run tauri dev
 
 ---
 
-## 📜 License
+## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
