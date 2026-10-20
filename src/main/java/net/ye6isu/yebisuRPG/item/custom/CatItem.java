@@ -28,9 +28,7 @@ public class CatItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
         if (player.isCrouching()) {
-            if (!level.isClientSide()) { player.setDeltaMovement(((player.getLookAngle().x) * (4)), ((player.getLookAngle().y) * (4)), ((player.getLookAngle().z) * (4))); player.hurtMarked = true; }
-        } else {
-            DashUtil.start(player, player.getLookAngle().x, player.getLookAngle().y, player.getLookAngle().z, 20, (int)(5), DashUtil.Easing.EASE_OUT, null, null, "sphere", 1.5, 0, 0, false);
+            if (!level.isClientSide()) { player.setDeltaMovement(0, 3, 0); player.hurtMarked = true; }
         }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }
