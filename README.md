@@ -21,9 +21,12 @@ This repository consists of two integrated components:
 ![Combat & Entity Systems](docs/images/modPreview2.png)
 *Server-authoritative attribute tracking, player capabilities, and custom rendering passes.*
 
-### YCS4 Developer Tool
+### YCS4 Developer Tool & Node Canvas
 ![YCS4 Desktop Studio](docs/images/YCS4.png)
-*Desktop tool for asset inspection, declarative data management, and visual method authoring.*
+*Desktop workspace for asset inspection and declarative data management.*
+
+![YCS4 Node Editor Canvas](docs/images/YCS42.png)
+*Interactive node-based visual scripting canvas featuring typed data-flow routing.*
 
 ---
 
