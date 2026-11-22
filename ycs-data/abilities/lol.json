@@ -1,0 +1,26 @@
+{
+  "_injections": [
+    {
+      "content": "        AbilityRegistry.register(\"lol\", \"test_texture\", 1, java.util.Map.of());",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityRegistry.java",
+      "marker": "YCS_Abilities",
+      "type": "java-marker"
+    },
+    {
+      "file": "resources/assets/yebisurpg/textures/hud/test_texture.png",
+      "type": "created-file"
+    },
+    {
+      "content": "            case \"lol\" -> { if (!level.isClientSide()) { player.setDeltaMovement(((player.getLookAngle().x) * (3)), ((player.getLookAngle().y) * (3)), ((player.getLookAngle().z) * (3))); player.hurtMarked = true; } if (!level.isClientSide() && player instanceof Entity animEntity_944242c9ce74) { AnimationAPI.triggerThirdPersonAnimation(animEntity_944242c9ce74, \"test\", \"yebisurpg:animations/player.animation.json\", (float)(1)); } }",
+      "file": "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java",
+      "marker": "YCS_Ability_Use_Dispatch",
+      "type": "java-marker"
+    }
+  ],
+  "cooldownSeconds": 1.0,
+  "dispatchCode": "if (!level.isClientSide()) { player.setDeltaMovement(((player.getLookAngle().x) * (3)), ((player.getLookAngle().y) * (3)), ((player.getLookAngle().z) * (3))); player.hurtMarked = true; } if (!level.isClientSide() && player instanceof Entity animEntity_944242c9ce74) { AnimationAPI.triggerThirdPersonAnimation(animEntity_944242c9ce74, \"test\", \"yebisurpg:animations/player.animation.json\", (float)(1)); }",
+  "icon": "test_texture",
+  "name": "lol",
+  "resourceCosts": {},
+  "titleText": "walloop"
+}

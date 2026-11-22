@@ -1,14 +1,13 @@
 package net.ye6isu.yebisuRPG.keybind;
 
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.ye6isu.yebisuRPG.animation.AnimationAPI;
+import net.ye6isu.yebisuRPG.util.DashUtil;
+import net.ye6isu.yebisuRPG.util.ProjectileUtil;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.ye6isu.yebisuRPG.util.DashUtil;
-import net.minecraft.world.entity.LivingEntity;
-import net.ye6isu.yebisuRPG.util.DashUtil;
-import net.minecraft.world.entity.LivingEntity;
-import net.ye6isu.yebisuRPG.util.ProjectileUtil;
-import net.ye6isu.yebisuRPG.util.ProjectJjkDashUtil;
 // YCS_Ability_Handler_Imports
 
 /**
@@ -26,8 +25,7 @@ public final class AbilityHandlers {
         Level level = player.level();
         ItemStack stack = player.getMainHandItem();
         switch (abilityId) {
-            case "woop" -> { DashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(20), (int)((double)(5)), DashUtil.Easing.EASE_OUT, null, null, "sphere", (double)(1.5), (double)(0), (double)(0), false); }
-            case "wap" -> { ProjectJjkDashUtil.start(player, (double)((player.getLookAngle().x)), (double)((player.getLookAngle().y)), (double)((player.getLookAngle().z)), (double)(24), (int)((double)(2)), (int)((double)(2)), (double)(0.2), true); }
+            case "lol" -> { if (!level.isClientSide()) { player.setDeltaMovement(((player.getLookAngle().x) * (3)), ((player.getLookAngle().y) * (3)), ((player.getLookAngle().z) * (3))); player.hurtMarked = true; } if (!level.isClientSide() && player instanceof Entity animEntity_944242c9ce74) { AnimationAPI.triggerThirdPersonAnimation(animEntity_944242c9ce74, "test", "yebisurpg:animations/player.animation.json", (float)(1)); } }
             // YCS_Ability_Use_Dispatch
             default -> {}
         }

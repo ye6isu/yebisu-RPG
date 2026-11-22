@@ -116,6 +116,22 @@ export const NODE_DEFINITIONS = Object.freeze([
     defaults: { projectile: 'minecraft:arrow' },
   },
   {
+    kind: 'anim.thirdperson.play',
+    opcode: 'anim.thirdperson.play',
+    label: 'Play Third Person Animation',
+    color: '#3a7a40',
+    flow: true,
+    inputType: 'entity',
+    inputId: 'entity',
+    inputLabel: 'Entity',
+    inputs: [
+      { id: 'animName', label: 'Animation', type: 'string', default: 'test' },
+      { id: 'filePath', label: 'File Path', type: 'string', default: 'yebisurpg:animations/player.animation.json' },
+      { id: 'speed', label: 'Speed', type: 'number', default: '1.0' },
+    ],
+    defaults: { animName: 'test', filePath: 'yebisurpg:animations/player.animation.json', speed: '1.0' },
+  },
+  {
     kind: 'entity.dash', opcode: 'entity.dash', label: 'Dash', color: '#c46c94', flow: true,
     inputType: 'entity', inputId: 'entity', inputLabel: 'Entity',
     inputs: [

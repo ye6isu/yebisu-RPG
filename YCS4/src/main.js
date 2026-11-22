@@ -1191,7 +1191,7 @@ const addObjectContainer = (type = 'Item', mode = 'home', targetGrid = workspace
 
     folderVisual.append(folderBackground, folderContent, folderFront);
     button.append(folderVisual);
-  } else if (type === 'Texture' || type === 'Item') {
+  } else if (type === 'Texture' || type === 'Item' || type === 'Ability') {
     const preview = document.createElement('img');
     preview.className = 'object-container-texture-preview';
     preview.alt = '';
@@ -2031,7 +2031,7 @@ const setActiveWorkspaceTab = activeTab => {
 
 const workspaceToggleButtons = [...document.querySelectorAll('[data-workspace-toggle]')];
 const setPrimaryWorkspaceMode = mode => {
-  const label = mode === 'assets' ? 'Assets' : mode === 'data' ? 'Data' : 'Home';
+  const label = mode === 'assets' ? 'Assets' : mode === 'data' ? 'Data' : mode === 'abilities' ? 'Abilities' : 'Home';
   setDataWorkspaceFilterOpen(false);
   homeTab.dataset.workspaceMode = mode;
   homeWorkspace.dataset.workspaceMode = mode;
@@ -2353,7 +2353,430 @@ const itemEditorPage = initializeItemEditorPage({
     for (const shell of shells) removeObjectContainerShell(shell);
   },
 });
-const { addItemWorkspace, closeDropdowns: closeItemEditorDropdowns } = itemEditorPage;
+const {
+  addItemWorkspace,
+  closeSavedItemWorkspaces,
+  closeDropdowns: closeItemEditorDropdowns,
+  openCustomMethodEditor,
+  compileMethodGraph,
+} = itemEditorPage;
+
+const openAbilityWorkspace = async (abilityId = '', initialData = null) => {
+  let abilityData = initialData;
+  if (!abilityData && abilityId) {
+    try {
+      const raw = await invoke('load_ycs_data', { category: 'abilities', id: abilityId });
+      abilityData = JSON.parse(raw);
+    } catch {
+      abilityData = { name: abilityId, titleText: abilityId, icon: '', cooldownSeconds: 1, resourceCosts: {} };
+    }
+  }
+  if (!abilityData) {
+    abilityData = { name: '', titleText: '', icon: '', cooldownSeconds: 1, resourceCosts: {} };
+  }
+
+  const existingPanel = [...workspaceItemEditors.querySelectorAll('.workspace-ability-editor')]
+    .find(panel => panel.dataset.abilityId === abilityId && abilityId);
+  if (existingPanel) {
+    const existingTab = workspaceTabs.querySelector(`[data-workspace-panel-id="${CSS.escape(existingPanel.id)}"]`);
+    if (existingTab) setActiveWorkspaceTab(existingTab);
+    return;
+  }
+
+  const safeId = (abilityId || 'new-ability').replace(/[^a-zA-Z0-9_-]/g, '-');
+  const panelId = `ability-editor-${safeId}-${Date.now().toString(36)}`;
+  const tabId = `ability-tab-${safeId}-${Date.now().toString(36)}`;
+  const labelText = String(abilityData.titleText || abilityData.name || 'New Ability');
+
+  const panel = document.createElement('section');
+  panel.id = panelId;
+  panel.className = 'workspace-item-editor workspace-ability-editor';
+  panel.dataset.abilityId = abilityId;
+  panel.dataset.lastSavedId = abilityId;
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', tabId);
+
+  // Keep method records for node canvas
+  const storageKey = `ycs4.ability::${abilityId || 'new'}::abilityUse`;
+  let nodeGraph = abilityData.nodeGraph || null;
+  if (!nodeGraph) {
+    try {
+      nodeGraph = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    } catch {}
+  }
+  panel.itemCustomMethods = [
+    {
+      key: 'use',
+      label: 'Ability Action',
+      graph: nodeGraph,
+      graphs: { use: nodeGraph },
+    },
+  ];
+
+  const viewport = document.createElement('div');
+  viewport.className = 'workspace-item-scroll-viewport';
+  const form = document.createElement('div');
+  form.className = 'workspace-item-editor-form';
+
+  // Primary row: Name + Actions
+  const nameRow = document.createElement('label');
+  nameRow.className = 'workspace-item-field-row workspace-item-primary-row';
+  const nameLabel = document.createElement('span');
+  nameLabel.textContent = 'Ability Name';
+  const nameInput = document.createElement('input');
+  nameInput.className = 'pixel-text-box';
+  nameInput.type = 'text';
+  nameInput.value = abilityData.titleText || abilityData.name || '';
+  nameInput.placeholder = 'e.g. Wooper';
+
+  const actions = document.createElement('div');
+  actions.className = 'workspace-item-actions';
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'pixel-button workspace-item-action-button';
+  removeBtn.type = 'button';
+  removeBtn.setAttribute('aria-label', 'Delete ability');
+  removeBtn.innerHTML = '<span class="workspace-file-icon workspace-file-icon-delete" aria-hidden="true"></span>';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'pixel-button workspace-item-action-button';
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', 'Close ability');
+  closeBtn.innerHTML = '<span class="workspace-file-icon workspace-file-icon-cancel" aria-hidden="true"></span>';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'pixel-button workspace-item-action-button';
+  saveBtn.type = 'button';
+  saveBtn.setAttribute('aria-label', 'Save ability');
+  saveBtn.innerHTML = '<span class="workspace-file-icon workspace-file-icon-save" aria-hidden="true"></span>';
+
+  actions.append(removeBtn, closeBtn, saveBtn);
+  nameRow.append(nameLabel, nameInput, actions);
+  form.append(nameRow);
+
+  // ID Row
+  const idRow = document.createElement('label');
+  idRow.className = 'workspace-item-field-row';
+  const idLabel = document.createElement('span');
+  idLabel.textContent = 'Ability ID';
+  const idInput = document.createElement('input');
+  idInput.className = 'pixel-text-box';
+  idInput.type = 'text';
+  idInput.value = abilityData.name || abilityId || '';
+  idInput.placeholder = 'e.g. woop';
+  idRow.append(idLabel, idInput);
+  form.append(idRow);
+
+  // Cooldown Row
+  const cdRow = document.createElement('label');
+  cdRow.className = 'workspace-item-field-row';
+  const cdLabel = document.createElement('span');
+  cdLabel.textContent = 'Cooldown (s)';
+  const cdInput = document.createElement('input');
+  cdInput.className = 'pixel-text-box';
+  cdInput.type = 'number';
+  cdInput.step = '0.1';
+  cdInput.value = String(abilityData.cooldownSeconds ?? 1);
+  cdRow.append(cdLabel, cdInput);
+  form.append(cdRow);
+
+  // HUD Texture Combobox Row (matching Item Editor texture picker)
+  const iconRow = document.createElement('div');
+  iconRow.className = 'workspace-item-field-row';
+  const iconLabel = document.createElement('span');
+  iconLabel.textContent = 'Texture';
+  const iconDropdown = document.createElement('div');
+  iconDropdown.className = 'pixel-combobox workspace-item-dropdown workspace-item-texture-combobox';
+  iconDropdown.setAttribute('data-item-texture-combobox', '');
+  const iconControl = document.createElement('div');
+  iconControl.className = 'pixel-combobox-control';
+  const iconInput = document.createElement('input');
+  iconInput.className = 'pixel-text-box pixel-combobox-input';
+  iconInput.type = 'text';
+  iconInput.autocomplete = 'off';
+  iconInput.spellcheck = false;
+  iconInput.placeholder = '(None)';
+  iconInput.setAttribute('aria-label', 'Texture');
+  iconInput.setAttribute('data-item-texture-input', '');
+  const iconButton = document.createElement('button');
+  iconButton.className = 'pixel-button pixel-combobox-button';
+  iconButton.type = 'button';
+  iconButton.setAttribute('aria-haspopup', 'listbox');
+  iconButton.setAttribute('aria-expanded', 'false');
+  iconButton.setAttribute('aria-label', 'Open texture options');
+  iconButton.setAttribute('data-item-texture-button', '');
+  const iconArrow = document.createElement('span');
+  iconArrow.className = 'pixel-direction-icon pixel-direction-down';
+  iconArrow.setAttribute('aria-hidden', 'true');
+  iconButton.append(iconArrow);
+  const iconOptions = document.createElement('div');
+  iconOptions.className = 'preferences-scale-options pixel-option-stack pixel-combobox-options workspace-item-texture-options';
+  iconOptions.setAttribute('role', 'listbox');
+  iconOptions.setAttribute('data-item-texture-options', '');
+  iconOptions.hidden = true;
+  iconControl.append(iconInput, iconButton);
+  iconDropdown.append(iconControl, iconOptions);
+  iconRow.append(iconLabel, iconDropdown);
+  form.append(iconRow);
+
+  // Populate textures with image previews identical to Item Editor
+  const loadAbilityTextures = async () => {
+    const entries = [];
+    try {
+      const textureIds = await invoke('list_ycs_data', { category: 'textures' });
+      for (const id of textureIds) {
+        try {
+          const [metadataText, extension, data] = await invoke('load_texture_bundle', { id });
+          const metadata = JSON.parse(metadataText);
+          const url = URL.createObjectURL(new Blob([new Uint8Array(data)], {
+            type: textureMimeType(extension),
+          }));
+          entries.push({ id, label: String(metadata.label || id), url });
+        } catch (error) {
+          console.error(`Failed to load texture ${id}.`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to list textures.', error);
+    }
+
+    const noneOption = document.createElement('button');
+    noneOption.className = 'pixel-option workspace-item-texture-option workspace-item-texture-option-none';
+    noneOption.type = 'button';
+    noneOption.setAttribute('role', 'option');
+    noneOption.setAttribute('aria-selected', String(!abilityData.icon));
+    noneOption.dataset.itemTextureValue = '';
+    noneOption.dataset.itemTextureLabel = '(None)';
+    noneOption.textContent = '(None)';
+
+    const textureOptions = entries.map(({ id, label, url }) => {
+      const option = document.createElement('button');
+      option.className = 'pixel-option workspace-item-texture-option';
+      option.type = 'button';
+      option.setAttribute('role', 'option');
+      const isSelected = id === abilityData.icon;
+      option.setAttribute('aria-selected', String(isSelected));
+      option.dataset.itemTextureValue = id;
+      option.dataset.itemTextureLabel = label;
+      const image = document.createElement('img');
+      image.className = 'workspace-item-texture-option-preview';
+      image.src = url;
+      image.alt = '';
+      image.draggable = false;
+      const text = document.createElement('span');
+      text.textContent = label;
+      option.append(image, text);
+      return option;
+    });
+
+    iconOptions.replaceChildren(noneOption, ...textureOptions);
+
+    // Initial label selection
+    if (abilityData.icon) {
+      const selectedEntry = entries.find(e => e.id === abilityData.icon);
+      const selLabel = selectedEntry ? selectedEntry.label : abilityData.icon;
+      iconInput.value = selLabel;
+      iconInput.dataset.value = abilityData.icon;
+      iconInput.dataset.selectedLabel = selLabel;
+    } else {
+      iconInput.value = '';
+      iconInput.dataset.value = '';
+      iconInput.dataset.selectedLabel = '';
+    }
+  };
+  loadAbilityTextures();
+
+  const filterAbilityTextureOptions = (showAll = false) => {
+    const q = iconInput.value.trim().toLocaleLowerCase();
+    for (const opt of iconOptions.querySelectorAll('[data-item-texture-value]')) {
+      opt.hidden = !showAll && Boolean(q)
+        && !opt.dataset.itemTextureLabel.toLocaleLowerCase().includes(q);
+    }
+  };
+
+  iconButton.addEventListener('pointerdown', event => {
+    event.stopPropagation();
+  });
+
+  iconButton.addEventListener('click', event => {
+    event.stopPropagation();
+    const opening = iconOptions.hidden;
+    iconOptions.hidden = !opening;
+    iconButton.setAttribute('aria-expanded', String(opening));
+    if (opening) {
+      filterAbilityTextureOptions(true);
+      iconInput.focus();
+    }
+  });
+
+  iconInput.addEventListener('pointerdown', event => {
+    event.stopPropagation();
+  });
+
+  iconInput.addEventListener('focus', () => {
+    iconOptions.hidden = false;
+    iconButton.setAttribute('aria-expanded', 'true');
+    filterAbilityTextureOptions(true);
+  });
+
+  iconInput.addEventListener('input', () => {
+    if (iconInput.value !== (iconInput.dataset.selectedLabel || '')) {
+      iconInput.dataset.value = '';
+      iconInput.dataset.selectedLabel = '';
+    }
+    iconOptions.hidden = false;
+    iconButton.setAttribute('aria-expanded', 'true');
+    filterAbilityTextureOptions(false);
+  });
+
+  iconOptions.addEventListener('pointerdown', event => {
+    event.stopPropagation();
+  });
+
+  iconOptions.addEventListener('click', event => {
+    event.stopPropagation();
+    const opt = event.target.closest('[data-item-texture-value]');
+    if (!opt) return;
+    iconInput.value = opt.dataset.itemTextureLabel === '(None)' ? '' : opt.dataset.itemTextureLabel;
+    iconInput.dataset.value = opt.dataset.itemTextureValue;
+    iconInput.dataset.selectedLabel = opt.dataset.itemTextureLabel;
+    iconOptions.hidden = true;
+    iconButton.setAttribute('aria-expanded', 'false');
+    for (const sibling of iconOptions.querySelectorAll('[data-item-texture-value]')) {
+      sibling.setAttribute('aria-selected', String(sibling === opt));
+    }
+  });
+
+  // Node Scripting / Action Row
+  const scriptRow = document.createElement('div');
+  scriptRow.className = 'workspace-item-field-row';
+  const scriptLabel = document.createElement('span');
+  scriptLabel.textContent = 'Ability Logic';
+  const scriptEditBtn = document.createElement('button');
+  scriptEditBtn.className = 'pixel-button';
+  scriptEditBtn.type = 'button';
+  scriptEditBtn.textContent = 'Edit';
+  scriptEditBtn.addEventListener('click', () => {
+    openCustomMethodEditor(panel, 'use', `Ability Action (${idInput.value.trim() || 'use'})`);
+  });
+  scriptRow.append(scriptLabel, scriptEditBtn);
+  form.append(scriptRow);
+
+  const status = document.createElement('div');
+  status.className = 'workspace-item-status-text';
+  form.append(status);
+
+  viewport.append(form);
+  panel.append(viewport);
+  workspaceItemEditors.append(panel);
+
+  const { tab, closeButton } = createClosableWorkspaceTab({ id: tabId, labelText, panelId });
+  tab.dataset.workspaceEditorType = 'ability';
+  setActiveWorkspaceTab(tab);
+
+  const cleanup = () => {
+    panel.remove();
+    removeWorkspaceTab(tab);
+  };
+  closeBtn.addEventListener('click', cleanup);
+  closeButton?.addEventListener('click', cleanup);
+
+  saveBtn.addEventListener('click', async () => {
+    const id = idInput.value.trim().toLowerCase().replace(/\s+/g, '_');
+    const title = nameInput.value.trim() || id;
+    const cooldown = Number.parseFloat(cdInput.value) || 1.0;
+    const exactTextureOption = [...iconOptions.querySelectorAll('[data-item-texture-value]')]
+      .find(option => option.dataset.itemTextureLabel === iconInput.value.trim());
+    const icon = iconInput.dataset.value || exactTextureOption?.dataset.itemTextureValue || '';
+    if (!id) {
+      status.textContent = 'Ability ID is required.';
+      return;
+    }
+
+    saveBtn.disabled = true;
+    status.textContent = 'Saving ability...';
+
+    // Compile node graph into dispatch line
+    const methodRecord = panel.itemCustomMethods?.[0];
+    const graphState = methodRecord?.graphs?.use || methodRecord?.graph;
+    let dispatchCode = '';
+    if (graphState) {
+      try {
+        localStorage.setItem(`ycs4.ability::${id}::abilityUse`, JSON.stringify(graphState));
+      } catch {}
+      const lines = compileMethodGraph(graphState, 'use');
+      dispatchCode = lines.join(' ');
+    } else if (abilityData.dispatchCode) {
+      dispatchCode = abilityData.dispatchCode;
+    }
+
+    try {
+      await invoke('save_ability_definition', {
+        id,
+        lastSavedId: panel.dataset.lastSavedId || null,
+        title,
+        icon,
+        cooldown,
+        costs: abilityData.resourceCosts || {},
+        dispatchCode: dispatchCode || null,
+      });
+
+      panel.dataset.lastSavedId = id;
+      panel.dataset.abilityId = id;
+      status.textContent = 'Ability saved.';
+      const tabLabel = tab.querySelector('.workspace-tab-label');
+      if (tabLabel) tabLabel.textContent = title;
+
+      // Find or create shell in the abilities workspace grid
+      let shell = collectWorkspaceHierarchyShells().find(s => (
+        s.dataset.objectType === 'Ability'
+        && (s.dataset.workspaceReferenceId === id || (abilityId && s.dataset.workspaceReferenceId === abilityId))
+      ));
+      if (!shell) {
+        const button = addObjectContainer('Ability', 'abilities', workspaceObjectGrid, title);
+        shell = button.closest('.workspace-object-shell');
+      }
+      if (shell) {
+        shell.dataset.workspaceReferenceId = id;
+        const labelEl = shell.querySelector('.workspace-object-label');
+        if (labelEl) { labelEl.textContent = title; labelEl.title = title; }
+        const btn = shell.querySelector(':scope > .workspace-object');
+        if (btn) btn.setAttribute('aria-label', title);
+        if (icon) {
+          loadTexturePreviewForShell(shell, icon);
+        }
+      }
+      syncPrimaryWorkspaceObjects();
+      persistWorkspaceLayout();
+      cleanup();
+    } catch (err) {
+      status.textContent = `Save failed: ${err}`;
+      saveBtn.disabled = false;
+    }
+  });
+
+  removeBtn.addEventListener('click', async () => {
+    const id = panel.dataset.lastSavedId || abilityId;
+    if (!id) {
+      removeWorkspaceTab(tab);
+      return;
+    }
+    removeBtn.disabled = true;
+    status.textContent = 'Deleting ability...';
+    try {
+      await invoke('delete_ability_definition', { id });
+      removeWorkspaceTab(tab);
+      for (const shell of collectWorkspaceHierarchyShells()) {
+        if (shell.dataset.objectType === 'Ability' && shell.dataset.workspaceReferenceId === id) {
+          removeObjectContainerShell(shell);
+        }
+      }
+      persistWorkspaceLayout();
+    } catch (err) {
+      status.textContent = `Delete failed: ${err}`;
+      removeBtn.disabled = false;
+    }
+  });
+};
 
 openResourceWorkspace = (resourceId, resourceData) => {
   const existingPanel = [...workspaceItemEditors.querySelectorAll('.workspace-resource-editor')]
@@ -2646,6 +3069,7 @@ function persistWorkspaceLayout() {
     const layout = {
       version: 1,
       home: roots.filter(shell => shell.dataset.workspaceMode === 'home').map(serializeWorkspaceShell),
+      abilities: roots.filter(shell => shell.dataset.workspaceMode === 'abilities').map(serializeWorkspaceShell),
       assets: roots.filter(shell => shell.dataset.workspaceMode === 'assets').map(serializeWorkspaceShell),
     };
     localStorage.setItem(workspaceLayoutStorageKey, JSON.stringify(layout));
@@ -2680,6 +3104,7 @@ function restoreWorkspaceLayout() {
         shell.dataset.workspaceReferenceId = entry.referenceId;
         if (type === 'Texture') loadTexturePreviewForShell(shell);
         if (type === 'Item') loadItemPreviewForShell(shell);
+        if (type === 'Ability') loadAbilityPreviewForShell(shell);
       }
       if (type === 'Folder') {
         restoreEntries(entry.children, mode, getFolderContentHost(shell));
@@ -2692,6 +3117,7 @@ function restoreWorkspaceLayout() {
   try {
     workspaceObjectGrid.replaceChildren();
     restoreEntries(layout.home, 'home', workspaceObjectGrid);
+    restoreEntries(layout.abilities, 'abilities', workspaceObjectGrid);
     restoreEntries(layout.assets, 'assets', workspaceObjectGrid);
   } finally {
     isRestoringWorkspaceLayout = false;
@@ -2714,14 +3140,14 @@ const reconcileSavedWorkspaceReferences = async ({
     const savedIds = new Set(ids);
     const seenReferences = new Set();
     for (const shell of collectWorkspaceHierarchyShells()) {
-      const referenceId = shell.dataset.objectType === objectType
-        ? shell.dataset.workspaceReferenceId
-        : '';
-      if (!referenceId) continue;
-      if (savedIds.has(referenceId) && !seenReferences.has(referenceId)) {
+      if (shell.dataset.objectType !== objectType) continue;
+      const referenceId = shell.dataset.workspaceReferenceId || '';
+      // If shell has a referenceId and it still exists on disk, keep the first one
+      if (referenceId && savedIds.has(referenceId) && !seenReferences.has(referenceId)) {
         seenReferences.add(referenceId);
         continue;
       }
+      // If referenceId is empty or doesn't exist on disk or is a duplicate, purge it!
       const parentFolder = workspaceObjectFolderParents.get(shell) || null;
       shell.remove();
       workspaceObjectFolderParents.delete(shell);
@@ -2768,6 +3194,16 @@ const loadSavedTextureLabel = async id => {
   }
 };
 
+const loadSavedAbilityLabel = async id => {
+  try {
+    const raw = await invoke('load_ycs_data', { category: 'abilities', id });
+    const data = JSON.parse(raw);
+    return String(data.titleText || data.name || data.id || id);
+  } catch {
+    return id;
+  }
+};
+
 const savedWorkspaceLifecycles = new Map([
   ['Item', {
     category: 'items',
@@ -2776,6 +3212,13 @@ const savedWorkspaceLifecycles = new Map([
     loadLabel: loadSavedItemLabel,
     loadPreview: loadItemPreviewForShell,
     onDeleted: id => itemEditorPage.closeSavedItemWorkspaces(id),
+  }],
+  ['Ability', {
+    category: 'abilities',
+    mode: 'abilities',
+    deleteCommand: 'delete_ability_definition',
+    loadLabel: loadSavedAbilityLabel,
+    loadPreview: loadAbilityPreviewForShell,
   }],
   ['Texture', {
     category: 'textures',
@@ -3051,6 +3494,20 @@ async function loadItemPreviewForShell(shell) {
   }
 }
 
+async function loadAbilityPreviewForShell(shell) {
+  const id = shell?.dataset.workspaceReferenceId;
+  if (!id || shell.dataset.objectType !== 'Ability') return;
+  try {
+    const raw = await invoke('load_ycs_data', { category: 'abilities', id });
+    const ability = JSON.parse(raw);
+    if (ability.icon) {
+      await loadTexturePreviewForShell(shell, ability.icon);
+    }
+  } catch (error) {
+    console.error(`Failed to load Ability preview for ${id}.`, error);
+  }
+}
+
 const folderWouldCreateCycle = (movingShell, targetFolderShell) => {
   let folder = targetFolderShell;
   while (folder) {
@@ -3309,6 +3766,14 @@ document.addEventListener('click', event => {
     if (id) addItemWorkspace(id);
     return;
   }
+  const abilityObject = event.target.closest('.object-container[data-object-type="Ability"]');
+  if (abilityObject && !draggedWorkspaceObjectShell && !suppressWorkspaceObjectClick) {
+    const resultShell = abilityObject.closest('.workspace-object-shell');
+    const shell = resolvePrimarySearchResult(resultShell);
+    const id = shell.dataset.workspaceReferenceId;
+    openAbilityWorkspace(id || '');
+    return;
+  }
   const folderObject = event.target.closest('.folder-object:not(.object-folder-preview)');
   if (!folderObject || draggedWorkspaceObjectShell || suppressWorkspaceObjectClick) return;
   const shell = folderObject.closest('.workspace-object-shell');
@@ -3366,8 +3831,9 @@ const removeWorkspaceObjectWithLifecycle = async shell => {
   if (referenceId) {
     const lifecycle = savedWorkspaceLifecycles.get(objectType);
     if (!lifecycle) {
-      console.error(`Refusing visual-only deletion for unregistered saved ${objectType} '${referenceId}'.`);
-      return false;
+      console.warn(`Unregistered saved ${objectType} '${referenceId}' - removing visual shell.`);
+      removeObjectContainerShell(canonicalShell);
+      return true;
     }
     try {
       if (lifecycle.usageCommand) {
@@ -3383,12 +3849,17 @@ const removeWorkspaceObjectWithLifecycle = async shell => {
       if (lifecycle.usageCommand) {
         try {
           const usages = await invoke(lifecycle.usageCommand, { textureId: referenceId });
-          if (usages.length > 0) showTextureUsageWarning(referenceId, usages);
+          if (usages.length > 0) {
+            showTextureUsageWarning(referenceId, usages);
+            return false;
+          }
         } catch (usageError) {
           console.error(`Failed to inspect ${objectType} usage for '${referenceId}'.`, usageError);
         }
       }
-      return false;
+      // If the backend failed because it was already deleted or doesn't exist, remove visual shell anyway
+      removeObjectContainerShell(canonicalShell);
+      return true;
     }
 
     const matchingReferences = collectWorkspaceHierarchyShells().filter(candidate => (
@@ -3599,6 +4070,10 @@ workspaceCreateOptions.addEventListener('click', event => {
     addItemWorkspace();
     return;
   }
+  if (objectType === 'Ability') {
+    openAbilityWorkspace();
+    return;
+  }
   if (objectType === 'Texture') {
     openTextureImportDialog();
     return;
@@ -3733,6 +4208,10 @@ if (workspaceObjectNewOptions) {
 
       if (objectType === 'Item') {
         addItemWorkspace();
+        return;
+      }
+      if (objectType === 'Ability') {
+        openAbilityWorkspace();
         return;
       }
       if (objectType === 'Texture') {
@@ -4990,6 +5469,13 @@ document.addEventListener('pointerdown', event => {
     setTextureImportFilterOpen(false);
   }
   if (!event.target.closest('#workspace-object-context-menu')) closeWorkspaceObjectContextMenu();
+  if (!event.target.closest('[data-item-texture-combobox]')) {
+    for (const cb of document.querySelectorAll('.workspace-ability-editor [data-item-texture-combobox]')) {
+      cb.querySelector('[data-item-texture-button]')?.setAttribute('aria-expanded', 'false');
+      const opt = cb.querySelector('[data-item-texture-options]');
+      if (opt) opt.hidden = true;
+    }
+  }
   if (!event.target.closest('.workspace-item-dropdown')) closeItemEditorDropdowns();
   if (event.target.closest('.menu-entry')) return;
   setFileMenuOpen(false);

@@ -92,6 +92,7 @@
           <aside class="workspace-action-rail" aria-label="Home workspace actions">
             <div class="workspace-actions workspace-actions-top">
               <button class="pixel-button workspace-action-button" type="button" aria-label="Home" aria-pressed="true" data-workspace-toggle data-workspace-mode="home"><span class="workspace-mode-icon workspace-mode-icon-first" aria-hidden="true"></span></button>
+              <button class="pixel-button workspace-action-button" type="button" aria-label="Abilities" aria-pressed="false" data-workspace-toggle data-workspace-mode="abilities"><span class="workspace-mode-icon workspace-mode-icon-ability" aria-hidden="true"></span></button>
               <button class="pixel-button workspace-action-button" type="button" aria-label="Data" aria-pressed="false" data-workspace-toggle data-workspace-mode="data"><span class="workspace-mode-icon workspace-mode-icon-data" aria-hidden="true"></span></button>
               <button class="pixel-button workspace-action-button" type="button" aria-label="Assets" aria-pressed="false" data-workspace-toggle data-workspace-mode="assets"><span class="workspace-mode-icon workspace-mode-icon-second" aria-hidden="true"></span></button>
             </div>
@@ -103,11 +104,11 @@
           </aside>
           <main id="home-workspace" class="workspace-container" role="tabpanel" aria-labelledby="home-tab">
         <div class="workspace-top-controls" aria-label="Workspace top controls">
-          <div class="workspace-top-controls-left" data-primary-workspace-modes="home assets">
+          <div class="workspace-top-controls-left" data-primary-workspace-modes="home assets abilities">
             <input id="workspace-search-input" class="pixel-text-box workspace-top-text-box" type="text" aria-label="Search workspace" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
           </div>
           <span id="data-workspace-heading" class="data-workspace-heading" data-primary-workspace-modes="data" hidden>Variable</span>
-          <div id="workspace-create-dropdown" class="workspace-create-dropdown" data-primary-workspace-modes="home assets">
+          <div id="workspace-create-dropdown" class="workspace-create-dropdown" data-primary-workspace-modes="home assets abilities">
             <button
               id="workspace-create-button"
               class="pixel-button workspace-top-control-button"
@@ -119,11 +120,12 @@
             >+</button>
             <div id="workspace-create-options" class="preferences-scale-options pixel-option-stack workspace-create-options" role="menu" hidden>
               <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Item" data-workspace-create-mode="home">Item</button>
+              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Ability" data-workspace-create-mode="abilities" hidden>Ability</button>
               <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Texture" data-workspace-create-mode="assets" hidden>Texture</button>
-              <div class="workspace-create-divider-row" role="separator" data-workspace-create-mode="home assets">
+              <div class="workspace-create-divider-row" role="separator" data-workspace-create-mode="home assets abilities">
                 <div class="pixel-divider pixel-divider-horizontal workspace-create-divider" aria-hidden="true"></div>
               </div>
-              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Folder" data-workspace-create-mode="home assets">Folder</button>
+              <button class="pixel-option workspace-create-option" type="button" role="menuitem" data-workspace-create-option="Folder" data-workspace-create-mode="home assets abilities">Folder</button>
             </div>
           </div>
           <div id="data-workspace-actions" class="data-workspace-actions" data-primary-workspace-modes="data" hidden>

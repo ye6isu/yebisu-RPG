@@ -1074,6 +1074,11 @@ body.detached-floating-window #warning-dialog {
   background-position: calc(-1 * var(--ycs-workspace-action-middle-size)) 0;
 }
 
+.workspace-mode-icon-ability {
+  background-position: calc(-2 * var(--ycs-workspace-action-middle-size)) 0;
+  filter: hue-rotate(90deg);
+}
+
 .workspace-task-icon {
   display: block;
   width: var(--ycs-workspace-action-middle-size);

@@ -18,6 +18,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
+import net.ye6isu.yebisuRPG.animation.AnimationAPI;
 import net.ye6isu.yebisuRPG.util.DashUtil;
 import net.ye6isu.yebisuRPG.util.ProjectileUtil;
 
@@ -27,9 +28,7 @@ public class CatItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         player.startUsingItem(usedHand);
-        if (player.isCrouching()) {
-            if (!level.isClientSide()) { player.setDeltaMovement(0, 3, 0); player.hurtMarked = true; }
-        }
+        if (!level.isClientSide() && player instanceof Entity animEntity_843ca38e1547) { AnimationAPI.triggerThirdPersonAnimation(animEntity_843ca38e1547, "test", "yebisurpg:animations/player.animation.json", (float)(1)); }
         return InteractionResultHolder.consume(player.getItemInHand(usedHand));
     }
  }

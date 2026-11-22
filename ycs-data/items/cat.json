@@ -1,33 +1,9 @@
 {
   "_injections": [
     {
-      "content": "    public static final DeferredItem<Item> CAT = ITEMS.register(\"cat\",\n            () -> new CatItem(new Item.Properties().stacksTo(32).attributes(ItemAttributeModifiers.builder().add(Attributes.ATTACK_SPEED, new AttributeModifier(Item.BASE_ATTACK_SPEED_ID, 6, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND).build())));",
+      "content": "    public static final DeferredItem<Item> CAT = ITEMS.register(\"cat\",\n            () -> new CatItem(new Item.Properties().stacksTo(1)));",
       "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
       "marker": "YCS_Mod_Items",
-      "type": "java-marker"
-    },
-    {
-      "content": "import net.minecraft.world.entity.EquipmentSlotGroup;",
-      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
-      "marker": "YCS_Mod_Item_Imports",
-      "type": "java-marker"
-    },
-    {
-      "content": "import net.minecraft.world.entity.ai.attributes.AttributeModifier;",
-      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
-      "marker": "YCS_Mod_Item_Imports",
-      "type": "java-marker"
-    },
-    {
-      "content": "import net.minecraft.world.entity.ai.attributes.Attributes;",
-      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
-      "marker": "YCS_Mod_Item_Imports",
-      "type": "java-marker"
-    },
-    {
-      "content": "import net.minecraft.world.item.component.ItemAttributeModifiers;",
-      "file": "java/net/ye6isu/yebisuRPG/item/ModItems.java",
-      "marker": "YCS_Mod_Item_Imports",
       "type": "java-marker"
     },
     {
@@ -61,17 +37,14 @@
     }
   ],
   "attackDamage": null,
-  "attackSpeed": 6,
+  "attackSpeed": null,
   "canAlwaysEat": false,
   "compiledMethods": {
     "use": [
-      "if (player.isCrouching()) {",
-      "    if (!level.isClientSide()) { player.setDeltaMovement(0, 3, 0); player.hurtMarked = true; }",
-      "}"
+      "if (!level.isClientSide() && player instanceof Entity animEntity_843ca38e1547) { AnimationAPI.triggerThirdPersonAnimation(animEntity_843ca38e1547, \"test\", \"yebisurpg:animations/player.animation.json\", (float)(1)); }"
     ]
   },
   "creativeTab": "yebisurpg",
-  "customClass": false,
   "customMethods": [
     {
       "continuousUse": false,
@@ -79,57 +52,29 @@
         "content": {
           "connections": [
             {
-              "dataType": "entity",
-              "from": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
-              "fromPin": "output",
-              "id": "3831b316-ade1-487e-be55-dba4b7138253",
-              "to": "5fb453a0-39ca-44a5-84bf-c9e70fc79148",
-              "toPin": "input",
-              "type": "data"
-            },
-            {
-              "dataType": "entity",
-              "from": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
-              "fromPin": "output",
-              "id": "31a14683-a07c-4a29-bc81-4ca7907b8ba0",
-              "to": "1084d663-d2eb-49e7-b8c1-ec0efcca0c2e",
-              "toPin": "input",
-              "type": "data"
-            },
-            {
-              "dataType": "number",
               "from": "__method_start__",
               "fromPin": "output",
-              "id": "66e0ff2f-8bbe-4dfb-b008-dc5d4cd38cc6",
-              "to": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-              "toPin": "input",
-              "type": "flow"
-            },
-            {
-              "dataType": "number",
-              "from": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-              "fromPin": "if-0",
-              "id": "11c02359-fd2f-408c-9f27-01c1ec253aa0",
-              "to": "4d660e5f-db3b-4161-a28d-d606d2138b07",
+              "id": "6c65d3c8-7c81-4ffa-b806-bdd2bdbb77b9",
+              "to": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
               "toPin": "input",
               "type": "flow"
             },
             {
               "dataType": "entity",
-              "from": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
-              "fromPin": "output",
-              "id": "45d426e0-04cd-4f37-bcd7-fe4295fb94bc",
-              "to": "4d660e5f-db3b-4161-a28d-d606d2138b07",
-              "toPin": "entity",
+              "from": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
+              "fromPin": "entity",
+              "id": "22f65d18-e556-4aa6-bbfe-dda78e803a54",
+              "to": "6fd739e9-077d-4f1c-b9ca-5278504cf2b7",
+              "toPin": "output",
               "type": "data"
             },
             {
-              "dataType": "boolean",
-              "from": "1084d663-d2eb-49e7-b8c1-ec0efcca0c2e",
+              "dataType": "entity",
+              "from": "6fd739e9-077d-4f1c-b9ca-5278504cf2b7",
               "fromPin": "output",
-              "id": "6858db52-7d65-4a1c-b6ec-86fdd2353451",
-              "to": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-              "toPin": "condition",
+              "id": "8142af10-7eb0-4525-ba12-0d1f864e636f",
+              "to": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
+              "toPin": "entity",
               "type": "data"
             }
           ],
@@ -137,7 +82,7 @@
             {
               "color": "#7a7a7a",
               "id": "__method_start__",
-              "layer": 40,
+              "layer": 96,
               "start": true,
               "values": {},
               "x": 24,
@@ -145,71 +90,34 @@
             },
             {
               "color": "#30e1b9",
-              "id": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
+              "id": "6fd739e9-077d-4f1c-b9ca-5278504cf2b7",
               "kind": "entity.context",
-              "layer": 154,
+              "layer": 103,
               "opcode": "entity.event",
               "settings": {},
               "value": "entity.event",
               "values": {},
-              "x": 15.946767552536809,
-              "y": 144.06942913127
+              "x": 34.728978850899566,
+              "y": 119.0751818575816
             },
             {
-              "color": "#4d65b4",
-              "id": "5fb453a0-39ca-44a5-84bf-c9e70fc79148",
-              "kind": "entity.look_dir",
-              "layer": 161,
-              "opcode": "entity.look_dir",
-              "settings": {},
-              "values": {},
-              "x": 339.1764894077963,
-              "y": 208.02224133606796
-            },
-            {
-              "color": "#6494a4",
-              "conditionCount": 1,
-              "id": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-              "kind": "control.if",
-              "layer": 158,
-              "opcode": "control.if",
+              "color": "#3a7a40",
+              "id": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
+              "kind": "anim.thirdperson.play",
+              "layer": 106,
+              "opcode": "anim.thirdperson.play",
               "settings": {
-                "elseIfCount": 0,
-                "hasElse": false
+                "animName": "test",
+                "filePath": "yebisurpg:animations/player.animation.json",
+                "speed": "1.0"
               },
-              "values": {},
-              "x": 383.0256151759409,
-              "y": 23.668070132735316
-            },
-            {
-              "color": "#6494a4",
-              "id": "1084d663-d2eb-49e7-b8c1-ec0efcca0c2e",
-              "kind": "entity.is_crouching",
-              "layer": 157,
-              "opcode": "entity.is_crouching",
-              "settings": {},
-              "values": {},
-              "x": 234.2302677792643,
-              "y": 84.94389493266277
-            },
-            {
-              "color": "#c46c94",
-              "id": "4d660e5f-db3b-4161-a28d-d606d2138b07",
-              "kind": "entity.apply_motion",
-              "layer": 160,
-              "opcode": "entity.apply_motion",
-              "settings": {
-                "mode": "add"
-              },
-              "value": "0",
               "values": {
-                "entity": "",
-                "mode": "set",
-                "y": "3",
-                "z": "0"
+                "animName": "test",
+                "filePath": "yebisurpg:animations/player.animation.json",
+                "speed": "1.0"
               },
-              "x": 537.034189674049,
-              "y": 24.134001876162728
+              "x": 426.5518253122938,
+              "y": 17.317608825174034
             }
           ]
         },
@@ -221,57 +129,29 @@
           "content": {
             "connections": [
               {
-                "dataType": "entity",
-                "from": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
-                "fromPin": "output",
-                "id": "3831b316-ade1-487e-be55-dba4b7138253",
-                "to": "5fb453a0-39ca-44a5-84bf-c9e70fc79148",
-                "toPin": "input",
-                "type": "data"
-              },
-              {
-                "dataType": "entity",
-                "from": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
-                "fromPin": "output",
-                "id": "31a14683-a07c-4a29-bc81-4ca7907b8ba0",
-                "to": "1084d663-d2eb-49e7-b8c1-ec0efcca0c2e",
-                "toPin": "input",
-                "type": "data"
-              },
-              {
-                "dataType": "number",
                 "from": "__method_start__",
                 "fromPin": "output",
-                "id": "66e0ff2f-8bbe-4dfb-b008-dc5d4cd38cc6",
-                "to": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-                "toPin": "input",
-                "type": "flow"
-              },
-              {
-                "dataType": "number",
-                "from": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-                "fromPin": "if-0",
-                "id": "11c02359-fd2f-408c-9f27-01c1ec253aa0",
-                "to": "4d660e5f-db3b-4161-a28d-d606d2138b07",
+                "id": "6c65d3c8-7c81-4ffa-b806-bdd2bdbb77b9",
+                "to": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
                 "toPin": "input",
                 "type": "flow"
               },
               {
                 "dataType": "entity",
-                "from": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
-                "fromPin": "output",
-                "id": "45d426e0-04cd-4f37-bcd7-fe4295fb94bc",
-                "to": "4d660e5f-db3b-4161-a28d-d606d2138b07",
-                "toPin": "entity",
+                "from": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
+                "fromPin": "entity",
+                "id": "22f65d18-e556-4aa6-bbfe-dda78e803a54",
+                "to": "6fd739e9-077d-4f1c-b9ca-5278504cf2b7",
+                "toPin": "output",
                 "type": "data"
               },
               {
-                "dataType": "boolean",
-                "from": "1084d663-d2eb-49e7-b8c1-ec0efcca0c2e",
+                "dataType": "entity",
+                "from": "6fd739e9-077d-4f1c-b9ca-5278504cf2b7",
                 "fromPin": "output",
-                "id": "6858db52-7d65-4a1c-b6ec-86fdd2353451",
-                "to": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-                "toPin": "condition",
+                "id": "8142af10-7eb0-4525-ba12-0d1f864e636f",
+                "to": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
+                "toPin": "entity",
                 "type": "data"
               }
             ],
@@ -279,7 +159,7 @@
               {
                 "color": "#7a7a7a",
                 "id": "__method_start__",
-                "layer": 40,
+                "layer": 96,
                 "start": true,
                 "values": {},
                 "x": 24,
@@ -287,71 +167,34 @@
               },
               {
                 "color": "#30e1b9",
-                "id": "e2bc4895-4bb0-46e0-98cb-fa8e101a5775",
+                "id": "6fd739e9-077d-4f1c-b9ca-5278504cf2b7",
                 "kind": "entity.context",
-                "layer": 154,
+                "layer": 103,
                 "opcode": "entity.event",
                 "settings": {},
                 "value": "entity.event",
                 "values": {},
-                "x": 15.946767552536809,
-                "y": 144.06942913127
+                "x": 34.728978850899566,
+                "y": 119.0751818575816
               },
               {
-                "color": "#4d65b4",
-                "id": "5fb453a0-39ca-44a5-84bf-c9e70fc79148",
-                "kind": "entity.look_dir",
-                "layer": 161,
-                "opcode": "entity.look_dir",
-                "settings": {},
-                "values": {},
-                "x": 339.1764894077963,
-                "y": 208.02224133606796
-              },
-              {
-                "color": "#6494a4",
-                "conditionCount": 1,
-                "id": "4fbaf7bb-72cd-40d1-9270-5fbcaffc01a1",
-                "kind": "control.if",
-                "layer": 158,
-                "opcode": "control.if",
+                "color": "#3a7a40",
+                "id": "2c1fee59-e206-4e9f-b7dc-843ca38e1547",
+                "kind": "anim.thirdperson.play",
+                "layer": 106,
+                "opcode": "anim.thirdperson.play",
                 "settings": {
-                  "elseIfCount": 0,
-                  "hasElse": false
+                  "animName": "test",
+                  "filePath": "yebisurpg:animations/player.animation.json",
+                  "speed": "1.0"
                 },
-                "values": {},
-                "x": 383.0256151759409,
-                "y": 23.668070132735316
-              },
-              {
-                "color": "#6494a4",
-                "id": "1084d663-d2eb-49e7-b8c1-ec0efcca0c2e",
-                "kind": "entity.is_crouching",
-                "layer": 157,
-                "opcode": "entity.is_crouching",
-                "settings": {},
-                "values": {},
-                "x": 234.2302677792643,
-                "y": 84.94389493266277
-              },
-              {
-                "color": "#c46c94",
-                "id": "4d660e5f-db3b-4161-a28d-d606d2138b07",
-                "kind": "entity.apply_motion",
-                "layer": 160,
-                "opcode": "entity.apply_motion",
-                "settings": {
-                  "mode": "add"
-                },
-                "value": "0",
                 "values": {
-                  "entity": "",
-                  "mode": "set",
-                  "y": "3",
-                  "z": "0"
+                  "animName": "test",
+                  "filePath": "yebisurpg:animations/player.animation.json",
+                  "speed": "1.0"
                 },
-                "x": 537.034189674049,
-                "y": 24.134001876162728
+                "x": 426.5518253122938,
+                "y": 17.317608825174034
               }
             ]
           },
@@ -367,7 +210,7 @@
   "dataComponents": [],
   "displayModel": "",
   "displayModelData": null,
-  "displayName": "yebisu",
+  "displayName": "Cat",
   "enabledMethods": [
     "use"
   ],
@@ -378,14 +221,14 @@
   "geoModel": "",
   "geoModelData": null,
   "geoTexture": "",
-  "holdingMode": "generated",
+  "holdingMode": "handheld",
   "id": "cat",
   "itemAbilitiesEnabled": false,
   "itemAbilitySlots": [],
   "nutrition": 4,
   "recipes": [],
   "saturation": 0.3,
-  "stackSize": 32,
+  "stackSize": 1,
   "states": [],
   "tags": [],
   "texture": "mrow",

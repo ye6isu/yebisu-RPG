@@ -23,8 +23,7 @@ public final class AbilityRegistry {
     }
 
     static {
-        AbilityRegistry.register("woop", "placehold_ability_2", 1, java.util.Map.ofEntries(java.util.Map.entry("stamina", 1.0)));
-        AbilityRegistry.register("wap", "placehold_ability", 1, java.util.Map.of());
+        AbilityRegistry.register("lol", "test_texture", 1, java.util.Map.of());
         // YCS_Abilities
     }
 }

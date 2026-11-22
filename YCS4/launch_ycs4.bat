@@ -51,6 +51,10 @@ if not defined NPM_CMD (
 
 set "PATH=%NODE_DIR%;%CARGO_DIR%;%PATH%"
 
+set "TEMURIN_JDK=%USERPROFILE%\.jdks\temurin-21.0.12.1"
+if not defined JAVA_HOME if exist "%TEMURIN_JDK%\bin\java.exe" set "JAVA_HOME=%TEMURIN_JDK%"
+if defined JAVA_HOME set "PATH=%JAVA_HOME%\bin;%PATH%"
+
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VS_INSTALL="
 if exist "%VSWHERE%" (

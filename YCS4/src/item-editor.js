@@ -643,6 +643,12 @@ export const initializeItemEditorPage = ({
           : [`if (!level.isClientSide()) { ${entityValue}.push(${inputValue(node, 'x')}, ${inputValue(node, 'y')}, ${inputValue(node, 'z')}); }`];
       } else if (node.kind === 'projectile.fire') {
         lines = [`ProjectileUtil.fire(${entityInput('entity')}, "minecraft:arrow", ${inputValue(node, 'x')}, ${inputValue(node, 'y')}, ${inputValue(node, 'z')}, (float)(${inputValue(node, 'power', '1.5')}));`];
+      } else if (node.kind === 'anim.thirdperson.play') {
+        const animEntity = entityInput('entity');
+        const animName = inputValue(node, 'animName', '"test"');
+        const filePath = inputValue(node, 'filePath', '"yebisurpg:animations/player.animation.json"');
+        const speed = inputValue(node, 'speed', '1.0');
+        lines = [`if (!level.isClientSide() && ${animEntity} instanceof Entity animEntity_${suffix}) { AnimationAPI.triggerThirdPersonAnimation(animEntity_${suffix}, ${animName}, ${filePath}, (float)(${speed})); }`];
       } else if (node.kind === 'entity.dash') {
         const easing = ['LINEAR', 'EASE_IN', 'EASE_OUT', 'EASE_IN_OUT'].includes(node.values?.easing)
           ? node.values.easing
@@ -3205,5 +3211,11 @@ export const initializeItemEditorPage = ({
     }
   });
 
-  return { addItemWorkspace, closeSavedItemWorkspaces, closeDropdowns };
+  return {
+    addItemWorkspace,
+    closeSavedItemWorkspaces,
+    closeDropdowns,
+    openCustomMethodEditor,
+    compileMethodGraph,
+  };
 };

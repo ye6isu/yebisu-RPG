@@ -1019,7 +1019,7 @@ fn build_custom_item_class(id: &str, authored: &Map<String, Value>) -> Result<Op
     } else {
         format!("    public {}(Properties properties) {{ super(properties); }}", class_name)
     };
-    let source = format!("package net.ye6isu.yebisuRPG.item.custom;\n\nimport java.util.List;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.world.InteractionHand;\nimport net.minecraft.world.InteractionResult;\nimport net.minecraft.world.InteractionResultHolder;\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.effect.MobEffects;\nimport net.minecraft.world.entity.Entity;\nimport net.minecraft.world.entity.LivingEntity;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.Item.TooltipContext;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.Tier;\nimport net.minecraft.world.item.TooltipFlag;\nimport net.minecraft.world.item.UseAnim;\nimport net.minecraft.world.item.{};\nimport net.minecraft.world.level.Level;\nimport net.ye6isu.yebisuRPG.util.DashUtil;\nimport net.ye6isu.yebisuRPG.util.ProjectileUtil;\n\npublic class {} extends {} {{\n{}\n{} }}\n", base_class, class_name, base_class, constructor, methods);
+    let source = format!("package net.ye6isu.yebisuRPG.item.custom;\n\nimport java.util.List;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.world.InteractionHand;\nimport net.minecraft.world.InteractionResult;\nimport net.minecraft.world.InteractionResultHolder;\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.effect.MobEffects;\nimport net.minecraft.world.entity.Entity;\nimport net.minecraft.world.entity.LivingEntity;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.Item.TooltipContext;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.Tier;\nimport net.minecraft.world.item.TooltipFlag;\nimport net.minecraft.world.item.UseAnim;\nimport net.minecraft.world.item.{};\nimport net.minecraft.world.level.Level;\nimport net.ye6isu.yebisuRPG.animation.AnimationAPI;\nimport net.ye6isu.yebisuRPG.util.DashUtil;\nimport net.ye6isu.yebisuRPG.util.ProjectileUtil;\n\npublic class {} extends {} {{\n{}\n{} }}\n", base_class, class_name, base_class, constructor, methods);
     Ok(Some((class_name, source)))
 }
 
@@ -1108,6 +1108,114 @@ fn build_basic_item_registration(id: &str, stack_size: u32, authored: &Map<Strin
     imports.sort(); imports.dedup();
     let registered_type = if tool_enabled { base_class } else { "Item" };
     Ok((format!("    public static final DeferredItem<{}> {} = ITEMS.register(\"{}\",\n            () -> {});", registered_type, constant, id, constructor), imports))
+}
+
+#[tauri::command]
+fn save_ability_definition(
+    id: &str,
+    last_saved_id: Option<String>,
+    title: &str,
+    icon: &str,
+    cooldown: f64,
+    costs: Value,
+    dispatch_code: Option<String>,
+) -> Result<String, String> {
+    validate_texture_id(id)?;
+    let previous_id = last_saved_id.as_deref().filter(|v| !v.is_empty()).unwrap_or(id);
+    let abilities_dir = ycs_data_dir().join("abilities");
+    fs::create_dir_all(&abilities_dir).map_err(|e| e.to_string())?;
+
+    let prev_path = abilities_dir.join(format!("{}.json", previous_id));
+    let mut prev_data: Value = if prev_path.is_file() {
+        serde_json::from_str(&fs::read_to_string(&prev_path).map_err(|e| e.to_string())?).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    };
+
+    remove_item_injections(&prev_data)?;
+    if previous_id != id && prev_path.is_file() {
+        let _ = fs::remove_file(&prev_path);
+    }
+
+    let mut injections = Vec::<Value>::new();
+
+    // 1. Registry line in AbilityRegistry.java
+    let costs_map_str = if let Some(map) = costs.as_object() {
+        if map.is_empty() {
+            "java.util.Map.of()".to_string()
+        } else {
+            let entries: Vec<String> = map
+                .iter()
+                .map(|(k, v)| format!("java.util.Map.entry(\"{}\", {}d)", k, v.as_f64().unwrap_or(0.0)))
+                .collect();
+            format!("java.util.Map.ofEntries({})", entries.join(", "))
+        }
+    } else {
+        "java.util.Map.of()".to_string()
+    };
+
+    let registry_file = "java/net/ye6isu/yebisuRPG/keybind/AbilityRegistry.java";
+    let registry_line = format!(
+        "        AbilityRegistry.register(\"{}\", \"{}\", {}, {});",
+        id, icon, cooldown, costs_map_str
+    );
+    inject_marker_content(registry_file, "YCS_Abilities", &registry_line)?;
+    injections.push(json!({
+        "type": "java-marker", "file": registry_file, "marker": "YCS_Abilities", "content": registry_line
+    }));
+
+    // 2. Icon copy to resources/assets/yebisurpg/textures/hud/<icon>.png if icon exists
+    if !icon.is_empty() {
+        let hud_dest = format!("resources/assets/yebisurpg/textures/hud/{}.png", icon);
+        if let Ok(Some((_, data))) = read_texture_sidecar(&ycs_data_dir().join("textures"), icon) {
+            let target_path = safe_source_path(&hud_dest)?;
+            if let Some(parent) = target_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            if fs::write(target_path, data).is_ok() {
+                injections.push(json!({ "type": "created-file", "file": hud_dest }));
+            }
+        }
+    }
+
+    // 3. Dispatch line in AbilityHandlers.java
+    let handler_file = "java/net/ye6isu/yebisuRPG/keybind/AbilityHandlers.java";
+    let code_body = dispatch_code.unwrap_or_default();
+    let dispatch_line = format!("            case \"{}\" -> {{ {} }}", id, code_body.trim());
+    inject_marker_content(handler_file, "YCS_Ability_Use_Dispatch", &dispatch_line)?;
+    injections.push(json!({
+        "type": "java-marker", "file": handler_file, "marker": "YCS_Ability_Use_Dispatch", "content": dispatch_line
+    }));
+
+    let ability_json = json!({
+        "name": id,
+        "titleText": title,
+        "icon": icon,
+        "cooldownSeconds": cooldown,
+        "resourceCosts": costs,
+        "dispatchCode": code_body,
+        "_injections": injections
+    });
+
+    let current_path = abilities_dir.join(format!("{}.json", id));
+    fs::write(&current_path, serde_json::to_string_pretty(&ability_json).map_err(|e| e.to_string())?)
+        .map_err(|e| format!("Failed to save ability: {}", e))?;
+
+    Ok(format!("Saved ability {}", id))
+}
+
+#[tauri::command]
+fn delete_ability_definition(id: &str) -> Result<String, String> {
+    validate_texture_id(id)?;
+    let ability_path = ycs_data_dir().join("abilities").join(format!("{}.json", id));
+    if !ability_path.is_file() {
+        return Ok(format!("Ability {} is already removed", id));
+    }
+    let data: Value = serde_json::from_str(&fs::read_to_string(&ability_path).map_err(|e| e.to_string())?)
+        .map_err(|e| format!("Invalid Ability JSON: {}", e))?;
+    remove_item_injections(&data)?;
+    fs::remove_file(ability_path).map_err(|e| format!("Failed to remove Ability JSON: {}", e))?;
+    Ok(format!("Removed ability {} and its injections", id))
 }
 
 #[tauri::command]
@@ -1385,6 +1493,24 @@ fn delete_basic_item(id: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn import_animation_asset(file_name: &str, content: String) -> Result<String, String> {
+    if file_name.is_empty() || file_name.contains("..") || file_name.contains('/') || file_name.contains('\\') {
+        return Err("Invalid animation file name".to_string());
+    }
+    let sanitized_name = if file_name.ends_with(".animation.json") || file_name.ends_with(".json") {
+        file_name.to_string()
+    } else {
+        format!("{}.animation.json", file_name)
+    };
+
+    let target_dir = source_root().join("resources/assets/yebisurpg/animations");
+    fs::create_dir_all(&target_dir).map_err(|e| format!("Failed to create animations folder: {}", e))?;
+    let target_path = target_dir.join(&sanitized_name);
+    fs::write(&target_path, content).map_err(|e| format!("Failed to write animation file: {}", e))?;
+    Ok(format!("yebisurpg:animations/{}", sanitized_name))
+}
+
+#[tauri::command]
 fn save_texture_bundle(
     id: &str,
     metadata: &str,
@@ -1489,7 +1615,10 @@ pub fn run() {
                 delete_texture_bundle,
               delete_basic_item,
               save_basic_item,
+              save_ability_definition,
+              delete_ability_definition,
               save_texture_bundle,
+            import_animation_asset,
             toggle_gradle_task,
             gradle_task_snapshot,
         ])
