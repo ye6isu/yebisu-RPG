@@ -82,6 +82,7 @@ CLAUDE.md
 .agents/
 .tmp-src/
 uploaded/
+INTERVIEW_WALKTHROUGH.md
 
 # ============================================================
 # YCS4 Build Artifacts
